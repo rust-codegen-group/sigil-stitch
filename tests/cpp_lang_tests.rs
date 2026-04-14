@@ -12,10 +12,7 @@ fn test_cpp_includes() {
     let myclass = TypeName::<CppLang>::importable("./myclass.hpp", "MyClass");
 
     let mut b = CodeBlock::<CppLang>::builder();
-    b.add_statement(
-        "%T << %S",
-        (cout, StringLitArg("hello".to_string())),
-    );
+    b.add_statement("%T << %S", (cout, StringLitArg("hello".to_string())));
     b.add_statement("%T v", (vector,));
     b.add_statement("%T obj", (myclass,));
     let block = b.build().unwrap();

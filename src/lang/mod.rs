@@ -1,6 +1,7 @@
 pub mod c_lang;
 pub mod cpp_lang;
 pub mod go_lang;
+pub mod javascript;
 pub mod python;
 pub mod rust_lang;
 pub mod typescript;

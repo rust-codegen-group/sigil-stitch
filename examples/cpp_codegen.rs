@@ -107,11 +107,9 @@ fn main() {
     priv_section.add("private:", ());
     priv_section.add_line();
     priv_section.add("%>", ());
-    let name_field =
-        FieldSpec::builder("name_", TypeName::primitive("std::string")).build();
+    let name_field = FieldSpec::builder("name_", TypeName::primitive("std::string")).build();
     priv_section.add_code(emit_field(&name_field));
-    let level_field =
-        FieldSpec::builder("level_", TypeName::primitive("LogLevel")).build();
+    let level_field = FieldSpec::builder("level_", TypeName::primitive("LogLevel")).build();
     priv_section.add_code(emit_field(&level_field));
     console_b.extra_member(priv_section.build().unwrap());
 
@@ -124,11 +122,8 @@ fn main() {
     pub_section2.add("%>", ());
 
     // Constructor
-    let ctor_body = CodeBlock::<CppLang>::of(
-        "name_ = name;\nlevel_ = LogLevel::Info;",
-        (),
-    )
-    .unwrap();
+    let ctor_body =
+        CodeBlock::<CppLang>::of("name_ = name;\nlevel_ = LogLevel::Info;", ()).unwrap();
     let mut ctor = FunSpec::<CppLang>::builder("ConsoleLogger");
     ctor.add_param(ParameterSpec::new(
         "name",

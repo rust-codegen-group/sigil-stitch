@@ -207,8 +207,7 @@ fn test_cpp_template_class() {
     priv_section.add("private:", ());
     priv_section.add_line();
     priv_section.add("%>", ());
-    let field =
-        FieldSpec::builder("data_", TypeName::primitive("std::vector<T>")).build();
+    let field = FieldSpec::builder("data_", TypeName::primitive("std::vector<T>")).build();
     priv_section.add_code(emit_field(&field));
     tb.extra_member(priv_section.build().unwrap());
 
@@ -329,8 +328,7 @@ fn test_cpp_full_header() {
     priv_section.add("private:", ());
     priv_section.add_line();
     priv_section.add("%>", ());
-    let field =
-        FieldSpec::builder("name_", TypeName::primitive("std::string")).build();
+    let field = FieldSpec::builder("name_", TypeName::primitive("std::string")).build();
     priv_section.add_code(emit_field(&field));
     tb.extra_member(priv_section.build().unwrap());
 
