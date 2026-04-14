@@ -1,5 +1,6 @@
 pub mod c_lang;
 pub mod cpp_lang;
+pub mod dart;
 pub mod go_lang;
 pub mod java_lang;
 pub mod javascript;
