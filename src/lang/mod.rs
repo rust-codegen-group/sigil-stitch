@@ -6,6 +6,7 @@ pub mod javascript;
 pub mod kotlin;
 pub mod python;
 pub mod rust_lang;
+pub mod swift;
 pub mod typescript;
 
 use crate::import::ImportGroup;
