@@ -7,6 +7,7 @@ use crate::spec::fun_spec::FunSpec;
 use crate::spec::import_spec::ImportSpec;
 use crate::spec::modifiers::DeclarationContext;
 use crate::spec::type_spec::TypeSpec;
+use crate::type_name::TypeName;
 
 /// A member of a file.
 #[derive(Debug, Clone)]
@@ -15,6 +16,17 @@ pub enum FileMember<L: CodeLang> {
     Code(CodeBlock<L>),
     /// Raw content string (escape hatch, no import tracking).
     RawContent(String),
+    /// Raw content string with associated types for import tracking.
+    ///
+    /// Content is emitted verbatim; types are walked for import collection only.
+    /// The caller is responsible for ensuring type names in the raw content match
+    /// what the import resolver will emit.
+    RawContentWithImports {
+        /// The raw content to emit verbatim.
+        content: String,
+        /// Types to register for import collection.
+        types: Vec<TypeName<L>>,
+    },
     /// A type declaration (struct, class, interface, trait, enum).
     Type(TypeSpec<L>),
     /// A top-level function.
@@ -75,6 +87,10 @@ impl<L: CodeLang> FileSpec<L> {
         enum Materialized<L: CodeLang> {
             Blocks(Vec<CodeBlock<L>>),
             Raw(String),
+            RawWithImports {
+                content: String,
+                types: Vec<TypeName<L>>,
+            },
         }
 
         let materialized: Vec<Materialized<L>> = self
@@ -83,6 +99,12 @@ impl<L: CodeLang> FileSpec<L> {
             .map(|m| match m {
                 FileMember::Code(b) => Materialized::Blocks(vec![b.clone()]),
                 FileMember::RawContent(s) => Materialized::Raw(s.clone()),
+                FileMember::RawContentWithImports { content, types } => {
+                    Materialized::RawWithImports {
+                        content: content.clone(),
+                        types: types.clone(),
+                    }
+                }
                 FileMember::Type(spec) => Materialized::Blocks(spec.emit(&self.lang)),
                 FileMember::Fun(spec) => {
                     Materialized::Blocks(vec![spec.emit(&self.lang, DeclarationContext::TopLevel)])
@@ -98,10 +120,18 @@ impl<L: CodeLang> FileSpec<L> {
         }
 
         for mat in &materialized {
-            if let Materialized::Blocks(blocks) = mat {
-                for block in blocks {
-                    import_refs.extend(import_collector::collect_imports(block));
+            match mat {
+                Materialized::Blocks(blocks) => {
+                    for block in blocks {
+                        import_refs.extend(import_collector::collect_imports(block));
+                    }
                 }
+                Materialized::RawWithImports { types, .. } => {
+                    for ty in types {
+                        ty.collect_imports(&mut import_refs);
+                    }
+                }
+                Materialized::Raw(_) => {}
             }
         }
 
@@ -163,6 +193,12 @@ impl<L: CodeLang> FileSpec<L> {
                         output.push('\n');
                     }
                 }
+                Materialized::RawWithImports { content, .. } => {
+                    output.push_str(content);
+                    if !content.ends_with('\n') {
+                        output.push('\n');
+                    }
+                }
             }
         }
 
@@ -197,6 +233,18 @@ impl<L: CodeLang> FileSpecBuilder<L> {
     pub fn add_raw(&mut self, content: &str) -> &mut Self {
         self.members
             .push(FileMember::RawContent(content.to_string()));
+        self
+    }
+
+    /// Add raw content with associated types for import tracking.
+    ///
+    /// The content is emitted verbatim (no substitution). The types are walked
+    /// during import collection so the correct import statements are generated.
+    pub fn add_raw_with_imports(&mut self, content: &str, types: Vec<TypeName<L>>) -> &mut Self {
+        self.members.push(FileMember::RawContentWithImports {
+            content: content.to_string(),
+            types,
+        });
         self
     }
 

@@ -44,6 +44,7 @@
 
 pub mod code_block;
 pub mod code_renderer;
+pub mod code_template;
 pub mod import;
 pub mod import_collector;
 pub mod lang;
@@ -54,6 +55,7 @@ pub mod type_name;
 /// Common re-exports for convenient usage.
 pub mod prelude {
     pub use crate::code_block::{CodeBlock, CodeBlockBuilder};
+    pub use crate::code_template::{CodeTemplate, ParamKind};
     pub use crate::lang::CodeLang;
     pub use crate::spec::field_spec::FieldSpec;
     pub use crate::spec::file_spec::FileSpec;
