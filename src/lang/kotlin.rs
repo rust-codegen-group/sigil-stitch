@@ -48,9 +48,25 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 ///
 /// # Primary constructors
 ///
-/// Not directly supported yet. Use `extra_member` or raw code:
+/// Use `add_primary_constructor_param()` on `TypeSpecBuilder`:
 /// ```ignore
-/// tb.extra_member(CodeBlock::<Kotlin>::of("(val name: String, val age: Int)", ()).unwrap());
+/// let mut tb = TypeSpec::<Kotlin>::builder("Person", TypeKind::Class);
+/// tb.add_primary_constructor_param(ParameterSpec::new("val name", TypeName::primitive("String")));
+/// tb.add_primary_constructor_param(ParameterSpec::new("val age", TypeName::primitive("Int")));
+/// // Emits: class Person(val name: String, val age: Int) {
+/// ```
+///
+/// # Secondary constructor delegation
+///
+/// Use `delegation()` on `FunSpecBuilder` for `super(...)` / `this(...)` calls.
+/// Kotlin places delegation in the signature (after params, before body):
+/// ```ignore
+/// let mut ctor = FunSpec::<Kotlin>::builder("constructor");
+/// ctor.is_constructor();
+/// ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+/// ctor.delegation(CodeBlock::of("this(name, 0)", ()).unwrap());
+/// ctor.body(CodeBlock::of("// secondary", ()).unwrap());
+/// // Emits: constructor(name: String) : this(name, 0) { ... }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Kotlin {
@@ -317,6 +333,16 @@ impl CodeLang for Kotlin {
 
     fn property_getter_keyword(&self) -> &str {
         "get()"
+    }
+
+    fn constructor_delegation_style(
+        &self,
+    ) -> crate::spec::modifiers::ConstructorDelegationStyle {
+        crate::spec::modifiers::ConstructorDelegationStyle::Signature
+    }
+
+    fn supports_primary_constructor(&self) -> bool {
+        true
     }
 }
 

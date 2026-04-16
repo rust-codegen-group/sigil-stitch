@@ -3,7 +3,7 @@
 use crate::code_block::{Arg, CodeBlock};
 use crate::lang::CodeLang;
 use crate::spec::annotation_spec::AnnotationSpec;
-use crate::spec::modifiers::{DeclarationContext, Modifiers, Visibility};
+use crate::spec::modifiers::{ConstructorDelegationStyle, DeclarationContext, Modifiers, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::type_name::TypeName;
 
@@ -81,6 +81,13 @@ pub struct FunSpec<L: CodeLang> {
     pub(crate) receiver: Option<ParameterSpec<L>>,
     /// Suffixes appended after the parameter list (e.g., C++: `const`, `override`, `= 0`).
     pub(crate) suffixes: Vec<String>,
+    /// Constructor delegation call (e.g., `super(arg1, arg2)` or `this(arg1)`).
+    ///
+    /// For body-style languages (TS, Java, Dart, Swift): emitted as the first
+    /// statement in the constructor body.
+    /// For signature-style languages (Kotlin): emitted after the parameter list
+    /// as ` : super(...)` / ` : this(...)`.
+    pub(crate) delegation: Option<CodeBlock<L>>,
 }
 
 impl<L: CodeLang> FunSpec<L> {
@@ -98,6 +105,7 @@ impl<L: CodeLang> FunSpec<L> {
             annotation_specs: Vec::new(),
             receiver: None,
             suffixes: Vec::new(),
+            delegation: None,
         }
     }
 
@@ -206,6 +214,19 @@ impl<L: CodeLang> FunSpec<L> {
             sig_args.push(Arg::TypeName(ret.clone()));
         }
 
+        // Constructor delegation — signature style (Kotlin: `constructor(x: Int) : this(x, 0)`).
+        let delegation_in_body = if let Some(deleg) = &self.delegation {
+            if lang.constructor_delegation_style() == ConstructorDelegationStyle::Signature {
+                sig.push_str(" : %L");
+                sig_args.push(Arg::Code(deleg.clone()));
+                false
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+
         // Body or abstract.
         if let Some(body) = &self.body {
             sig.push_str(lang.block_open());
@@ -218,6 +239,12 @@ impl<L: CodeLang> FunSpec<L> {
                 let doc_str = lang.render_doc_comment(&doc_lines);
                 cb.add("%L", doc_str);
                 cb.add_line();
+            }
+            // Constructor delegation — body style (TS/Java/Dart/Swift).
+            if delegation_in_body
+                && let Some(deleg) = &self.delegation
+            {
+                cb.add_statement("%L", deleg.clone());
             }
             cb.add_code(body.clone());
             cb.add_line();
@@ -241,6 +268,12 @@ impl<L: CodeLang> FunSpec<L> {
                     let doc_str = lang.render_doc_comment(&doc_lines);
                     cb.add("%L", doc_str);
                     cb.add_line();
+                }
+                // Constructor delegation — body style.
+                if delegation_in_body
+                    && let Some(deleg) = &self.delegation
+                {
+                    cb.add_statement("%L", deleg.clone());
                 }
                 cb.add_statement(empty, ());
                 cb.add("%<", ());
@@ -287,6 +320,7 @@ pub struct FunSpecBuilder<L: CodeLang> {
     annotation_specs: Vec<AnnotationSpec<L>>,
     receiver: Option<ParameterSpec<L>>,
     suffixes: Vec<String>,
+    delegation: Option<CodeBlock<L>>,
 }
 
 impl<L: CodeLang> FunSpecBuilder<L> {
@@ -380,6 +414,17 @@ impl<L: CodeLang> FunSpecBuilder<L> {
         self
     }
 
+    /// Set a constructor delegation call (e.g., `super(arg1, arg2)` or `this(arg1)`).
+    ///
+    /// For body-style languages (TS, JS, Java, Dart, Swift), this is emitted as
+    /// the first statement in the constructor body.
+    /// For signature-style languages (Kotlin), this appears after the parameter
+    /// list: `constructor(x: Int) : this(x, 0) { ... }`.
+    pub fn delegation(&mut self, call: CodeBlock<L>) -> &mut Self {
+        self.delegation = Some(call);
+        self
+    }
+
     /// Consume the builder and produce a [`FunSpec`].
     ///
     /// # Panics
@@ -402,6 +447,7 @@ impl<L: CodeLang> FunSpecBuilder<L> {
             annotation_specs: self.annotation_specs,
             receiver: self.receiver,
             suffixes: self.suffixes,
+            delegation: self.delegation,
         }
     }
 }

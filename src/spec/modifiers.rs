@@ -51,6 +51,17 @@ pub enum PropertyStyle {
     Field,
 }
 
+/// Where a constructor delegation call (`super(...)` / `this(...)`) is placed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstructorDelegationStyle {
+    /// Delegation is the first statement in the constructor body.
+    /// Used by TS, JS, Java, Dart, Swift, Python, C++.
+    Body,
+    /// Delegation appears between the parameter list and the body.
+    /// Used by Kotlin: `constructor(x: Int) : this(x, 0) { ... }`.
+    Signature,
+}
+
 /// Modifier flags for a declaration.
 #[derive(Debug, Clone, Default)]
 pub struct Modifiers {

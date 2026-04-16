@@ -282,6 +282,29 @@ pub trait CodeLang: Sized + Clone + 'static {
         ""
     }
 
+    /// Where a constructor delegation call (`super(...)` / `this(...)`) is placed.
+    ///
+    /// Default: `Body` — the delegation call is emitted as the first statement
+    /// in the constructor body (TS, JS, Java, Dart, Swift, Python, C++).
+    ///
+    /// Kotlin overrides to `Signature` — the delegation call appears between the
+    /// parameter list and the body: `constructor(x: Int) : this(x, 0) { ... }`.
+    fn constructor_delegation_style(
+        &self,
+    ) -> crate::spec::modifiers::ConstructorDelegationStyle {
+        crate::spec::modifiers::ConstructorDelegationStyle::Body
+    }
+
+    /// Whether this language supports primary constructors on type declarations.
+    ///
+    /// When true, `TypeSpec` will render primary constructor parameters after the
+    /// type name: `class Foo(val x: Int, val y: String)`.
+    ///
+    /// Default: `false`. Kotlin overrides to `true`.
+    fn supports_primary_constructor(&self) -> bool {
+        false
+    }
+
     // --- Phase 3: property support ---
 
     /// How `PropertySpec` renders: accessor methods or inline field body.

@@ -7,6 +7,7 @@ use crate::spec::enum_variant_spec::EnumVariantSpec;
 use crate::spec::field_spec::FieldSpec;
 use crate::spec::fun_spec::{FunSpec, TypeParamSpec, render_type_params};
 use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
+use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::property_spec::PropertySpec;
 use crate::type_name::TypeName;
 
@@ -27,6 +28,8 @@ pub struct TypeSpec<L: CodeLang> {
     pub(crate) annotation_specs: Vec<AnnotationSpec<L>>,
     pub(crate) extra_members: Vec<CodeBlock<L>>,
     pub(crate) variants: Vec<EnumVariantSpec<L>>,
+    /// Primary constructor parameters (Kotlin: `class Foo(val x: Int, val y: String)`).
+    pub(crate) primary_constructor: Vec<ParameterSpec<L>>,
 }
 
 impl<L: CodeLang> TypeSpec<L> {
@@ -47,6 +50,7 @@ impl<L: CodeLang> TypeSpec<L> {
             annotation_specs: Vec::new(),
             extra_members: Vec::new(),
             variants: Vec::new(),
+            primary_constructor: Vec::new(),
         }
     }
 
@@ -354,7 +358,7 @@ impl<L: CodeLang> TypeSpec<L> {
         }
     }
 
-    /// Emit the type header line: `{vis}{keyword} {name}<params>{extends}{implements} {`.
+    /// Emit the type header line: `{vis}{keyword} {name}<params>(primary ctor){extends}{implements} {`.
     fn emit_header(&self, cb: &mut CodeBlockBuilder<L>, lang: &L) {
         let vis = lang.render_visibility(self.modifiers.visibility, DeclarationContext::TopLevel);
         let kw = lang.type_keyword(self.kind);
@@ -373,6 +377,15 @@ impl<L: CodeLang> TypeSpec<L> {
         // Type parameters.
         let tp_str = render_type_params(&self.type_params, lang, &mut args);
         fmt.push_str(&tp_str);
+
+        // Primary constructor parameters (Kotlin: `class Foo(val x: Int, val y: String)`).
+        if !self.primary_constructor.is_empty() && lang.supports_primary_constructor() {
+            fmt.push('(');
+            fmt.push_str("%L");
+            let params_block = self.build_primary_constructor_block(lang);
+            args.push(Arg::Code(params_block));
+            fmt.push(')');
+        }
 
         // Super types (extends).
         if !self.super_types.is_empty() {
@@ -424,6 +437,18 @@ impl<L: CodeLang> TypeSpec<L> {
         cb.add(&fmt, args);
         cb.add_line();
     }
+
+    /// Build a CodeBlock for primary constructor parameters.
+    fn build_primary_constructor_block(&self, lang: &L) -> CodeBlock<L> {
+        let mut pb = CodeBlock::<L>::builder();
+        for (i, param) in self.primary_constructor.iter().enumerate() {
+            if i > 0 {
+                pb.add(",%W", ());
+            }
+            param.emit_into(&mut pb, lang);
+        }
+        pb.build().unwrap()
+    }
 }
 
 /// Builder for [`TypeSpec`].
@@ -443,6 +468,7 @@ pub struct TypeSpecBuilder<L: CodeLang> {
     annotation_specs: Vec<AnnotationSpec<L>>,
     extra_members: Vec<CodeBlock<L>>,
     variants: Vec<EnumVariantSpec<L>>,
+    primary_constructor: Vec<ParameterSpec<L>>,
 }
 
 impl<L: CodeLang> TypeSpecBuilder<L> {
@@ -524,6 +550,18 @@ impl<L: CodeLang> TypeSpecBuilder<L> {
         self
     }
 
+    /// Add a primary constructor parameter.
+    ///
+    /// When the language supports primary constructors (`supports_primary_constructor()`),
+    /// these parameters are rendered in the type header after the name:
+    /// `class Foo(val x: Int, val y: String)`.
+    ///
+    /// For languages that don't support primary constructors, these are ignored.
+    pub fn add_primary_constructor_param(&mut self, param: ParameterSpec<L>) -> &mut Self {
+        self.primary_constructor.push(param);
+        self
+    }
+
     /// Consume the builder and produce a [`TypeSpec`].
     ///
     /// # Panics
@@ -550,6 +588,7 @@ impl<L: CodeLang> TypeSpecBuilder<L> {
             annotation_specs: self.annotation_specs,
             extra_members: self.extra_members,
             variants: self.variants,
+            primary_constructor: self.primary_constructor,
         }
     }
 }
