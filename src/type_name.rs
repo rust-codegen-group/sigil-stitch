@@ -18,6 +18,8 @@ pub enum TypeName<L: CodeLang> {
         name: String,
         /// Whether this is a type-only import.
         is_type_only: bool,
+        /// Optional preferred alias for this import (e.g., `Foo as Bar`).
+        alias: Option<String>,
     },
     /// A primitive/built-in type (no import needed).
     Primitive(String),
@@ -69,6 +71,7 @@ impl<L: CodeLang> TypeName<L> {
             module: module.to_string(),
             name: name.to_string(),
             is_type_only: false,
+            alias: None,
         }
     }
 
@@ -78,6 +81,7 @@ impl<L: CodeLang> TypeName<L> {
             module: module.to_string(),
             name: name.to_string(),
             is_type_only: true,
+            alias: None,
         }
     }
 
@@ -92,6 +96,22 @@ impl<L: CodeLang> TypeName<L> {
     /// is specified (e.g., Python's bare `self` parameter).
     pub fn is_empty(&self) -> bool {
         matches!(self, TypeName::Primitive(s) | TypeName::Raw(s) if s.is_empty())
+    }
+
+    /// Set a preferred import alias for this type name.
+    ///
+    /// When a TypeName has an alias, the import statement will use it
+    /// (e.g., `import { Foo as Bar }`) and `%T` rendering will emit the alias.
+    ///
+    /// Only affects `Importable` variants; other variants are returned unchanged.
+    pub fn with_alias(mut self, alias: &str) -> Self {
+        if let TypeName::Importable {
+            alias: ref mut a, ..
+        } = self
+        {
+            *a = Some(alias.to_string());
+        }
+        self
     }
 
     /// Create an array type.
@@ -171,11 +191,13 @@ impl<L: CodeLang> TypeName<L> {
                 module,
                 name,
                 is_type_only,
+                alias,
             } => {
                 out.push(ImportRef {
                     module: module.clone(),
                     name: name.clone(),
                     is_type_only: *is_type_only,
+                    alias: alias.clone(),
                 });
             }
             TypeName::Array(inner)
@@ -528,5 +550,41 @@ mod tests {
         t.collect_imports(&mut imports);
         assert!(imports.is_empty());
         assert_eq!(t.render(80, &identity_resolve), "any");
+    }
+
+    #[test]
+    fn test_with_alias_on_importable() {
+        let t = TypeName::<TypeScript>::importable("./models", "User").with_alias("MyUser");
+        // Verify the alias is stored correctly.
+        if let TypeName::Importable { alias, .. } = &t {
+            assert_eq!(alias.as_deref(), Some("MyUser"));
+        } else {
+            panic!("Expected Importable variant");
+        }
+    }
+
+    #[test]
+    fn test_with_alias_propagates_to_import_ref() {
+        let t = TypeName::<TypeScript>::importable("./models", "User").with_alias("MyUser");
+        let mut imports = Vec::new();
+        t.collect_imports(&mut imports);
+        assert_eq!(imports.len(), 1);
+        assert_eq!(imports[0].name, "User");
+        assert_eq!(imports[0].alias.as_deref(), Some("MyUser"));
+    }
+
+    #[test]
+    fn test_with_alias_noop_on_primitive() {
+        // with_alias on a non-Importable variant should be a no-op.
+        let t = TypeName::<TypeScript>::primitive("number").with_alias("MyNumber");
+        assert_eq!(t.render(80, &identity_resolve), "number");
+    }
+
+    #[test]
+    fn test_with_alias_renders_alias_name() {
+        let t = TypeName::<TypeScript>::importable("./models", "User").with_alias("MyUser");
+        // The resolve function should map to the alias.
+        let resolve = |_module: &str, _name: &str| "MyUser".to_string();
+        assert_eq!(t.render(80, &resolve), "MyUser");
     }
 }

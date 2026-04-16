@@ -427,4 +427,60 @@ mod tests {
     fn test_build_empty_filename_panics() {
         FileSpec::<TypeScript>::builder("").build();
     }
+
+    #[test]
+    fn test_aliased_type_in_codeblock() {
+        let user =
+            TypeName::<TypeScript>::importable("./models", "User").with_alias("UserModel");
+
+        let mut b = CodeBlock::<TypeScript>::builder();
+        b.add_statement("const u: %T = getUser()", (user,));
+        let block = b.build().unwrap();
+
+        let mut fb = FileSpec::<TypeScript>::builder("user.ts");
+        fb.add_code(block);
+        let file = fb.build();
+
+        let output = file.render(80).unwrap();
+        // Import should use the alias.
+        assert!(
+            output.contains("User as UserModel"),
+            "Expected aliased import, got:\n{output}"
+        );
+        // Code should reference the alias name.
+        assert!(
+            output.contains("const u: UserModel = getUser();"),
+            "Expected alias in code, got:\n{output}"
+        );
+    }
+
+    #[test]
+    fn test_aliased_type_with_auto_alias_conflict() {
+        // Two types named "User" from different modules.
+        // First one has a preferred alias; second should still get auto-aliased.
+        let user1 =
+            TypeName::<TypeScript>::importable_type("./models", "User").with_alias("ModelUser");
+        let user2 = TypeName::<TypeScript>::importable_type("./other", "User");
+
+        let mut b = CodeBlock::<TypeScript>::builder();
+        b.add_statement("const u1: %T = get1()", (user1,));
+        b.add_statement("const u2: %T = get2()", (user2,));
+        let block = b.build().unwrap();
+
+        let mut fb = FileSpec::<TypeScript>::builder("user.ts");
+        fb.add_code(block);
+        let file = fb.build();
+
+        let output = file.render(80).unwrap();
+        // First uses its preferred alias.
+        assert!(
+            output.contains("const u1: ModelUser = get1();"),
+            "Expected preferred alias, got:\n{output}"
+        );
+        // Second gets auto-aliased since "User" is claimed.
+        assert!(
+            output.contains("const u2: OtherUser = get2();"),
+            "Expected auto-alias for second, got:\n{output}"
+        );
+    }
 }
