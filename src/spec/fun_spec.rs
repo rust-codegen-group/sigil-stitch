@@ -156,12 +156,16 @@ impl<L: CodeLang> FunSpec<L> {
     }
 
     /// Emit this function as a CodeBlock.
-    pub fn emit(&self, lang: &L, ctx: DeclarationContext) -> CodeBlock<L> {
+    pub fn emit(
+        &self,
+        lang: &L,
+        ctx: DeclarationContext,
+    ) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
         let mut cb = CodeBlock::<L>::builder();
 
         // Annotations (structured specs first, then raw CodeBlocks).
         for spec in &self.annotation_specs {
-            cb.add_code(spec.emit(lang));
+            cb.add_code(spec.emit(lang)?);
             cb.add_line();
         }
         for ann in &self.annotations {
@@ -236,7 +240,7 @@ impl<L: CodeLang> FunSpec<L> {
         // Parameters — build as a sub-block for %W support.
         sig.push('(');
         sig.push_str("%L");
-        let params_block = self.build_params_block(lang);
+        let params_block = self.build_params_block(lang)?;
         sig_args.push(Arg::Code(params_block));
         sig.push(')');
 
@@ -328,10 +332,10 @@ impl<L: CodeLang> FunSpec<L> {
             }
         }
 
-        cb.build().unwrap()
+        cb.build()
     }
 
-    fn build_params_block(&self, lang: &L) -> CodeBlock<L> {
+    fn build_params_block(&self, lang: &L) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
         let mut pb = CodeBlock::<L>::builder();
         for (i, param) in self.params.iter().enumerate() {
             if i > 0 {
@@ -339,7 +343,7 @@ impl<L: CodeLang> FunSpec<L> {
             }
             param.emit_into(&mut pb, lang);
         }
-        pb.build().unwrap()
+        pb.build()
     }
 }
 
@@ -464,15 +468,17 @@ impl<L: CodeLang> FunSpecBuilder<L> {
 
     /// Consume the builder and produce a [`FunSpec`].
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `name` is empty.
-    pub fn build(self) -> FunSpec<L> {
-        assert!(
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
+    pub fn build(self) -> Result<FunSpec<L>, crate::error::SigilStitchError> {
+        snafu::ensure!(
             !self.name.is_empty(),
-            "FunSpecBuilder::build() failed: 'name' must not be empty",
+            crate::error::EmptyNameSnafu {
+                builder: "FunSpecBuilder",
+            }
         );
-        FunSpec {
+        Ok(FunSpec {
             name: self.name,
             params: self.params,
             return_type: self.return_type,
@@ -485,7 +491,7 @@ impl<L: CodeLang> FunSpecBuilder<L> {
             receiver: self.receiver,
             suffixes: self.suffixes,
             delegation: self.delegation,
-        }
+        })
     }
 }
 
@@ -497,28 +503,28 @@ mod tests {
 
     fn emit_fun_ts(spec: &FunSpec<TypeScript>, ctx: DeclarationContext) -> String {
         let lang = TypeScript::new();
-        let block = spec.emit(&lang, ctx);
+        let block = spec.emit(&lang, ctx).unwrap();
         let imports = crate::import::ImportGroup::new();
         let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
-        renderer.render(&block)
+        renderer.render(&block).unwrap()
     }
 
     fn emit_fun_rs(spec: &FunSpec<RustLang>, ctx: DeclarationContext) -> String {
         let lang = RustLang::new();
-        let block = spec.emit(&lang, ctx);
+        let block = spec.emit(&lang, ctx).unwrap();
         let imports = crate::import::ImportGroup::new();
         let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
-        renderer.render(&block)
+        renderer.render(&block).unwrap()
     }
 
     #[test]
     fn test_ts_simple_function() {
         let mut fb = FunSpec::<TypeScript>::builder("greet");
-        fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")));
+        fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap());
         fb.returns(TypeName::primitive("void"));
         let body = CodeBlock::<TypeScript>::of("console.log(name)", ()).unwrap();
         fb.body(body);
-        let fun = fb.build();
+        let fun = fb.build().unwrap();
         let output = emit_fun_ts(&fun, DeclarationContext::TopLevel);
         assert!(output.contains("function greet(name: string): void {"));
         assert!(output.contains("console.log(name)"));
@@ -528,7 +534,7 @@ mod tests {
     #[test]
     fn test_ts_async_method() {
         let mut fb = FunSpec::<TypeScript>::builder("getUser");
-        fb.add_param(ParameterSpec::new("id", TypeName::primitive("string")));
+        fb.add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap());
         fb.returns(TypeName::generic(
             TypeName::primitive("Promise"),
             vec![TypeName::primitive("User")],
@@ -537,7 +543,7 @@ mod tests {
         fb.visibility(Visibility::Public);
         let body = CodeBlock::<TypeScript>::of("return db.find(id)", ()).unwrap();
         fb.body(body);
-        let fun = fb.build();
+        let fun = fb.build().unwrap();
         let output = emit_fun_ts(&fun, DeclarationContext::Member);
         assert!(output.contains("public async getUser(id: string): Promise<User> {"));
     }
@@ -547,7 +553,7 @@ mod tests {
         let mut fb = FunSpec::<TypeScript>::builder("validate");
         fb.is_abstract();
         fb.returns(TypeName::primitive("boolean"));
-        let fun = fb.build();
+        let fun = fb.build().unwrap();
         let output = emit_fun_ts(&fun, DeclarationContext::Member);
         assert!(output.contains("abstract validate(): boolean;"));
     }
@@ -556,12 +562,12 @@ mod tests {
     fn test_rust_simple_function() {
         let mut fb = FunSpec::<RustLang>::builder("add");
         fb.visibility(Visibility::Public);
-        fb.add_param(ParameterSpec::new("a", TypeName::primitive("i32")));
-        fb.add_param(ParameterSpec::new("b", TypeName::primitive("i32")));
+        fb.add_param(ParameterSpec::new("a", TypeName::primitive("i32")).unwrap());
+        fb.add_param(ParameterSpec::new("b", TypeName::primitive("i32")).unwrap());
         fb.returns(TypeName::primitive("i32"));
         let body = CodeBlock::<RustLang>::of("a + b", ()).unwrap();
         fb.body(body);
-        let fun = fb.build();
+        let fun = fb.build().unwrap();
         let output = emit_fun_rs(&fun, DeclarationContext::TopLevel);
         assert!(output.contains("pub fn add(a: i32, b: i32) -> i32 {"));
         assert!(output.contains("a + b"));
@@ -573,18 +579,24 @@ mod tests {
             TypeParamSpec::<TypeScript>::new("T").with_bound(TypeName::primitive("Serializable"));
         let mut fb = FunSpec::<TypeScript>::builder("serialize");
         fb.add_type_param(tp);
-        fb.add_param(ParameterSpec::new("value", TypeName::primitive("T")));
+        fb.add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap());
         fb.returns(TypeName::primitive("string"));
         let body = CodeBlock::<TypeScript>::of("return JSON.stringify(value)", ()).unwrap();
         fb.body(body);
-        let fun = fb.build();
+        let fun = fb.build().unwrap();
         let output = emit_fun_ts(&fun, DeclarationContext::TopLevel);
         assert!(output.contains("function serialize<T extends Serializable>(value: T): string {"));
     }
 
     #[test]
-    #[should_panic(expected = "FunSpecBuilder::build() failed: 'name' must not be empty")]
-    fn test_build_empty_name_panics() {
-        FunSpec::<TypeScript>::builder("").build();
+    fn test_build_empty_name_errors() {
+        let result = FunSpec::<TypeScript>::builder("").build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("'name' must not be empty")
+        );
     }
 }

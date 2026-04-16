@@ -22,7 +22,7 @@ fn test_template_full_render_ts() {
 
     let mut fb = FileSpec::<TypeScript>::builder("app.ts");
     fb.add_code(block);
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import type { User } from './models'"));
     assert!(output.contains("const currentUser: User = getUser()"));
@@ -51,7 +51,7 @@ fn test_template_reuse_with_dedup() {
     let mut fb = FileSpec::<TypeScript>::builder("service.ts");
     fb.add_code(block1);
     fb.add_code(block2);
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import type { User } from './models'"));
     assert!(output.contains("import { Config } from './config'"));
@@ -80,7 +80,7 @@ fn test_template_composition_via_literal() {
 
     let mut fb = FileSpec::<TypeScript>::builder("answer.ts");
     fb.add_code(outer);
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("function getAnswer()"));
     assert!(output.contains("return 42"));
@@ -94,7 +94,7 @@ fn test_raw_with_imports_triggers_import() {
 
     let mut fb = FileSpec::<TypeScript>::builder("handler.ts");
     fb.add_raw_with_imports("const u: User = fetchUser();\n", vec![user_type]);
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     // Import should be generated.
     assert!(output.contains("import type { User } from './models'"));
@@ -108,7 +108,7 @@ fn test_raw_with_imports_no_substitution() {
 
     let mut fb = FileSpec::<TypeScript>::builder("test.ts");
     fb.add_raw_with_imports("// Helper is used here\n", vec![ty]);
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     // Raw content unchanged.
     assert!(output.contains("// Helper is used here"));
@@ -131,7 +131,7 @@ fn test_raw_with_imports_mixed_with_code() {
     cb.add_statement("const u: %T = getUser()", (same_user,));
     fb.add_code(cb.build().unwrap());
 
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     // Import appears only once (dedup).
     let import_count = output.matches("import type { User }").count();
@@ -155,7 +155,7 @@ fn test_template_rust_render() {
 
     let mut fb = FileSpec::<RustLang>::builder("main.rs");
     fb.add_code(block);
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("use crate::config::Config;"));
     assert!(output.contains("let cfg: Config = Config::default()"));

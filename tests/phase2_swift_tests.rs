@@ -20,27 +20,27 @@ fn test_swift_class_with_properties() {
     // Properties.
     let mut repo_field = FieldSpec::builder("repo", TypeName::primitive("UserRepository"));
     repo_field.visibility(Visibility::Private);
-    tb.add_field(repo_field.build());
+    tb.add_field(repo_field.build().unwrap());
 
     let mut logger_field = FieldSpec::builder("logger", TypeName::primitive("Logger"));
     logger_field.visibility(Visibility::Private);
     logger_field.is_readonly();
-    tb.add_field(logger_field.build());
+    tb.add_field(logger_field.build().unwrap());
 
     // Method.
     let find_body = CodeBlock::<Swift>::of("return repo.find(by: id)", ()).unwrap();
     let mut find = FunSpec::<Swift>::builder("findUser");
     find.visibility(Visibility::Public);
     find.returns(TypeName::primitive("User?"));
-    find.add_param(ParameterSpec::new("id", TypeName::primitive("String")));
+    find.add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap());
     find.body(find_body);
-    tb.add_method(find.build());
+    tb.add_method(find.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("UserService.swift", Swift::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/class_with_properties.swift", &output);
@@ -55,22 +55,22 @@ fn test_swift_struct() {
     let mut name_field = FieldSpec::builder("name", TypeName::primitive("String"));
     name_field.visibility(Visibility::Public);
     name_field.is_readonly();
-    tb.add_field(name_field.build());
+    tb.add_field(name_field.build().unwrap());
 
     let mut age_field = FieldSpec::builder("age", TypeName::primitive("Int"));
     age_field.visibility(Visibility::Public);
     age_field.is_readonly();
-    tb.add_field(age_field.build());
+    tb.add_field(age_field.build().unwrap());
 
     let mut email_field = FieldSpec::builder("email", TypeName::primitive("String?"));
     email_field.visibility(Visibility::Public);
-    tb.add_field(email_field.build());
+    tb.add_field(email_field.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("User.swift", Swift::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/struct.swift", &output);
@@ -87,22 +87,22 @@ fn test_swift_protocol() {
     // Protocol method requirements (no body).
     let mut find = FunSpec::<Swift>::builder("findById");
     find.returns(TypeName::primitive("T?"));
-    find.add_param(ParameterSpec::new("id", TypeName::primitive("String")));
-    tb.add_method(find.build());
+    find.add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap());
+    tb.add_method(find.build().unwrap());
 
     let mut save = FunSpec::<Swift>::builder("save");
-    save.add_param(ParameterSpec::new("entity", TypeName::primitive("T")));
-    tb.add_method(save.build());
+    save.add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap());
+    tb.add_method(save.build().unwrap());
 
     let mut delete = FunSpec::<Swift>::builder("delete");
-    delete.add_param(ParameterSpec::new("id", TypeName::primitive("String")));
-    tb.add_method(delete.build());
+    delete.add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap());
+    tb.add_method(delete.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("Repository.swift", Swift::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/protocol.swift", &output);
@@ -119,20 +119,20 @@ fn test_swift_abstract_class() {
     let mut desc = FunSpec::<Swift>::builder("describe");
     desc.returns(TypeName::primitive("String"));
     desc.body(desc_body);
-    tb.add_method(desc.build());
+    tb.add_method(desc.build().unwrap());
 
     // Abstract-like method (fatalError convention).
     let area_body = CodeBlock::<Swift>::of("fatalError(\"Subclasses must override\")", ()).unwrap();
     let mut area = FunSpec::<Swift>::builder("area");
     area.returns(TypeName::primitive("Double"));
     area.body(area_body);
-    tb.add_method(area.build());
+    tb.add_method(area.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("Shape.swift", Swift::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/abstract_class.swift", &output);
@@ -154,13 +154,13 @@ fn test_swift_class_extends_implements() {
     let mut is_admin = FunSpec::<Swift>::builder("isAdmin");
     is_admin.returns(TypeName::primitive("Bool"));
     is_admin.body(body);
-    tb.add_method(is_admin.build());
+    tb.add_method(is_admin.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("AdminService.swift", Swift::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/class_extends_implements.swift", &output);
@@ -172,15 +172,15 @@ fn test_swift_enum() {
     tb.visibility(Visibility::Public);
     tb.doc("Supported colors.");
 
-    tb.add_variant(EnumVariantSpec::new("red"));
-    tb.add_variant(EnumVariantSpec::new("green"));
-    tb.add_variant(EnumVariantSpec::new("blue"));
+    tb.add_variant(EnumVariantSpec::new("red").unwrap());
+    tb.add_variant(EnumVariantSpec::new("green").unwrap());
+    tb.add_variant(EnumVariantSpec::new("blue").unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("Color.swift", Swift::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/enum.swift", &output);
@@ -194,13 +194,13 @@ fn test_swift_async_function() {
     let mut fb_fun = FunSpec::<Swift>::builder("fetchUser");
     fb_fun.is_async();
     fb_fun.returns(user);
-    fb_fun.add_param(ParameterSpec::new("id", TypeName::primitive("String")));
+    fb_fun.add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap());
     fb_fun.body(body);
-    let fun = fb_fun.build();
+    let fun = fb_fun.build().unwrap();
 
     let mut fb = FileSpec::builder_with("Api.swift", Swift::new());
     fb.add_function(fun);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/async_function.swift", &output);
@@ -220,13 +220,13 @@ fn test_swift_override_method() {
     speak.returns(TypeName::primitive("String"));
     speak.is_override();
     speak.body(body);
-    tb.add_method(speak.build());
+    tb.add_method(speak.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("Dog.swift", Swift::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/override_method.swift", &output);
@@ -243,10 +243,10 @@ fn test_swift_full_module() {
     let mut fetch = FunSpec::<Swift>::builder("fetchData");
     fetch.is_async();
     fetch.returns(data.clone());
-    fetch.add_param(ParameterSpec::new("from", TypeName::primitive("URL")));
-    proto.add_method(fetch.build());
+    fetch.add_param(ParameterSpec::new("from", TypeName::primitive("URL")).unwrap());
+    proto.add_method(fetch.build().unwrap());
 
-    let proto_spec = proto.build();
+    let proto_spec = proto.build().unwrap();
 
     // Struct.
     let mut model = TypeSpec::<Swift>::builder("Response", TypeKind::Struct);
@@ -254,13 +254,13 @@ fn test_swift_full_module() {
 
     let mut status_field = FieldSpec::builder("statusCode", TypeName::primitive("Int"));
     status_field.is_readonly();
-    model.add_field(status_field.build());
+    model.add_field(status_field.build().unwrap());
 
     let mut body_field = FieldSpec::builder("body", TypeName::primitive("Data"));
     body_field.is_readonly();
-    model.add_field(body_field.build());
+    model.add_field(body_field.build().unwrap());
 
-    let model_spec = model.build();
+    let model_spec = model.build().unwrap();
 
     // Implementation class.
     let mut cls = TypeSpec::<Swift>::builder("NetworkFetcher", TypeKind::Class);
@@ -270,7 +270,7 @@ fn test_swift_full_module() {
     let mut session_field = FieldSpec::builder("session", TypeName::primitive("URLSession"));
     session_field.visibility(Visibility::Private);
     session_field.is_readonly();
-    cls.add_field(session_field.build());
+    cls.add_field(session_field.build().unwrap());
 
     // fetchData implementation.
     let fetch_body = CodeBlock::<Swift>::of(
@@ -281,29 +281,26 @@ fn test_swift_full_module() {
     let mut fetch_impl = FunSpec::<Swift>::builder("fetchData");
     fetch_impl.is_async();
     fetch_impl.returns(data);
-    fetch_impl.add_param(ParameterSpec::new("from", TypeName::primitive("URL")));
+    fetch_impl.add_param(ParameterSpec::new("from", TypeName::primitive("URL")).unwrap());
     fetch_impl.body(fetch_body);
-    cls.add_method(fetch_impl.build());
+    cls.add_method(fetch_impl.build().unwrap());
 
-    let cls_spec = cls.build();
+    let cls_spec = cls.build().unwrap();
 
     // Standalone function using URL import.
     let make_body = CodeBlock::<Swift>::of("return %T(string: urlString)!", (url,)).unwrap();
     let mut make_fn = FunSpec::<Swift>::builder("makeURL");
     make_fn.returns(TypeName::primitive("URL"));
-    make_fn.add_param(ParameterSpec::new(
-        "urlString",
-        TypeName::primitive("String"),
-    ));
+    make_fn.add_param(ParameterSpec::new("urlString", TypeName::primitive("String")).unwrap());
     make_fn.body(make_body);
-    let make_url = make_fn.build();
+    let make_url = make_fn.build().unwrap();
 
     let mut fb = FileSpec::builder_with("Network.swift", Swift::new());
     fb.add_type(proto_spec);
     fb.add_type(model_spec);
     fb.add_type(cls_spec);
     fb.add_function(make_url);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/full_module.swift", &output);
@@ -318,20 +315,20 @@ fn test_swift_enum_associated_values() {
     // case success(Data)
     let mut v_success = EnumVariantSpec::<Swift>::builder("success");
     v_success.associated_type(TypeName::primitive("Data"));
-    tb.add_variant(v_success.build());
+    tb.add_variant(v_success.build().unwrap());
 
     // case failure(Error, Int) — multi-element associated value
     let mut v_failure = EnumVariantSpec::<Swift>::builder("failure");
     v_failure.associated_type(TypeName::primitive("Error"));
     v_failure.associated_type(TypeName::primitive("Int"));
-    tb.add_variant(v_failure.build());
+    tb.add_variant(v_failure.build().unwrap());
 
     // case loading — simple variant
-    tb.add_variant(EnumVariantSpec::new("loading"));
+    tb.add_variant(EnumVariantSpec::new("loading").unwrap());
 
     let mut fb = FileSpec::builder_with("NetworkResult.swift", Swift::new());
-    fb.add_type(tb.build());
-    let file = fb.build();
+    fb.add_type(tb.build().unwrap());
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/enum_associated.swift", &output);

@@ -137,7 +137,7 @@ impl CodeTemplate {
     ///
     /// Returns `Err` if the syntax is invalid (unclosed `#{}`, unknown kind
     /// letter, or bare positional specifiers like `%T`).
-    pub fn new(format: &str) -> Result<Self, String> {
+    pub fn new(format: &str) -> Result<Self, crate::error::SigilStitchError> {
         let (positional_format, params) = parse_template(format)?;
         Ok(CodeTemplate {
             source: format.to_string(),
@@ -188,25 +188,29 @@ impl<L: CodeLang> TemplateApply<'_, L> {
 
     /// Build the `CodeBlock`, validating all parameters are provided and
     /// kind-correct.
-    pub fn build(&mut self) -> Result<CodeBlock<L>, String> {
+    pub fn build(&mut self) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
         let mut positional_args: Vec<Arg<L>> = Vec::with_capacity(self.template.params.len());
 
         for param in &self.template.params {
             let arg = self.args.get(&param.name).ok_or_else(|| {
-                format!(
-                    "Template {:?}: missing parameter '{}'",
-                    self.template.source, param.name
-                )
+                crate::error::SigilStitchError::Template {
+                    message: format!(
+                        "Template {:?}: missing parameter '{}'",
+                        self.template.source, param.name
+                    ),
+                }
             })?;
 
             if !param.kind.matches_arg(arg) {
-                return Err(format!(
-                    "Template {:?}: parameter '{}' declared as {} but received {:?}",
-                    self.template.source,
-                    param.name,
-                    param.kind.label(),
-                    arg_kind_label(arg),
-                ));
+                return Err(crate::error::SigilStitchError::Template {
+                    message: format!(
+                        "Template {:?}: parameter '{}' declared as {} but received {:?}",
+                        self.template.source,
+                        param.name,
+                        param.kind.label(),
+                        arg_kind_label(arg),
+                    ),
+                });
             }
 
             positional_args.push(arg.clone());
@@ -228,9 +232,15 @@ fn arg_kind_label<L: CodeLang>(arg: &Arg<L>) -> &'static str {
 
 // ── Template parser ─────────────────────────────────────
 
+fn template_err(message: String) -> crate::error::SigilStitchError {
+    crate::error::SigilStitchError::Template { message }
+}
+
 /// Parse a template format string, replacing `#{name:K}` with positional
 /// specifiers and collecting parameter declarations.
-fn parse_template(format: &str) -> Result<(String, Vec<TemplateParam>), String> {
+fn parse_template(
+    format: &str,
+) -> Result<(String, Vec<TemplateParam>), crate::error::SigilStitchError> {
     let mut output = String::with_capacity(format.len());
     let mut params = Vec::new();
     let bytes = format.as_bytes();
@@ -243,11 +253,11 @@ fn parse_template(format: &str) -> Result<(String, Vec<TemplateParam>), String> 
             match spec {
                 // Arg-consuming specifiers are forbidden in templates.
                 b'T' | b'N' | b'S' | b'L' => {
-                    return Err(format!(
+                    return Err(template_err(format!(
                         "Template format string contains bare positional specifier '%{}' \
                          at byte {}; use #{{name:{}}} syntax instead",
                         spec as char, i, spec as char,
-                    ));
+                    )));
                 }
                 // Non-arg specifiers pass through.
                 b'W' | b'>' | b'<' | b'[' | b']' | b'%' => {
@@ -279,52 +289,52 @@ fn parse_template(format: &str) -> Result<(String, Vec<TemplateParam>), String> 
                 let start = i;
                 let close = format[i + 2..]
                     .find('}')
-                    .ok_or_else(|| format!("Unclosed '#{{' at byte {start}"))?;
+                    .ok_or_else(|| template_err(format!("Unclosed '#{{' at byte {start}")))?;
                 let inner = &format[i + 2..i + 2 + close];
 
                 // Parse "name:K".
                 let colon = inner.find(':').ok_or_else(|| {
-                    format!(
+                    template_err(format!(
                         "Expected '#{{name:K}}' but found '#{{{}}}' at byte {} \
                          (missing ':' separator)",
                         inner, start
-                    )
+                    ))
                 })?;
                 let name = &inner[..colon];
                 let kind_str = &inner[colon + 1..];
 
                 if name.is_empty() {
-                    return Err(format!(
+                    return Err(template_err(format!(
                         "Empty parameter name in '#{{{}}}' at byte {}",
                         inner, start
-                    ));
+                    )));
                 }
                 if kind_str.len() != 1 {
-                    return Err(format!(
+                    return Err(template_err(format!(
                         "Expected single kind letter (T/N/S/L) but found '{}' in '#{{{}}}' at byte {}",
                         kind_str, inner, start
-                    ));
+                    )));
                 }
 
                 let kind = ParamKind::from_char(kind_str.as_bytes()[0]).ok_or_else(|| {
-                    format!(
+                    template_err(format!(
                         "Unknown parameter kind '{}' in '#{{{}}}' at byte {} \
                          (expected T, N, S, or L)",
                         kind_str, inner, start
-                    )
+                    ))
                 })?;
 
                 // Check duplicate names have consistent kinds.
                 if let Some(existing) = params.iter().find(|p: &&TemplateParam| p.name == name)
                     && existing.kind != kind
                 {
-                    return Err(format!(
+                    return Err(template_err(format!(
                         "Parameter '{}' declared as {} at byte {} but previously declared as {}",
                         name,
                         kind.label(),
                         start,
                         existing.kind.label(),
-                    ));
+                    )));
                 }
 
                 output.push_str(kind.specifier());
@@ -395,7 +405,10 @@ mod tests {
             .build();
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("missing parameter 'b'"), "got: {err}");
+        assert!(
+            err.to_string().contains("missing parameter 'b'"),
+            "got: {err}"
+        );
     }
 
     #[test]
@@ -408,8 +421,8 @@ mod tests {
             .build();
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("declared as Name"), "got: {err}");
-        assert!(err.contains("TypeName"), "got: {err}");
+        assert!(err.to_string().contains("declared as Name"), "got: {err}");
+        assert!(err.to_string().contains("TypeName"), "got: {err}");
     }
 
     #[test]
@@ -441,7 +454,10 @@ mod tests {
         let result = CodeTemplate::new("#{name:N} %T");
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("bare positional specifier '%T'"), "got: {err}");
+        assert!(
+            err.to_string().contains("bare positional specifier '%T'"),
+            "got: {err}"
+        );
     }
 
     #[test]
@@ -500,28 +516,38 @@ mod tests {
     fn test_unclosed_brace_error() {
         let result = CodeTemplate::new("#{name:T");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Unclosed"));
+        assert!(result.unwrap_err().to_string().contains("Unclosed"));
     }
 
     #[test]
     fn test_missing_colon_error() {
         let result = CodeTemplate::new("#{name}");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("missing ':'"));
+        assert!(result.unwrap_err().to_string().contains("missing ':'"));
     }
 
     #[test]
     fn test_unknown_kind_error() {
         let result = CodeTemplate::new("#{name:X}");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Unknown parameter kind"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unknown parameter kind")
+        );
     }
 
     #[test]
     fn test_empty_name_error() {
         let result = CodeTemplate::new("#{:T}");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Empty parameter name"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Empty parameter name")
+        );
     }
 
     #[test]
@@ -529,7 +555,10 @@ mod tests {
         let result = CodeTemplate::new("#{x:T} #{x:N}");
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("previously declared"), "got: {err}");
+        assert!(
+            err.to_string().contains("previously declared"),
+            "got: {err}"
+        );
     }
 
     #[test]

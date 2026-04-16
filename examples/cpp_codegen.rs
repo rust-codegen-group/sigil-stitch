@@ -26,13 +26,13 @@ use sigil_stitch::type_name::TypeName;
 /// Helper: emit a FunSpec as a CodeBlock for embedding in extra_member.
 fn emit_fun(fun: &FunSpec<CppLang>) -> CodeBlock<CppLang> {
     let lang = CppLang::new();
-    fun.emit(&lang, DeclarationContext::Member)
+    fun.emit(&lang, DeclarationContext::Member).unwrap()
 }
 
 /// Helper: emit a FieldSpec as a CodeBlock for embedding in extra_member.
 fn emit_field(field: &FieldSpec<CppLang>) -> CodeBlock<CppLang> {
     let lang = CppLang::new();
-    field.emit(&lang, DeclarationContext::Member)
+    field.emit(&lang, DeclarationContext::Member).unwrap()
 }
 
 fn main() {
@@ -54,7 +54,7 @@ fn main() {
     members.add("Error", ());
     members.add_line();
     enum_b.extra_member(members.build().unwrap());
-    let log_level = enum_b.build();
+    let log_level = enum_b.build().unwrap();
 
     // --- Abstract base class: Logger ---
     let mut logger_b = TypeSpec::<CppLang>::builder("Logger", TypeKind::Class);
@@ -69,13 +69,10 @@ fn main() {
     // Pure virtual: virtual void log(const char* msg) = 0;
     let mut log_fn = FunSpec::<CppLang>::builder("log");
     log_fn.is_abstract();
-    log_fn.add_param(ParameterSpec::new(
-        "msg",
-        TypeName::primitive("const char*"),
-    ));
+    log_fn.add_param(ParameterSpec::new("msg", TypeName::primitive("const char*")).unwrap());
     log_fn.returns(TypeName::primitive("void"));
     log_fn.suffix("= 0");
-    pub_section.add_code(emit_fun(&log_fn.build()));
+    pub_section.add_code(emit_fun(&log_fn.build().unwrap()));
 
     // Pure virtual: virtual LogLevel level() const = 0;
     pub_section.add_line();
@@ -84,17 +81,17 @@ fn main() {
     level_fn.returns(TypeName::primitive("LogLevel"));
     level_fn.suffix("const");
     level_fn.suffix("= 0");
-    pub_section.add_code(emit_fun(&level_fn.build()));
+    pub_section.add_code(emit_fun(&level_fn.build().unwrap()));
 
     // Virtual destructor
     pub_section.add_line();
     let mut dtor = FunSpec::<CppLang>::builder("~Logger");
     dtor.is_abstract();
     dtor.suffix("= default");
-    pub_section.add_code(emit_fun(&dtor.build()));
+    pub_section.add_code(emit_fun(&dtor.build().unwrap()));
 
     logger_b.extra_member(pub_section.build().unwrap());
-    let logger = logger_b.build();
+    let logger = logger_b.build().unwrap();
 
     // --- Derived class: ConsoleLogger ---
     let mut console_b = TypeSpec::<CppLang>::builder("ConsoleLogger", TypeKind::Class);
@@ -107,9 +104,13 @@ fn main() {
     priv_section.add("private:", ());
     priv_section.add_line();
     priv_section.add("%>", ());
-    let name_field = FieldSpec::builder("name_", TypeName::primitive("std::string")).build();
+    let name_field = FieldSpec::builder("name_", TypeName::primitive("std::string"))
+        .build()
+        .unwrap();
     priv_section.add_code(emit_field(&name_field));
-    let level_field = FieldSpec::builder("level_", TypeName::primitive("LogLevel")).build();
+    let level_field = FieldSpec::builder("level_", TypeName::primitive("LogLevel"))
+        .build()
+        .unwrap();
     priv_section.add_code(emit_field(&level_field));
     console_b.extra_member(priv_section.build().unwrap());
 
@@ -125,12 +126,9 @@ fn main() {
     let ctor_body =
         CodeBlock::<CppLang>::of("name_ = name;\nlevel_ = LogLevel::Info;", ()).unwrap();
     let mut ctor = FunSpec::<CppLang>::builder("ConsoleLogger");
-    ctor.add_param(ParameterSpec::new(
-        "name",
-        TypeName::primitive("const std::string&"),
-    ));
+    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("const std::string&")).unwrap());
     ctor.body(ctor_body);
-    pub_section2.add_code(emit_fun(&ctor.build()));
+    pub_section2.add_code(emit_fun(&ctor.build().unwrap()));
 
     // log override
     pub_section2.add_line();
@@ -140,14 +138,11 @@ fn main() {
     )
     .unwrap();
     let mut log_impl = FunSpec::<CppLang>::builder("log");
-    log_impl.add_param(ParameterSpec::new(
-        "msg",
-        TypeName::primitive("const char*"),
-    ));
+    log_impl.add_param(ParameterSpec::new("msg", TypeName::primitive("const char*")).unwrap());
     log_impl.returns(TypeName::primitive("void"));
     log_impl.suffix("override");
     log_impl.body(log_body);
-    pub_section2.add_code(emit_fun(&log_impl.build()));
+    pub_section2.add_code(emit_fun(&log_impl.build().unwrap()));
 
     // level override
     pub_section2.add_line();
@@ -157,16 +152,16 @@ fn main() {
     level_impl.suffix("const");
     level_impl.suffix("override");
     level_impl.body(level_body);
-    pub_section2.add_code(emit_fun(&level_impl.build()));
+    pub_section2.add_code(emit_fun(&level_impl.build().unwrap()));
 
     console_b.extra_member(pub_section2.build().unwrap());
-    let console_logger = console_b.build();
+    let console_logger = console_b.build().unwrap();
 
     // --- Template function: make_vector ---
     let mut make_vec_fn = FunSpec::<CppLang>::builder("make_vector");
     make_vec_fn.annotation(CodeBlock::<CppLang>::of("template<typename T>", ()).unwrap());
-    make_vec_fn.add_param(ParameterSpec::new("first", TypeName::primitive("T")));
-    make_vec_fn.add_param(ParameterSpec::new("second", TypeName::primitive("T")));
+    make_vec_fn.add_param(ParameterSpec::new("first", TypeName::primitive("T")).unwrap());
+    make_vec_fn.add_param(ParameterSpec::new("second", TypeName::primitive("T")).unwrap());
     make_vec_fn.returns(TypeName::primitive("std::vector<T>"));
     let vec_body = CodeBlock::<CppLang>::of(
         "%T<T> result;\nresult.push_back(first);\nresult.push_back(second);\nreturn result;",
@@ -174,7 +169,7 @@ fn main() {
     )
     .unwrap();
     make_vec_fn.body(vec_body);
-    let make_vector = make_vec_fn.build();
+    let make_vector = make_vec_fn.build().unwrap();
 
     // --- Assemble file ---
     let mut fb = FileSpec::builder_with("logging.hpp", CppLang::header());
@@ -186,7 +181,7 @@ fn main() {
     fb.add_function(make_vector);
     fb.add_raw("\n} // namespace app\n");
 
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
     print!("{output}");
 }

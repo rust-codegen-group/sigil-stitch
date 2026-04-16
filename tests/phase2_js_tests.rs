@@ -13,12 +13,14 @@ use sigil_stitch::type_name::TypeName;
 
 /// Shorthand for a JS parameter (no type annotation).
 fn param(name: &str) -> ParameterSpec<JavaScript> {
-    ParameterSpec::new(name, TypeName::primitive(""))
+    ParameterSpec::new(name, TypeName::primitive("")).unwrap()
 }
 
 /// Shorthand for a JS field (no type annotation).
 fn field(name: &str) -> FieldSpec<JavaScript> {
-    FieldSpec::builder(name, TypeName::primitive("")).build()
+    FieldSpec::builder(name, TypeName::primitive(""))
+        .build()
+        .unwrap()
 }
 
 #[test]
@@ -33,25 +35,25 @@ fn test_js_class_with_methods() {
     let ctor_body = CodeBlock::<JavaScript>::of("this.count = 0;", ()).unwrap();
     let mut ctor = FunSpec::<JavaScript>::builder("constructor");
     ctor.body(ctor_body);
-    tb.add_method(ctor.build());
+    tb.add_method(ctor.build().unwrap());
 
     // increment method.
     let inc_body = CodeBlock::<JavaScript>::of("this.count++;", ()).unwrap();
     let mut inc = FunSpec::<JavaScript>::builder("increment");
     inc.body(inc_body);
-    tb.add_method(inc.build());
+    tb.add_method(inc.build().unwrap());
 
     // getCount method.
     let get_body = CodeBlock::<JavaScript>::of("return this.count;", ()).unwrap();
     let mut get = FunSpec::<JavaScript>::builder("getCount");
     get.body(get_body);
-    tb.add_method(get.build());
+    tb.add_method(get.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("counter.js", JavaScript::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/class_with_methods.js", &output);
@@ -71,13 +73,13 @@ fn test_js_class_with_constructor() {
     ctor.add_param(param("name"));
     ctor.add_param(param("email"));
     ctor.body(ctor_body);
-    tb.add_method(ctor.build());
+    tb.add_method(ctor.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("user.js", JavaScript::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/class_with_constructor.js", &output);
@@ -94,11 +96,11 @@ fn test_js_export_function() {
     fb.visibility(Visibility::Public);
     fb.add_param(param("name"));
     fb.body(body);
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("greet.js", JavaScript::new());
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/export_function.js", &output);
@@ -117,14 +119,14 @@ fn test_js_class_extends() {
     ctor.add_param(param("name"));
     ctor.add_param(param("breed"));
     ctor.body(ctor_body);
-    tb.add_method(ctor.build());
+    tb.add_method(ctor.build().unwrap());
 
     let speak_body = CodeBlock::<JavaScript>::of("return 'Woof!';", ()).unwrap();
     let mut speak = FunSpec::<JavaScript>::builder("speak");
     speak.body(speak_body);
-    tb.add_method(speak.build());
+    tb.add_method(speak.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     // Trigger import via code block.
     let import_trigger = CodeBlock::<JavaScript>::of("// Uses %T", (animal_import,)).unwrap();
@@ -132,7 +134,7 @@ fn test_js_class_extends() {
     let mut fb = FileSpec::builder_with("dog.js", JavaScript::new());
     fb.add_code(import_trigger);
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/class_extends.js", &output);
@@ -152,11 +154,11 @@ fn test_js_async_function() {
     fb.is_async();
     fb.add_param(param("url"));
     fb.body(body);
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("api.js", JavaScript::new());
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/async_function.js", &output);
@@ -173,13 +175,13 @@ fn test_js_static_method() {
     add.add_param(param("a"));
     add.add_param(param("b"));
     add.body(body);
-    tb.add_method(add.build());
+    tb.add_method(add.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("math.js", JavaScript::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/static_method.js", &output);
@@ -197,18 +199,18 @@ fn test_js_private_field() {
     let mut ctor = FunSpec::<JavaScript>::builder("constructor");
     ctor.add_param(param("initialBalance"));
     ctor.body(ctor_body);
-    tb.add_method(ctor.build());
+    tb.add_method(ctor.build().unwrap());
 
     let get_body = CodeBlock::<JavaScript>::of("return this.#balance;", ()).unwrap();
     let mut get = FunSpec::<JavaScript>::builder("getBalance");
     get.body(get_body);
-    tb.add_method(get.build());
+    tb.add_method(get.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("account.js", JavaScript::new());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/private_field.js", &output);
@@ -231,7 +233,7 @@ fn test_js_full_module() {
         CodeBlock::<JavaScript>::of("super();\nthis.#handlers = new Map();", ()).unwrap();
     let mut ctor = FunSpec::<JavaScript>::builder("constructor");
     ctor.body(ctor_body);
-    tb.add_method(ctor.build());
+    tb.add_method(ctor.build().unwrap());
 
     let pub_body = CodeBlock::<JavaScript>::of(
         "const id = %T();\nthis.emit(event, data);\nreturn id;",
@@ -242,9 +244,9 @@ fn test_js_full_module() {
     publish.add_param(param("event"));
     publish.add_param(param("data"));
     publish.body(pub_body);
-    tb.add_method(publish.build());
+    tb.add_method(publish.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     // Trigger EventEmitter import.
     let import_trigger = CodeBlock::<JavaScript>::of("// extends %T", (event_emitter,)).unwrap();
@@ -254,13 +256,13 @@ fn test_js_full_module() {
     let mut create_fn = FunSpec::<JavaScript>::builder("createEventBus");
     create_fn.visibility(Visibility::Public);
     create_fn.body(create_body);
-    let create = create_fn.build();
+    let create = create_fn.build().unwrap();
 
     let mut fb = FileSpec::builder_with("event-bus.js", JavaScript::new());
     fb.add_code(import_trigger);
     fb.add_type(ts);
     fb.add_function(create);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/full_module.js", &output);
@@ -278,23 +280,23 @@ fn test_js_enum() {
 
     let mut v_up = EnumVariantSpec::<JavaScript>::builder("Up");
     v_up.value(CodeBlock::<JavaScript>::of("'UP'", ()).unwrap());
-    tb.add_variant(v_up.build());
+    tb.add_variant(v_up.build().unwrap());
 
     let mut v_down = EnumVariantSpec::<JavaScript>::builder("Down");
     v_down.value(CodeBlock::<JavaScript>::of("'DOWN'", ()).unwrap());
-    tb.add_variant(v_down.build());
+    tb.add_variant(v_down.build().unwrap());
 
     let mut v_left = EnumVariantSpec::<JavaScript>::builder("Left");
     v_left.value(CodeBlock::<JavaScript>::of("'LEFT'", ()).unwrap());
-    tb.add_variant(v_left.build());
+    tb.add_variant(v_left.build().unwrap());
 
     let mut v_right = EnumVariantSpec::<JavaScript>::builder("Right");
     v_right.value(CodeBlock::<JavaScript>::of("'RIGHT'", ()).unwrap());
-    tb.add_variant(v_right.build());
+    tb.add_variant(v_right.build().unwrap());
 
     let mut fb = FileSpec::builder_with("direction.js", JavaScript::new());
-    fb.add_type(tb.build());
-    let file = fb.build();
+    fb.add_type(tb.build().unwrap());
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/enum.js", &output);

@@ -14,13 +14,13 @@ use sigil_stitch::type_name::TypeName;
 /// Helper: emit a FunSpec as a CodeBlock for embedding in extra_member.
 fn emit_fun(fun: &FunSpec<CppLang>) -> CodeBlock<CppLang> {
     let lang = CppLang::new();
-    fun.emit(&lang, DeclarationContext::Member)
+    fun.emit(&lang, DeclarationContext::Member).unwrap()
 }
 
 /// Helper: emit a FieldSpec as a CodeBlock for embedding in extra_member.
 fn emit_field(field: &FieldSpec<CppLang>) -> CodeBlock<CppLang> {
     let lang = CppLang::new();
-    field.emit(&lang, DeclarationContext::Member)
+    field.emit(&lang, DeclarationContext::Member).unwrap()
 }
 
 #[test]
@@ -35,7 +35,9 @@ fn test_cpp_class_with_methods() {
     priv_section.add("private:", ());
     priv_section.add_line();
     priv_section.add("%>", ());
-    let field = FieldSpec::builder("count_", TypeName::primitive("int")).build();
+    let field = FieldSpec::builder("count_", TypeName::primitive("int"))
+        .build()
+        .unwrap();
     priv_section.add_code(emit_field(&field));
     tb.extra_member(priv_section.build().unwrap());
 
@@ -51,7 +53,7 @@ fn test_cpp_class_with_methods() {
     let ctor_body = CodeBlock::<CppLang>::of("count_ = 0;", ()).unwrap();
     let mut ctor = FunSpec::<CppLang>::builder("Counter");
     ctor.body(ctor_body);
-    pub_section.add_code(emit_fun(&ctor.build()));
+    pub_section.add_code(emit_fun(&ctor.build().unwrap()));
 
     // increment method
     pub_section.add_line();
@@ -59,7 +61,7 @@ fn test_cpp_class_with_methods() {
     let mut inc = FunSpec::<CppLang>::builder("increment");
     inc.returns(TypeName::primitive("void"));
     inc.body(inc_body);
-    pub_section.add_code(emit_fun(&inc.build()));
+    pub_section.add_code(emit_fun(&inc.build().unwrap()));
 
     // get_count — const method
     pub_section.add_line();
@@ -68,16 +70,16 @@ fn test_cpp_class_with_methods() {
     get.returns(TypeName::primitive("int"));
     get.suffix("const");
     get.body(get_body);
-    pub_section.add_code(emit_fun(&get.build()));
+    pub_section.add_code(emit_fun(&get.build().unwrap()));
 
     tb.extra_member(pub_section.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("counter.hpp", CppLang::header());
     fb.header(CodeBlock::<CppLang>::of("#pragma once", ()).unwrap());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/class_with_methods.cpp", &output);
@@ -87,14 +89,26 @@ fn test_cpp_class_with_methods() {
 fn test_cpp_struct_with_fields() {
     // Struct — data-only, uses emit_split (no methods_inside_type_body).
     let mut tb = TypeSpec::<CppLang>::builder("Point", TypeKind::Struct);
-    tb.add_field(FieldSpec::builder("x", TypeName::primitive("double")).build());
-    tb.add_field(FieldSpec::builder("y", TypeName::primitive("double")).build());
-    tb.add_field(FieldSpec::builder("z", TypeName::primitive("double")).build());
-    let ts = tb.build();
+    tb.add_field(
+        FieldSpec::builder("x", TypeName::primitive("double"))
+            .build()
+            .unwrap(),
+    );
+    tb.add_field(
+        FieldSpec::builder("y", TypeName::primitive("double"))
+            .build()
+            .unwrap(),
+    );
+    tb.add_field(
+        FieldSpec::builder("z", TypeName::primitive("double"))
+            .build()
+            .unwrap(),
+    );
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("point.hpp", CppLang::header());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/struct_with_fields.cpp", &output);
@@ -104,14 +118,14 @@ fn test_cpp_struct_with_fields() {
 fn test_cpp_enum_class() {
     let mut tb = TypeSpec::<CppLang>::builder("Color", TypeKind::Enum);
     tb.doc("Available colors.");
-    tb.add_variant(EnumVariantSpec::new("Red"));
-    tb.add_variant(EnumVariantSpec::new("Green"));
-    tb.add_variant(EnumVariantSpec::new("Blue"));
-    let ts = tb.build();
+    tb.add_variant(EnumVariantSpec::new("Red").unwrap());
+    tb.add_variant(EnumVariantSpec::new("Green").unwrap());
+    tb.add_variant(EnumVariantSpec::new("Blue").unwrap());
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("color.hpp", CppLang::header());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/enum_class.cpp", &output);
@@ -135,22 +149,22 @@ fn test_cpp_virtual_method() {
     area.returns(TypeName::primitive("double"));
     area.suffix("const");
     area.suffix("= 0");
-    pub_section.add_code(emit_fun(&area.build()));
+    pub_section.add_code(emit_fun(&area.build().unwrap()));
 
     // Virtual destructor: virtual ~Shape() = default;
     pub_section.add_line();
     let mut dtor = FunSpec::<CppLang>::builder("~Shape");
     dtor.is_abstract();
     dtor.suffix("= default");
-    pub_section.add_code(emit_fun(&dtor.build()));
+    pub_section.add_code(emit_fun(&dtor.build().unwrap()));
 
     tb.extra_member(pub_section.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("shape.hpp", CppLang::header());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/virtual_method.cpp", &output);
@@ -162,11 +176,11 @@ fn test_cpp_const_method() {
     fb.returns(TypeName::primitive("int"));
     fb.suffix("const");
     fb.suffix("noexcept");
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("api.hpp", CppLang::header());
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/const_method.cpp", &output);
@@ -176,16 +190,16 @@ fn test_cpp_const_method() {
 fn test_cpp_template_function() {
     let mut fb = FunSpec::<CppLang>::builder("max_of");
     fb.annotation(CodeBlock::<CppLang>::of("template<typename T>", ()).unwrap());
-    fb.add_param(ParameterSpec::new("a", TypeName::primitive("const T&")));
-    fb.add_param(ParameterSpec::new("b", TypeName::primitive("const T&")));
+    fb.add_param(ParameterSpec::new("a", TypeName::primitive("const T&")).unwrap());
+    fb.add_param(ParameterSpec::new("b", TypeName::primitive("const T&")).unwrap());
     fb.returns(TypeName::primitive("T"));
     let body = CodeBlock::<CppLang>::of("return (a > b) ? a : b;", ()).unwrap();
     fb.body(body);
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("algo.hpp", CppLang::header());
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/template_function.cpp", &output);
@@ -203,7 +217,9 @@ fn test_cpp_template_class() {
     priv_section.add("private:", ());
     priv_section.add_line();
     priv_section.add("%>", ());
-    let field = FieldSpec::builder("data_", TypeName::primitive("std::vector<T>")).build();
+    let field = FieldSpec::builder("data_", TypeName::primitive("std::vector<T>"))
+        .build()
+        .unwrap();
     priv_section.add_code(emit_field(&field));
     tb.extra_member(priv_section.build().unwrap());
 
@@ -217,10 +233,10 @@ fn test_cpp_template_class() {
 
     let push_body = CodeBlock::<CppLang>::of("data_.push_back(value);", ()).unwrap();
     let mut push = FunSpec::<CppLang>::builder("push");
-    push.add_param(ParameterSpec::new("value", TypeName::primitive("const T&")));
+    push.add_param(ParameterSpec::new("value", TypeName::primitive("const T&")).unwrap());
     push.returns(TypeName::primitive("void"));
     push.body(push_body);
-    pub_section.add_code(emit_fun(&push.build()));
+    pub_section.add_code(emit_fun(&push.build().unwrap()));
 
     pub_section.add_line();
     let empty_body = CodeBlock::<CppLang>::of("return data_.empty();", ()).unwrap();
@@ -228,16 +244,16 @@ fn test_cpp_template_class() {
     empty.returns(TypeName::primitive("bool"));
     empty.suffix("const");
     empty.body(empty_body);
-    pub_section.add_code(emit_fun(&empty.build()));
+    pub_section.add_code(emit_fun(&empty.build().unwrap()));
 
     tb.extra_member(pub_section.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("stack.hpp", CppLang::header());
     fb.header(CodeBlock::<CppLang>::of("#pragma once", ()).unwrap());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/template_class.cpp", &output);
@@ -258,9 +274,9 @@ fn test_cpp_inheritance() {
     speak.returns(TypeName::primitive("void"));
     speak.suffix("const");
     speak.suffix("= 0");
-    pub_section.add_code(emit_fun(&speak.build()));
+    pub_section.add_code(emit_fun(&speak.build().unwrap()));
     base_tb.extra_member(pub_section.build().unwrap());
-    let base = base_tb.build();
+    let base = base_tb.build().unwrap();
 
     // Derived class with multiple inheritance.
     let mut derived_tb = TypeSpec::<CppLang>::builder("Dog", TypeKind::Class);
@@ -278,14 +294,14 @@ fn test_cpp_inheritance() {
     speak_impl.suffix("const");
     speak_impl.suffix("override");
     speak_impl.body(body);
-    pub_section2.add_code(emit_fun(&speak_impl.build()));
+    pub_section2.add_code(emit_fun(&speak_impl.build().unwrap()));
     derived_tb.extra_member(pub_section2.build().unwrap());
-    let derived = derived_tb.build();
+    let derived = derived_tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("animals.hpp", CppLang::header());
     fb.add_type(base);
     fb.add_type(derived);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/inheritance.cpp", &output);
@@ -298,11 +314,11 @@ fn test_cpp_static_method() {
     fb.is_static();
     fb.returns(TypeName::primitive("int"));
     fb.body(body);
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("helpers.cpp", CppLang::new());
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/static_method.cpp", &output);
@@ -324,7 +340,9 @@ fn test_cpp_full_header() {
     priv_section.add("private:", ());
     priv_section.add_line();
     priv_section.add("%>", ());
-    let field = FieldSpec::builder("name_", TypeName::primitive("std::string")).build();
+    let field = FieldSpec::builder("name_", TypeName::primitive("std::string"))
+        .build()
+        .unwrap();
     priv_section.add_code(emit_field(&field));
     tb.extra_member(priv_section.build().unwrap());
 
@@ -339,12 +357,9 @@ fn test_cpp_full_header() {
     // Constructor
     let ctor_body = CodeBlock::<CppLang>::of("name_ = name;", ()).unwrap();
     let mut ctor = FunSpec::<CppLang>::builder("Logger");
-    ctor.add_param(ParameterSpec::new(
-        "name",
-        TypeName::primitive("const std::string&"),
-    ));
+    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("const std::string&")).unwrap());
     ctor.body(ctor_body);
-    pub_section.add_code(emit_fun(&ctor.build()));
+    pub_section.add_code(emit_fun(&ctor.build().unwrap()));
 
     // log method using imports
     pub_section.add_line();
@@ -354,13 +369,10 @@ fn test_cpp_full_header() {
     )
     .unwrap();
     let mut log = FunSpec::<CppLang>::builder("log");
-    log.add_param(ParameterSpec::new(
-        "msg",
-        TypeName::primitive("const char*"),
-    ));
+    log.add_param(ParameterSpec::new("msg", TypeName::primitive("const char*")).unwrap());
     log.returns(TypeName::primitive("void"));
     log.body(log_body);
-    pub_section.add_code(emit_fun(&log.build()));
+    pub_section.add_code(emit_fun(&log.build().unwrap()));
 
     // name getter — const
     pub_section.add_line();
@@ -369,11 +381,11 @@ fn test_cpp_full_header() {
     name_fn.returns(TypeName::primitive("const std::string&"));
     name_fn.suffix("const");
     name_fn.body(name_body);
-    pub_section.add_code(emit_fun(&name_fn.build()));
+    pub_section.add_code(emit_fun(&name_fn.build().unwrap()));
 
     tb.extra_member(pub_section.build().unwrap());
 
-    let ts = tb.build();
+    let ts = tb.build().unwrap();
 
     // Trigger base.hpp import.
     let import_trigger = CodeBlock::<CppLang>::of(
@@ -386,7 +398,7 @@ fn test_cpp_full_header() {
     fb.header(CodeBlock::<CppLang>::of("#pragma once", ()).unwrap());
     fb.add_code(import_trigger);
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/full_header.cpp", &output);

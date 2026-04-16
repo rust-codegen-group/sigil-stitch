@@ -39,17 +39,32 @@ fn main() {
     members.add("LOG_ERROR", ());
     members.add_line();
     enum_b.extra_member(members.build().unwrap());
-    let log_level = enum_b.build();
+    let log_level = enum_b.build().unwrap();
 
     // --- Struct: Config ---
     let mut struct_b = TypeSpec::<CLang>::builder("Config", TypeKind::Struct);
     struct_b.doc("Application configuration.");
-    struct_b.add_field(FieldSpec::builder("host", TypeName::primitive("const char*")).build());
-    struct_b.add_field(FieldSpec::builder("port", TypeName::primitive("int")).build());
-    struct_b
-        .add_field(FieldSpec::builder("log_level", TypeName::primitive("enum LogLevel")).build());
-    struct_b.add_field(FieldSpec::builder("max_connections", TypeName::primitive("int")).build());
-    let config = struct_b.build();
+    struct_b.add_field(
+        FieldSpec::builder("host", TypeName::primitive("const char*"))
+            .build()
+            .unwrap(),
+    );
+    struct_b.add_field(
+        FieldSpec::builder("port", TypeName::primitive("int"))
+            .build()
+            .unwrap(),
+    );
+    struct_b.add_field(
+        FieldSpec::builder("log_level", TypeName::primitive("enum LogLevel"))
+            .build()
+            .unwrap(),
+    );
+    struct_b.add_field(
+        FieldSpec::builder("max_connections", TypeName::primitive("int"))
+            .build()
+            .unwrap(),
+    );
+    let config = struct_b.build().unwrap();
 
     // --- Function: config_create ---
     let mut create_body_b = CodeBlock::<CLang>::builder();
@@ -70,25 +85,19 @@ fn main() {
     let create_body = create_body_b.build().unwrap();
 
     let mut create_fn = FunSpec::<CLang>::builder("config_create");
-    create_fn.add_param(ParameterSpec::new(
-        "host",
-        TypeName::primitive("const char*"),
-    ));
-    create_fn.add_param(ParameterSpec::new("port", TypeName::primitive("int")));
+    create_fn.add_param(ParameterSpec::new("host", TypeName::primitive("const char*")).unwrap());
+    create_fn.add_param(ParameterSpec::new("port", TypeName::primitive("int")).unwrap());
     create_fn.returns(TypeName::primitive("struct Config*"));
     create_fn.body(create_body);
-    let config_create = create_fn.build();
+    let config_create = create_fn.build().unwrap();
 
     // --- Function: config_destroy ---
     let destroy_body = CodeBlock::<CLang>::of("%T(cfg);", (free,)).unwrap();
     let mut destroy_fn = FunSpec::<CLang>::builder("config_destroy");
-    destroy_fn.add_param(ParameterSpec::new(
-        "cfg",
-        TypeName::primitive("struct Config*"),
-    ));
+    destroy_fn.add_param(ParameterSpec::new("cfg", TypeName::primitive("struct Config*")).unwrap());
     destroy_fn.returns(TypeName::primitive("void"));
     destroy_fn.body(destroy_body);
-    let config_destroy = destroy_fn.build();
+    let config_destroy = destroy_fn.build().unwrap();
 
     // --- Function: config_print ---
     let print_body = CodeBlock::<CLang>::of(
@@ -100,13 +109,11 @@ fn main() {
     )
     .unwrap();
     let mut print_fn = FunSpec::<CLang>::builder("config_print");
-    print_fn.add_param(ParameterSpec::new(
-        "cfg",
-        TypeName::primitive("const struct Config*"),
-    ));
+    print_fn
+        .add_param(ParameterSpec::new("cfg", TypeName::primitive("const struct Config*")).unwrap());
     print_fn.returns(TypeName::primitive("void"));
     print_fn.body(print_body);
-    let config_print = print_fn.build();
+    let config_print = print_fn.build().unwrap();
 
     // --- Assemble file ---
     let mut fb = FileSpec::builder_with("config.h", CLang::header());
@@ -117,7 +124,7 @@ fn main() {
     fb.add_function(config_destroy);
     fb.add_function(config_print);
 
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
     print!("{output}");
 }

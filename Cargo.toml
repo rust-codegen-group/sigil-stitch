@@ -20,3 +20,4 @@ exclude = [
 
 [dependencies]
 pretty = "0.12"
+snafu = "0.9"

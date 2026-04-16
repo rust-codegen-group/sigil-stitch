@@ -29,7 +29,7 @@ fn main() {
     // Fields.
     let mut fb1 = FieldSpec::builder("name", TypeName::primitive("String"));
     fb1.visibility(Visibility::Public);
-    tb.add_field(fb1.build());
+    tb.add_field(fb1.build().unwrap());
 
     let mut fb2 = FieldSpec::builder(
         "values",
@@ -39,7 +39,7 @@ fn main() {
         ),
     );
     fb2.visibility(Visibility::Public);
-    tb.add_field(fb2.build());
+    tb.add_field(fb2.build().unwrap());
 
     // Constructor method.
     let body = CodeBlock::<RustLang>::of(
@@ -49,15 +49,15 @@ fn main() {
     .unwrap();
     let mut mfb = FunSpec::<RustLang>::builder("new");
     mfb.visibility(Visibility::Public);
-    mfb.add_param(ParameterSpec::new("name", TypeName::primitive("&str")));
+    mfb.add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap());
     mfb.returns(TypeName::primitive("Self"));
     mfb.body(body);
-    tb.add_method(mfb.build());
+    tb.add_method(mfb.build().unwrap());
 
     // Build and render.
     let mut file = FileSpec::builder_with("config.rs", RustLang::new());
-    file.add_type(tb.build());
-    let spec = file.build();
+    file.add_type(tb.build().unwrap());
+    let spec = file.build().unwrap();
 
     let output = spec.render(100).unwrap();
     println!("{output}");

@@ -22,12 +22,14 @@ use sigil_stitch::type_name::TypeName;
 
 /// Shorthand for a JS parameter (no type annotation).
 fn param(name: &str) -> ParameterSpec<JavaScript> {
-    ParameterSpec::new(name, TypeName::primitive(""))
+    ParameterSpec::new(name, TypeName::primitive("")).unwrap()
 }
 
 /// Shorthand for a JS field (no type annotation).
 fn field(name: &str) -> FieldSpec<JavaScript> {
-    FieldSpec::builder(name, TypeName::primitive("")).build()
+    FieldSpec::builder(name, TypeName::primitive(""))
+        .build()
+        .unwrap()
 }
 
 fn main() {
@@ -54,15 +56,15 @@ fn main() {
     ctor.add_param(param("name"));
     ctor.add_param(param("level"));
     ctor.body(ctor_body);
-    logger_tb.add_method(ctor.build());
+    logger_tb.add_method(ctor.build().unwrap());
 
     // getName method
     let get_name_body = CodeBlock::<JavaScript>::of("return this.#name;", ()).unwrap();
     let mut get_name = FunSpec::<JavaScript>::builder("getName");
     get_name.body(get_name_body);
-    logger_tb.add_method(get_name.build());
+    logger_tb.add_method(get_name.build().unwrap());
 
-    let logger = logger_tb.build();
+    let logger = logger_tb.build().unwrap();
 
     // --- Derived class: ConsoleLogger ---
     let mut console_tb = TypeSpec::<JavaScript>::builder("ConsoleLogger", TypeKind::Class);
@@ -75,7 +77,7 @@ fn main() {
     let mut ctor2 = FunSpec::<JavaScript>::builder("constructor");
     ctor2.add_param(param("name"));
     ctor2.body(ctor_body2);
-    console_tb.add_method(ctor2.build());
+    console_tb.add_method(ctor2.build().unwrap());
 
     // log method — uses imports
     let log_body = CodeBlock::<JavaScript>::of(
@@ -86,9 +88,9 @@ fn main() {
     let mut log_fn = FunSpec::<JavaScript>::builder("log");
     log_fn.add_param(param("message"));
     log_fn.body(log_body);
-    console_tb.add_method(log_fn.build());
+    console_tb.add_method(log_fn.build().unwrap());
 
-    let console_logger = console_tb.build();
+    let console_logger = console_tb.build().unwrap();
 
     // --- EventBus class ---
     let mut bus_tb = TypeSpec::<JavaScript>::builder("EventBus", TypeKind::Class);
@@ -102,7 +104,7 @@ fn main() {
         CodeBlock::<JavaScript>::of("super();\nthis.#subscribers = new Map();", ()).unwrap();
     let mut bus_ctor = FunSpec::<JavaScript>::builder("constructor");
     bus_ctor.body(bus_ctor_body);
-    bus_tb.add_method(bus_ctor.build());
+    bus_tb.add_method(bus_ctor.build().unwrap());
 
     let emit_body = CodeBlock::<JavaScript>::of(
         "const id = %T();\nthis.emit(event, { id, ...data });\nreturn id;",
@@ -113,9 +115,9 @@ fn main() {
     emit_fn.add_param(param("event"));
     emit_fn.add_param(param("data"));
     emit_fn.body(emit_body);
-    bus_tb.add_method(emit_fn.build());
+    bus_tb.add_method(emit_fn.build().unwrap());
 
-    let event_bus = bus_tb.build();
+    let event_bus = bus_tb.build().unwrap();
 
     // --- Standalone exported functions ---
     let create_logger_body =
@@ -124,13 +126,13 @@ fn main() {
     create_logger.visibility(Visibility::Public);
     create_logger.add_param(param("name"));
     create_logger.body(create_logger_body);
-    let create_logger_fn = create_logger.build();
+    let create_logger_fn = create_logger.build().unwrap();
 
     let create_bus_body = CodeBlock::<JavaScript>::of("return new EventBus();", ()).unwrap();
     let mut create_bus = FunSpec::<JavaScript>::builder("createEventBus");
     create_bus.visibility(Visibility::Public);
     create_bus.body(create_bus_body);
-    let create_bus_fn = create_bus.build();
+    let create_bus_fn = create_bus.build().unwrap();
 
     // Async function
     let fetch_body = CodeBlock::<JavaScript>::of(
@@ -143,7 +145,7 @@ fn main() {
     fetch_fn.is_async();
     fetch_fn.add_param(param("url"));
     fetch_fn.body(fetch_body);
-    let fetch_json = fetch_fn.build();
+    let fetch_json = fetch_fn.build().unwrap();
 
     // --- Trigger imports for extends base types ---
     let import_trigger =
@@ -159,7 +161,7 @@ fn main() {
     fb.add_function(create_bus_fn);
     fb.add_function(fetch_json);
 
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
     print!("{output}");
 }

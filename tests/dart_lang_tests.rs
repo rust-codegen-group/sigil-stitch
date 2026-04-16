@@ -16,7 +16,7 @@ fn test_dart_function_with_imports() {
 
     let mut fb = FileSpec::builder_with("app.dart", DartLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("dart/function_with_imports.dart", &output);
@@ -41,7 +41,7 @@ fn test_dart_import_grouping() {
 
     let mut fb = FileSpec::builder_with("imports.dart", DartLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("dart/import_grouping.dart", &output);
@@ -61,7 +61,7 @@ fn test_dart_control_flow() {
 
     let mut fb = FileSpec::builder_with("flow.dart", DartLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("dart/control_flow.dart", &output);

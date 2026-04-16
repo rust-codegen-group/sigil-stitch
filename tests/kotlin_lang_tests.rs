@@ -16,7 +16,7 @@ fn test_kotlin_function_with_imports() {
 
     let mut fb = FileSpec::builder_with("App.kt", Kotlin::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("kotlin/function_with_imports.kt", &output);
@@ -41,7 +41,7 @@ fn test_kotlin_import_grouping() {
 
     let mut fb = FileSpec::builder_with("Imports.kt", Kotlin::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("kotlin/import_grouping.kt", &output);
@@ -61,7 +61,7 @@ fn test_kotlin_control_flow() {
 
     let mut fb = FileSpec::builder_with("Flow.kt", Kotlin::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("kotlin/control_flow.kt", &output);

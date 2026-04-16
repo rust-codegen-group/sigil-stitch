@@ -38,7 +38,7 @@
 //!
 //! let mut fb = FileSpec::<TypeScript>::builder("user.ts");
 //! fb.add_code(body);
-//! let file = fb.build();
+//! let file = fb.build().unwrap();
 //!
 //! let output = file.render(80).unwrap();
 //! assert!(output.contains("import type { User } from './models'"));
@@ -50,6 +50,8 @@ pub mod code_block;
 pub mod code_renderer;
 /// Reusable named-parameter templates that produce `CodeBlock`s.
 pub mod code_template;
+/// Error types for sigil-stitch.
+pub mod error;
 /// Import types, grouping, and conflict resolution.
 pub mod import;
 /// Walks `CodeBlock` trees to extract all import references.
@@ -67,6 +69,7 @@ pub mod type_name;
 pub mod prelude {
     pub use crate::code_block::{CodeBlock, CodeBlockBuilder};
     pub use crate::code_template::{CodeTemplate, ParamKind};
+    pub use crate::error::SigilStitchError;
     pub use crate::lang::CodeLang;
     pub use crate::spec::field_spec::FieldSpec;
     pub use crate::spec::file_spec::FileSpec;

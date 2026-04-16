@@ -45,7 +45,7 @@ fn main() {
     cases.add_line();
     priority.extra_member(cases.build().unwrap());
 
-    let priority_spec = priority.build();
+    let priority_spec = priority.build().unwrap();
 
     // --- Abstract class (interface): TaskRepository ---
     let tp = TypeParamSpec::<DartLang>::new("T");
@@ -56,36 +56,36 @@ fn main() {
 
     let mut find = FunSpec::<DartLang>::builder("findById");
     find.returns(TypeName::primitive("T?"));
-    find.add_param(ParameterSpec::new("id", TypeName::primitive("String")));
-    repo.add_method(find.build());
+    find.add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap());
+    repo.add_method(find.build().unwrap());
 
     let mut find_all = FunSpec::<DartLang>::builder("findAll");
     find_all.returns(TypeName::primitive("List<T>"));
-    repo.add_method(find_all.build());
+    repo.add_method(find_all.build().unwrap());
 
     let mut save = FunSpec::<DartLang>::builder("save");
-    save.add_param(ParameterSpec::new("entity", TypeName::primitive("T")));
-    repo.add_method(save.build());
+    save.add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap());
+    repo.add_method(save.build().unwrap());
 
-    let repo_spec = repo.build();
+    let repo_spec = repo.build().unwrap();
 
     // --- Class: Task ---
     let mut task_cls = TypeSpec::<DartLang>::builder("Task", TypeKind::Class);
     task_cls.doc("A task entity.");
 
     let id_field = FieldSpec::builder("id", TypeName::primitive("String"));
-    task_cls.add_field(id_field.build());
+    task_cls.add_field(id_field.build().unwrap());
 
     let name_field = FieldSpec::builder("name", TypeName::primitive("String"));
-    task_cls.add_field(name_field.build());
+    task_cls.add_field(name_field.build().unwrap());
 
     let mut priority_field = FieldSpec::builder("priority", TypeName::primitive("Priority"));
     priority_field.is_readonly();
-    task_cls.add_field(priority_field.build());
+    task_cls.add_field(priority_field.build().unwrap());
 
     let mut completed_field = FieldSpec::builder("completed", TypeName::primitive("bool"));
     completed_field.initializer(CodeBlock::<DartLang>::of("false", ()).unwrap());
-    task_cls.add_field(completed_field.build());
+    task_cls.add_field(completed_field.build().unwrap());
 
     // Constructor.
     let ctor_body = CodeBlock::<DartLang>::of(
@@ -94,16 +94,13 @@ fn main() {
     )
     .unwrap();
     let mut ctor = FunSpec::<DartLang>::builder("Task");
-    ctor.add_param(ParameterSpec::new("id", TypeName::primitive("String")));
-    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
-    ctor.add_param(ParameterSpec::new(
-        "priority",
-        TypeName::primitive("Priority"),
-    ));
+    ctor.add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap());
+    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
+    ctor.add_param(ParameterSpec::new("priority", TypeName::primitive("Priority")).unwrap());
     ctor.body(ctor_body);
-    task_cls.add_method(ctor.build());
+    task_cls.add_method(ctor.build().unwrap());
 
-    let task_spec = task_cls.build();
+    let task_spec = task_cls.build().unwrap();
 
     // --- Class: Constants with static final ---
     let mut constants = TypeSpec::<DartLang>::builder("Constants", TypeKind::Class);
@@ -113,7 +110,7 @@ fn main() {
     max_field.is_static();
     max_field.is_readonly();
     max_field.initializer(CodeBlock::<DartLang>::of("3", ()).unwrap());
-    constants.add_field(max_field.build());
+    constants.add_field(max_field.build().unwrap());
 
     let mut api_field = FieldSpec::builder("apiUrl", TypeName::primitive("String"));
     api_field.is_static();
@@ -122,9 +119,9 @@ fn main() {
         CodeBlock::<DartLang>::of("%S", (StringLitArg("https://api.example.com".to_string()),))
             .unwrap(),
     );
-    constants.add_field(api_field.build());
+    constants.add_field(api_field.build().unwrap());
 
-    let constants_spec = constants.build();
+    let constants_spec = constants.build().unwrap();
 
     // --- Class: InMemoryTaskRepository extends nothing, implements TaskRepository ---
     let mut impl_cls = TypeSpec::<DartLang>::builder("InMemoryTaskRepository", TypeKind::Class);
@@ -134,7 +131,7 @@ fn main() {
     let mut tasks_field = FieldSpec::builder("_tasks", TypeName::primitive("List<Task>"));
     tasks_field.is_readonly();
     tasks_field.initializer(CodeBlock::<DartLang>::of("[]", ()).unwrap());
-    impl_cls.add_field(tasks_field.build());
+    impl_cls.add_field(tasks_field.build().unwrap());
 
     // findById with @override.
     let find_body = CodeBlock::<DartLang>::of(
@@ -144,10 +141,10 @@ fn main() {
     .unwrap();
     let mut find_impl = FunSpec::<DartLang>::builder("findById");
     find_impl.returns(TypeName::primitive("Task?"));
-    find_impl.add_param(ParameterSpec::new("id", TypeName::primitive("String")));
+    find_impl.add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap());
     find_impl.annotation(CodeBlock::<DartLang>::of("@override", ()).unwrap());
     find_impl.body(find_body);
-    impl_cls.add_method(find_impl.build());
+    impl_cls.add_method(find_impl.build().unwrap());
 
     // findAll with @override.
     let find_all_body = CodeBlock::<DartLang>::of("return List.unmodifiable(_tasks);", ()).unwrap();
@@ -155,17 +152,17 @@ fn main() {
     find_all_impl.returns(TypeName::primitive("List<Task>"));
     find_all_impl.annotation(CodeBlock::<DartLang>::of("@override", ()).unwrap());
     find_all_impl.body(find_all_body);
-    impl_cls.add_method(find_all_impl.build());
+    impl_cls.add_method(find_all_impl.build().unwrap());
 
     // save with @override.
     let save_body = CodeBlock::<DartLang>::of("_tasks.add(entity);", ()).unwrap();
     let mut save_impl = FunSpec::<DartLang>::builder("save");
-    save_impl.add_param(ParameterSpec::new("entity", TypeName::primitive("Task")));
+    save_impl.add_param(ParameterSpec::new("entity", TypeName::primitive("Task")).unwrap());
     save_impl.annotation(CodeBlock::<DartLang>::of("@override", ()).unwrap());
     save_impl.body(save_body);
-    impl_cls.add_method(save_impl.build());
+    impl_cls.add_method(save_impl.build().unwrap());
 
-    let impl_spec = impl_cls.build();
+    let impl_spec = impl_cls.build().unwrap();
 
     // --- Generic class: SortedList<T extends Comparable> ---
     let sorted_tp =
@@ -178,22 +175,22 @@ fn main() {
     let mut items_field = FieldSpec::builder("_items", TypeName::primitive("List<T>"));
     items_field.is_readonly();
     items_field.initializer(CodeBlock::<DartLang>::of("[]", ()).unwrap());
-    sorted.add_field(items_field.build());
+    sorted.add_field(items_field.build().unwrap());
 
     let add_body = CodeBlock::<DartLang>::of("_items.add(item);\n_items.sort();", ()).unwrap();
     let mut add_fn = FunSpec::<DartLang>::builder("add");
     add_fn.returns(TypeName::primitive("void"));
-    add_fn.add_param(ParameterSpec::new("item", TypeName::primitive("T")));
+    add_fn.add_param(ParameterSpec::new("item", TypeName::primitive("T")).unwrap());
     add_fn.body(add_body);
-    sorted.add_method(add_fn.build());
+    sorted.add_method(add_fn.build().unwrap());
 
     let get_body = CodeBlock::<DartLang>::of("return List.unmodifiable(_items);", ()).unwrap();
     let mut get_fn = FunSpec::<DartLang>::builder("items");
     get_fn.returns(TypeName::primitive("List<T>"));
     get_fn.body(get_body);
-    sorted.add_method(get_fn.build());
+    sorted.add_method(get_fn.build().unwrap());
 
-    let sorted_spec = sorted.build();
+    let sorted_spec = sorted.build().unwrap();
 
     // --- Standalone function using imports ---
     let parse_body = CodeBlock::<DartLang>::of(
@@ -203,9 +200,9 @@ fn main() {
     .unwrap();
     let mut parse_fn = FunSpec::<DartLang>::builder("parseTask");
     parse_fn.returns(TypeName::primitive("Task"));
-    parse_fn.add_param(ParameterSpec::new("json", TypeName::primitive("String")));
+    parse_fn.add_param(ParameterSpec::new("json", TypeName::primitive("String")).unwrap());
     parse_fn.body(parse_body);
-    let parse_task = parse_fn.build();
+    let parse_task = parse_fn.build().unwrap();
 
     // Trigger Future + http imports.
     let future_trigger = CodeBlock::<DartLang>::of("// %T", (future,)).unwrap();
@@ -223,7 +220,7 @@ fn main() {
     fb.add_type(sorted_spec);
     fb.add_function(parse_task);
 
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
     print!("{output}");
 }

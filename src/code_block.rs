@@ -95,7 +95,10 @@ impl<L: CodeLang> CodeBlock<L> {
     }
 
     /// Create a CodeBlock from a single format string and arguments.
-    pub fn of(format: &str, args: impl IntoArgs<L>) -> Result<Self, String> {
+    pub fn of(
+        format: &str,
+        args: impl IntoArgs<L>,
+    ) -> Result<Self, crate::error::SigilStitchError> {
         let mut builder = CodeBlockBuilder::new();
         builder.add(format, args);
         builder.build()
@@ -144,6 +147,7 @@ pub struct CodeBlockBuilder<L: CodeLang> {
     parts: Vec<FormatPart>,
     args: Vec<Arg<L>>,
     indent_depth: i32,
+    errors: Vec<crate::error::SigilStitchError>,
 }
 
 impl<L: CodeLang> CodeBlockBuilder<L> {
@@ -153,6 +157,7 @@ impl<L: CodeLang> CodeBlockBuilder<L> {
             parts: Vec::new(),
             args: Vec::new(),
             indent_depth: 0,
+            errors: Vec::new(),
         }
     }
 
@@ -174,14 +179,15 @@ impl<L: CodeLang> CodeBlockBuilder<L> {
             })
             .count();
 
-        assert_eq!(
-            expected_args,
-            arg_vec.len(),
-            "Format string {:?} expects {} args but got {}",
-            format,
-            expected_args,
-            arg_vec.len(),
-        );
+        if expected_args != arg_vec.len() {
+            self.errors
+                .push(crate::error::SigilStitchError::FormatArgCount {
+                    format: format.to_string(),
+                    expected: expected_args,
+                    actual: arg_vec.len(),
+                });
+            return self;
+        }
 
         self.parts.extend(parsed);
         self.args.extend(arg_vec);
@@ -253,15 +259,17 @@ impl<L: CodeLang> CodeBlockBuilder<L> {
 
     /// Build the immutable CodeBlock.
     ///
-    /// Returns an error if indent depth is not balanced (unmatched
+    /// Returns an error if any format string had an argument count mismatch,
+    /// or if indent depth is not balanced (unmatched
     /// begin_control_flow / end_control_flow).
-    pub fn build(self) -> Result<CodeBlock<L>, String> {
+    pub fn build(self) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
+        if let Some(err) = self.errors.into_iter().next() {
+            return Err(err);
+        }
         if self.indent_depth != 0 {
-            return Err(format!(
-                "Unbalanced control flow: indent depth is {} (expected 0). \
-                 Check begin_control_flow / end_control_flow calls.",
-                self.indent_depth,
-            ));
+            return Err(crate::error::SigilStitchError::UnbalancedIndent {
+                depth: self.indent_depth,
+            });
         }
         Ok(CodeBlock {
             parts: self.parts,
@@ -573,13 +581,21 @@ mod tests {
         // missing end_control_flow
         let result = b.build();
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Unbalanced"));
+        assert!(result.unwrap_err().to_string().contains("unbalanced"));
     }
 
     #[test]
-    #[should_panic(expected = "expects 1 args but got 0")]
     fn test_mismatched_arg_count() {
-        CodeBlock::<TypeScript>::builder().add("%T", ());
+        let mut b = CodeBlock::<TypeScript>::builder();
+        b.add("%T", ());
+        let result = b.build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("expects 1 args but got 0")
+        );
     }
 
     #[test]

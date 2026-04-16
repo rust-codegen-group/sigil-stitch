@@ -27,7 +27,7 @@ fn test_go_function_with_imports() {
     let mut fb = FileSpec::builder_with("server.go", GoLang::new());
     fb.header(CodeBlock::<GoLang>::of("package main", ()).unwrap());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("go/function_with_imports.go", &output);
@@ -50,7 +50,7 @@ fn test_go_import_grouping() {
     let mut fb = FileSpec::builder_with("main.go", GoLang::new());
     fb.header(CodeBlock::<GoLang>::of("package main", ()).unwrap());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("go/import_grouping.go", &output);
@@ -79,7 +79,7 @@ fn test_go_control_flow() {
     let mut fb = FileSpec::builder_with("classify.go", GoLang::new());
     fb.header(CodeBlock::<GoLang>::of("package main", ()).unwrap());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("go/control_flow.go", &output);
@@ -102,7 +102,7 @@ fn test_go_same_package_symbols() {
     let mut fb = FileSpec::builder_with("http.go", GoLang::new());
     fb.header(CodeBlock::<GoLang>::of("package main", ()).unwrap());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("go/same_package_symbols.go", &output);

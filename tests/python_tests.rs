@@ -23,7 +23,7 @@ fn test_python_function_with_imports() {
 
     let mut fb = FileSpec::builder_with("server.py", Python::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("python/function_with_imports.py", &output);
@@ -47,7 +47,7 @@ fn test_python_import_grouping() {
 
     let mut fb = FileSpec::builder_with("app.py", Python::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("python/import_grouping.py", &output);
@@ -73,7 +73,7 @@ fn test_python_control_flow() {
 
     let mut fb = FileSpec::builder_with("classify.py", Python::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("python/control_flow.py", &output);
@@ -95,7 +95,7 @@ fn test_python_class_basic() {
 
     let mut fb = FileSpec::builder_with("config.py", Python::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("python/class_basic.py", &output);

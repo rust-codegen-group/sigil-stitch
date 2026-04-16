@@ -28,7 +28,7 @@ fn test_c_function_with_includes() {
 
     let mut fb = FileSpec::builder_with("main.c", CLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/function_with_includes.c", &output);
@@ -58,7 +58,7 @@ fn test_c_include_grouping() {
 
     let mut fb = FileSpec::builder_with("test.c", CLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/include_grouping.c", &output);
@@ -78,7 +78,7 @@ fn test_c_control_flow() {
 
     let mut fb = FileSpec::builder_with("flow.c", CLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/control_flow.c", &output);
@@ -100,7 +100,7 @@ fn test_c_struct_basic() {
 
     let mut fb = FileSpec::builder_with("point.c", CLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/struct_basic.c", &output);

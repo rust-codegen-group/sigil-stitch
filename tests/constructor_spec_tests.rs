@@ -21,14 +21,14 @@ fn render_fun<L: sigil_stitch::lang::CodeLang>(
     lang: &L,
     ctx: DeclarationContext,
 ) -> String {
-    let block = spec.emit(lang, ctx);
+    let block = spec.emit(lang, ctx).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
     let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
-    renderer.render(&block)
+    renderer.render(&block).unwrap()
 }
 
 fn render_type<L: sigil_stitch::lang::CodeLang>(spec: &TypeSpec<L>, lang: &L) -> String {
-    let blocks = spec.emit(lang);
+    let blocks = spec.emit(lang).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
     let mut output = String::new();
     for (i, block) in blocks.iter().enumerate() {
@@ -36,7 +36,7 @@ fn render_type<L: sigil_stitch::lang::CodeLang>(spec: &TypeSpec<L>, lang: &L) ->
             output.push('\n');
         }
         let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
-        output.push_str(&renderer.render(block));
+        output.push_str(&renderer.render(block).unwrap());
     }
     output
 }
@@ -48,9 +48,9 @@ fn test_ts_constructor() {
     let ts = TypeScript::new();
     let mut fb = FunSpec::<TypeScript>::builder("constructor");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap());
     fb.body(CodeBlock::of("this.name = name", ()).unwrap());
-    let output = render_fun(&fb.build(), &ts, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &ts, DeclarationContext::Member);
     assert!(output.contains("constructor(name: string) {"));
     assert!(output.contains("this.name = name"));
     // Must NOT have "function" keyword.
@@ -64,10 +64,10 @@ fn test_ts_constructor_in_class() {
     tb.visibility(Visibility::Public);
     let mut ctor = FunSpec::builder("constructor");
     ctor.is_constructor();
-    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("string")));
+    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap());
     ctor.body(CodeBlock::of("this.name = name", ()).unwrap());
-    tb.add_method(ctor.build());
-    let output = render_type(&tb.build(), &ts);
+    tb.add_method(ctor.build().unwrap());
+    let output = render_type(&tb.build().unwrap(), &ts);
     assert!(output.contains("export class User {"));
     assert!(output.contains("constructor(name: string) {"));
 }
@@ -79,9 +79,9 @@ fn test_js_constructor() {
     let js = JavaScript::new();
     let mut fb = FunSpec::<JavaScript>::builder("constructor");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("")).unwrap());
     fb.body(CodeBlock::of("this.name = name", ()).unwrap());
-    let output = render_fun(&fb.build(), &js, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &js, DeclarationContext::Member);
     assert!(output.contains("constructor(name) {"));
     assert!(!output.contains("function"));
 }
@@ -94,12 +94,9 @@ fn test_java_constructor() {
     let mut fb = FunSpec::<JavaLang>::builder("UserService");
     fb.is_constructor();
     fb.visibility(Visibility::Public);
-    fb.add_param(ParameterSpec::new(
-        "repo",
-        TypeName::primitive("UserRepository"),
-    ));
+    fb.add_param(ParameterSpec::new("repo", TypeName::primitive("UserRepository")).unwrap());
     fb.body(CodeBlock::of("this.repo = repo;", ()).unwrap());
-    let output = render_fun(&fb.build(), &java, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &java, DeclarationContext::Member);
     assert!(output.contains("public UserService(UserRepository repo) {"));
     // No return type.
     assert!(!output.contains("void"));
@@ -113,7 +110,7 @@ fn test_cpp_constructor() {
     let mut fb = FunSpec::<CppLang>::builder("Counter");
     fb.is_constructor();
     fb.body(CodeBlock::of("count_ = 0;", ()).unwrap());
-    let output = render_fun(&fb.build(), &cpp, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &cpp, DeclarationContext::Member);
     assert!(output.contains("Counter() {"));
     // No return type prefix.
     assert!(!output.contains("void"));
@@ -126,9 +123,9 @@ fn test_dart_constructor() {
     let dart = DartLang::new();
     let mut fb = FunSpec::<DartLang>::builder("Task");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("title", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("title", TypeName::primitive("String")).unwrap());
     fb.body(CodeBlock::of("this.title = title;", ()).unwrap());
-    let output = render_fun(&fb.build(), &dart, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &dart, DeclarationContext::Member);
     assert!(output.contains("Task(String title) {"));
 }
 
@@ -139,9 +136,9 @@ fn test_swift_constructor() {
     let swift = Swift::new();
     let mut fb = FunSpec::<Swift>::builder("init");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     fb.body(CodeBlock::of("self.name = name", ()).unwrap());
-    let output = render_fun(&fb.build(), &swift, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &swift, DeclarationContext::Member);
     // Must be `init(name: String)` NOT `func init(name: String)`.
     assert!(output.contains("init(name: String) {"));
     assert!(!output.contains("func init"));
@@ -153,10 +150,10 @@ fn test_swift_constructor_in_class() {
     let mut tb = TypeSpec::<Swift>::builder("Person", TypeKind::Class);
     let mut ctor = FunSpec::builder("init");
     ctor.is_constructor();
-    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     ctor.body(CodeBlock::of("self.name = name", ()).unwrap());
-    tb.add_method(ctor.build());
-    let output = render_type(&tb.build(), &swift);
+    tb.add_method(ctor.build().unwrap());
+    let output = render_type(&tb.build().unwrap(), &swift);
     assert!(output.contains("class Person {"));
     assert!(output.contains("init(name: String) {"));
     assert!(!output.contains("func init"));
@@ -169,9 +166,9 @@ fn test_kotlin_secondary_constructor() {
     let kt = Kotlin::new();
     let mut fb = FunSpec::<Kotlin>::builder("constructor");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     fb.body(CodeBlock::of("this.name = name", ()).unwrap());
-    let output = render_fun(&fb.build(), &kt, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &kt, DeclarationContext::Member);
     // Must be `constructor(name: String)` NOT `fun constructor(name: String)`.
     assert!(output.contains("constructor(name: String)"));
     assert!(!output.contains("fun constructor"));
@@ -183,10 +180,10 @@ fn test_kotlin_constructor_in_class() {
     let mut tb = TypeSpec::<Kotlin>::builder("Person", TypeKind::Class);
     let mut ctor = FunSpec::builder("constructor");
     ctor.is_constructor();
-    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     ctor.body(CodeBlock::of("this.name = name", ()).unwrap());
-    tb.add_method(ctor.build());
-    let output = render_type(&tb.build(), &kt);
+    tb.add_method(ctor.build().unwrap());
+    let output = render_type(&tb.build().unwrap(), &kt);
     assert!(output.contains("class Person {"));
     assert!(output.contains("constructor(name: String)"));
     assert!(!output.contains("fun constructor"));
@@ -199,10 +196,10 @@ fn test_python_constructor() {
     let py = Python::new();
     let mut fb = FunSpec::<Python>::builder("__init__");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("self", TypeName::primitive("")));
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("str")));
+    fb.add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap());
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("str")).unwrap());
     fb.body(CodeBlock::of("self.name = name", ()).unwrap());
-    let output = render_fun(&fb.build(), &py, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &py, DeclarationContext::Member);
     // Must keep "def" keyword: `def __init__(self, name: str):`
     assert!(output.contains("def __init__(self, name: str):"));
 }
@@ -215,10 +212,10 @@ fn test_rust_constructor() {
     let mut fb = FunSpec::<RustLang>::builder("new");
     fb.is_constructor();
     fb.visibility(Visibility::Public);
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("&str")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap());
     fb.returns(TypeName::primitive("Self"));
     fb.body(CodeBlock::of("Self { name: name.to_string() }", ()).unwrap());
-    let output = render_fun(&fb.build(), &rs, DeclarationContext::TopLevel);
+    let output = render_fun(&fb.build().unwrap(), &rs, DeclarationContext::TopLevel);
     // Must keep "fn" keyword: `pub fn new(name: &str) -> Self {`
     assert!(output.contains("pub fn new(name: &str) -> Self {"));
 }
@@ -230,10 +227,10 @@ fn test_js_constructor_with_super() {
     let js = JavaScript::new();
     let mut fb = FunSpec::<JavaScript>::builder("constructor");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("")));
-    fb.add_param(ParameterSpec::new("breed", TypeName::primitive("")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("")).unwrap());
+    fb.add_param(ParameterSpec::new("breed", TypeName::primitive("")).unwrap());
     fb.body(CodeBlock::of("super(name);\nthis.breed = breed;", ()).unwrap());
-    let output = render_fun(&fb.build(), &js, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &js, DeclarationContext::Member);
     assert!(output.contains("constructor(name, breed) {"));
     assert!(output.contains("super(name);"));
     assert!(output.contains("this.breed = breed;"));
@@ -245,9 +242,9 @@ fn test_java_constructor_with_super() {
     let mut fb = FunSpec::<JavaLang>::builder("Dog");
     fb.is_constructor();
     fb.visibility(Visibility::Public);
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     fb.body(CodeBlock::of("super(name);", ()).unwrap());
-    let output = render_fun(&fb.build(), &java, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &java, DeclarationContext::Member);
     assert!(output.contains("public Dog(String name) {"));
     assert!(output.contains("super(name);"));
 }
@@ -260,9 +257,9 @@ fn test_backward_compat_ts_constructor_without_flag() {
     // should still work because TS function_keyword(Member) already returns "".
     let ts = TypeScript::new();
     let mut fb = FunSpec::<TypeScript>::builder("constructor");
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap());
     fb.body(CodeBlock::of("this.name = name", ()).unwrap());
-    let output = render_fun(&fb.build(), &ts, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &ts, DeclarationContext::Member);
     assert!(output.contains("constructor(name: string) {"));
 }
 
@@ -272,12 +269,9 @@ fn test_backward_compat_java_constructor_without_flag() {
     let java = JavaLang::new();
     let mut fb = FunSpec::<JavaLang>::builder("UserService");
     fb.visibility(Visibility::Public);
-    fb.add_param(ParameterSpec::new(
-        "repo",
-        TypeName::primitive("UserRepository"),
-    ));
+    fb.add_param(ParameterSpec::new("repo", TypeName::primitive("UserRepository")).unwrap());
     fb.body(CodeBlock::of("this.repo = repo;", ()).unwrap());
-    let output = render_fun(&fb.build(), &java, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &java, DeclarationContext::Member);
     assert!(output.contains("public UserService(UserRepository repo) {"));
 }
 
@@ -288,11 +282,11 @@ fn test_ts_constructor_with_super_delegation() {
     let ts = TypeScript::new();
     let mut fb = FunSpec::<TypeScript>::builder("constructor");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")));
-    fb.add_param(ParameterSpec::new("age", TypeName::primitive("number")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap());
+    fb.add_param(ParameterSpec::new("age", TypeName::primitive("number")).unwrap());
     fb.delegation(CodeBlock::of("super(name)", ()).unwrap());
     fb.body(CodeBlock::of("this.age = age", ()).unwrap());
-    let output = render_fun(&fb.build(), &ts, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &ts, DeclarationContext::Member);
     assert!(output.contains("constructor(name: string, age: number) {"));
     assert!(output.contains("super(name);"));
     assert!(output.contains("this.age = age"));
@@ -307,10 +301,10 @@ fn test_ts_constructor_with_this_delegation() {
     let ts = TypeScript::new();
     let mut fb = FunSpec::<TypeScript>::builder("constructor");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap());
     fb.delegation(CodeBlock::of("this(name, 0)", ()).unwrap());
     fb.body(CodeBlock::of("// additional init", ()).unwrap());
-    let output = render_fun(&fb.build(), &ts, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &ts, DeclarationContext::Member);
     assert!(output.contains("this(name, 0);"));
 }
 
@@ -320,11 +314,11 @@ fn test_java_constructor_with_super_delegation() {
     let mut fb = FunSpec::<JavaLang>::builder("Dog");
     fb.is_constructor();
     fb.visibility(Visibility::Public);
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
-    fb.add_param(ParameterSpec::new("breed", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
+    fb.add_param(ParameterSpec::new("breed", TypeName::primitive("String")).unwrap());
     fb.delegation(CodeBlock::of("super(name)", ()).unwrap());
     fb.body(CodeBlock::of("this.breed = breed;", ()).unwrap());
-    let output = render_fun(&fb.build(), &java, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &java, DeclarationContext::Member);
     assert!(output.contains("public Dog(String name, String breed) {"));
     assert!(output.contains("super(name);"));
     assert!(output.contains("this.breed = breed;"));
@@ -339,10 +333,10 @@ fn test_java_constructor_with_this_delegation() {
     let mut fb = FunSpec::<JavaLang>::builder("Config");
     fb.is_constructor();
     fb.visibility(Visibility::Public);
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     fb.delegation(CodeBlock::of("this(name, \"default\")", ()).unwrap());
     fb.body(CodeBlock::of("// chained", ()).unwrap());
-    let output = render_fun(&fb.build(), &java, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &java, DeclarationContext::Member);
     assert!(output.contains("this(name, \"default\");"));
 }
 
@@ -351,10 +345,10 @@ fn test_kotlin_constructor_with_super_delegation_signature_style() {
     let kt = Kotlin::new();
     let mut fb = FunSpec::<Kotlin>::builder("constructor");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     fb.delegation(CodeBlock::of("super(name)", ()).unwrap());
     fb.body(CodeBlock::of("this.name = name", ()).unwrap());
-    let output = render_fun(&fb.build(), &kt, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &kt, DeclarationContext::Member);
     // Kotlin places delegation in the signature, not the body
     assert!(output.contains("constructor(name: String) : super(name) {"));
     assert!(output.contains("this.name = name"));
@@ -372,10 +366,10 @@ fn test_kotlin_constructor_with_this_delegation_signature_style() {
     let kt = Kotlin::new();
     let mut fb = FunSpec::<Kotlin>::builder("constructor");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     fb.delegation(CodeBlock::of("this(name, 0)", ()).unwrap());
     fb.body(CodeBlock::of("// chained", ()).unwrap());
-    let output = render_fun(&fb.build(), &kt, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &kt, DeclarationContext::Member);
     assert!(output.contains("constructor(name: String) : this(name, 0) {"));
 }
 
@@ -384,10 +378,10 @@ fn test_swift_constructor_with_super_delegation() {
     let swift = Swift::new();
     let mut fb = FunSpec::<Swift>::builder("init");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     fb.delegation(CodeBlock::of("super.init()", ()).unwrap());
     fb.body(CodeBlock::of("self.name = name", ()).unwrap());
-    let output = render_fun(&fb.build(), &swift, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &swift, DeclarationContext::Member);
     assert!(output.contains("init(name: String) {"));
     assert!(output.contains("super.init()"));
     assert!(output.contains("self.name = name"));
@@ -398,10 +392,10 @@ fn test_dart_constructor_with_super_delegation() {
     let dart = DartLang::new();
     let mut fb = FunSpec::<DartLang>::builder("Dog");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     fb.delegation(CodeBlock::of("super(name)", ()).unwrap());
     fb.body(CodeBlock::of("print('Dog created');", ()).unwrap());
-    let output = render_fun(&fb.build(), &dart, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &dart, DeclarationContext::Member);
     assert!(output.contains("Dog(String name) {"));
     assert!(output.contains("super(name);"));
     assert!(output.contains("print('Dog created');"));
@@ -412,11 +406,11 @@ fn test_python_constructor_with_super_delegation() {
     let py = Python::new();
     let mut fb = FunSpec::<Python>::builder("__init__");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new("self", TypeName::primitive("")));
-    fb.add_param(ParameterSpec::new("name", TypeName::primitive("str")));
+    fb.add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap());
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("str")).unwrap());
     fb.delegation(CodeBlock::of("super().__init__(name)", ()).unwrap());
     fb.body(CodeBlock::of("self.extra = True", ()).unwrap());
-    let output = render_fun(&fb.build(), &py, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &py, DeclarationContext::Member);
     assert!(output.contains("def __init__(self, name: str):"));
     assert!(output.contains("super().__init__(name)"));
     assert!(output.contains("self.extra = True"));
@@ -427,13 +421,10 @@ fn test_cpp_constructor_with_super_delegation() {
     let cpp = CppLang::new();
     let mut fb = FunSpec::<CppLang>::builder("Dog");
     fb.is_constructor();
-    fb.add_param(ParameterSpec::new(
-        "name",
-        TypeName::primitive("std::string"),
-    ));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("std::string")).unwrap());
     fb.delegation(CodeBlock::of("Animal(name)", ()).unwrap());
     fb.body(CodeBlock::of("// extra init", ()).unwrap());
-    let output = render_fun(&fb.build(), &cpp, DeclarationContext::Member);
+    let output = render_fun(&fb.build().unwrap(), &cpp, DeclarationContext::Member);
     // C++ uses body-style delegation (in this simplified model)
     assert!(output.contains("Dog(std::string name) {"));
     assert!(output.contains("Animal(name);"));
@@ -450,13 +441,13 @@ fn test_ts_class_with_super_constructor_delegation() {
 
     let mut ctor = FunSpec::builder("constructor");
     ctor.is_constructor();
-    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("string")));
-    ctor.add_param(ParameterSpec::new("breed", TypeName::primitive("string")));
+    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap());
+    ctor.add_param(ParameterSpec::new("breed", TypeName::primitive("string")).unwrap());
     ctor.delegation(CodeBlock::of("super(name)", ()).unwrap());
     ctor.body(CodeBlock::of("this.breed = breed", ()).unwrap());
-    tb.add_method(ctor.build());
+    tb.add_method(ctor.build().unwrap());
 
-    let output = render_type(&tb.build(), &ts);
+    let output = render_type(&tb.build().unwrap(), &ts);
     assert!(output.contains("export class Dog extends Animal {"));
     assert!(output.contains("constructor(name: string, breed: string) {"));
     assert!(output.contains("super(name);"));
@@ -471,12 +462,12 @@ fn test_kotlin_class_with_super_constructor_delegation() {
 
     let mut ctor = FunSpec::builder("constructor");
     ctor.is_constructor();
-    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     ctor.delegation(CodeBlock::of("super(name)", ()).unwrap());
     ctor.body(CodeBlock::of("this.name = name", ()).unwrap());
-    tb.add_method(ctor.build());
+    tb.add_method(ctor.build().unwrap());
 
-    let output = render_type(&tb.build(), &kt);
+    let output = render_type(&tb.build().unwrap(), &kt);
     assert!(output.contains("class Dog : Animal {"));
     assert!(output.contains("constructor(name: String) : super(name) {"));
 }
@@ -487,13 +478,14 @@ fn test_kotlin_class_with_super_constructor_delegation() {
 fn test_kotlin_primary_constructor() {
     let kt = Kotlin::new();
     let mut tb = TypeSpec::<Kotlin>::builder("Person", TypeKind::Class);
-    tb.add_primary_constructor_param(ParameterSpec::new(
-        "val name",
-        TypeName::primitive("String"),
-    ));
-    tb.add_primary_constructor_param(ParameterSpec::new("val age", TypeName::primitive("Int")));
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("val name", TypeName::primitive("String")).unwrap(),
+    );
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("val age", TypeName::primitive("Int")).unwrap(),
+    );
 
-    let output = render_type(&tb.build(), &kt);
+    let output = render_type(&tb.build().unwrap(), &kt);
     assert!(output.contains("class Person(val name: String, val age: Int) {"));
 }
 
@@ -501,14 +493,15 @@ fn test_kotlin_primary_constructor() {
 fn test_kotlin_primary_constructor_with_super() {
     let kt = Kotlin::new();
     let mut tb = TypeSpec::<Kotlin>::builder("Student", TypeKind::Class);
-    tb.add_primary_constructor_param(ParameterSpec::new(
-        "val name",
-        TypeName::primitive("String"),
-    ));
-    tb.add_primary_constructor_param(ParameterSpec::new("val grade", TypeName::primitive("Int")));
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("val name", TypeName::primitive("String")).unwrap(),
+    );
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("val grade", TypeName::primitive("Int")).unwrap(),
+    );
     tb.extends(TypeName::primitive("Person"));
 
-    let output = render_type(&tb.build(), &kt);
+    let output = render_type(&tb.build().unwrap(), &kt);
     assert!(output.contains("class Student(val name: String, val grade: Int) : Person {"));
 }
 
@@ -516,10 +509,14 @@ fn test_kotlin_primary_constructor_with_super() {
 fn test_kotlin_data_class_primary_constructor() {
     let kt = Kotlin::new();
     let mut tb = TypeSpec::<Kotlin>::builder("Point", TypeKind::Struct);
-    tb.add_primary_constructor_param(ParameterSpec::new("val x", TypeName::primitive("Int")));
-    tb.add_primary_constructor_param(ParameterSpec::new("val y", TypeName::primitive("Int")));
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("val x", TypeName::primitive("Int")).unwrap(),
+    );
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("val y", TypeName::primitive("Int")).unwrap(),
+    );
 
-    let output = render_type(&tb.build(), &kt);
+    let output = render_type(&tb.build().unwrap(), &kt);
     assert!(output.contains("data class Point(val x: Int, val y: Int) {"));
 }
 
@@ -527,21 +524,22 @@ fn test_kotlin_data_class_primary_constructor() {
 fn test_kotlin_primary_constructor_with_secondary() {
     let kt = Kotlin::new();
     let mut tb = TypeSpec::<Kotlin>::builder("Config", TypeKind::Class);
-    tb.add_primary_constructor_param(ParameterSpec::new(
-        "val name",
-        TypeName::primitive("String"),
-    ));
-    tb.add_primary_constructor_param(ParameterSpec::new("val value", TypeName::primitive("Int")));
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("val name", TypeName::primitive("String")).unwrap(),
+    );
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("val value", TypeName::primitive("Int")).unwrap(),
+    );
 
     // Secondary constructor delegates to primary
     let mut ctor = FunSpec::builder("constructor");
     ctor.is_constructor();
-    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     ctor.delegation(CodeBlock::of("this(name, 0)", ()).unwrap());
     ctor.body(CodeBlock::of("// secondary", ()).unwrap());
-    tb.add_method(ctor.build());
+    tb.add_method(ctor.build().unwrap());
 
-    let output = render_type(&tb.build(), &kt);
+    let output = render_type(&tb.build().unwrap(), &kt);
     assert!(output.contains("class Config(val name: String, val value: Int) {"));
     assert!(output.contains("constructor(name: String) : this(name, 0) {"));
 }
@@ -552,9 +550,11 @@ fn test_kotlin_primary_constructor_with_secondary() {
 fn test_ts_ignores_primary_constructor() {
     let ts = TypeScript::new();
     let mut tb = TypeSpec::<TypeScript>::builder("Foo", TypeKind::Class);
-    tb.add_primary_constructor_param(ParameterSpec::new("x", TypeName::primitive("number")));
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("x", TypeName::primitive("number")).unwrap(),
+    );
 
-    let output = render_type(&tb.build(), &ts);
+    let output = render_type(&tb.build().unwrap(), &ts);
     // TypeScript doesn't support primary constructors — params should be ignored
     assert!(output.contains("class Foo {"));
     assert!(!output.contains("(x: number)"));

@@ -96,20 +96,20 @@ impl<L: CodeLang> TypeSpec<L> {
     ///
     /// Returns a `Vec` because Rust struct + impl = two separate blocks,
     /// while TypeScript class = one block.
-    pub fn emit(&self, lang: &L) -> Vec<CodeBlock<L>> {
+    pub fn emit(&self, lang: &L) -> Result<Vec<CodeBlock<L>>, crate::error::SigilStitchError> {
         if lang.methods_inside_type_body(self.kind) {
-            vec![self.emit_inline(lang)]
+            Ok(vec![self.emit_inline(lang)?])
         } else {
             self.emit_split(lang)
         }
     }
 
     /// Emit as a single block with methods inside the body (TypeScript class/interface, Rust trait).
-    fn emit_inline(&self, lang: &L) -> CodeBlock<L> {
+    fn emit_inline(&self, lang: &L) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
         let mut cb = CodeBlock::<L>::builder();
 
-        self.emit_preamble(&mut cb, lang);
-        self.emit_header(&mut cb, lang);
+        self.emit_preamble(&mut cb, lang)?;
+        self.emit_header(&mut cb, lang)?;
 
         // Body.
         cb.add("%>", ());
@@ -124,14 +124,14 @@ impl<L: CodeLang> TypeSpec<L> {
             if i > 0 {
                 // No extra blank line between fields.
             }
-            cb.add_code(field.emit(lang, DeclarationContext::Member));
+            cb.add_code(field.emit(lang, DeclarationContext::Member)?);
         }
         // Enum variants.
         if !self.variants.is_empty() {
             if !self.fields.is_empty() {
                 cb.add_line();
             }
-            self.emit_variants(&mut cb, lang);
+            self.emit_variants(&mut cb, lang)?;
         }
         let has_body_above = !self.fields.is_empty() || !self.variants.is_empty();
         // Properties (after fields, before methods).
@@ -143,7 +143,7 @@ impl<L: CodeLang> TypeSpec<L> {
                 if i > 0 {
                     cb.add_line();
                 }
-                for block in prop.emit(lang, DeclarationContext::Member) {
+                for block in prop.emit(lang, DeclarationContext::Member)? {
                     cb.add_code(block);
                 }
             }
@@ -156,7 +156,7 @@ impl<L: CodeLang> TypeSpec<L> {
             if i > 0 {
                 cb.add_line();
             }
-            cb.add_code(method.emit(lang, DeclarationContext::Member));
+            cb.add_code(method.emit(lang, DeclarationContext::Member)?);
         }
         for extra in &self.extra_members {
             cb.add_code(extra.clone());
@@ -169,28 +169,28 @@ impl<L: CodeLang> TypeSpec<L> {
             cb.add_line();
         }
 
-        cb.build().unwrap()
+        cb.build()
     }
 
     /// Emit as separate struct + impl blocks (Rust struct/enum).
-    fn emit_split(&self, lang: &L) -> Vec<CodeBlock<L>> {
+    fn emit_split(&self, lang: &L) -> Result<Vec<CodeBlock<L>>, crate::error::SigilStitchError> {
         let mut blocks = Vec::new();
 
         // Block 1: struct/enum definition.
         let mut cb = CodeBlock::<L>::builder();
-        self.emit_preamble(&mut cb, lang);
-        self.emit_header(&mut cb, lang);
+        self.emit_preamble(&mut cb, lang)?;
+        self.emit_header(&mut cb, lang)?;
 
         cb.add("%>", ());
         for field in &self.fields {
-            cb.add_code(field.emit(lang, DeclarationContext::Member));
+            cb.add_code(field.emit(lang, DeclarationContext::Member)?);
         }
         // Enum variants.
         if !self.variants.is_empty() {
             if !self.fields.is_empty() {
                 cb.add_line();
             }
-            self.emit_variants(&mut cb, lang);
+            self.emit_variants(&mut cb, lang)?;
         }
         for extra in &self.extra_members {
             cb.add_code(extra.clone());
@@ -202,7 +202,7 @@ impl<L: CodeLang> TypeSpec<L> {
             cb.add(&format!("{close}{term}"), ());
             cb.add_line();
         }
-        blocks.push(cb.build().unwrap());
+        blocks.push(cb.build()?);
 
         // Block 2: impl block (only if methods or properties are non-empty).
         if !self.methods.is_empty() || !self.properties.is_empty() {
@@ -236,7 +236,7 @@ impl<L: CodeLang> TypeSpec<L> {
                 if i > 0 {
                     impl_cb.add_line();
                 }
-                for block in prop.emit(lang, DeclarationContext::Member) {
+                for block in prop.emit(lang, DeclarationContext::Member)? {
                     impl_cb.add_code(block);
                 }
             }
@@ -247,7 +247,7 @@ impl<L: CodeLang> TypeSpec<L> {
                 if i > 0 {
                     impl_cb.add_line();
                 }
-                impl_cb.add_code(method.emit(lang, DeclarationContext::Member));
+                impl_cb.add_code(method.emit(lang, DeclarationContext::Member)?);
             }
             impl_cb.add("%<", ());
             let close = lang.block_close();
@@ -256,14 +256,18 @@ impl<L: CodeLang> TypeSpec<L> {
                 impl_cb.add_line();
             }
 
-            blocks.push(impl_cb.build().unwrap());
+            blocks.push(impl_cb.build()?);
         }
 
-        blocks
+        Ok(blocks)
     }
 
     /// Emit enum variants with language-aware separators.
-    fn emit_variants(&self, cb: &mut CodeBlockBuilder<L>, lang: &L) {
+    fn emit_variants(
+        &self,
+        cb: &mut CodeBlockBuilder<L>,
+        lang: &L,
+    ) -> Result<(), crate::error::SigilStitchError> {
         let sep = lang.enum_variant_separator();
         let trailing = lang.enum_variant_trailing_separator();
         let count = self.variants.len();
@@ -273,7 +277,7 @@ impl<L: CodeLang> TypeSpec<L> {
             // Emit variant parts directly here rather than calling variant.emit(),
             // because we need to append the separator before the trailing newline.
             for spec in &variant.annotation_specs {
-                cb.add_code(spec.emit(lang));
+                cb.add_code(spec.emit(lang)?);
                 cb.add_line();
             }
             for ann in &variant.annotations {
@@ -366,12 +370,17 @@ impl<L: CodeLang> TypeSpec<L> {
             cb.add(&fmt, args);
             cb.add_line();
         }
+        Ok(())
     }
 
     /// Emit annotations and doc comment.
-    fn emit_preamble(&self, cb: &mut CodeBlockBuilder<L>, lang: &L) {
+    fn emit_preamble(
+        &self,
+        cb: &mut CodeBlockBuilder<L>,
+        lang: &L,
+    ) -> Result<(), crate::error::SigilStitchError> {
         for spec in &self.annotation_specs {
-            cb.add_code(spec.emit(lang));
+            cb.add_code(spec.emit(lang)?);
             cb.add_line();
         }
         for ann in &self.annotations {
@@ -384,10 +393,15 @@ impl<L: CodeLang> TypeSpec<L> {
             cb.add("%L", doc_str);
             cb.add_line();
         }
+        Ok(())
     }
 
     /// Emit the type header line: `{vis}{keyword} {name}<params>(primary ctor){extends}{implements} {`.
-    fn emit_header(&self, cb: &mut CodeBlockBuilder<L>, lang: &L) {
+    fn emit_header(
+        &self,
+        cb: &mut CodeBlockBuilder<L>,
+        lang: &L,
+    ) -> Result<(), crate::error::SigilStitchError> {
         let vis = lang.render_visibility(self.modifiers.visibility, DeclarationContext::TopLevel);
         let kw = lang.type_keyword(self.kind);
 
@@ -410,7 +424,7 @@ impl<L: CodeLang> TypeSpec<L> {
         if !self.primary_constructor.is_empty() && lang.supports_primary_constructor() {
             fmt.push('(');
             fmt.push_str("%L");
-            let params_block = self.build_primary_constructor_block(lang);
+            let params_block = self.build_primary_constructor_block(lang)?;
             args.push(Arg::Code(params_block));
             fmt.push(')');
         }
@@ -464,10 +478,14 @@ impl<L: CodeLang> TypeSpec<L> {
         fmt.push_str(lang.block_open());
         cb.add(&fmt, args);
         cb.add_line();
+        Ok(())
     }
 
     /// Build a CodeBlock for primary constructor parameters.
-    fn build_primary_constructor_block(&self, lang: &L) -> CodeBlock<L> {
+    fn build_primary_constructor_block(
+        &self,
+        lang: &L,
+    ) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
         let mut pb = CodeBlock::<L>::builder();
         for (i, param) in self.primary_constructor.iter().enumerate() {
             if i > 0 {
@@ -475,7 +493,7 @@ impl<L: CodeLang> TypeSpec<L> {
             }
             param.emit_into(&mut pb, lang);
         }
-        pb.build().unwrap()
+        pb.build()
     }
 }
 
@@ -592,16 +610,17 @@ impl<L: CodeLang> TypeSpecBuilder<L> {
 
     /// Consume the builder and produce a [`TypeSpec`].
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `name` is empty.
-    pub fn build(self) -> TypeSpec<L> {
-        assert!(
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
+    pub fn build(self) -> Result<TypeSpec<L>, crate::error::SigilStitchError> {
+        snafu::ensure!(
             !self.name.is_empty(),
-            "TypeSpecBuilder::build() failed: 'name' must not be empty (kind: {:?})",
-            self.kind,
+            crate::error::EmptyNameSnafu {
+                builder: "TypeSpecBuilder",
+            }
         );
-        TypeSpec {
+        Ok(TypeSpec {
             name: self.name,
             kind: self.kind,
             modifiers: self.modifiers,
@@ -617,7 +636,7 @@ impl<L: CodeLang> TypeSpecBuilder<L> {
             extra_members: self.extra_members,
             variants: self.variants,
             primary_constructor: self.primary_constructor,
-        }
+        })
     }
 }
 
@@ -637,7 +656,7 @@ mod tests {
                 output.push('\n');
             }
             let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
-            output.push_str(&renderer.render(block));
+            output.push_str(&renderer.render(block).unwrap());
         }
         output
     }
@@ -651,7 +670,7 @@ mod tests {
                 output.push('\n');
             }
             let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
-            output.push_str(&renderer.render(block));
+            output.push_str(&renderer.render(block).unwrap());
         }
         output
     }
@@ -662,15 +681,15 @@ mod tests {
         tb.visibility(Visibility::Public);
         let mut field_b = FieldSpec::builder("name", TypeName::primitive("string"));
         field_b.visibility(Visibility::Private);
-        tb.add_field(field_b.build());
+        tb.add_field(field_b.build().unwrap());
         let body = CodeBlock::<TypeScript>::of("return this.name", ()).unwrap();
         let mut fb = FunSpec::builder("getName");
         fb.returns(TypeName::primitive("string"));
         fb.body(body);
-        tb.add_method(fb.build());
-        let ts = tb.build();
+        tb.add_method(fb.build().unwrap());
+        let ts = tb.build().unwrap();
 
-        let blocks = ts.emit(&TypeScript::new());
+        let blocks = ts.emit(&TypeScript::new()).unwrap();
         let output = render_blocks_ts(&blocks);
         assert!(output.contains("export class UserService {"));
         assert!(output.contains("private name: string;"));
@@ -684,16 +703,16 @@ mod tests {
         tb.visibility(Visibility::Public);
         tb.add_method({
             let mut fb = FunSpec::builder("findById");
-            fb.add_param(ParameterSpec::new("id", TypeName::primitive("string")));
+            fb.add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap());
             fb.returns(TypeName::generic(
                 TypeName::primitive("Promise"),
                 vec![TypeName::primitive("Entity")],
             ));
-            fb.build()
+            fb.build().unwrap()
         });
-        let ts = tb.build();
+        let ts = tb.build().unwrap();
 
-        let blocks = ts.emit(&TypeScript::new());
+        let blocks = ts.emit(&TypeScript::new()).unwrap();
         let output = render_blocks_ts(&blocks);
         assert!(output.contains("export interface Repository {"));
         assert!(output.contains("findById(id: string): Promise<Entity>;"));
@@ -706,18 +725,18 @@ mod tests {
         tb.add_field({
             let mut fb = FieldSpec::builder("name", TypeName::primitive("String"));
             fb.visibility(Visibility::Public);
-            fb.build()
+            fb.build().unwrap()
         });
         let body = CodeBlock::<RustLang>::of("Self { name: name.to_string() }", ()).unwrap();
         let mut fb = FunSpec::<RustLang>::builder("new");
         fb.visibility(Visibility::Public);
-        fb.add_param(ParameterSpec::new("name", TypeName::primitive("&str")));
+        fb.add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap());
         fb.returns(TypeName::primitive("Self"));
         fb.body(body);
-        tb.add_method(fb.build());
-        let ts = tb.build();
+        tb.add_method(fb.build().unwrap());
+        let ts = tb.build().unwrap();
 
-        let blocks = ts.emit(&RustLang::new());
+        let blocks = ts.emit(&RustLang::new()).unwrap();
         let output = render_blocks_rs(&blocks);
         // Should have separate struct and impl blocks.
         assert!(output.contains("pub struct Config {"));
@@ -732,9 +751,9 @@ mod tests {
         tb.visibility(Visibility::Public);
         tb.extends(TypeName::primitive("BaseService"));
         tb.implements(TypeName::primitive("Serializable"));
-        let ts = tb.build();
+        let ts = tb.build().unwrap();
 
-        let blocks = ts.emit(&TypeScript::new());
+        let blocks = ts.emit(&TypeScript::new()).unwrap();
         let output = render_blocks_ts(&blocks);
         assert!(
             output.contains(
@@ -744,8 +763,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "TypeSpecBuilder::build() failed: 'name' must not be empty")]
-    fn test_build_empty_name_panics() {
-        TypeSpec::<TypeScript>::builder("", TypeKind::Class).build();
+    fn test_build_empty_name_errors() {
+        let result = TypeSpec::<TypeScript>::builder("", TypeKind::Class).build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("'name' must not be empty")
+        );
     }
 }

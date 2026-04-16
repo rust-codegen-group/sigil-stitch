@@ -331,14 +331,25 @@ impl<L: CodeLang> TypeName<L> {
     }
 
     /// Render this type to a string at a given width.
-    pub fn render<F>(&self, width: usize, resolve: &F) -> String
+    pub fn render<F>(
+        &self,
+        width: usize,
+        resolve: &F,
+    ) -> Result<String, crate::error::SigilStitchError>
     where
         F: Fn(&str, &str) -> String,
     {
         let doc = self.to_doc(resolve);
         let mut buf = Vec::new();
-        doc.render(width, &mut buf).unwrap();
-        String::from_utf8(buf).unwrap()
+        doc.render(width, &mut buf)
+            .map_err(|e| crate::error::SigilStitchError::Render {
+                context: "TypeName::render".to_string(),
+                message: e.to_string(),
+            })?;
+        String::from_utf8(buf).map_err(|e| crate::error::SigilStitchError::Render {
+            context: "TypeName::render UTF-8 conversion".to_string(),
+            message: e.to_string(),
+        })
     }
 
     /// Language-aware variant of [`TypeName::to_doc`] that consults the lang for
@@ -432,13 +443,13 @@ mod tests {
     #[test]
     fn test_primitive() {
         let t = TypeName::<TypeScript>::primitive("number");
-        assert_eq!(t.render(80, &identity_resolve), "number");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "number");
     }
 
     #[test]
     fn test_importable() {
         let t = TypeName::<TypeScript>::importable("./models", "User");
-        assert_eq!(t.render(80, &identity_resolve), "User");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "User");
     }
 
     #[test]
@@ -451,13 +462,13 @@ mod tests {
                 name.to_string()
             }
         };
-        assert_eq!(t.render(80, &resolve), "OtherUser");
+        assert_eq!(t.render(80, &resolve).unwrap(), "OtherUser");
     }
 
     #[test]
     fn test_array() {
         let t = TypeName::<TypeScript>::array(TypeName::primitive("string"));
-        assert_eq!(t.render(80, &identity_resolve), "string[]");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "string[]");
     }
 
     #[test]
@@ -466,7 +477,7 @@ mod tests {
             TypeName::primitive("Promise"),
             vec![TypeName::importable("./models", "User")],
         );
-        assert_eq!(t.render(80, &identity_resolve), "Promise<User>");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "Promise<User>");
     }
 
     #[test]
@@ -479,7 +490,7 @@ mod tests {
             ],
         );
         // At width 20, should break
-        let output = t.render(20, &identity_resolve);
+        let output = t.render(20, &identity_resolve).unwrap();
         assert!(output.contains('\n'));
         assert!(output.contains("VeryLongKeyTypeName"));
         assert!(output.contains("VeryLongValueTypeName"));
@@ -492,7 +503,10 @@ mod tests {
             TypeName::primitive("number"),
             TypeName::primitive("boolean"),
         ]);
-        assert_eq!(t.render(80, &identity_resolve), "string | number | boolean");
+        assert_eq!(
+            t.render(80, &identity_resolve).unwrap(),
+            "string | number | boolean"
+        );
     }
 
     #[test]
@@ -502,33 +516,33 @@ mod tests {
             TypeName::primitive("VeryLongTypeName2"),
             TypeName::primitive("VeryLongTypeName3"),
         ]);
-        let output = t.render(30, &identity_resolve);
+        let output = t.render(30, &identity_resolve).unwrap();
         assert!(output.contains('\n'));
     }
 
     #[test]
     fn test_pointer() {
         let t = TypeName::<TypeScript>::pointer(TypeName::primitive("User"));
-        assert_eq!(t.render(80, &identity_resolve), "*User");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "*User");
     }
 
     #[test]
     fn test_slice() {
         let t = TypeName::<TypeScript>::slice(TypeName::primitive("User"));
-        assert_eq!(t.render(80, &identity_resolve), "[]User");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "[]User");
     }
 
     #[test]
     fn test_map() {
         let t =
             TypeName::<TypeScript>::map(TypeName::primitive("string"), TypeName::primitive("User"));
-        assert_eq!(t.render(80, &identity_resolve), "map[string]User");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "map[string]User");
     }
 
     #[test]
     fn test_optional() {
         let t = TypeName::<TypeScript>::optional(TypeName::primitive("string"));
-        assert_eq!(t.render(80, &identity_resolve), "string | null");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "string | null");
     }
 
     #[test]
@@ -538,7 +552,7 @@ mod tests {
             TypeName::primitive("boolean"),
         );
         assert_eq!(
-            t.render(80, &identity_resolve),
+            t.render(80, &identity_resolve).unwrap(),
             "(string, number) => boolean"
         );
     }
@@ -550,7 +564,10 @@ mod tests {
             vec![TypeName::importable("./models", "User")],
         );
         let outer = TypeName::generic(TypeName::primitive("Promise"), vec![inner]);
-        assert_eq!(outer.render(80, &identity_resolve), "Promise<Array<User>>");
+        assert_eq!(
+            outer.render(80, &identity_resolve).unwrap(),
+            "Promise<Array<User>>"
+        );
     }
 
     #[test]
@@ -576,7 +593,7 @@ mod tests {
         let mut imports = Vec::new();
         t.collect_imports(&mut imports);
         assert!(imports.is_empty());
-        assert_eq!(t.render(80, &identity_resolve), "any");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "any");
     }
 
     #[test]
@@ -604,7 +621,7 @@ mod tests {
     fn test_with_alias_noop_on_primitive() {
         // with_alias on a non-Importable variant should be a no-op.
         let t = TypeName::<TypeScript>::primitive("number").with_alias("MyNumber");
-        assert_eq!(t.render(80, &identity_resolve), "number");
+        assert_eq!(t.render(80, &identity_resolve).unwrap(), "number");
     }
 
     #[test]
@@ -612,6 +629,6 @@ mod tests {
         let t = TypeName::<TypeScript>::importable("./models", "User").with_alias("MyUser");
         // The resolve function should map to the alias.
         let resolve = |_module: &str, _name: &str| "MyUser".to_string();
-        assert_eq!(t.render(80, &resolve), "MyUser");
+        assert_eq!(t.render(80, &resolve).unwrap(), "MyUser");
     }
 }

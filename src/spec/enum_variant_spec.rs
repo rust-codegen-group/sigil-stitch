@@ -58,15 +58,17 @@ pub struct EnumVariantSpec<L: CodeLang> {
 impl<L: CodeLang> EnumVariantSpec<L> {
     /// Create a simple variant with just a name.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `name` is empty.
-    pub fn new(name: &str) -> Self {
-        assert!(
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
+    pub fn new(name: &str) -> Result<Self, crate::error::SigilStitchError> {
+        snafu::ensure!(
             !name.is_empty(),
-            "EnumVariantSpec::new() failed: 'name' must not be empty",
+            crate::error::EmptyNameSnafu {
+                builder: "EnumVariantSpec",
+            }
         );
-        Self {
+        Ok(Self {
             name: name.to_string(),
             doc: Vec::new(),
             value: None,
@@ -74,7 +76,7 @@ impl<L: CodeLang> EnumVariantSpec<L> {
             annotation_specs: Vec::new(),
             associated_types: Vec::new(),
             fields: Vec::new(),
-        }
+        })
     }
 
     /// Create a variant builder for more complex variants.
@@ -147,15 +149,17 @@ impl<L: CodeLang> EnumVariantSpecBuilder<L> {
 
     /// Build the variant spec.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `name` is empty.
-    pub fn build(self) -> EnumVariantSpec<L> {
-        assert!(
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
+    pub fn build(self) -> Result<EnumVariantSpec<L>, crate::error::SigilStitchError> {
+        snafu::ensure!(
             !self.name.is_empty(),
-            "EnumVariantSpecBuilder::build() failed: 'name' must not be empty",
+            crate::error::EmptyNameSnafu {
+                builder: "EnumVariantSpecBuilder",
+            }
         );
-        EnumVariantSpec {
+        Ok(EnumVariantSpec {
             name: self.name,
             doc: self.doc,
             value: self.value,
@@ -163,7 +167,7 @@ impl<L: CodeLang> EnumVariantSpecBuilder<L> {
             annotation_specs: self.annotation_specs,
             associated_types: self.associated_types,
             fields: self.fields,
-        }
+        })
     }
 }
 
@@ -179,7 +183,7 @@ mod tests {
     use crate::type_name::TypeName;
 
     fn render_enum<L: CodeLang>(ts: &TypeSpec<L>, lang: &L) -> String {
-        let blocks = ts.emit(lang);
+        let blocks = ts.emit(lang).unwrap();
         let imports = crate::import::ImportGroup::new();
         let mut output = String::new();
         for (i, block) in blocks.iter().enumerate() {
@@ -187,7 +191,7 @@ mod tests {
                 output.push('\n');
             }
             let mut renderer = crate::code_renderer::CodeRenderer::new(lang, &imports, 80);
-            output.push_str(&renderer.render(block));
+            output.push_str(&renderer.render(block).unwrap());
         }
         output
     }
@@ -195,10 +199,10 @@ mod tests {
     #[test]
     fn test_simple_variants() {
         let mut tb = TypeSpec::<RustLang>::builder("Color", TypeKind::Enum);
-        tb.add_variant(EnumVariantSpec::new("Red"));
-        tb.add_variant(EnumVariantSpec::new("Green"));
-        tb.add_variant(EnumVariantSpec::new("Blue"));
-        let ts = tb.build();
+        tb.add_variant(EnumVariantSpec::new("Red").unwrap());
+        tb.add_variant(EnumVariantSpec::new("Green").unwrap());
+        tb.add_variant(EnumVariantSpec::new("Blue").unwrap());
+        let ts = tb.build().unwrap();
         let output = render_enum(&ts, &RustLang::new());
         assert!(output.contains("Red,"));
         assert!(output.contains("Green,"));
@@ -210,8 +214,8 @@ mod tests {
         let mut tb = TypeSpec::<TypeScript>::builder("Direction", TypeKind::Enum);
         let mut v = EnumVariantSpec::builder("Up");
         v.value(CodeBlock::<TypeScript>::of("'UP'", ()).unwrap());
-        tb.add_variant(v.build());
-        let ts = tb.build();
+        tb.add_variant(v.build().unwrap());
+        let ts = tb.build().unwrap();
         let output = render_enum(&ts, &TypeScript::new());
         assert!(output.contains("Up = 'UP',"));
     }
@@ -219,9 +223,9 @@ mod tests {
     #[test]
     fn test_swift_variant_prefix() {
         let mut tb = TypeSpec::<Swift>::builder("Color", TypeKind::Enum);
-        tb.add_variant(EnumVariantSpec::new("red"));
-        tb.add_variant(EnumVariantSpec::new("green"));
-        let ts = tb.build();
+        tb.add_variant(EnumVariantSpec::new("red").unwrap());
+        tb.add_variant(EnumVariantSpec::new("green").unwrap());
+        let ts = tb.build().unwrap();
         let output = render_enum(&ts, &Swift::new());
         assert!(output.contains("case red"));
         assert!(output.contains("case green"));
@@ -232,8 +236,8 @@ mod tests {
     #[test]
     fn test_trailing_separator() {
         let mut tb = TypeSpec::<RustLang>::builder("Color", TypeKind::Enum);
-        tb.add_variant(EnumVariantSpec::new("Red"));
-        let ts = tb.build();
+        tb.add_variant(EnumVariantSpec::new("Red").unwrap());
+        let ts = tb.build().unwrap();
         let output = render_enum(&ts, &RustLang::new());
         // Rust has trailing comma.
         assert!(output.contains("Red,"));
@@ -242,9 +246,9 @@ mod tests {
     #[test]
     fn test_no_trailing_separator() {
         let mut tb = TypeSpec::<crate::lang::c_lang::CLang>::builder("Color", TypeKind::Enum);
-        tb.add_variant(EnumVariantSpec::new("RED"));
-        tb.add_variant(EnumVariantSpec::new("GREEN"));
-        let ts = tb.build();
+        tb.add_variant(EnumVariantSpec::new("RED").unwrap());
+        tb.add_variant(EnumVariantSpec::new("GREEN").unwrap());
+        let ts = tb.build().unwrap();
         let output = render_enum(&ts, &crate::lang::c_lang::CLang::new());
         assert!(output.contains("RED,"));
         // Last variant has no trailing comma in C.
@@ -253,15 +257,27 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "EnumVariantSpec::new() failed: 'name' must not be empty")]
-    fn test_new_empty_name_panics() {
-        EnumVariantSpec::<TypeScript>::new("");
+    fn test_new_empty_name_errors() {
+        let result = EnumVariantSpec::<TypeScript>::new("");
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("'name' must not be empty")
+        );
     }
 
     #[test]
-    #[should_panic(expected = "EnumVariantSpecBuilder::build() failed: 'name' must not be empty")]
-    fn test_build_empty_name_panics() {
-        EnumVariantSpec::<TypeScript>::builder("").build();
+    fn test_build_empty_name_errors() {
+        let result = EnumVariantSpec::<TypeScript>::builder("").build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("'name' must not be empty")
+        );
     }
 
     #[test]
@@ -269,9 +285,9 @@ mod tests {
         let mut tb = TypeSpec::<RustLang>::builder("Expr", TypeKind::Enum);
         let mut v = EnumVariantSpec::<RustLang>::builder("Literal");
         v.associated_type(TypeName::primitive("i64"));
-        tb.add_variant(v.build());
-        tb.add_variant(EnumVariantSpec::new("Unit"));
-        let ts = tb.build();
+        tb.add_variant(v.build().unwrap());
+        tb.add_variant(EnumVariantSpec::new("Unit").unwrap());
+        let ts = tb.build().unwrap();
         let output = render_enum(&ts, &RustLang::new());
         assert!(output.contains("Literal(i64),"));
         assert!(output.contains("Unit,"));
@@ -283,8 +299,8 @@ mod tests {
         let mut v = EnumVariantSpec::<RustLang>::builder("Both");
         v.associated_type(TypeName::primitive("String"));
         v.associated_type(TypeName::primitive("i32"));
-        tb.add_variant(v.build());
-        let ts = tb.build();
+        tb.add_variant(v.build().unwrap());
+        let ts = tb.build().unwrap();
         let output = render_enum(&ts, &RustLang::new());
         assert!(output.contains("Both(String, i32),"));
     }
@@ -292,12 +308,20 @@ mod tests {
     #[test]
     fn test_struct_variant() {
         let mut tb = TypeSpec::<RustLang>::builder("Msg", TypeKind::Enum);
-        tb.add_variant(EnumVariantSpec::new("Quit"));
+        tb.add_variant(EnumVariantSpec::new("Quit").unwrap());
         let mut v = EnumVariantSpec::<RustLang>::builder("Move");
-        v.add_field(FieldSpec::builder("x", TypeName::primitive("i32")).build());
-        v.add_field(FieldSpec::builder("y", TypeName::primitive("i32")).build());
-        tb.add_variant(v.build());
-        let ts = tb.build();
+        v.add_field(
+            FieldSpec::builder("x", TypeName::primitive("i32"))
+                .build()
+                .unwrap(),
+        );
+        v.add_field(
+            FieldSpec::builder("y", TypeName::primitive("i32"))
+                .build()
+                .unwrap(),
+        );
+        tb.add_variant(v.build().unwrap());
+        let ts = tb.build().unwrap();
         let output = render_enum(&ts, &RustLang::new());
         assert!(output.contains("Quit,"));
         assert!(output.contains("Move {"));
@@ -310,9 +334,9 @@ mod tests {
         let mut tb = TypeSpec::<Swift>::builder("Result", TypeKind::Enum);
         let mut v_success = EnumVariantSpec::<Swift>::builder("success");
         v_success.associated_type(TypeName::primitive("Data"));
-        tb.add_variant(v_success.build());
-        tb.add_variant(EnumVariantSpec::new("failure"));
-        let ts = tb.build();
+        tb.add_variant(v_success.build().unwrap());
+        tb.add_variant(EnumVariantSpec::new("failure").unwrap());
+        let ts = tb.build().unwrap();
         let output = render_enum(&ts, &Swift::new());
         assert!(output.contains("case success(Data)"));
         assert!(output.contains("case failure"));

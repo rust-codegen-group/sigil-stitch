@@ -19,7 +19,7 @@ fn test_ts_forced_named_import() {
     let mut fb = FileSpec::<TypeScript>::builder("app.ts");
     fb.add_import(ImportSpec::named("./models", "User"));
     fb.add_code(CodeBlock::<TypeScript>::of("console.log('hello')", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import { User } from './models';"));
     assert!(output.contains("console.log('hello')"));
@@ -30,7 +30,7 @@ fn test_ts_aliased_import() {
     let mut fb = FileSpec::<TypeScript>::builder("app.ts");
     fb.add_import(ImportSpec::named_as("./models", "User", "AppUser"));
     fb.add_code(CodeBlock::<TypeScript>::of("const u: AppUser = get()", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("User as AppUser"));
 }
@@ -40,7 +40,7 @@ fn test_ts_type_only_import() {
     let mut fb = FileSpec::<TypeScript>::builder("app.ts");
     fb.add_import(ImportSpec::named_type("./models", "User"));
     fb.add_code(CodeBlock::<TypeScript>::of("// no usage", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import type { User } from './models';"));
 }
@@ -50,7 +50,7 @@ fn test_ts_side_effect_import() {
     let mut fb = FileSpec::<TypeScript>::builder("app.ts");
     fb.add_import(ImportSpec::side_effect("./polyfill"));
     fb.add_code(CodeBlock::<TypeScript>::of("// app code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import './polyfill';"));
 }
@@ -60,7 +60,7 @@ fn test_ts_wildcard_import() {
     let mut fb = FileSpec::<TypeScript>::builder("app.ts");
     fb.add_import(ImportSpec::wildcard("./utils"));
     fb.add_code(CodeBlock::<TypeScript>::of("// app code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import * as Utils from './utils';"));
 }
@@ -73,7 +73,7 @@ fn test_ts_mixed_explicit_and_auto() {
     fb.add_import(ImportSpec::side_effect("./polyfill"));
     fb.add_import(ImportSpec::named("./helpers", "format"));
     fb.add_code(CodeBlock::<TypeScript>::of("const u: %T = get()", (user,)).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import './polyfill';"));
     assert!(output.contains("import type { User } from './models';"));
@@ -93,7 +93,7 @@ fn test_ts_explicit_alias_takes_precedence() {
     code.add_statement("const u1: %T = get1()", (user1,));
     code.add_statement("const u2: %T = get2()", (user2,));
     fb.add_code(code.build().unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("User as OtherUser"));
     assert!(output.contains("const u2: OtherUser = get2();"));
@@ -106,7 +106,7 @@ fn test_js_side_effect_import() {
     let mut fb = FileSpec::builder_with("app.js", JavaScript::new());
     fb.add_import(ImportSpec::side_effect("./polyfill"));
     fb.add_code(CodeBlock::<JavaScript>::of("// app code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import './polyfill';"));
 }
@@ -116,7 +116,7 @@ fn test_js_wildcard_import() {
     let mut fb = FileSpec::builder_with("app.js", JavaScript::new());
     fb.add_import(ImportSpec::wildcard("./utils"));
     fb.add_code(CodeBlock::<JavaScript>::of("// app code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import * as Utils from './utils';"));
 }
@@ -128,7 +128,7 @@ fn test_rust_forced_named_import() {
     let mut fb = FileSpec::builder_with("main.rs", RustLang::new());
     fb.add_import(ImportSpec::named("std::collections", "HashMap"));
     fb.add_code(CodeBlock::<RustLang>::of("// code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("use std::collections::HashMap;"));
 }
@@ -138,7 +138,7 @@ fn test_rust_wildcard_import() {
     let mut fb = FileSpec::builder_with("main.rs", RustLang::new());
     fb.add_import(ImportSpec::wildcard("std::collections"));
     fb.add_code(CodeBlock::<RustLang>::of("// code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("use std::collections::*;"));
 }
@@ -151,7 +151,7 @@ fn test_go_side_effect_import() {
     fb.header(CodeBlock::<GoLang>::of("package main", ()).unwrap());
     fb.add_import(ImportSpec::side_effect("database/sql"));
     fb.add_code(CodeBlock::<GoLang>::of("// init", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import _ \"database/sql\""));
 }
@@ -162,7 +162,7 @@ fn test_go_wildcard_import() {
     fb.header(CodeBlock::<GoLang>::of("package main", ()).unwrap());
     fb.add_import(ImportSpec::wildcard("math"));
     fb.add_code(CodeBlock::<GoLang>::of("// use math", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import . \"math\""));
 }
@@ -175,7 +175,7 @@ fn test_go_mixed_side_effect_and_named() {
     fb.header(CodeBlock::<GoLang>::of("package main", ()).unwrap());
     fb.add_import(ImportSpec::side_effect("github.com/lib/pq"));
     fb.add_code(CodeBlock::<GoLang>::of("%T(\"hello\")", (fmt,)).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import ("));
     assert!(output.contains("\"fmt\""));
@@ -189,7 +189,7 @@ fn test_python_side_effect_import() {
     let mut fb = FileSpec::builder_with("app.py", Python::new());
     fb.add_import(ImportSpec::side_effect("logging"));
     fb.add_code(CodeBlock::<Python>::of("# code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import logging"));
 }
@@ -199,7 +199,7 @@ fn test_python_wildcard_import() {
     let mut fb = FileSpec::builder_with("app.py", Python::new());
     fb.add_import(ImportSpec::wildcard("os.path"));
     fb.add_code(CodeBlock::<Python>::of("# code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("from os.path import *"));
 }
@@ -211,7 +211,7 @@ fn test_java_wildcard_import() {
     let mut fb = FileSpec::builder_with("App.java", JavaLang::new());
     fb.add_import(ImportSpec::wildcard("java.util"));
     fb.add_code(CodeBlock::<JavaLang>::of("// code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import java.util.*;"));
 }
@@ -221,7 +221,7 @@ fn test_java_forced_named_import() {
     let mut fb = FileSpec::builder_with("App.java", JavaLang::new());
     fb.add_import(ImportSpec::named("java.util", "List"));
     fb.add_code(CodeBlock::<JavaLang>::of("// code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import java.util.List;"));
 }
@@ -233,7 +233,7 @@ fn test_kotlin_wildcard_import() {
     let mut fb = FileSpec::builder_with("App.kt", Kotlin::new());
     fb.add_import(ImportSpec::wildcard("kotlin.collections"));
     fb.add_code(CodeBlock::<Kotlin>::of("// code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import kotlin.collections.*"));
 }
@@ -245,7 +245,7 @@ fn test_swift_forced_module_import() {
     let mut fb = FileSpec::builder_with("App.swift", Swift::new());
     fb.add_import(ImportSpec::side_effect("UIKit"));
     fb.add_code(CodeBlock::<Swift>::of("// code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import UIKit"));
 }
@@ -257,7 +257,7 @@ fn test_dart_side_effect_import() {
     let mut fb = FileSpec::builder_with("app.dart", DartLang::new());
     fb.add_import(ImportSpec::side_effect("package:flutter/material.dart"));
     fb.add_code(CodeBlock::<DartLang>::of("// code", ()).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     assert!(output.contains("import 'package:flutter/material.dart';"));
 }
@@ -272,7 +272,7 @@ fn test_no_duplicate_when_explicit_matches_auto() {
     // Explicit import of the same thing that %T will auto-collect.
     fb.add_import(ImportSpec::named("./models", "User"));
     fb.add_code(CodeBlock::<TypeScript>::of("const u: %T = get()", (user,)).unwrap());
-    let output = fb.build().render(80).unwrap();
+    let output = fb.build().unwrap().render(80).unwrap();
 
     // Should appear only once.
     let count = output.matches("User").count();

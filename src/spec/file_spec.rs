@@ -1,5 +1,6 @@
 use crate::code_block::CodeBlock;
 use crate::code_renderer::CodeRenderer;
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::import_collector;
 use crate::lang::CodeLang;
@@ -106,7 +107,7 @@ impl<L: CodeLang> FileSpec<L> {
     /// Render the file to a string using the three-pass algorithm.
     ///
     /// `width` controls the target line width for pretty-printing.
-    pub fn render(&self, width: usize) -> Result<String, String> {
+    pub fn render(&self, width: usize) -> Result<String, SigilStitchError> {
         // Phase 0: Materialize specs into CodeBlocks.
         enum Materialized<L: CodeLang> {
             Blocks(Vec<CodeBlock<L>>),
@@ -117,10 +118,9 @@ impl<L: CodeLang> FileSpec<L> {
             },
         }
 
-        let materialized: Vec<Materialized<L>> = self
-            .members
-            .iter()
-            .map(|m| match m {
+        let mut materialized: Vec<Materialized<L>> = Vec::with_capacity(self.members.len());
+        for m in &self.members {
+            materialized.push(match m {
                 FileMember::Code(b) => Materialized::Blocks(vec![b.clone()]),
                 FileMember::RawContent(s) => Materialized::Raw(s.clone()),
                 FileMember::RawContentWithImports { content, types } => {
@@ -129,12 +129,12 @@ impl<L: CodeLang> FileSpec<L> {
                         types: types.clone(),
                     }
                 }
-                FileMember::Type(spec) => Materialized::Blocks(spec.emit(&self.lang)),
+                FileMember::Type(spec) => Materialized::Blocks(spec.emit(&self.lang)?),
                 FileMember::Fun(spec) => {
-                    Materialized::Blocks(vec![spec.emit(&self.lang, DeclarationContext::TopLevel)])
+                    Materialized::Blocks(vec![spec.emit(&self.lang, DeclarationContext::TopLevel)?])
                 }
-            })
-            .collect();
+            });
+        }
 
         // Pass 1: Collect imports from all CodeBlock members.
         let mut import_refs = Vec::new();
@@ -175,7 +175,7 @@ impl<L: CodeLang> FileSpec<L> {
         // Render header block if present (e.g., license comment, Go package declaration).
         if let Some(header) = &self.header {
             let mut renderer = CodeRenderer::new(&self.lang, &imports, width);
-            let header_output = renderer.render(header);
+            let header_output = renderer.render(header)?;
             if !header_output.is_empty() {
                 output.push_str(&header_output);
                 if !header_output.ends_with('\n') {
@@ -204,7 +204,7 @@ impl<L: CodeLang> FileSpec<L> {
                             output.push('\n');
                         }
                         let mut renderer = CodeRenderer::new(&self.lang, &imports, width);
-                        let member_output = renderer.render(block);
+                        let member_output = renderer.render(block)?;
                         output.push_str(&member_output);
                         if !member_output.ends_with('\n') {
                             output.push('\n');
@@ -307,21 +307,23 @@ impl<L: CodeLang> FileSpecBuilder<L> {
 
     /// Build the FileSpec.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `filename` is empty.
-    pub fn build(self) -> FileSpec<L> {
-        assert!(
+    /// Returns [`SigilStitchError::EmptyName`] if `filename` is empty.
+    pub fn build(self) -> Result<FileSpec<L>, SigilStitchError> {
+        snafu::ensure!(
             !self.filename.is_empty(),
-            "FileSpecBuilder::build() failed: 'filename' must not be empty",
+            crate::error::EmptyNameSnafu {
+                builder: "FileSpecBuilder",
+            }
         );
-        FileSpec {
+        Ok(FileSpec {
             filename: self.filename,
             header: self.header,
             members: self.members,
             explicit_imports: self.explicit_imports,
             lang: self.lang,
-        }
+        })
     }
 }
 
@@ -333,7 +335,7 @@ mod tests {
 
     #[test]
     fn test_empty_file() {
-        let file = FileSpec::<TypeScript>::builder("empty.ts").build();
+        let file = FileSpec::<TypeScript>::builder("empty.ts").build().unwrap();
         let output = file.render(80).unwrap();
         assert!(output.is_empty() || output.trim().is_empty());
     }
@@ -348,7 +350,7 @@ mod tests {
 
         let mut fb = FileSpec::<TypeScript>::builder("user.ts");
         fb.add_code(block);
-        let file = fb.build();
+        let file = fb.build().unwrap();
 
         let output = file.render(80).unwrap();
         assert!(output.contains("import type { User } from './models'"));
@@ -367,7 +369,7 @@ mod tests {
 
         let mut fb = FileSpec::<TypeScript>::builder("user.ts");
         fb.add_code(block);
-        let file = fb.build();
+        let file = fb.build().unwrap();
 
         let output = file.render(80).unwrap();
         // First wins simple name.
@@ -381,7 +383,7 @@ mod tests {
     fn test_raw_content_no_import_tracking() {
         let mut fb = FileSpec::<TypeScript>::builder("raw.ts");
         fb.add_raw("// This is raw content\nexport const VERSION = '1.0.0';\n");
-        let file = fb.build();
+        let file = fb.build().unwrap();
 
         let output = file.render(80).unwrap();
         assert!(output.contains("// This is raw content"));
@@ -401,7 +403,7 @@ mod tests {
         let mut fb = FileSpec::<TypeScript>::builder("mixed.ts");
         fb.add_raw("// Generated file, do not edit.\n");
         fb.add_code(block);
-        let file = fb.build();
+        let file = fb.build().unwrap();
 
         let output = file.render(80).unwrap();
         assert!(output.contains("import type { User }"));
@@ -422,7 +424,7 @@ mod tests {
         let mut fb = FileSpec::<TypeScript>::builder("test.ts");
         fb.header(header);
         fb.add_code(block);
-        let file = fb.build();
+        let file = fb.build().unwrap();
 
         let output = file.render(80).unwrap();
         assert!(output.starts_with("// License: MIT"));
@@ -441,7 +443,7 @@ mod tests {
 
         let mut fb = FileSpec::<TypeScript>::builder("user.ts");
         fb.add_code(block);
-        let file = fb.build();
+        let file = fb.build().unwrap();
 
         let output = file.render(80).unwrap();
         // Should appear only once.
@@ -450,9 +452,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "FileSpecBuilder::build() failed: 'filename' must not be empty")]
-    fn test_build_empty_filename_panics() {
-        FileSpec::<TypeScript>::builder("").build();
+    fn test_build_empty_filename_errors() {
+        let result = FileSpec::<TypeScript>::builder("").build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("'name' must not be empty")
+        );
     }
 
     #[test]
@@ -465,7 +473,7 @@ mod tests {
 
         let mut fb = FileSpec::<TypeScript>::builder("user.ts");
         fb.add_code(block);
-        let file = fb.build();
+        let file = fb.build().unwrap();
 
         let output = file.render(80).unwrap();
         // Import should use the alias.
@@ -495,7 +503,7 @@ mod tests {
 
         let mut fb = FileSpec::<TypeScript>::builder("user.ts");
         fb.add_code(block);
-        let file = fb.build();
+        let file = fb.build().unwrap();
 
         let output = file.render(80).unwrap();
         // First uses its preferred alias.

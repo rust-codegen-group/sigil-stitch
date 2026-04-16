@@ -1,6 +1,7 @@
 use pretty::RcDoc;
 
 use crate::code_block::{Arg, CodeBlock, FormatPart};
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::CodeLang;
 
@@ -36,26 +37,36 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
     }
 
     /// Render a CodeBlock to string.
-    pub fn render(&mut self, block: &CodeBlock<L>) -> String {
+    pub fn render(&mut self, block: &CodeBlock<L>) -> Result<String, SigilStitchError> {
         let mut arg_index = 0;
-        self.render_parts(&block.parts, &block.args, &mut arg_index);
-        std::mem::take(&mut self.output)
+        self.render_parts(&block.parts, &block.args, &mut arg_index)?;
+        Ok(std::mem::take(&mut self.output))
     }
 
-    fn render_parts(&mut self, parts: &[FormatPart], args: &[Arg<L>], arg_index: &mut usize) {
+    fn render_parts(
+        &mut self,
+        parts: &[FormatPart],
+        args: &[Arg<L>],
+        arg_index: &mut usize,
+    ) -> Result<(), SigilStitchError> {
         // Check if this sequence of parts contains any %W (soft breaks).
         // If so, we build the whole thing as an RcDoc and let pretty decide.
         let has_wrap = parts.iter().any(|p| matches!(p, FormatPart::Wrap));
 
         if has_wrap {
-            self.render_with_pretty(parts, args, arg_index);
+            self.render_with_pretty(parts, args, arg_index)
         } else {
-            self.render_direct(parts, args, arg_index);
+            self.render_direct(parts, args, arg_index)
         }
     }
 
     /// Direct string rendering (no %W in this segment).
-    fn render_direct(&mut self, parts: &[FormatPart], args: &[Arg<L>], arg_index: &mut usize) {
+    fn render_direct(
+        &mut self,
+        parts: &[FormatPart],
+        args: &[Arg<L>],
+        arg_index: &mut usize,
+    ) -> Result<(), SigilStitchError> {
         for part in parts {
             match part {
                 FormatPart::Literal(text) => {
@@ -85,8 +96,17 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
                         };
                         let doc = tn.to_doc_with_lang(&resolve, self.lang);
                         let mut buf = Vec::new();
-                        doc.render(remaining_width, &mut buf).unwrap();
-                        let rendered = String::from_utf8(buf).unwrap();
+                        doc.render(remaining_width, &mut buf).map_err(|e| {
+                            SigilStitchError::Render {
+                                context: "CodeRenderer::render_direct %T".to_string(),
+                                message: e.to_string(),
+                            }
+                        })?;
+                        let rendered =
+                            String::from_utf8(buf).map_err(|e| SigilStitchError::Render {
+                                context: "CodeRenderer::render_direct %T UTF-8".to_string(),
+                                message: e.to_string(),
+                            })?;
                         // Handle multi-line output: indent continuation lines.
                         let lines: Vec<&str> = rendered.split('\n').collect();
                         for (i, line) in lines.iter().enumerate() {
@@ -128,7 +148,7 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
                         }
                         Arg::Code(block) => {
                             let mut inner_idx = 0;
-                            self.render_parts(&block.parts, &block.args, &mut inner_idx);
+                            self.render_parts(&block.parts, &block.args, &mut inner_idx)?;
                         }
                         _ => {}
                     }
@@ -174,16 +194,29 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
                 }
             }
         }
+        Ok(())
     }
 
     /// Render a segment containing %W using the pretty crate.
-    fn render_with_pretty(&mut self, parts: &[FormatPart], args: &[Arg<L>], arg_index: &mut usize) {
+    fn render_with_pretty(
+        &mut self,
+        parts: &[FormatPart],
+        args: &[Arg<L>],
+        arg_index: &mut usize,
+    ) -> Result<(), SigilStitchError> {
         // Build an RcDoc from the parts, using softline() for %W.
         let doc = self.build_doc_from_parts(parts, args, arg_index);
         let remaining_width = self.width.saturating_sub(self.current_column);
         let mut buf = Vec::new();
-        doc.render(remaining_width, &mut buf).unwrap();
-        let rendered = String::from_utf8(buf).unwrap();
+        doc.render(remaining_width, &mut buf)
+            .map_err(|e| SigilStitchError::Render {
+                context: "CodeRenderer::render_with_pretty".to_string(),
+                message: e.to_string(),
+            })?;
+        let rendered = String::from_utf8(buf).map_err(|e| SigilStitchError::Render {
+            context: "CodeRenderer::render_with_pretty UTF-8".to_string(),
+            message: e.to_string(),
+        })?;
 
         let lines: Vec<&str> = rendered.split('\n').collect();
         for (i, line) in lines.iter().enumerate() {
@@ -193,6 +226,7 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
             }
             self.emit(line);
         }
+        Ok(())
     }
 
     fn build_doc_from_parts(
@@ -339,7 +373,7 @@ mod tests {
         let ts = TypeScript::new();
         let imports = ImportGroup::new();
         let mut renderer = CodeRenderer::new(&ts, &imports, width);
-        renderer.render(block)
+        renderer.render(block).unwrap()
     }
 
     #[test]
@@ -399,7 +433,7 @@ mod tests {
 
         let ts = TypeScript::new();
         let mut renderer = CodeRenderer::new(&ts, &imports, 80);
-        let output = renderer.render(&block);
+        let output = renderer.render(&block).unwrap();
         assert_eq!(output.trim(), "const u: User = getUser();");
     }
 

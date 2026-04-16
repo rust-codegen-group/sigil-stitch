@@ -107,7 +107,7 @@ impl<L: CodeLang> AnnotationSpec<L> {
     /// Emit this annotation as a `CodeBlock` using the language's annotation syntax.
     ///
     /// Called during spec `emit()` methods which have access to `&L`.
-    pub fn emit(&self, lang: &L) -> CodeBlock<L> {
+    pub fn emit(&self, lang: &L) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
         let (prefix, suffix) = lang.render_annotation_prefix();
 
         // Build the argument list portion: "(arg1, arg2)" or empty.
@@ -121,7 +121,7 @@ impl<L: CodeLang> AnnotationSpec<L> {
             AnnotationName::Simple(name) => {
                 // Simple name: render directly as a literal string.
                 let rendered = format!("{prefix}{name}{args_str}{suffix}");
-                CodeBlock::of("%L", rendered).expect("annotation format should be valid")
+                CodeBlock::of("%L", rendered)
             }
             AnnotationName::Importable(type_name) => {
                 // Importable name: use %T so the import collector tracks it.
@@ -135,7 +135,7 @@ impl<L: CodeLang> AnnotationSpec<L> {
                 if !tail.is_empty() {
                     cb.add("%L", tail);
                 }
-                cb.build().expect("annotation format should be valid")
+                cb.build()
             }
         }
     }
@@ -151,7 +151,7 @@ mod tests {
     fn test_simple_annotation_ts() {
         let ts = TypeScript::new();
         let ann = AnnotationSpec::<TypeScript>::new("deprecated");
-        let cb = ann.emit(&ts);
+        let cb = ann.emit(&ts).unwrap();
         assert!(!cb.is_empty());
     }
 
@@ -159,7 +159,7 @@ mod tests {
     fn test_simple_annotation_with_args() {
         let ts = TypeScript::new();
         let ann = AnnotationSpec::<TypeScript>::new("deprecated").arg("reason: 'use v2'");
-        let cb = ann.emit(&ts);
+        let cb = ann.emit(&ts).unwrap();
         assert!(!cb.is_empty());
     }
 
@@ -167,7 +167,7 @@ mod tests {
     fn test_rust_prefix() {
         let rs = RustLang::new();
         let ann = AnnotationSpec::<RustLang>::new("allow").arg("dead_code");
-        let cb = ann.emit(&rs);
+        let cb = ann.emit(&rs).unwrap();
         assert!(!cb.is_empty());
     }
 
@@ -176,7 +176,7 @@ mod tests {
         let ts = TypeScript::new();
         let type_name = TypeName::<TypeScript>::importable("./decorators", "Component");
         let ann = AnnotationSpec::importable(type_name);
-        let cb = ann.emit(&ts);
+        let cb = ann.emit(&ts).unwrap();
         assert!(!cb.is_empty());
     }
 
@@ -186,7 +186,7 @@ mod tests {
         let ann = AnnotationSpec::<RustLang>::new("cfg")
             .arg("test")
             .arg("feature = \"nightly\"");
-        let cb = ann.emit(&rs);
+        let cb = ann.emit(&rs).unwrap();
         assert!(!cb.is_empty());
     }
 }

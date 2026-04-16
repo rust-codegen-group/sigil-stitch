@@ -4,6 +4,7 @@
 //! returning an in-memory collection of rendered files or writing them
 //! to the filesystem.
 
+use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
 use crate::spec::file_spec::FileSpec;
 
@@ -58,12 +59,10 @@ impl<L: CodeLang> ProjectSpec<L> {
     ///
     /// Each file resolves imports independently. File ordering is preserved.
     /// Fails on the first render error, including the filename in the message.
-    pub fn render(&self, width: usize) -> Result<Vec<RenderedFile>, String> {
+    pub fn render(&self, width: usize) -> Result<Vec<RenderedFile>, SigilStitchError> {
         let mut rendered = Vec::with_capacity(self.files.len());
         for file in &self.files {
-            let content = file
-                .render(width)
-                .map_err(|e| format!("{}: {e}", file.filename()))?;
+            let content = file.render(width)?;
             rendered.push(RenderedFile {
                 path: file.filename().to_string(),
                 content,
@@ -79,18 +78,22 @@ impl<L: CodeLang> ProjectSpec<L> {
         &self,
         base_dir: &std::path::Path,
         width: usize,
-    ) -> Result<Vec<std::path::PathBuf>, std::io::Error> {
-        let rendered = self
-            .render(width)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    ) -> Result<Vec<std::path::PathBuf>, SigilStitchError> {
+        let rendered = self.render(width)?;
 
         let mut written = Vec::with_capacity(rendered.len());
         for file in &rendered {
             let full_path = base_dir.join(&file.path);
             if let Some(parent) = full_path.parent() {
-                std::fs::create_dir_all(parent)?;
+                std::fs::create_dir_all(parent).map_err(|source| SigilStitchError::Io {
+                    source,
+                    context: format!("creating directory for {}", file.path),
+                })?;
             }
-            std::fs::write(&full_path, &file.content)?;
+            std::fs::write(&full_path, &file.content).map_err(|source| SigilStitchError::Io {
+                source,
+                context: format!("writing file {}", file.path),
+            })?;
             written.push(full_path);
         }
         Ok(written)

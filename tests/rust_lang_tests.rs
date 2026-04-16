@@ -39,7 +39,7 @@ fn test_function_with_imports() {
     let mut fb = FileSpec::builder_with("lib.rs", RustLang::new());
     fb.add_code(func_block);
     fb.add_code(struct_block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("rust/function_with_imports.rs", &output);
@@ -73,7 +73,7 @@ fn test_import_grouping() {
 
     let mut fb = FileSpec::builder_with("main.rs", RustLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("rust/import_grouping.rs", &output);
@@ -93,7 +93,7 @@ fn test_import_conflict() {
 
     let mut fb = FileSpec::builder_with("conflict.rs", RustLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("rust/import_conflict.rs", &output);
@@ -121,7 +121,7 @@ fn test_rust_control_flow() {
 
     let mut fb = FileSpec::builder_with("classify.rs", RustLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("rust/control_flow.rs", &output);

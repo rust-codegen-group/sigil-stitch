@@ -46,7 +46,10 @@ impl<L: CodeLang> ParameterSpec<L> {
     }
 
     /// Convenience constructor for a simple parameter (name + type, no frills).
-    pub fn new(name: &str, param_type: TypeName<L>) -> Self {
+    pub fn new(
+        name: &str,
+        param_type: TypeName<L>,
+    ) -> Result<Self, crate::error::SigilStitchError> {
         Self::builder(name, param_type).build()
     }
 
@@ -122,20 +125,22 @@ impl<L: CodeLang> ParameterSpecBuilder<L> {
 
     /// Build the [`ParameterSpec`].
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `name` is empty.
-    pub fn build(self) -> ParameterSpec<L> {
-        assert!(
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
+    pub fn build(self) -> Result<ParameterSpec<L>, crate::error::SigilStitchError> {
+        snafu::ensure!(
             !self.name.is_empty(),
-            "ParameterSpecBuilder::build() failed: 'name' must not be empty",
+            crate::error::EmptyNameSnafu {
+                builder: "ParameterSpecBuilder",
+            }
         );
-        ParameterSpec {
+        Ok(ParameterSpec {
             name: self.name,
             param_type: self.param_type,
             default_value: self.default_value,
             is_variadic: self.is_variadic,
-        }
+        })
     }
 }
 
@@ -154,12 +159,12 @@ mod tests {
         // Use a basic renderer to get the output.
         let imports = crate::import::ImportGroup::new();
         let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
-        renderer.render(&block)
+        renderer.render(&block).unwrap()
     }
 
     #[test]
     fn test_simple_param() {
-        let param = ParameterSpec::<TypeScript>::new("id", TypeName::primitive("string"));
+        let param = ParameterSpec::<TypeScript>::new("id", TypeName::primitive("string")).unwrap();
         let output = emit_param(&param);
         assert_eq!(output, "id: string");
     }
@@ -168,7 +173,7 @@ mod tests {
     fn test_variadic_param() {
         let mut pb = ParameterSpec::builder("args", TypeName::<TypeScript>::primitive("string"));
         pb.variadic();
-        let param = pb.build();
+        let param = pb.build().unwrap();
         let output = emit_param(&param);
         assert_eq!(output, "...args: string");
     }
@@ -178,14 +183,21 @@ mod tests {
         let default = CodeBlock::<TypeScript>::of("0", ()).unwrap();
         let mut pb = ParameterSpec::builder("count", TypeName::<TypeScript>::primitive("number"));
         pb.default_value(default);
-        let param = pb.build();
+        let param = pb.build().unwrap();
         let output = emit_param(&param);
         assert_eq!(output, "count: number = 0");
     }
 
     #[test]
-    #[should_panic(expected = "ParameterSpecBuilder::build() failed: 'name' must not be empty")]
-    fn test_build_empty_name_panics() {
-        ParameterSpec::builder("", TypeName::<TypeScript>::primitive("string")).build();
+    fn test_build_empty_name_errors() {
+        let result =
+            ParameterSpec::builder("", TypeName::<TypeScript>::primitive("string")).build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("'name' must not be empty")
+        );
     }
 }

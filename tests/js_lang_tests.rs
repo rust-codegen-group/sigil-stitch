@@ -28,7 +28,7 @@ fn test_js_function_with_imports() {
 
     let mut fb = FileSpec::builder_with("greet.js", JavaScript::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/function_with_imports.js", &output);
@@ -49,7 +49,7 @@ fn test_js_no_import_type() {
 
     let mut fb = FileSpec::builder_with("test.js", JavaScript::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/no_import_type.js", &output);
@@ -69,7 +69,7 @@ fn test_js_control_flow() {
 
     let mut fb = FileSpec::builder_with("flow.js", JavaScript::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/control_flow.js", &output);

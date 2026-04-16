@@ -23,7 +23,7 @@ fn test_single_file_project() {
     let mut fb = FileSpec::<TypeScript>::builder("index.ts");
     fb.add_code(CodeBlock::of("console.log('hello')", ()).unwrap());
     let mut pb = ProjectSpec::builder();
-    pb.add_file(fb.build());
+    pb.add_file(fb.build().unwrap());
     let project = pb.build();
 
     let rendered = project.render(80).unwrap();
@@ -48,8 +48,8 @@ fn test_multi_file_project_with_imports() {
     f2.add_code(cb.build().unwrap());
 
     let mut pb = ProjectSpec::builder();
-    pb.add_file(f1.build());
-    pb.add_file(f2.build());
+    pb.add_file(f1.build().unwrap());
+    pb.add_file(f2.build().unwrap());
     let project = pb.build();
 
     let rendered = project.render(80).unwrap();
@@ -72,7 +72,7 @@ fn test_file_ordering_preserved() {
     for name in ["c.ts", "a.ts", "b.ts"] {
         let mut fb = FileSpec::builder(name);
         fb.add_code(CodeBlock::of("// placeholder", ()).unwrap());
-        pb.add_file(fb.build());
+        pb.add_file(fb.build().unwrap());
     }
     let rendered = pb.build().render(80).unwrap();
     let paths: Vec<&str> = rendered.iter().map(|r| r.path.as_str()).collect();
@@ -91,7 +91,7 @@ fn test_render_error_includes_filename() {
     let mut fb = FileSpec::<TypeScript>::builder("app.ts");
     fb.add_code(CodeBlock::of("const x = 1", ()).unwrap());
     let mut pb = ProjectSpec::builder();
-    pb.add_file(fb.build());
+    pb.add_file(fb.build().unwrap());
     let result = pb.build().render(80);
     assert!(result.is_ok());
 }
@@ -107,7 +107,7 @@ fn test_write_to_creates_files() {
     let mut pb = ProjectSpec::<TypeScript>::builder();
     let mut fb = FileSpec::builder("hello.ts");
     fb.add_code(CodeBlock::of("export const x = 1", ()).unwrap());
-    pb.add_file(fb.build());
+    pb.add_file(fb.build().unwrap());
 
     let written = pb.build().write_to(&dir, 80).unwrap();
     assert_eq!(written.len(), 1);
@@ -129,7 +129,7 @@ fn test_write_to_creates_nested_dirs() {
     let mut pb = ProjectSpec::<TypeScript>::builder();
     let mut fb = FileSpec::builder("src/models/user.ts");
     fb.add_code(CodeBlock::of("export class User {}", ()).unwrap());
-    pb.add_file(fb.build());
+    pb.add_file(fb.build().unwrap());
 
     let written = pb.build().write_to(&dir, 80).unwrap();
     assert_eq!(written.len(), 1);
@@ -148,10 +148,10 @@ fn test_rust_project() {
     fun.visibility(Visibility::Public);
     fun.returns(TypeName::primitive("String"));
     fun.body(CodeBlock::of("String::from(\"hello\")", ()).unwrap());
-    fb.add_function(fun.build());
+    fb.add_function(fun.build().unwrap());
 
     let mut pb = ProjectSpec::builder();
-    pb.add_file(fb.build());
+    pb.add_file(fb.build().unwrap());
     let rendered = pb.build().render(80).unwrap();
 
     assert_eq!(rendered.len(), 1);
@@ -171,8 +171,8 @@ fn test_multi_file_rust_project() {
     f2.add_code(cb.build().unwrap());
 
     let mut pb = ProjectSpec::builder();
-    pb.add_file(f1.build());
-    pb.add_file(f2.build());
+    pb.add_file(f1.build().unwrap());
+    pb.add_file(f2.build().unwrap());
     let rendered = pb.build().render(80).unwrap();
 
     assert_eq!(rendered.len(), 2);

@@ -15,15 +15,27 @@ use sigil_stitch::type_name::TypeName;
 fn test_c_struct_with_fields() {
     let mut tb = TypeSpec::<CLang>::builder("Config", TypeKind::Struct);
     tb.doc("Application configuration.");
-    tb.add_field(FieldSpec::builder("timeout", TypeName::primitive("int")).build());
-    tb.add_field(FieldSpec::builder("name", TypeName::primitive("char*")).build());
-    tb.add_field(FieldSpec::builder("verbose", TypeName::primitive("int")).build());
-    let ts = tb.build();
+    tb.add_field(
+        FieldSpec::builder("timeout", TypeName::primitive("int"))
+            .build()
+            .unwrap(),
+    );
+    tb.add_field(
+        FieldSpec::builder("name", TypeName::primitive("char*"))
+            .build()
+            .unwrap(),
+    );
+    tb.add_field(
+        FieldSpec::builder("verbose", TypeName::primitive("int"))
+            .build()
+            .unwrap(),
+    );
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("config.h", CLang::header());
     fb.header(CodeBlock::<CLang>::of("#pragma once", ()).unwrap());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/struct_with_fields.c", &output);
@@ -33,15 +45,15 @@ fn test_c_struct_with_fields() {
 fn test_c_function_with_params() {
     let body = CodeBlock::<CLang>::of("return a + b;", ()).unwrap();
     let mut fb = FunSpec::<CLang>::builder("add");
-    fb.add_param(ParameterSpec::new("a", TypeName::primitive("int")));
-    fb.add_param(ParameterSpec::new("b", TypeName::primitive("int")));
+    fb.add_param(ParameterSpec::new("a", TypeName::primitive("int")).unwrap());
+    fb.add_param(ParameterSpec::new("b", TypeName::primitive("int")).unwrap());
     fb.returns(TypeName::primitive("int"));
     fb.body(body);
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("math.c", CLang::new());
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/function_with_params.c", &output);
@@ -56,17 +68,14 @@ fn test_c_void_function() {
     )
     .unwrap();
     let mut fb = FunSpec::<CLang>::builder("greet");
-    fb.add_param(ParameterSpec::new(
-        "name",
-        TypeName::primitive("const char*"),
-    ));
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("const char*")).unwrap());
     fb.returns(TypeName::primitive("void"));
     fb.body(body);
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("greet.c", CLang::new());
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/void_function.c", &output);
@@ -76,15 +85,15 @@ fn test_c_void_function() {
 fn test_c_enum() {
     let mut tb = TypeSpec::<CLang>::builder("Direction", TypeKind::Enum);
     tb.doc("Cardinal directions.");
-    tb.add_variant(EnumVariantSpec::new("UP"));
-    tb.add_variant(EnumVariantSpec::new("DOWN"));
-    tb.add_variant(EnumVariantSpec::new("LEFT"));
-    tb.add_variant(EnumVariantSpec::new("RIGHT"));
-    let ts = tb.build();
+    tb.add_variant(EnumVariantSpec::new("UP").unwrap());
+    tb.add_variant(EnumVariantSpec::new("DOWN").unwrap());
+    tb.add_variant(EnumVariantSpec::new("LEFT").unwrap());
+    tb.add_variant(EnumVariantSpec::new("RIGHT").unwrap());
+    let ts = tb.build().unwrap();
 
     let mut fb = FileSpec::builder_with("direction.h", CLang::header());
     fb.add_type(ts);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/enum.c", &output);
@@ -96,14 +105,14 @@ fn test_c_static_function() {
     let mut fb = FunSpec::<CLang>::builder("square");
     fb.visibility(Visibility::Private);
     fb.is_static();
-    fb.add_param(ParameterSpec::new("x", TypeName::primitive("int")));
+    fb.add_param(ParameterSpec::new("x", TypeName::primitive("int")).unwrap());
     fb.returns(TypeName::primitive("int"));
     fb.body(body);
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("helpers.c", CLang::new());
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/static_function.c", &output);
@@ -113,17 +122,14 @@ fn test_c_static_function() {
 fn test_c_function_declaration() {
     // Forward declaration — no body, should end with semicolon.
     let mut fb = FunSpec::<CLang>::builder("process");
-    fb.add_param(ParameterSpec::new(
-        "data",
-        TypeName::primitive("const char*"),
-    ));
-    fb.add_param(ParameterSpec::new("len", TypeName::primitive("size_t")));
+    fb.add_param(ParameterSpec::new("data", TypeName::primitive("const char*")).unwrap());
+    fb.add_param(ParameterSpec::new("len", TypeName::primitive("size_t")).unwrap());
     fb.returns(TypeName::primitive("int"));
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("api.h", CLang::header());
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/function_declaration.c", &output);
@@ -133,21 +139,29 @@ fn test_c_function_declaration() {
 fn test_c_struct_with_function() {
     // Struct definition + a separate function that uses it.
     let mut tb = TypeSpec::<CLang>::builder("Point", TypeKind::Struct);
-    tb.add_field(FieldSpec::builder("x", TypeName::primitive("int")).build());
-    tb.add_field(FieldSpec::builder("y", TypeName::primitive("int")).build());
-    let ts = tb.build();
+    tb.add_field(
+        FieldSpec::builder("x", TypeName::primitive("int"))
+            .build()
+            .unwrap(),
+    );
+    tb.add_field(
+        FieldSpec::builder("y", TypeName::primitive("int"))
+            .build()
+            .unwrap(),
+    );
+    let ts = tb.build().unwrap();
 
     let body = CodeBlock::<CLang>::of("return p.x + p.y;", ()).unwrap();
     let mut fb = FunSpec::<CLang>::builder("point_sum");
-    fb.add_param(ParameterSpec::new("p", TypeName::primitive("struct Point")));
+    fb.add_param(ParameterSpec::new("p", TypeName::primitive("struct Point")).unwrap());
     fb.returns(TypeName::primitive("int"));
     fb.body(body);
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("point.c", CLang::new());
     file_b.add_type(ts);
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/struct_with_function.c", &output);
@@ -161,9 +175,17 @@ fn test_c_top_level_with_includes() {
 
     let mut tb = TypeSpec::<CLang>::builder("Server", TypeKind::Struct);
     tb.doc("HTTP server configuration.");
-    tb.add_field(FieldSpec::builder("port", TypeName::primitive("int")).build());
-    tb.add_field(FieldSpec::builder("host", TypeName::primitive("const char*")).build());
-    let ts = tb.build();
+    tb.add_field(
+        FieldSpec::builder("port", TypeName::primitive("int"))
+            .build()
+            .unwrap(),
+    );
+    tb.add_field(
+        FieldSpec::builder("host", TypeName::primitive("const char*"))
+            .build()
+            .unwrap(),
+    );
+    let ts = tb.build().unwrap();
 
     // Function that uses imports.
     let body = CodeBlock::<CLang>::of(
@@ -176,19 +198,16 @@ fn test_c_top_level_with_includes() {
     )
     .unwrap();
     let mut fb = FunSpec::<CLang>::builder("server_start");
-    fb.add_param(ParameterSpec::new(
-        "srv",
-        TypeName::primitive("struct Server"),
-    ));
+    fb.add_param(ParameterSpec::new("srv", TypeName::primitive("struct Server")).unwrap());
     fb.returns(TypeName::primitive("void"));
     fb.body(body);
-    let fun = fb.build();
+    let fun = fb.build().unwrap();
 
     let mut file_b = FileSpec::builder_with("server.h", CLang::header());
     file_b.header(CodeBlock::<CLang>::of("#pragma once", ()).unwrap());
     file_b.add_type(ts);
     file_b.add_function(fun);
-    let file = file_b.build();
+    let file = file_b.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/top_level_with_includes.c", &output);

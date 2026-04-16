@@ -78,7 +78,11 @@ impl<L: CodeLang> PropertySpec<L> {
     ///
     /// Accessor style returns 1–2 blocks (getter, setter).
     /// Field style returns 1 block (field with inline body).
-    pub fn emit(&self, lang: &L, ctx: DeclarationContext) -> Vec<CodeBlock<L>> {
+    pub fn emit(
+        &self,
+        lang: &L,
+        ctx: DeclarationContext,
+    ) -> Result<Vec<CodeBlock<L>>, crate::error::SigilStitchError> {
         match lang.property_style() {
             PropertyStyle::Accessor => self.emit_accessor(lang, ctx),
             PropertyStyle::Field => self.emit_field(lang, ctx),
@@ -86,14 +90,18 @@ impl<L: CodeLang> PropertySpec<L> {
     }
 
     /// Emit as accessor methods: `get name(): T { ... }` / `set name(v: T) { ... }`.
-    fn emit_accessor(&self, lang: &L, ctx: DeclarationContext) -> Vec<CodeBlock<L>> {
+    fn emit_accessor(
+        &self,
+        lang: &L,
+        ctx: DeclarationContext,
+    ) -> Result<Vec<CodeBlock<L>>, crate::error::SigilStitchError> {
         let mut blocks = Vec::new();
 
         if let Some(getter_body) = &self.getter {
             let mut cb = CodeBlock::<L>::builder();
 
             // Annotations + doc on the getter.
-            self.emit_preamble(&mut cb, lang);
+            self.emit_preamble(&mut cb, lang)?;
 
             // Signature: [vis] get [name]()[return_type_sep][type][block_open]
             let vis = lang.render_visibility(self.modifiers.visibility, ctx);
@@ -127,7 +135,7 @@ impl<L: CodeLang> PropertySpec<L> {
                 cb.add_line();
             }
 
-            blocks.push(cb.build().unwrap());
+            blocks.push(cb.build()?);
         }
 
         if let Some(setter) = &self.setter {
@@ -167,18 +175,22 @@ impl<L: CodeLang> PropertySpec<L> {
                 cb.add_line();
             }
 
-            blocks.push(cb.build().unwrap());
+            blocks.push(cb.build()?);
         }
 
-        blocks
+        Ok(blocks)
     }
 
     /// Emit as a field with inline getter/setter body (Swift/Kotlin).
-    fn emit_field(&self, lang: &L, ctx: DeclarationContext) -> Vec<CodeBlock<L>> {
+    fn emit_field(
+        &self,
+        lang: &L,
+        ctx: DeclarationContext,
+    ) -> Result<Vec<CodeBlock<L>>, crate::error::SigilStitchError> {
         let mut cb = CodeBlock::<L>::builder();
 
         // Annotations + doc.
-        self.emit_preamble(&mut cb, lang);
+        self.emit_preamble(&mut cb, lang)?;
 
         // Field header: [vis] [var/let] [name]: [type] {
         let vis = lang.render_visibility(self.modifiers.visibility, ctx);
@@ -251,13 +263,17 @@ impl<L: CodeLang> PropertySpec<L> {
             cb.add_line();
         }
 
-        vec![cb.build().unwrap()]
+        Ok(vec![cb.build()?])
     }
 
     /// Emit annotations and doc comment as a preamble.
-    fn emit_preamble(&self, cb: &mut crate::code_block::CodeBlockBuilder<L>, lang: &L) {
+    fn emit_preamble(
+        &self,
+        cb: &mut crate::code_block::CodeBlockBuilder<L>,
+        lang: &L,
+    ) -> Result<(), crate::error::SigilStitchError> {
         for spec in &self.annotation_specs {
-            cb.add_code(spec.emit(lang));
+            cb.add_code(spec.emit(lang)?);
             cb.add_line();
         }
         for ann in &self.annotations {
@@ -270,6 +286,7 @@ impl<L: CodeLang> PropertySpec<L> {
             cb.add("%L", doc_str);
             cb.add_line();
         }
+        Ok(())
     }
 }
 
@@ -334,15 +351,17 @@ impl<L: CodeLang> PropertySpecBuilder<L> {
 
     /// Build the [`PropertySpec`].
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `name` is empty.
-    pub fn build(self) -> PropertySpec<L> {
-        assert!(
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
+    pub fn build(self) -> Result<PropertySpec<L>, crate::error::SigilStitchError> {
+        snafu::ensure!(
             !self.name.is_empty(),
-            "PropertySpecBuilder::build() failed: 'name' must not be empty",
+            crate::error::EmptyNameSnafu {
+                builder: "PropertySpecBuilder",
+            }
         );
-        PropertySpec {
+        Ok(PropertySpec {
             name: self.name,
             property_type: self.property_type,
             modifiers: self.modifiers,
@@ -351,7 +370,7 @@ impl<L: CodeLang> PropertySpecBuilder<L> {
             setter: self.setter,
             annotations: self.annotations,
             annotation_specs: self.annotation_specs,
-        }
+        })
     }
 }
 
@@ -361,8 +380,14 @@ mod tests {
     use crate::lang::typescript::TypeScript;
 
     #[test]
-    #[should_panic(expected = "PropertySpecBuilder::build() failed: 'name' must not be empty")]
-    fn test_build_empty_name_panics() {
-        PropertySpec::builder("", TypeName::<TypeScript>::primitive("string")).build();
+    fn test_build_empty_name_errors() {
+        let result = PropertySpec::builder("", TypeName::<TypeScript>::primitive("string")).build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("'name' must not be empty")
+        );
     }
 }

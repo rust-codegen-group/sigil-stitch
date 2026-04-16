@@ -55,7 +55,7 @@ fn build_width_test_file() -> FileSpec<TypeScript> {
 
     let mut fb = FileSpec::<TypeScript>::builder("handler.ts");
     fb.add_code(block);
-    fb.build()
+    fb.build().unwrap()
 }
 
 // === Divergence regression: conflicting imports near %W break points ===
@@ -86,7 +86,7 @@ fn test_divergence_regression() {
 
     let mut fb = FileSpec::<TypeScript>::builder("merge.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     // Render at a tight width to stress both aliasing and line breaking.
     let output = file.render(60).unwrap();
@@ -112,7 +112,7 @@ fn test_multiline_type_semicolons() {
 
     let mut fb = FileSpec::<TypeScript>::builder("account.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     // Width 40 forces the union to wrap across multiple lines.
     let output = file.render(40).unwrap();
@@ -140,7 +140,7 @@ fn test_deep_nesting() {
 
     let mut fb = FileSpec::<TypeScript>::builder("deep.ts");
     fb.add_code(current);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/deep_nesting.ts", &output);
@@ -184,7 +184,7 @@ fn test_single_type_reference() {
 
     let mut fb = FileSpec::<TypeScript>::builder("alias.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/single_type_ref.ts", &output);

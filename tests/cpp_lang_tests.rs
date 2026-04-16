@@ -19,7 +19,7 @@ fn test_cpp_includes() {
 
     let mut fb = FileSpec::builder_with("test.cpp", CppLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/includes.cpp", &output);
@@ -43,7 +43,7 @@ fn test_cpp_namespace_wrapping() {
     fb.add_raw("\nnamespace math {\n");
     fb.add_code(block);
     fb.add_raw("\n} // namespace math\n");
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/namespace_wrapping.cpp", &output);
@@ -63,7 +63,7 @@ fn test_cpp_control_flow() {
 
     let mut fb = FileSpec::builder_with("flow.cpp", CppLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/control_flow.cpp", &output);

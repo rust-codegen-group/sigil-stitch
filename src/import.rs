@@ -217,15 +217,19 @@ fn module_to_prefix(module: &str) -> String {
 }
 
 /// Validate that a module path doesn't contain injection-prone characters.
-pub fn validate_module_path(path: &str) -> Result<(), String> {
+pub fn validate_module_path(path: &str) -> Result<(), crate::error::SigilStitchError> {
     if path.is_empty() {
-        return Err("Module path cannot be empty".to_string());
+        return Err(crate::error::SigilStitchError::InvalidModulePath {
+            message: "Module path cannot be empty".to_string(),
+        });
     }
     // Reject characters that could break import syntax.
     for ch in path.chars() {
         match ch {
             '\n' | '\r' | '\'' | '"' | '`' | ';' | '{' | '}' | '(' | ')' => {
-                return Err(format!("Module path contains invalid character: {:?}", ch));
+                return Err(crate::error::SigilStitchError::InvalidModulePath {
+                    message: format!("Module path contains invalid character: {:?}", ch),
+                });
             }
             _ => {}
         }

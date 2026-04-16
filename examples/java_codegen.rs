@@ -47,7 +47,7 @@ fn main() {
     constants.add_line();
     priority.extra_member(constants.build().unwrap());
 
-    let priority_spec = priority.build();
+    let priority_spec = priority.build().unwrap();
 
     // --- Interface: TaskRepository<T> ---
     let tp = TypeParamSpec::<JavaLang>::new("T").with_bound(TypeName::primitive("Serializable"));
@@ -61,20 +61,20 @@ fn main() {
 
     let mut find = FunSpec::<JavaLang>::builder("findById");
     find.returns(TypeName::primitive("T"));
-    find.add_param(ParameterSpec::new("id", TypeName::primitive("long")));
+    find.add_param(ParameterSpec::new("id", TypeName::primitive("long")).unwrap());
     find.annotation(CodeBlock::<JavaLang>::of("@%T", (nullable.clone(),)).unwrap());
-    repo_iface.add_method(find.build());
+    repo_iface.add_method(find.build().unwrap());
 
     let mut find_all = FunSpec::<JavaLang>::builder("findAll");
     find_all.returns(TypeName::primitive("List<T>"));
-    repo_iface.add_method(find_all.build());
+    repo_iface.add_method(find_all.build().unwrap());
 
     let mut save = FunSpec::<JavaLang>::builder("save");
     save.returns(TypeName::primitive("void"));
-    save.add_param(ParameterSpec::new("entity", TypeName::primitive("T")));
-    repo_iface.add_method(save.build());
+    save.add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap());
+    repo_iface.add_method(save.build().unwrap());
 
-    let repo_spec = repo_iface.build();
+    let repo_spec = repo_iface.build().unwrap();
 
     // --- Abstract class: BaseTask ---
     let mut base_task = TypeSpec::<JavaLang>::builder("BaseTask", TypeKind::Class);
@@ -85,15 +85,15 @@ fn main() {
     let mut id_field = FieldSpec::builder("id", TypeName::primitive("long"));
     id_field.visibility(Visibility::Private);
     id_field.is_readonly();
-    base_task.add_field(id_field.build());
+    base_task.add_field(id_field.build().unwrap());
 
     let mut name_field = FieldSpec::builder("name", TypeName::primitive("String"));
     name_field.visibility(Visibility::Private);
-    base_task.add_field(name_field.build());
+    base_task.add_field(name_field.build().unwrap());
 
     let mut priority_field = FieldSpec::builder("priority", TypeName::primitive("Priority"));
     priority_field.visibility(Visibility::Private);
-    base_task.add_field(priority_field.build());
+    base_task.add_field(priority_field.build().unwrap());
 
     // Constructor
     let ctor_body = CodeBlock::<JavaLang>::of(
@@ -103,14 +103,11 @@ fn main() {
     .unwrap();
     let mut base_ctor = FunSpec::<JavaLang>::builder("BaseTask");
     base_ctor.visibility(Visibility::Protected);
-    base_ctor.add_param(ParameterSpec::new("id", TypeName::primitive("long")));
-    base_ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
-    base_ctor.add_param(ParameterSpec::new(
-        "priority",
-        TypeName::primitive("Priority"),
-    ));
+    base_ctor.add_param(ParameterSpec::new("id", TypeName::primitive("long")).unwrap());
+    base_ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
+    base_ctor.add_param(ParameterSpec::new("priority", TypeName::primitive("Priority")).unwrap());
     base_ctor.body(ctor_body);
-    base_task.add_method(base_ctor.build());
+    base_task.add_method(base_ctor.build().unwrap());
 
     // Concrete getter
     let get_id_body = CodeBlock::<JavaLang>::of("return this.id;", ()).unwrap();
@@ -118,16 +115,16 @@ fn main() {
     get_id.visibility(Visibility::Public);
     get_id.returns(TypeName::primitive("long"));
     get_id.body(get_id_body);
-    base_task.add_method(get_id.build());
+    base_task.add_method(get_id.build().unwrap());
 
     // Abstract method
     let mut execute = FunSpec::<JavaLang>::builder("execute");
     execute.visibility(Visibility::Public);
     execute.is_abstract();
     execute.returns(TypeName::primitive("void"));
-    base_task.add_method(execute.build());
+    base_task.add_method(execute.build().unwrap());
 
-    let base_task_spec = base_task.build();
+    let base_task_spec = base_task.build().unwrap();
 
     // --- Concrete class: SimpleTask extends BaseTask implements Serializable ---
     let mut simple_task = TypeSpec::<JavaLang>::builder("SimpleTask", TypeKind::Class);
@@ -144,7 +141,7 @@ fn main() {
     log_field.is_static();
     log_field.is_readonly();
     log_field.initializer(logger_init);
-    simple_task.add_field(log_field.build());
+    simple_task.add_field(log_field.build().unwrap());
 
     // Trigger Logger import
     let logger_trigger = CodeBlock::<JavaLang>::of("// Logger type: %T", (logger,)).unwrap();
@@ -154,10 +151,10 @@ fn main() {
         CodeBlock::<JavaLang>::of("super(id, name, Priority.MEDIUM);", ()).unwrap();
     let mut simple_ctor = FunSpec::<JavaLang>::builder("SimpleTask");
     simple_ctor.visibility(Visibility::Public);
-    simple_ctor.add_param(ParameterSpec::new("id", TypeName::primitive("long")));
-    simple_ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
+    simple_ctor.add_param(ParameterSpec::new("id", TypeName::primitive("long")).unwrap());
+    simple_ctor.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
     simple_ctor.body(simple_ctor_body);
-    simple_task.add_method(simple_ctor.build());
+    simple_task.add_method(simple_ctor.build().unwrap());
 
     // execute() override
     let exec_body = CodeBlock::<JavaLang>::of(
@@ -170,9 +167,9 @@ fn main() {
     exec.returns(TypeName::primitive("void"));
     exec.annotation(CodeBlock::<JavaLang>::of("@Override", ()).unwrap());
     exec.body(exec_body);
-    simple_task.add_method(exec.build());
+    simple_task.add_method(exec.build().unwrap());
 
-    let simple_task_spec = simple_task.build();
+    let simple_task_spec = simple_task.build().unwrap();
 
     // --- Standalone utility function (wrapped in class body by user) ---
     let create_body = CodeBlock::<JavaLang>::of(
@@ -185,7 +182,7 @@ fn main() {
     create_fn.is_static();
     create_fn.returns(TypeName::primitive("List<SimpleTask>"));
     create_fn.body(create_body);
-    let create_tasks = create_fn.build();
+    let create_tasks = create_fn.build().unwrap();
 
     // findById using Optional — trigger import
     let find_body = CodeBlock::<JavaLang>::of(
@@ -197,13 +194,11 @@ fn main() {
     find_fn.visibility(Visibility::Public);
     find_fn.is_static();
     find_fn.returns(TypeName::primitive("Optional<SimpleTask>"));
-    find_fn.add_param(ParameterSpec::new(
-        "tasks",
-        TypeName::primitive("List<SimpleTask>"),
-    ));
-    find_fn.add_param(ParameterSpec::new("id", TypeName::primitive("long")));
+    find_fn
+        .add_param(ParameterSpec::new("tasks", TypeName::primitive("List<SimpleTask>")).unwrap());
+    find_fn.add_param(ParameterSpec::new("id", TypeName::primitive("long")).unwrap());
     find_fn.body(find_body);
-    let find_task = find_fn.build();
+    let find_task = find_fn.build().unwrap();
 
     // Trigger Optional import
     let optional_trigger = CodeBlock::<JavaLang>::of("// Optional: %T", (optional,)).unwrap();
@@ -219,7 +214,7 @@ fn main() {
     fb.add_function(create_tasks);
     fb.add_function(find_task);
 
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
     print!("{output}");
 }

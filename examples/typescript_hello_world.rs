@@ -26,7 +26,7 @@ fn main() {
     let mut field_b = FieldSpec::builder("userRepo", TypeName::primitive("UserRepository"));
     field_b.visibility(Visibility::Private);
     field_b.is_readonly();
-    tb.add_field(field_b.build());
+    tb.add_field(field_b.build().unwrap());
 
     // Async method with control flow body.
     let mut body = CodeBlock::<TypeScript>::builder();
@@ -42,18 +42,18 @@ fn main() {
 
     let mut fb = FunSpec::builder("getUser");
     fb.is_async();
-    fb.add_param(ParameterSpec::new("id", TypeName::primitive("string")));
+    fb.add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap());
     fb.returns(TypeName::generic(
         TypeName::primitive("Promise"),
         vec![user_type],
     ));
     fb.body(body_block);
-    tb.add_method(fb.build());
+    tb.add_method(fb.build().unwrap());
 
     // Build the file.
     let mut file = FileSpec::<TypeScript>::builder("UserService.ts");
-    file.add_type(tb.build());
-    let spec = file.build();
+    file.add_type(tb.build().unwrap());
+    let spec = file.build().unwrap();
 
     // Render at 80 columns.
     let output = spec.render(80).unwrap();

@@ -23,7 +23,7 @@ fn test_hello_world() {
 
     let mut fb = FileSpec::<TypeScript>::builder("UserService.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/hello_world.ts", &output);
@@ -43,7 +43,7 @@ fn test_conflicting_imports() {
 
     let mut fb = FileSpec::<TypeScript>::builder("users.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/conflicting_imports.ts", &output);
@@ -70,7 +70,7 @@ fn test_long_params() {
 
     let mut fb = FileSpec::<TypeScript>::builder("api.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/long_params.ts", &output);
@@ -99,7 +99,7 @@ fn test_nested_codeblock() {
 
     let mut fb = FileSpec::<TypeScript>::builder("getUser.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/nested_codeblock.ts", &output);
@@ -129,7 +129,7 @@ fn test_control_flow() {
 
     let mut fb = FileSpec::<TypeScript>::builder("validate.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/control_flow.ts", &output);
@@ -139,7 +139,7 @@ fn test_control_flow() {
 
 #[test]
 fn test_empty_file() {
-    let file = FileSpec::<TypeScript>::builder("empty.ts").build();
+    let file = FileSpec::<TypeScript>::builder("empty.ts").build().unwrap();
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/empty.ts", &output);
 }
@@ -150,7 +150,7 @@ fn test_empty_file() {
 fn test_raw_content() {
     let mut fb = FileSpec::<TypeScript>::builder("version.ts");
     fb.add_raw("// Auto-generated, do not edit.\n\nexport const VERSION = '1.0.0';\n");
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/raw_content.ts", &output);
@@ -167,7 +167,7 @@ fn test_string_and_name() {
 
     let mut fb = FileSpec::<TypeScript>::builder("fetch.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/string_and_name.ts", &output);
@@ -189,7 +189,7 @@ fn test_same_module_multiple_types() {
 
     let mut fb = FileSpec::<TypeScript>::builder("types.ts");
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
 
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/same_module_types.ts", &output);

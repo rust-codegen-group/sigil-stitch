@@ -16,7 +16,7 @@ fn test_java_function_with_imports() {
 
     let mut fb = FileSpec::builder_with("App.java", JavaLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("java/function_with_imports.java", &output);
@@ -37,7 +37,7 @@ fn test_java_import_grouping() {
 
     let mut fb = FileSpec::builder_with("Imports.java", JavaLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("java/import_grouping.java", &output);
@@ -57,7 +57,7 @@ fn test_java_control_flow() {
 
     let mut fb = FileSpec::builder_with("Flow.java", JavaLang::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("java/control_flow.java", &output);

@@ -66,12 +66,16 @@ impl<L: CodeLang> FieldSpec<L> {
     }
 
     /// Emit this field as a CodeBlock.
-    pub fn emit(&self, lang: &L, ctx: DeclarationContext) -> CodeBlock<L> {
+    pub fn emit(
+        &self,
+        lang: &L,
+        ctx: DeclarationContext,
+    ) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
         let mut cb = CodeBlock::<L>::builder();
 
         // Annotations (structured specs first, then raw CodeBlocks).
         for spec in &self.annotation_specs {
-            cb.add_code(spec.emit(lang));
+            cb.add_code(spec.emit(lang)?);
             cb.add_line();
         }
         for ann in &self.annotations {
@@ -146,7 +150,7 @@ impl<L: CodeLang> FieldSpec<L> {
         cb.add(&fmt, args);
         cb.add_line();
 
-        cb.build().unwrap()
+        cb.build()
     }
 }
 
@@ -214,15 +218,17 @@ impl<L: CodeLang> FieldSpecBuilder<L> {
 
     /// Build the [`FieldSpec`] from this builder.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `name` is empty.
-    pub fn build(self) -> FieldSpec<L> {
-        assert!(
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
+    pub fn build(self) -> Result<FieldSpec<L>, crate::error::SigilStitchError> {
+        snafu::ensure!(
             !self.name.is_empty(),
-            "FieldSpecBuilder::build() failed: 'name' must not be empty",
+            crate::error::EmptyNameSnafu {
+                builder: "FieldSpecBuilder",
+            }
         );
-        FieldSpec {
+        Ok(FieldSpec {
             name: self.name,
             field_type: self.field_type,
             modifiers: self.modifiers,
@@ -231,7 +237,7 @@ impl<L: CodeLang> FieldSpecBuilder<L> {
             annotations: self.annotations,
             annotation_specs: self.annotation_specs,
             tag: self.tag,
-        }
+        })
     }
 }
 
@@ -243,23 +249,25 @@ mod tests {
 
     fn emit_field_ts(spec: &FieldSpec<TypeScript>, ctx: DeclarationContext) -> String {
         let lang = TypeScript::new();
-        let block = spec.emit(&lang, ctx);
+        let block = spec.emit(&lang, ctx).unwrap();
         let imports = crate::import::ImportGroup::new();
         let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
-        renderer.render(&block)
+        renderer.render(&block).unwrap()
     }
 
     fn emit_field_rs(spec: &FieldSpec<RustLang>, ctx: DeclarationContext) -> String {
         let lang = RustLang::new();
-        let block = spec.emit(&lang, ctx);
+        let block = spec.emit(&lang, ctx).unwrap();
         let imports = crate::import::ImportGroup::new();
         let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
-        renderer.render(&block)
+        renderer.render(&block).unwrap()
     }
 
     #[test]
     fn test_ts_field_basic() {
-        let field = FieldSpec::builder("name", TypeName::<TypeScript>::primitive("string")).build();
+        let field = FieldSpec::builder("name", TypeName::<TypeScript>::primitive("string"))
+            .build()
+            .unwrap();
         let output = emit_field_ts(&field, DeclarationContext::Member);
         assert_eq!(output.trim(), "name: string;");
     }
@@ -268,7 +276,7 @@ mod tests {
     fn test_ts_field_with_visibility() {
         let mut fb = FieldSpec::builder("name", TypeName::<TypeScript>::primitive("string"));
         fb.visibility(Visibility::Private);
-        let field = fb.build();
+        let field = fb.build().unwrap();
         let output = emit_field_ts(&field, DeclarationContext::Member);
         assert_eq!(output.trim(), "private name: string;");
     }
@@ -277,7 +285,7 @@ mod tests {
     fn test_rust_field_basic() {
         let mut fb = FieldSpec::builder("name", TypeName::<RustLang>::primitive("String"));
         fb.visibility(Visibility::Public);
-        let field = fb.build();
+        let field = fb.build().unwrap();
         let output = emit_field_rs(&field, DeclarationContext::Member);
         assert_eq!(output.trim(), "pub name: String,");
     }
@@ -287,14 +295,20 @@ mod tests {
         let mut fb = FieldSpec::builder("MAX", TypeName::<TypeScript>::primitive("number"));
         fb.is_static();
         fb.is_readonly();
-        let field = fb.build();
+        let field = fb.build().unwrap();
         let output = emit_field_ts(&field, DeclarationContext::Member);
         assert_eq!(output.trim(), "static readonly MAX: number;");
     }
 
     #[test]
-    #[should_panic(expected = "FieldSpecBuilder::build() failed: 'name' must not be empty")]
-    fn test_build_empty_name_panics() {
-        FieldSpec::builder("", TypeName::<TypeScript>::primitive("string")).build();
+    fn test_build_empty_name_errors() {
+        let result = FieldSpec::builder("", TypeName::<TypeScript>::primitive("string")).build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("'name' must not be empty")
+        );
     }
 }

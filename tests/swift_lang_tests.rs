@@ -17,7 +17,7 @@ fn test_swift_function_with_imports() {
 
     let mut fb = FileSpec::builder_with("App.swift", Swift::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/function_with_imports.swift", &output);
@@ -42,7 +42,7 @@ fn test_swift_import_grouping() {
 
     let mut fb = FileSpec::builder_with("Imports.swift", Swift::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/import_grouping.swift", &output);
@@ -62,7 +62,7 @@ fn test_swift_control_flow() {
 
     let mut fb = FileSpec::builder_with("Flow.swift", Swift::new());
     fb.add_code(block);
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/control_flow.swift", &output);

@@ -47,7 +47,7 @@ fn main() {
     constants.add_line();
     priority.extra_member(constants.build().unwrap());
 
-    let priority_spec = priority.build();
+    let priority_spec = priority.build().unwrap();
 
     // --- Interface: Repository<T> ---
     let tp = TypeParamSpec::<Kotlin>::new("T");
@@ -60,18 +60,18 @@ fn main() {
 
     let mut find = FunSpec::<Kotlin>::builder("findById");
     find.returns(TypeName::primitive("T?"));
-    find.add_param(ParameterSpec::new("id", TypeName::primitive("String")));
-    repo_iface.add_method(find.build());
+    find.add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap());
+    repo_iface.add_method(find.build().unwrap());
 
     let mut find_all = FunSpec::<Kotlin>::builder("findAll");
     find_all.returns(list.clone());
-    repo_iface.add_method(find_all.build());
+    repo_iface.add_method(find_all.build().unwrap());
 
     let mut save = FunSpec::<Kotlin>::builder("save");
-    save.add_param(ParameterSpec::new("entity", TypeName::primitive("T")));
-    repo_iface.add_method(save.build());
+    save.add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap());
+    repo_iface.add_method(save.build().unwrap());
 
-    let repo_spec = repo_iface.build();
+    let repo_spec = repo_iface.build().unwrap();
 
     // --- Data class: Task ---
     let mut task_dc = TypeSpec::<Kotlin>::builder("Task", TypeKind::Struct);
@@ -79,21 +79,21 @@ fn main() {
 
     let mut id_field = FieldSpec::builder("id", TypeName::primitive("String"));
     id_field.is_readonly();
-    task_dc.add_field(id_field.build());
+    task_dc.add_field(id_field.build().unwrap());
 
     let mut name_field = FieldSpec::builder("name", TypeName::primitive("String"));
     name_field.is_readonly();
-    task_dc.add_field(name_field.build());
+    task_dc.add_field(name_field.build().unwrap());
 
     let mut priority_field = FieldSpec::builder("priority", TypeName::primitive("Priority"));
     priority_field.is_readonly();
-    task_dc.add_field(priority_field.build());
+    task_dc.add_field(priority_field.build().unwrap());
 
     let mut completed_field = FieldSpec::builder("completed", TypeName::primitive("Boolean"));
     completed_field.initializer(CodeBlock::<Kotlin>::of("false", ()).unwrap());
-    task_dc.add_field(completed_field.build());
+    task_dc.add_field(completed_field.build().unwrap());
 
-    let task_spec = task_dc.build();
+    let task_spec = task_dc.build().unwrap();
 
     // --- Abstract class: BaseService ---
     let mut base_svc = TypeSpec::<Kotlin>::builder("BaseService", TypeKind::Class);
@@ -103,22 +103,22 @@ fn main() {
     let mut name_f = FieldSpec::builder("serviceName", TypeName::primitive("String"));
     name_f.visibility(Visibility::Protected);
     name_f.is_readonly();
-    base_svc.add_field(name_f.build());
+    base_svc.add_field(name_f.build().unwrap());
 
     // Concrete method
     let log_body = CodeBlock::<Kotlin>::of("println(\"[$serviceName] $message\")", ()).unwrap();
     let mut log_fn = FunSpec::<Kotlin>::builder("log");
     log_fn.visibility(Visibility::Protected);
-    log_fn.add_param(ParameterSpec::new("message", TypeName::primitive("String")));
+    log_fn.add_param(ParameterSpec::new("message", TypeName::primitive("String")).unwrap());
     log_fn.body(log_body);
-    base_svc.add_method(log_fn.build());
+    base_svc.add_method(log_fn.build().unwrap());
 
     // Abstract method
     let mut init_fn = FunSpec::<Kotlin>::builder("initialize");
     init_fn.is_abstract();
-    base_svc.add_method(init_fn.build());
+    base_svc.add_method(init_fn.build().unwrap());
 
-    let base_svc_spec = base_svc.build();
+    let base_svc_spec = base_svc.build().unwrap();
 
     // --- Concrete class: TaskService extends BaseService, implements Repository<Task> ---
     let mut task_svc = TypeSpec::<Kotlin>::builder("TaskService", TypeKind::Class);
@@ -131,7 +131,7 @@ fn main() {
     tasks_field.visibility(Visibility::Private);
     tasks_field.is_readonly();
     tasks_field.initializer(CodeBlock::<Kotlin>::of("%T()", (array_list,)).unwrap());
-    task_svc.add_field(tasks_field.build());
+    task_svc.add_field(tasks_field.build().unwrap());
 
     // initialize override
     let init_body = CodeBlock::<Kotlin>::of(
@@ -142,17 +142,17 @@ fn main() {
     let mut init_impl = FunSpec::<Kotlin>::builder("initialize");
     init_impl.is_override();
     init_impl.body(init_body);
-    task_svc.add_method(init_impl.build());
+    task_svc.add_method(init_impl.build().unwrap());
 
     // findById override — trigger UUID import
     let find_body =
         CodeBlock::<Kotlin>::of("return tasks.firstOrNull { it.id == id }", ()).unwrap();
     let mut find_impl = FunSpec::<Kotlin>::builder("findById");
     find_impl.returns(TypeName::primitive("Task?"));
-    find_impl.add_param(ParameterSpec::new("id", TypeName::primitive("String")));
+    find_impl.add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap());
     find_impl.is_override();
     find_impl.body(find_body);
-    task_svc.add_method(find_impl.build());
+    task_svc.add_method(find_impl.build().unwrap());
 
     // findAll override
     let find_all_body = CodeBlock::<Kotlin>::of("return %T(tasks)", (list.clone(),)).unwrap();
@@ -160,17 +160,17 @@ fn main() {
     find_all_impl.returns(list);
     find_all_impl.is_override();
     find_all_impl.body(find_all_body);
-    task_svc.add_method(find_all_impl.build());
+    task_svc.add_method(find_all_impl.build().unwrap());
 
     // save override
     let save_body = CodeBlock::<Kotlin>::of("tasks.add(entity)", ()).unwrap();
     let mut save_impl = FunSpec::<Kotlin>::builder("save");
-    save_impl.add_param(ParameterSpec::new("entity", TypeName::primitive("Task")));
+    save_impl.add_param(ParameterSpec::new("entity", TypeName::primitive("Task")).unwrap());
     save_impl.is_override();
     save_impl.body(save_body);
-    task_svc.add_method(save_impl.build());
+    task_svc.add_method(save_impl.build().unwrap());
 
-    let task_svc_spec = task_svc.build();
+    let task_svc_spec = task_svc.build().unwrap();
 
     // --- Suspend function: fetchTasks ---
     let fetch_body = CodeBlock::<Kotlin>::of(
@@ -182,7 +182,7 @@ fn main() {
     fetch_fn.is_async();
     fetch_fn.returns(TypeName::primitive("List<Task>"));
     fetch_fn.body(fetch_body);
-    let fetch_tasks = fetch_fn.build();
+    let fetch_tasks = fetch_fn.build().unwrap();
 
     // --- Standalone function using UUID + CoroutineScope ---
     let create_body = CodeBlock::<Kotlin>::of(
@@ -192,13 +192,10 @@ fn main() {
     .unwrap();
     let mut create_fn = FunSpec::<Kotlin>::builder("createTask");
     create_fn.returns(TypeName::primitive("Task"));
-    create_fn.add_param(ParameterSpec::new("name", TypeName::primitive("String")));
-    create_fn.add_param(ParameterSpec::new(
-        "priority",
-        TypeName::primitive("Priority"),
-    ));
+    create_fn.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
+    create_fn.add_param(ParameterSpec::new("priority", TypeName::primitive("Priority")).unwrap());
     create_fn.body(create_body);
-    let create_task = create_fn.build();
+    let create_task = create_fn.build().unwrap();
 
     // Trigger CoroutineScope import
     let scope_trigger =
@@ -215,7 +212,7 @@ fn main() {
     fb.add_function(fetch_tasks);
     fb.add_function(create_task);
 
-    let file = fb.build();
+    let file = fb.build().unwrap();
     let output = file.render(80).unwrap();
     print!("{output}");
 }
