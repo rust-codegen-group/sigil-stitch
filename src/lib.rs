@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 //! # Sigil-Stitch
 //!
 //! Type-safe, import-aware, width-aware code generation for multiple languages.
@@ -42,14 +44,23 @@
 //! assert!(output.contains("import type { User } from './models'"));
 //! ```
 
+/// Composable code fragments with format specifiers (`%T`, `%N`, `%S`, `%L`, etc.).
 pub mod code_block;
+/// Rendering engine that walks `CodeBlock` format parts into final output.
 pub mod code_renderer;
+/// Reusable named-parameter templates that produce `CodeBlock`s.
 pub mod code_template;
+/// Import types, grouping, and conflict resolution.
 pub mod import;
+/// Walks `CodeBlock` trees to extract all import references.
 pub mod import_collector;
+/// Language abstraction trait and per-language implementations.
 pub mod lang;
+/// Collision-free name allocation for generated identifiers.
 pub mod name_allocator;
+/// Structural builders (TypeSpec, FunSpec, FileSpec, etc.) that emit `CodeBlock`s.
 pub mod spec;
+/// Type references with recursive import tracking and pretty-printing.
 pub mod type_name;
 
 /// Common re-exports for convenient usage.

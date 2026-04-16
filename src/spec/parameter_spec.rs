@@ -14,6 +14,7 @@ pub struct ParameterSpec<L: CodeLang> {
 }
 
 impl<L: CodeLang> ParameterSpec<L> {
+    /// Create a new builder for a parameter with the given name and type.
     pub fn builder(name: &str, param_type: TypeName<L>) -> ParameterSpecBuilder<L> {
         ParameterSpecBuilder {
             name: name.to_string(),
@@ -28,10 +29,12 @@ impl<L: CodeLang> ParameterSpec<L> {
         Self::builder(name, param_type).build()
     }
 
+    /// Return the parameter name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Return the parameter type.
     pub fn param_type(&self) -> &TypeName<L> {
         &self.param_type
     }
@@ -84,16 +87,19 @@ pub struct ParameterSpecBuilder<L: CodeLang> {
 }
 
 impl<L: CodeLang> ParameterSpecBuilder<L> {
+    /// Set the default value for this parameter.
     pub fn default_value(&mut self, value: crate::code_block::CodeBlock<L>) -> &mut Self {
         self.default_value = Some(value);
         self
     }
 
+    /// Mark this parameter as variadic.
     pub fn variadic(&mut self) -> &mut Self {
         self.is_variadic = true;
         self
     }
 
+    /// Build the [`ParameterSpec`].
     pub fn build(self) -> ParameterSpec<L> {
         ParameterSpec {
             name: self.name,

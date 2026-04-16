@@ -64,6 +64,7 @@ impl Default for Swift {
 }
 
 impl Swift {
+    /// Create a new Swift language instance.
     pub fn new() -> Self {
         Self::default()
     }

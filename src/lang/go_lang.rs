@@ -36,6 +36,7 @@ impl Default for GoLang {
 }
 
 impl GoLang {
+    /// Create a new Go language instance.
     pub fn new() -> Self {
         Self::default()
     }

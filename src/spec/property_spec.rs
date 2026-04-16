@@ -32,6 +32,7 @@ pub struct PropertySpec<L: CodeLang> {
 }
 
 impl<L: CodeLang> PropertySpec<L> {
+    /// Create a new builder for a property with the given name and type.
     pub fn builder(name: &str, property_type: TypeName<L>) -> PropertySpecBuilder<L> {
         PropertySpecBuilder {
             name: name.to_string(),
@@ -45,6 +46,7 @@ impl<L: CodeLang> PropertySpec<L> {
         }
     }
 
+    /// Return the property name.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -262,11 +264,13 @@ pub struct PropertySpecBuilder<L: CodeLang> {
 }
 
 impl<L: CodeLang> PropertySpecBuilder<L> {
+    /// Set the getter body.
     pub fn getter(&mut self, body: CodeBlock<L>) -> &mut Self {
         self.getter = Some(body);
         self
     }
 
+    /// Set the setter parameter name and body.
     pub fn setter(&mut self, param_name: &str, body: CodeBlock<L>) -> &mut Self {
         self.setter = Some(SetterSpec {
             param_name: param_name.to_string(),
@@ -275,31 +279,37 @@ impl<L: CodeLang> PropertySpecBuilder<L> {
         self
     }
 
+    /// Set the visibility.
     pub fn visibility(&mut self, vis: Visibility) -> &mut Self {
         self.modifiers.visibility = vis;
         self
     }
 
+    /// Mark this property as static.
     pub fn is_static(&mut self) -> &mut Self {
         self.modifiers.is_static = true;
         self
     }
 
+    /// Add a doc comment line.
     pub fn doc(&mut self, line: &str) -> &mut Self {
         self.doc.push(line.to_string());
         self
     }
 
+    /// Add a raw annotation code block.
     pub fn annotation(&mut self, ann: CodeBlock<L>) -> &mut Self {
         self.annotations.push(ann);
         self
     }
 
+    /// Add a structured annotation.
     pub fn annotate(&mut self, spec: AnnotationSpec<L>) -> &mut Self {
         self.annotation_specs.push(spec);
         self
     }
 
+    /// Build the [`PropertySpec`].
     pub fn build(self) -> PropertySpec<L> {
         PropertySpec {
             name: self.name,

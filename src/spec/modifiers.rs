@@ -54,12 +54,19 @@ pub enum PropertyStyle {
 /// Modifier flags for a declaration.
 #[derive(Debug, Clone, Default)]
 pub struct Modifiers {
+    /// Visibility level for the declaration.
     pub visibility: Visibility,
+    /// Whether the declaration is static.
     pub is_static: bool,
+    /// Whether the declaration is abstract.
     pub is_abstract: bool,
+    /// Whether the declaration is readonly.
     pub is_readonly: bool,
+    /// Whether the declaration is async.
     pub is_async: bool,
+    /// Whether the declaration is an override.
     pub is_override: bool,
+    /// Whether the declaration is a constructor.
     pub is_constructor: bool,
 }
 

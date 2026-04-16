@@ -5,6 +5,18 @@ edition = "2024"
 rust-version = "1.88.0"
 description = "Type-safe, import-aware, width-aware code generation for multiple languages"
 license = "MIT OR Apache-2.0"
+authors = ["Adam Cavendish"]
+repository = "https://github.com/adamcavendish/sigil-stitch"
+homepage = "https://github.com/adamcavendish/sigil-stitch"
+readme = "README.md"
+keywords = ["codegen", "code-generation", "pretty-printing", "multi-language", "builder"]
+categories = ["development-tools"]
+exclude = [
+    ".github/",
+    "coverage/",
+    "tests/golden/",
+    "Justfile",
+]
 
 [dependencies]
 pretty = "0.12"

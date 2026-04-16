@@ -15,6 +15,7 @@ pub struct TypeParamSpec<L: CodeLang> {
 }
 
 impl<L: CodeLang> TypeParamSpec<L> {
+    /// Create a new type parameter with the given name and no bounds.
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -22,6 +23,7 @@ impl<L: CodeLang> TypeParamSpec<L> {
         }
     }
 
+    /// Add a trait/interface bound to this type parameter.
     pub fn with_bound(mut self, bound: TypeName<L>) -> Self {
         self.bounds.push(bound);
         self
@@ -82,6 +84,7 @@ pub struct FunSpec<L: CodeLang> {
 }
 
 impl<L: CodeLang> FunSpec<L> {
+    /// Create a new builder for a function with the given name.
     pub fn builder(name: &str) -> FunSpecBuilder<L> {
         FunSpecBuilder {
             name: name.to_string(),
@@ -98,6 +101,7 @@ impl<L: CodeLang> FunSpec<L> {
         }
     }
 
+    /// Return the function name.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -286,81 +290,97 @@ pub struct FunSpecBuilder<L: CodeLang> {
 }
 
 impl<L: CodeLang> FunSpecBuilder<L> {
+    /// Add a parameter to the function signature.
     pub fn add_param(&mut self, param: ParameterSpec<L>) -> &mut Self {
         self.params.push(param);
         self
     }
 
+    /// Set the return type.
     pub fn returns(&mut self, ret: TypeName<L>) -> &mut Self {
         self.return_type = Some(ret);
         self
     }
 
+    /// Set the function body.
     pub fn body(&mut self, body: CodeBlock<L>) -> &mut Self {
         self.body = Some(body);
         self
     }
 
+    /// Set the visibility modifier.
     pub fn visibility(&mut self, vis: Visibility) -> &mut Self {
         self.modifiers.visibility = vis;
         self
     }
 
+    /// Mark this function as async.
     pub fn is_async(&mut self) -> &mut Self {
         self.modifiers.is_async = true;
         self
     }
 
+    /// Mark this function as static.
     pub fn is_static(&mut self) -> &mut Self {
         self.modifiers.is_static = true;
         self
     }
 
+    /// Mark this function as abstract.
     pub fn is_abstract(&mut self) -> &mut Self {
         self.modifiers.is_abstract = true;
         self
     }
 
+    /// Mark this function as an override.
     pub fn is_override(&mut self) -> &mut Self {
         self.modifiers.is_override = true;
         self
     }
 
+    /// Mark this function as a constructor.
     pub fn is_constructor(&mut self) -> &mut Self {
         self.modifiers.is_constructor = true;
         self
     }
 
+    /// Add a documentation comment line.
     pub fn doc(&mut self, line: &str) -> &mut Self {
         self.doc.push(line.to_string());
         self
     }
 
+    /// Add a generic type parameter.
     pub fn add_type_param(&mut self, tp: TypeParamSpec<L>) -> &mut Self {
         self.type_params.push(tp);
         self
     }
 
+    /// Add a raw annotation CodeBlock.
     pub fn annotation(&mut self, ann: CodeBlock<L>) -> &mut Self {
         self.annotations.push(ann);
         self
     }
 
+    /// Add a structured annotation spec.
     pub fn annotate(&mut self, spec: AnnotationSpec<L>) -> &mut Self {
         self.annotation_specs.push(spec);
         self
     }
 
+    /// Set the receiver parameter (e.g., Go's `(s *Server)`).
     pub fn receiver(&mut self, recv: ParameterSpec<L>) -> &mut Self {
         self.receiver = Some(recv);
         self
     }
 
+    /// Append a suffix after the parameter list (e.g., C++ `const`, `override`).
     pub fn suffix(&mut self, s: &str) -> &mut Self {
         self.suffixes.push(s.to_string());
         self
     }
 
+    /// Consume the builder and produce a [`FunSpec`].
     pub fn build(self) -> FunSpec<L> {
         FunSpec {
             name: self.name,

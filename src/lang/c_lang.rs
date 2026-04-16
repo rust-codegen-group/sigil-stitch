@@ -50,6 +50,7 @@ impl Default for CLang {
 }
 
 impl CLang {
+    /// Create a new C language instance.
     pub fn new() -> Self {
         Self::default()
     }

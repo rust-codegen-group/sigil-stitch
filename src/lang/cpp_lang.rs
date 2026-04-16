@@ -73,6 +73,7 @@ impl Default for CppLang {
 }
 
 impl CppLang {
+    /// Create a new C++ language instance.
     pub fn new() -> Self {
         Self::default()
     }

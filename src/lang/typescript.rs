@@ -21,6 +21,7 @@ impl Default for TypeScript {
 }
 
 impl TypeScript {
+    /// Create a new TypeScript language instance.
     pub fn new() -> Self {
         Self::default()
     }

@@ -13,6 +13,7 @@ pub struct NameAllocator {
 }
 
 impl NameAllocator {
+    /// Create a new empty name allocator.
     pub fn new() -> Self {
         Self {
             allocated: HashMap::new(),

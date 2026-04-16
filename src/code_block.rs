@@ -103,6 +103,7 @@ pub struct CodeBlockBuilder<L: CodeLang> {
 }
 
 impl<L: CodeLang> CodeBlockBuilder<L> {
+    /// Create a new empty code block builder.
     pub fn new() -> Self {
         Self {
             parts: Vec::new(),
@@ -299,6 +300,7 @@ fn parse_format(format: &str) -> Vec<FormatPart> {
 
 /// Trait for converting various types into a `Vec<Arg<L>>` for format strings.
 pub trait IntoArgs<L: CodeLang> {
+    /// Convert into a vector of format arguments.
     fn into_args(self) -> Vec<Arg<L>>;
 }
 

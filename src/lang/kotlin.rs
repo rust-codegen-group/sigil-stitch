@@ -67,6 +67,7 @@ impl Default for Kotlin {
 }
 
 impl Kotlin {
+    /// Create a new Kotlin language instance.
     pub fn new() -> Self {
         Self::default()
     }

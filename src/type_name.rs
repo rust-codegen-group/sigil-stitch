@@ -12,8 +12,11 @@ use crate::lang::CodeLang;
 pub enum TypeName<L: CodeLang> {
     /// A type that requires an import statement.
     Importable {
+        /// The module path to import from.
         module: String,
+        /// The type name being imported.
         name: String,
+        /// Whether this is a type-only import.
         is_type_only: bool,
     },
     /// A primitive/built-in type (no import needed).
@@ -22,7 +25,9 @@ pub enum TypeName<L: CodeLang> {
     Array(Box<TypeName<L>>),
     /// Generic type. e.g., `Promise<User>`, `HashMap<String, User>`.
     Generic {
+        /// The base type (e.g., `Promise`, `HashMap`).
         base: Box<TypeName<L>>,
+        /// The type parameters.
         params: Vec<TypeName<L>>,
     },
     /// Union type. TS: `A | B | C`.
@@ -35,14 +40,18 @@ pub enum TypeName<L: CodeLang> {
     Slice(Box<TypeName<L>>),
     /// Map type. Go: `map[K]V`, TS: `Record<K, V>`.
     Map {
+        /// The key type.
         key: Box<TypeName<L>>,
+        /// The value type.
         value: Box<TypeName<L>>,
     },
     /// Optional type. TS: `T | null`, Rust: `Option<T>`.
     Optional(Box<TypeName<L>>),
     /// Function type. TS: `(a: A, b: B) => R`.
     Function {
+        /// The parameter types.
         params: Vec<TypeName<L>>,
+        /// The return type.
         return_type: Box<TypeName<L>>,
     },
     /// Raw string escape hatch. No import tracking.

@@ -31,6 +31,7 @@ impl ImportEntry {
 /// A collection of resolved import entries, ready for rendering.
 #[derive(Debug, Clone, Default)]
 pub struct ImportGroup {
+    /// The resolved import entries.
     pub entries: Vec<ImportEntry>,
 }
 
@@ -38,12 +39,16 @@ pub struct ImportGroup {
 /// Not yet resolved (no alias, no dedup).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ImportRef {
+    /// The module path to import from.
     pub module: String,
+    /// The name being imported.
     pub name: String,
+    /// Whether this is a type-only import.
     pub is_type_only: bool,
 }
 
 impl ImportGroup {
+    /// Create a new empty import group.
     pub fn new() -> Self {
         Self::default()
     }

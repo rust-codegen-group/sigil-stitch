@@ -52,6 +52,7 @@ impl Default for Python {
 }
 
 impl Python {
+    /// Create a new Python language instance.
     pub fn new() -> Self {
         Self::default()
     }

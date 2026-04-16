@@ -16,10 +16,15 @@ use crate::lang::CodeLang;
 pub enum ImportSpec<L: CodeLang> {
     /// Import a specific named symbol from a module.
     Named {
+        /// The module path to import from.
         module: String,
+        /// The symbol name to import.
         name: String,
+        /// Optional alias for the imported symbol.
         alias: Option<String>,
+        /// Whether this is a type-only import (e.g., TypeScript `import type`).
         is_type_only: bool,
+        /// Language phantom data.
         _phantom: PhantomData<L>,
     },
     /// Side-effect import: import a module for its side effects only.
@@ -31,7 +36,9 @@ pub enum ImportSpec<L: CodeLang> {
     /// - Dart: `import 'package:foo/init.dart';`
     /// - C/C++: `#include "header.h"`
     SideEffect {
+        /// The module path to import for side effects.
         module: String,
+        /// Language phantom data.
         _phantom: PhantomData<L>,
     },
     /// Wildcard import: import all exports from a module.
@@ -42,7 +49,9 @@ pub enum ImportSpec<L: CodeLang> {
     /// - Rust: `use module::*;`
     /// - Go: `import . "pkg"`
     Wildcard {
+        /// The module path to wildcard-import from.
         module: String,
+        /// Language phantom data.
         _phantom: PhantomData<L>,
     },
 }

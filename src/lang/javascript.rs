@@ -61,6 +61,7 @@ impl Default for JavaScript {
 }
 
 impl JavaScript {
+    /// Create a new JavaScript language instance.
     pub fn new() -> Self {
         Self::default()
     }

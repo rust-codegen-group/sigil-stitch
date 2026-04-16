@@ -63,6 +63,7 @@ impl Default for DartLang {
 }
 
 impl DartLang {
+    /// Create a new Dart language instance.
     pub fn new() -> Self {
         Self::default()
     }

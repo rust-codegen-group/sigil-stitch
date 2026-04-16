@@ -18,6 +18,7 @@ impl Default for RustLang {
 }
 
 impl RustLang {
+    /// Create a new Rust language instance.
     pub fn new() -> Self {
         Self::default()
     }

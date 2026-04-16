@@ -22,6 +22,7 @@ pub struct CodeRenderer<'a, L: CodeLang> {
 }
 
 impl<'a, L: CodeLang> CodeRenderer<'a, L> {
+    /// Create a new renderer with the given language, imports, and target width.
     pub fn new(lang: &'a L, imports: &'a ImportGroup, width: usize) -> Self {
         Self {
             lang,

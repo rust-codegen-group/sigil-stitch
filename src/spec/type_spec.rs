@@ -30,6 +30,7 @@ pub struct TypeSpec<L: CodeLang> {
 }
 
 impl<L: CodeLang> TypeSpec<L> {
+    /// Create a new builder for a type declaration with the given name and kind.
     pub fn builder(name: &str, kind: TypeKind) -> TypeSpecBuilder<L> {
         TypeSpecBuilder {
             name: name.to_string(),
@@ -49,10 +50,12 @@ impl<L: CodeLang> TypeSpec<L> {
         }
     }
 
+    /// Return the name of this type.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Return the kind of this type (struct, class, interface, etc.).
     pub fn kind(&self) -> TypeKind {
         self.kind
     }
@@ -381,61 +384,73 @@ pub struct TypeSpecBuilder<L: CodeLang> {
 }
 
 impl<L: CodeLang> TypeSpecBuilder<L> {
+    /// Set the visibility modifier.
     pub fn visibility(&mut self, vis: Visibility) -> &mut Self {
         self.modifiers.visibility = vis;
         self
     }
 
+    /// Mark this type as abstract.
     pub fn is_abstract(&mut self) -> &mut Self {
         self.modifiers.is_abstract = true;
         self
     }
 
+    /// Add a documentation comment line.
     pub fn doc(&mut self, line: &str) -> &mut Self {
         self.doc.push(line.to_string());
         self
     }
 
+    /// Add a field to this type.
     pub fn add_field(&mut self, field: FieldSpec<L>) -> &mut Self {
         self.fields.push(field);
         self
     }
 
+    /// Add a computed property to this type.
     pub fn add_property(&mut self, prop: PropertySpec<L>) -> &mut Self {
         self.properties.push(prop);
         self
     }
 
+    /// Add a method to this type.
     pub fn add_method(&mut self, method: FunSpec<L>) -> &mut Self {
         self.methods.push(method);
         self
     }
 
+    /// Add a type parameter (generic).
     pub fn add_type_param(&mut self, tp: TypeParamSpec<L>) -> &mut Self {
         self.type_params.push(tp);
         self
     }
 
+    /// Add a super type (extends / inherits from).
     pub fn extends(&mut self, super_type: TypeName<L>) -> &mut Self {
         self.super_types.push(super_type);
         self
     }
 
+    /// Add an implemented interface.
     pub fn implements(&mut self, iface: TypeName<L>) -> &mut Self {
         self.impl_types.push(iface);
         self
     }
 
+    /// Add a raw annotation code block.
     pub fn annotation(&mut self, ann: CodeBlock<L>) -> &mut Self {
         self.annotations.push(ann);
         self
     }
 
+    /// Add a structured annotation.
     pub fn annotate(&mut self, spec: AnnotationSpec<L>) -> &mut Self {
         self.annotation_specs.push(spec);
         self
     }
 
+    /// Add an extra code block to the type body.
     pub fn extra_member(&mut self, block: CodeBlock<L>) -> &mut Self {
         self.extra_members.push(block);
         self
@@ -447,6 +462,7 @@ impl<L: CodeLang> TypeSpecBuilder<L> {
         self
     }
 
+    /// Consume the builder and produce a [`TypeSpec`].
     pub fn build(self) -> TypeSpec<L> {
         TypeSpec {
             name: self.name,

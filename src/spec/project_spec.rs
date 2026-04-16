@@ -23,6 +23,7 @@ pub struct ProjectSpec<L: CodeLang> {
 }
 
 impl<L: CodeLang> ProjectSpec<L> {
+    /// Create a new builder for a project specification.
     pub fn builder() -> ProjectSpecBuilder<L> {
         ProjectSpecBuilder { files: Vec::new() }
     }
@@ -77,11 +78,13 @@ pub struct ProjectSpecBuilder<L: CodeLang> {
 }
 
 impl<L: CodeLang> ProjectSpecBuilder<L> {
+    /// Add a file to the project.
     pub fn add_file(&mut self, file: FileSpec<L>) -> &mut Self {
         self.files.push(file);
         self
     }
 
+    /// Build the [`ProjectSpec`].
     pub fn build(self) -> ProjectSpec<L> {
         ProjectSpec { files: self.files }
     }

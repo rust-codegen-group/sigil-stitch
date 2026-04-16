@@ -55,6 +55,7 @@ impl Default for JavaLang {
 }
 
 impl JavaLang {
+    /// Create a new Java language instance.
     pub fn new() -> Self {
         Self::default()
     }

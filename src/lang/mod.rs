@@ -1,13 +1,24 @@
+/// C language support.
 pub mod c_lang;
+/// C++ language support.
 pub mod cpp_lang;
+/// Dart language support.
 pub mod dart;
+/// Go language support.
 pub mod go_lang;
+/// Java language support.
 pub mod java_lang;
+/// JavaScript language support.
 pub mod javascript;
+/// Kotlin language support.
 pub mod kotlin;
+/// Python language support.
 pub mod python;
+/// Rust language support.
 pub mod rust_lang;
+/// Swift language support.
 pub mod swift;
+/// TypeScript language support.
 pub mod typescript;
 
 use crate::import::ImportGroup;

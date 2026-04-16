@@ -21,6 +21,7 @@ pub struct FieldSpec<L: CodeLang> {
 }
 
 impl<L: CodeLang> FieldSpec<L> {
+    /// Create a new [`FieldSpecBuilder`] with the given name and type.
     pub fn builder(name: &str, field_type: TypeName<L>) -> FieldSpecBuilder<L> {
         FieldSpecBuilder {
             name: name.to_string(),
@@ -34,10 +35,12 @@ impl<L: CodeLang> FieldSpec<L> {
         }
     }
 
+    /// Returns the field name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the field type.
     pub fn field_type(&self) -> &TypeName<L> {
         &self.field_type
     }
@@ -141,46 +144,55 @@ pub struct FieldSpecBuilder<L: CodeLang> {
 }
 
 impl<L: CodeLang> FieldSpecBuilder<L> {
+    /// Set the visibility modifier.
     pub fn visibility(&mut self, vis: Visibility) -> &mut Self {
         self.modifiers.visibility = vis;
         self
     }
 
+    /// Mark this field as static.
     pub fn is_static(&mut self) -> &mut Self {
         self.modifiers.is_static = true;
         self
     }
 
+    /// Mark this field as readonly.
     pub fn is_readonly(&mut self) -> &mut Self {
         self.modifiers.is_readonly = true;
         self
     }
 
+    /// Add a doc comment line.
     pub fn doc(&mut self, line: &str) -> &mut Self {
         self.doc.push(line.to_string());
         self
     }
 
+    /// Set the field initializer expression.
     pub fn initializer(&mut self, init: CodeBlock<L>) -> &mut Self {
         self.initializer = Some(init);
         self
     }
 
+    /// Add a raw annotation [`CodeBlock`].
     pub fn annotation(&mut self, ann: CodeBlock<L>) -> &mut Self {
         self.annotations.push(ann);
         self
     }
 
+    /// Add a structured [`AnnotationSpec`].
     pub fn annotate(&mut self, spec: AnnotationSpec<L>) -> &mut Self {
         self.annotation_specs.push(spec);
         self
     }
 
+    /// Set the struct tag (e.g., Go's `` `json:"name"` ``).
     pub fn tag(&mut self, t: &str) -> &mut Self {
         self.tag = Some(t.to_string());
         self
     }
 
+    /// Build the [`FieldSpec`] from this builder.
     pub fn build(self) -> FieldSpec<L> {
         FieldSpec {
             name: self.name,
