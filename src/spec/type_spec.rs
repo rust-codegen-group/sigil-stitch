@@ -235,6 +235,7 @@ impl<L: CodeLang> TypeSpec<L> {
         let sep = lang.enum_variant_separator();
         let trailing = lang.enum_variant_trailing_separator();
         let count = self.variants.len();
+        let field_term = lang.field_terminator();
 
         for (i, variant) in self.variants.iter().enumerate() {
             // Emit variant parts directly here rather than calling variant.emit(),
@@ -259,6 +260,67 @@ impl<L: CodeLang> TypeSpec<L> {
             let mut args: Vec<Arg<L>> = Vec::new();
             fmt.push_str(prefix);
             fmt.push_str(&variant.name);
+
+            // Tuple/associated types: Name(Type1, Type2)
+            if !variant.associated_types.is_empty() {
+                fmt.push('(');
+                for (j, ty) in variant.associated_types.iter().enumerate() {
+                    if j > 0 {
+                        fmt.push_str(", ");
+                    }
+                    fmt.push_str("%T");
+                    args.push(Arg::TypeName(ty.clone()));
+                }
+                fmt.push(')');
+            }
+
+            // Struct fields: Name { field: Type, ... }
+            if !variant.fields.is_empty() {
+                let is_last = i == count - 1;
+                let needs_sep = !sep.is_empty() && (!is_last || trailing);
+
+                fmt.push_str(" {");
+                cb.add(&fmt, args);
+                cb.add_line();
+                cb.add("%>", ());
+                for field in &variant.fields {
+                    let vis = lang.render_visibility(
+                        field.modifiers.visibility,
+                        crate::spec::modifiers::DeclarationContext::Member,
+                    );
+                    let mut f_fmt = String::new();
+                    let mut f_args: Vec<Arg<L>> = Vec::new();
+                    f_fmt.push_str(vis);
+                    if lang.type_before_name() {
+                        if !field.field_type.is_empty() {
+                            f_fmt.push_str("%T");
+                            f_args.push(Arg::TypeName(field.field_type.clone()));
+                            f_fmt.push(' ');
+                        }
+                        f_fmt.push_str(&field.name);
+                    } else {
+                        f_fmt.push_str(&field.name);
+                        if !field.field_type.is_empty() {
+                            let type_sep = lang.type_annotation_separator();
+                            f_fmt.push_str(type_sep);
+                            f_fmt.push_str("%T");
+                            f_args.push(Arg::TypeName(field.field_type.clone()));
+                        }
+                    }
+                    f_fmt.push_str(field_term);
+                    cb.add(&f_fmt, f_args);
+                    cb.add_line();
+                }
+                cb.add("%<", ());
+                if needs_sep {
+                    cb.add(&format!("}}{sep}"), ());
+                } else {
+                    cb.add("}", ());
+                }
+                cb.add_line();
+                continue;
+            }
+
             if let Some(val) = &variant.value {
                 fmt.push_str(" = %L");
                 args.push(Arg::Code(val.clone()));

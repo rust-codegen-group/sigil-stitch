@@ -3,6 +3,8 @@
 use crate::code_block::CodeBlock;
 use crate::lang::CodeLang;
 use crate::spec::annotation_spec::AnnotationSpec;
+use crate::spec::field_spec::FieldSpec;
+use crate::type_name::TypeName;
 
 /// A single enum variant (e.g., `Red`, `Up = 'UP'`, `case red`).
 ///
@@ -10,8 +12,14 @@ use crate::spec::annotation_spec::AnnotationSpec;
 /// The language's [`CodeLang::enum_variant_prefix`], [`CodeLang::enum_variant_separator`],
 /// and [`CodeLang::enum_variant_trailing_separator`] control rendering.
 ///
-/// For advanced forms (Rust tuple/struct variants, Java constructor args),
-/// use `extra_member()` on TypeSpec as an escape hatch.
+/// # Variant forms
+///
+/// - **Simple**: `EnumVariantSpec::new("Red")` → `Red`
+/// - **Valued**: `.value(CodeBlock::of("42", ())?)` → `Red = 42`
+/// - **Tuple/associated**: `.associated_type(TypeName::primitive("i32"))` →
+///   Rust: `Some(i32)`, Swift: `case success(Data)`
+/// - **Struct**: `.add_field(FieldSpec::builder("x", TypeName::primitive("i32")).build())` →
+///   Rust: `Move { x: i32, y: i32 }`
 #[derive(Debug, Clone)]
 pub struct EnumVariantSpec<L: CodeLang> {
     pub(crate) name: String,
@@ -19,6 +27,10 @@ pub struct EnumVariantSpec<L: CodeLang> {
     pub(crate) value: Option<CodeBlock<L>>,
     pub(crate) annotations: Vec<CodeBlock<L>>,
     pub(crate) annotation_specs: Vec<AnnotationSpec<L>>,
+    /// Associated types for tuple-style variants (e.g., `Some(T)`, `case .success(Data)`).
+    pub(crate) associated_types: Vec<TypeName<L>>,
+    /// Named fields for struct-style variants (e.g., Rust `Move { x: i32, y: i32 }`).
+    pub(crate) fields: Vec<FieldSpec<L>>,
 }
 
 impl<L: CodeLang> EnumVariantSpec<L> {
@@ -38,6 +50,8 @@ impl<L: CodeLang> EnumVariantSpec<L> {
             value: None,
             annotations: Vec::new(),
             annotation_specs: Vec::new(),
+            associated_types: Vec::new(),
+            fields: Vec::new(),
         }
     }
 
@@ -49,6 +63,8 @@ impl<L: CodeLang> EnumVariantSpec<L> {
             value: None,
             annotations: Vec::new(),
             annotation_specs: Vec::new(),
+            associated_types: Vec::new(),
+            fields: Vec::new(),
         }
     }
 }
@@ -61,6 +77,8 @@ pub struct EnumVariantSpecBuilder<L: CodeLang> {
     value: Option<CodeBlock<L>>,
     annotations: Vec<CodeBlock<L>>,
     annotation_specs: Vec<AnnotationSpec<L>>,
+    associated_types: Vec<TypeName<L>>,
+    fields: Vec<FieldSpec<L>>,
 }
 
 impl<L: CodeLang> EnumVariantSpecBuilder<L> {
@@ -88,6 +106,23 @@ impl<L: CodeLang> EnumVariantSpecBuilder<L> {
         self
     }
 
+    /// Add an associated type for tuple-style variants.
+    ///
+    /// Call multiple times for multi-element tuples.
+    /// Example: `Some(i32)` or `case .success(Data, Int)`.
+    pub fn associated_type(&mut self, ty: TypeName<L>) -> &mut Self {
+        self.associated_types.push(ty);
+        self
+    }
+
+    /// Add a named field for struct-style variants.
+    ///
+    /// Example: Rust `Move { x: i32, y: i32 }`.
+    pub fn add_field(&mut self, field: FieldSpec<L>) -> &mut Self {
+        self.fields.push(field);
+        self
+    }
+
     /// Build the variant spec.
     ///
     /// # Panics
@@ -104,6 +139,8 @@ impl<L: CodeLang> EnumVariantSpecBuilder<L> {
             value: self.value,
             annotations: self.annotations,
             annotation_specs: self.annotation_specs,
+            associated_types: self.associated_types,
+            fields: self.fields,
         }
     }
 }
@@ -114,8 +151,10 @@ mod tests {
     use crate::lang::rust_lang::RustLang;
     use crate::lang::swift::Swift;
     use crate::lang::typescript::TypeScript;
+    use crate::spec::field_spec::FieldSpec;
     use crate::spec::modifiers::TypeKind;
     use crate::spec::type_spec::TypeSpec;
+    use crate::type_name::TypeName;
 
     fn render_enum<L: CodeLang>(ts: &TypeSpec<L>, lang: &L) -> String {
         let blocks = ts.emit(lang);
@@ -201,5 +240,59 @@ mod tests {
     #[should_panic(expected = "EnumVariantSpecBuilder::build() failed: 'name' must not be empty")]
     fn test_build_empty_name_panics() {
         EnumVariantSpec::<TypeScript>::builder("").build();
+    }
+
+    #[test]
+    fn test_tuple_variant() {
+        let mut tb = TypeSpec::<RustLang>::builder("Expr", TypeKind::Enum);
+        let mut v = EnumVariantSpec::<RustLang>::builder("Literal");
+        v.associated_type(TypeName::primitive("i64"));
+        tb.add_variant(v.build());
+        tb.add_variant(EnumVariantSpec::new("Unit"));
+        let ts = tb.build();
+        let output = render_enum(&ts, &RustLang::new());
+        assert!(output.contains("Literal(i64),"));
+        assert!(output.contains("Unit,"));
+    }
+
+    #[test]
+    fn test_multi_tuple_variant() {
+        let mut tb = TypeSpec::<RustLang>::builder("Pair", TypeKind::Enum);
+        let mut v = EnumVariantSpec::<RustLang>::builder("Both");
+        v.associated_type(TypeName::primitive("String"));
+        v.associated_type(TypeName::primitive("i32"));
+        tb.add_variant(v.build());
+        let ts = tb.build();
+        let output = render_enum(&ts, &RustLang::new());
+        assert!(output.contains("Both(String, i32),"));
+    }
+
+    #[test]
+    fn test_struct_variant() {
+        let mut tb = TypeSpec::<RustLang>::builder("Msg", TypeKind::Enum);
+        tb.add_variant(EnumVariantSpec::new("Quit"));
+        let mut v = EnumVariantSpec::<RustLang>::builder("Move");
+        v.add_field(FieldSpec::builder("x", TypeName::primitive("i32")).build());
+        v.add_field(FieldSpec::builder("y", TypeName::primitive("i32")).build());
+        tb.add_variant(v.build());
+        let ts = tb.build();
+        let output = render_enum(&ts, &RustLang::new());
+        assert!(output.contains("Quit,"));
+        assert!(output.contains("Move {"));
+        assert!(output.contains("x: i32,"));
+        assert!(output.contains("y: i32,"));
+    }
+
+    #[test]
+    fn test_swift_associated_value() {
+        let mut tb = TypeSpec::<Swift>::builder("Result", TypeKind::Enum);
+        let mut v_success = EnumVariantSpec::<Swift>::builder("success");
+        v_success.associated_type(TypeName::primitive("Data"));
+        tb.add_variant(v_success.build());
+        tb.add_variant(EnumVariantSpec::new("failure"));
+        let ts = tb.build();
+        let output = render_enum(&ts, &Swift::new());
+        assert!(output.contains("case success(Data)"));
+        assert!(output.contains("case failure"));
     }
 }

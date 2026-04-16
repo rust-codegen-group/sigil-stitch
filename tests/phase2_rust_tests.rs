@@ -134,3 +134,74 @@ fn test_rust_top_level_function() {
 
     golden::assert_golden("rust/top_level_function.rs", &output);
 }
+
+#[test]
+fn test_rust_enum_tuple_variants() {
+    let mut tb = TypeSpec::<RustLang>::builder("Expr", TypeKind::Enum);
+    tb.visibility(Visibility::Public);
+
+    let derive = CodeBlock::<RustLang>::of("#[derive(Debug, Clone)]", ()).unwrap();
+    tb.annotation(derive);
+
+    // Simple variant.
+    tb.add_variant(EnumVariantSpec::new("Unit"));
+
+    // Single-element tuple variant.
+    let mut v_lit = EnumVariantSpec::<RustLang>::builder("Literal");
+    v_lit.associated_type(TypeName::primitive("i64"));
+    tb.add_variant(v_lit.build());
+
+    // Multi-element tuple variant.
+    let mut v_add = EnumVariantSpec::<RustLang>::builder("Add");
+    v_add.associated_type(TypeName::generic(
+        TypeName::primitive("Box"),
+        vec![TypeName::primitive("Expr")],
+    ));
+    v_add.associated_type(TypeName::generic(
+        TypeName::primitive("Box"),
+        vec![TypeName::primitive("Expr")],
+    ));
+    tb.add_variant(v_add.build());
+
+    let mut file = FileSpec::builder_with("expr.rs", RustLang::new());
+    file.add_type(tb.build());
+    let output = file.build().render(80).unwrap();
+
+    golden::assert_golden("rust/enum_tuple.rs", &output);
+}
+
+#[test]
+fn test_rust_enum_struct_variants() {
+    let mut tb = TypeSpec::<RustLang>::builder("Message", TypeKind::Enum);
+    tb.visibility(Visibility::Public);
+
+    let derive = CodeBlock::<RustLang>::of("#[derive(Debug)]", ()).unwrap();
+    tb.annotation(derive);
+
+    // Simple variant.
+    tb.add_variant(EnumVariantSpec::new("Quit"));
+
+    // Struct variant.
+    let mut v_move = EnumVariantSpec::<RustLang>::builder("Move");
+    v_move.add_field(FieldSpec::builder("x", TypeName::primitive("i32")).build());
+    v_move.add_field(FieldSpec::builder("y", TypeName::primitive("i32")).build());
+    tb.add_variant(v_move.build());
+
+    // Tuple variant.
+    let mut v_write = EnumVariantSpec::<RustLang>::builder("Write");
+    v_write.associated_type(TypeName::primitive("String"));
+    tb.add_variant(v_write.build());
+
+    // Another struct variant (last position).
+    let mut v_color = EnumVariantSpec::<RustLang>::builder("ChangeColor");
+    v_color.add_field(FieldSpec::builder("r", TypeName::primitive("u8")).build());
+    v_color.add_field(FieldSpec::builder("g", TypeName::primitive("u8")).build());
+    v_color.add_field(FieldSpec::builder("b", TypeName::primitive("u8")).build());
+    tb.add_variant(v_color.build());
+
+    let mut file = FileSpec::builder_with("message.rs", RustLang::new());
+    file.add_type(tb.build());
+    let output = file.build().render(80).unwrap();
+
+    golden::assert_golden("rust/enum_struct.rs", &output);
+}

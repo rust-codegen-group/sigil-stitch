@@ -1,5 +1,6 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::{FunSpec, TypeParamSpec};
@@ -150,4 +151,34 @@ fn test_go_top_level_function() {
 
     let output = file.render(80).unwrap();
     golden::assert_golden("go/top_level_function.go", &output);
+}
+
+// === Enum (Go uses const + iota pattern) ===
+
+#[test]
+fn test_go_enum() {
+    // Go doesn't have native enums — the idiomatic pattern is:
+    //   type Color int
+    //   const ( Red Color = iota; Green; Blue )
+    //
+    // TypeSpec with TypeKind::Enum produces a const-block-like structure
+    // using variant values to express iota-based definitions.
+    let mut tb = TypeSpec::<GoLang>::builder("Direction", TypeKind::Enum);
+    tb.doc("Direction represents a cardinal direction.");
+
+    let mut v_north = EnumVariantSpec::<GoLang>::builder("North");
+    v_north.value(CodeBlock::<GoLang>::of("iota", ()).unwrap());
+    tb.add_variant(v_north.build());
+
+    tb.add_variant(EnumVariantSpec::new("East"));
+    tb.add_variant(EnumVariantSpec::new("South"));
+    tb.add_variant(EnumVariantSpec::new("West"));
+
+    let mut fb = FileSpec::builder_with("direction.go", GoLang::new());
+    fb.header(CodeBlock::<GoLang>::of("package direction", ()).unwrap());
+    fb.add_type(tb.build());
+    let file = fb.build();
+
+    let output = file.render(80).unwrap();
+    golden::assert_golden("go/enum.go", &output);
 }

@@ -2,6 +2,7 @@ mod golden;
 
 use sigil_stitch::code_block::{CodeBlock, StringLitArg};
 use sigil_stitch::lang::javascript::JavaScript;
+use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -263,4 +264,38 @@ fn test_js_full_module() {
     let output = file.render(80).unwrap();
 
     golden::assert_golden("javascript/full_module.js", &output);
+}
+
+// === Enum (JS uses frozen object pattern via TypeKind::Enum → class) ===
+
+#[test]
+fn test_js_enum() {
+    // JavaScript has no native enums. TypeKind::Enum maps to `class`,
+    // producing a class with constant-like variant members.
+    let mut tb = TypeSpec::<JavaScript>::builder("Direction", TypeKind::Enum);
+    tb.visibility(Visibility::Public);
+    tb.doc("Cardinal directions.");
+
+    let mut v_up = EnumVariantSpec::<JavaScript>::builder("Up");
+    v_up.value(CodeBlock::<JavaScript>::of("'UP'", ()).unwrap());
+    tb.add_variant(v_up.build());
+
+    let mut v_down = EnumVariantSpec::<JavaScript>::builder("Down");
+    v_down.value(CodeBlock::<JavaScript>::of("'DOWN'", ()).unwrap());
+    tb.add_variant(v_down.build());
+
+    let mut v_left = EnumVariantSpec::<JavaScript>::builder("Left");
+    v_left.value(CodeBlock::<JavaScript>::of("'LEFT'", ()).unwrap());
+    tb.add_variant(v_left.build());
+
+    let mut v_right = EnumVariantSpec::<JavaScript>::builder("Right");
+    v_right.value(CodeBlock::<JavaScript>::of("'RIGHT'", ()).unwrap());
+    tb.add_variant(v_right.build());
+
+    let mut fb = FileSpec::builder_with("direction.js", JavaScript::new());
+    fb.add_type(tb.build());
+    let file = fb.build();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("javascript/enum.js", &output);
 }

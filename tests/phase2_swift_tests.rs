@@ -308,3 +308,31 @@ fn test_swift_full_module() {
 
     golden::assert_golden("swift/full_module.swift", &output);
 }
+
+#[test]
+fn test_swift_enum_associated_values() {
+    let mut tb = TypeSpec::<Swift>::builder("NetworkResult", TypeKind::Enum);
+    tb.visibility(Visibility::Public);
+    tb.doc("Result of a network request.");
+
+    // case success(Data)
+    let mut v_success = EnumVariantSpec::<Swift>::builder("success");
+    v_success.associated_type(TypeName::primitive("Data"));
+    tb.add_variant(v_success.build());
+
+    // case failure(Error, Int) — multi-element associated value
+    let mut v_failure = EnumVariantSpec::<Swift>::builder("failure");
+    v_failure.associated_type(TypeName::primitive("Error"));
+    v_failure.associated_type(TypeName::primitive("Int"));
+    tb.add_variant(v_failure.build());
+
+    // case loading — simple variant
+    tb.add_variant(EnumVariantSpec::new("loading"));
+
+    let mut fb = FileSpec::builder_with("NetworkResult.swift", Swift::new());
+    fb.add_type(tb.build());
+    let file = fb.build();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("swift/enum_associated.swift", &output);
+}
