@@ -3,7 +3,7 @@ use crate::lang::CodeLang;
 use crate::type_name::TypeName;
 
 /// A parsed format specifier from a format string.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FormatPart {
     /// Literal text (no interpolation).
     Literal(String),
@@ -40,7 +40,8 @@ pub enum FormatPart {
 }
 
 /// An argument to a CodeBlock format string.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub enum Arg<L: CodeLang> {
     /// A type name reference (used by `%T`).
     TypeName(TypeName<L>),
@@ -82,7 +83,8 @@ pub enum Arg<L: CodeLang> {
 /// cb.add_statement("const y = 2", ());
 /// let block = cb.build().unwrap();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct CodeBlock<L: CodeLang> {
     pub(crate) parts: Vec<FormatPart>,
     pub(crate) args: Vec<Arg<L>>,
@@ -164,27 +166,45 @@ impl<L: CodeLang> CodeBlockBuilder<L> {
     /// Add a formatted code fragment.
     pub fn add(&mut self, format: &str, args: impl IntoArgs<L>) -> &mut Self {
         let arg_vec = args.into_args();
-        let parsed = parse_format(format);
+        let parsed = match parse_format(format) {
+            Ok(parts) => parts,
+            Err(err) => {
+                self.errors.push(err);
+                return self;
+            }
+        };
 
-        let expected_args = parsed
+        let consuming_specifiers: Vec<String> = parsed
             .iter()
-            .filter(|p| {
-                matches!(
-                    p,
-                    FormatPart::Type
-                        | FormatPart::Name
-                        | FormatPart::StringLit
-                        | FormatPart::Literal_
-                )
+            .filter_map(|p| match p {
+                FormatPart::Type => Some("%T".to_string()),
+                FormatPart::Name => Some("%N".to_string()),
+                FormatPart::StringLit => Some("%S".to_string()),
+                FormatPart::Literal_ => Some("%L".to_string()),
+                _ => None,
             })
-            .count();
+            .collect();
+
+        let expected_args = consuming_specifiers.len();
 
         if expected_args != arg_vec.len() {
+            let actual_arg_kinds: Vec<String> = arg_vec
+                .iter()
+                .map(|a| match a {
+                    Arg::TypeName(_) => "TypeName".to_string(),
+                    Arg::Name(_) => "Name".to_string(),
+                    Arg::StringLit(_) => "StringLit".to_string(),
+                    Arg::Literal(_) => "Literal".to_string(),
+                    Arg::Code(_) => "Code".to_string(),
+                })
+                .collect();
             self.errors
                 .push(crate::error::SigilStitchError::FormatArgCount {
                     format: format.to_string(),
                     expected: expected_args,
                     actual: arg_vec.len(),
+                    expected_specifiers: consuming_specifiers,
+                    actual_arg_kinds,
                 });
             return self;
         }
@@ -290,7 +310,7 @@ impl<L: CodeLang> Default for CodeBlockBuilder<L> {
 }
 
 /// Parse a format string into FormatParts.
-fn parse_format(format: &str) -> Vec<FormatPart> {
+fn parse_format(format: &str) -> Result<Vec<FormatPart>, crate::error::SigilStitchError> {
     let mut parts = Vec::new();
     let mut current_literal = String::new();
     let bytes = format.as_bytes();
@@ -315,11 +335,10 @@ fn parse_format(format: &str) -> Vec<FormatPart> {
                     continue;
                 }
                 _ => {
-                    // Unknown specifier, treat as literal.
-                    current_literal.push('%');
-                    current_literal.push(spec as char);
-                    i += 2;
-                    continue;
+                    return Err(crate::error::SigilStitchError::InvalidFormatSpecifier {
+                        format: format.to_string(),
+                        specifier: spec as char,
+                    });
                 }
             };
             if let Some(part) = part {
@@ -345,7 +364,7 @@ fn parse_format(format: &str) -> Vec<FormatPart> {
         parts.push(FormatPart::Literal(current_literal));
     }
 
-    parts
+    Ok(parts)
 }
 
 // === IntoArgs trait and implementations ===
@@ -514,7 +533,7 @@ mod tests {
 
     #[test]
     fn test_parse_all_specifiers() {
-        let parts = parse_format("hello %T world %N %S %L %W %> %< %[ %]");
+        let parts = parse_format("hello %T world %N %S %L %W %> %< %[ %]").unwrap();
         assert!(parts.contains(&FormatPart::Type));
         assert!(parts.contains(&FormatPart::Name));
         assert!(parts.contains(&FormatPart::StringLit));
@@ -528,19 +547,19 @@ mod tests {
 
     #[test]
     fn test_parse_literal_percent() {
-        let parts = parse_format("100%%");
+        let parts = parse_format("100%%").unwrap();
         assert_eq!(parts, vec![FormatPart::Literal("100%".to_string())]);
     }
 
     #[test]
     fn test_parse_empty() {
-        let parts = parse_format("");
+        let parts = parse_format("").unwrap();
         assert!(parts.is_empty());
     }
 
     #[test]
     fn test_parse_newlines() {
-        let parts = parse_format("line1\nline2");
+        let parts = parse_format("line1\nline2").unwrap();
         assert_eq!(
             parts,
             vec![
@@ -670,5 +689,40 @@ mod tests {
         let block = b.build().unwrap();
         assert_eq!(block.args.len(), 1);
         assert!(matches!(&block.args[0], Arg::StringLit(s) if s == "hello"));
+    }
+
+    #[test]
+    fn test_invalid_format_specifier() {
+        let mut b = CodeBlock::<TypeScript>::builder();
+        b.add("hello %X world", ());
+        let result = b.build();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("invalid format specifier"));
+        assert!(err_msg.contains("%X"));
+    }
+
+    #[test]
+    fn test_parse_format_invalid_specifier_returns_error() {
+        let result = parse_format("foo %Z bar");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("invalid format specifier"));
+        assert!(err_msg.contains("%Z"));
+    }
+
+    #[test]
+    fn test_mismatched_arg_count_includes_specifiers_and_kinds() {
+        let user = TypeName::<TypeScript>::importable("./models", "User");
+        let mut b = CodeBlock::<TypeScript>::builder();
+        b.add("%T %S %L", (user,));
+        let result = b.build();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("expects 3 args but got 1"));
+        assert!(err_msg.contains("%T"));
+        assert!(err_msg.contains("%S"));
+        assert!(err_msg.contains("%L"));
+        assert!(err_msg.contains("TypeName"));
     }
 }

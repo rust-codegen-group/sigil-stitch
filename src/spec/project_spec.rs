@@ -9,7 +9,7 @@ use crate::lang::CodeLang;
 use crate::spec::file_spec::FileSpec;
 
 /// A rendered file produced by [`ProjectSpec::render()`]: path and content pair.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RenderedFile {
     /// The file path (as provided to `FileSpec::builder`).
     pub path: String,
@@ -45,7 +45,8 @@ pub struct RenderedFile {
 /// let rendered = project.render(80).unwrap();
 /// assert_eq!(rendered.len(), 2);
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound(serialize = "", deserialize = "L: Default"))]
 pub struct ProjectSpec<L: CodeLang> {
     pub(crate) files: Vec<FileSpec<L>>,
 }

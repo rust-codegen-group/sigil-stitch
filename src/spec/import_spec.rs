@@ -30,7 +30,8 @@ use crate::lang::CodeLang;
 /// // Side-effect import: import './polyfill';
 /// let spec = ImportSpec::<TypeScript>::side_effect("./polyfill");
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub enum ImportSpec<L: CodeLang> {
     /// Import a specific named symbol from a module.
     Named {
@@ -43,6 +44,7 @@ pub enum ImportSpec<L: CodeLang> {
         /// Whether this is a type-only import (e.g., TypeScript `import type`).
         is_type_only: bool,
         /// Language phantom data.
+        #[serde(skip)]
         _phantom: PhantomData<L>,
     },
     /// Side-effect import: import a module for its side effects only.
@@ -57,6 +59,7 @@ pub enum ImportSpec<L: CodeLang> {
         /// The module path to import for side effects.
         module: String,
         /// Language phantom data.
+        #[serde(skip)]
         _phantom: PhantomData<L>,
     },
     /// Wildcard import: import all exports from a module.
@@ -70,6 +73,7 @@ pub enum ImportSpec<L: CodeLang> {
         /// The module path to wildcard-import from.
         module: String,
         /// Language phantom data.
+        #[serde(skip)]
         _phantom: PhantomData<L>,
     },
 }

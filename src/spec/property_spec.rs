@@ -12,7 +12,8 @@ use crate::spec::modifiers::{DeclarationContext, Modifiers, PropertyStyle, Visib
 use crate::type_name::TypeName;
 
 /// A setter definition: parameter name + body.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct SetterSpec<L: CodeLang> {
     pub(crate) param_name: String,
     pub(crate) body: CodeBlock<L>,
@@ -42,7 +43,8 @@ pub struct SetterSpec<L: CodeLang> {
 /// pb.getter(getter_body);
 /// let prop = pb.build().unwrap();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct PropertySpec<L: CodeLang> {
     pub(crate) name: String,
     pub(crate) property_type: TypeName<L>,

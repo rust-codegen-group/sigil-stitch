@@ -1,4 +1,4 @@
-use pretty::RcDoc;
+use pretty::BoxDoc;
 
 use crate::code_block::{Arg, CodeBlock, FormatPart};
 use crate::error::SigilStitchError;
@@ -50,7 +50,7 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
         arg_index: &mut usize,
     ) -> Result<(), SigilStitchError> {
         // Check if this sequence of parts contains any %W (soft breaks).
-        // If so, we build the whole thing as an RcDoc and let pretty decide.
+        // If so, we build the whole thing as a BoxDoc and let pretty decide.
         let has_wrap = parts.iter().any(|p| matches!(p, FormatPart::Wrap));
 
         if has_wrap {
@@ -204,7 +204,7 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
         args: &[Arg<L>],
         arg_index: &mut usize,
     ) -> Result<(), SigilStitchError> {
-        // Build an RcDoc from the parts, using softline() for %W.
+        // Build a BoxDoc from the parts, using softline() for %W.
         let doc = self.build_doc_from_parts(parts, args, arg_index);
         let remaining_width = self.width.saturating_sub(self.current_column);
         let mut buf = Vec::new();
@@ -234,17 +234,17 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
         parts: &[FormatPart],
         args: &[Arg<L>],
         arg_index: &mut usize,
-    ) -> RcDoc<'static, ()> {
-        let mut doc = RcDoc::nil();
+    ) -> BoxDoc<'static, ()> {
+        let mut doc = BoxDoc::nil();
 
         for part in parts {
             let part_doc = match part {
                 FormatPart::Literal(text) => {
                     if let Some(comment_text) = text.strip_prefix("__COMMENT__") {
                         let prefix = self.lang.line_comment_prefix();
-                        RcDoc::text(format!("{prefix} {comment_text}"))
+                        BoxDoc::text(format!("{prefix} {comment_text}"))
                     } else {
-                        RcDoc::text(text.clone())
+                        BoxDoc::text(text.clone())
                     }
                 }
                 FormatPart::Type => {
@@ -262,68 +262,68 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
                         };
                         tn.to_doc_with_lang(&resolve, self.lang)
                     } else {
-                        RcDoc::nil()
+                        BoxDoc::nil()
                     }
                 }
                 FormatPart::Name => {
                     let arg = &args[*arg_index];
                     *arg_index += 1;
                     if let Arg::Name(name) = arg {
-                        RcDoc::text(name.clone())
+                        BoxDoc::text(name.clone())
                     } else {
-                        RcDoc::nil()
+                        BoxDoc::nil()
                     }
                 }
                 FormatPart::StringLit => {
                     let arg = &args[*arg_index];
                     *arg_index += 1;
                     if let Arg::StringLit(s) = arg {
-                        RcDoc::text(self.lang.render_string_literal(s))
+                        BoxDoc::text(self.lang.render_string_literal(s))
                     } else {
-                        RcDoc::nil()
+                        BoxDoc::nil()
                     }
                 }
                 FormatPart::Literal_ => {
                     let arg = &args[*arg_index];
                     *arg_index += 1;
                     match arg {
-                        Arg::Literal(s) => RcDoc::text(s.clone()),
+                        Arg::Literal(s) => BoxDoc::text(s.clone()),
                         Arg::Code(block) => {
                             let mut inner_idx = 0;
                             self.build_doc_from_parts(&block.parts, &block.args, &mut inner_idx)
                         }
-                        _ => RcDoc::nil(),
+                        _ => BoxDoc::nil(),
                     }
                 }
-                FormatPart::Wrap => RcDoc::softline(),
+                FormatPart::Wrap => BoxDoc::softline(),
                 FormatPart::Indent | FormatPart::Dedent => {
                     // Indent/dedent in pretty mode is handled by nest().
-                    RcDoc::nil()
+                    BoxDoc::nil()
                 }
-                FormatPart::StatementBegin => RcDoc::nil(),
+                FormatPart::StatementBegin => BoxDoc::nil(),
                 FormatPart::StatementEnd => {
                     if self.lang.uses_semicolons() {
-                        RcDoc::text(";")
+                        BoxDoc::text(";")
                     } else {
-                        RcDoc::nil()
+                        BoxDoc::nil()
                     }
                 }
-                FormatPart::Newline => RcDoc::hardline(),
-                FormatPart::BlockOpen => RcDoc::text(self.lang.block_open().to_string()),
+                FormatPart::Newline => BoxDoc::hardline(),
+                FormatPart::BlockOpen => BoxDoc::text(self.lang.block_open().to_string()),
                 FormatPart::BlockClose => {
                     let close = self.lang.block_close();
                     if close.is_empty() {
-                        RcDoc::nil()
+                        BoxDoc::nil()
                     } else {
-                        RcDoc::text(close.to_string())
+                        BoxDoc::text(close.to_string())
                     }
                 }
                 FormatPart::BlockCloseTransition => {
                     let close = self.lang.block_close();
                     if close.is_empty() {
-                        RcDoc::nil()
+                        BoxDoc::nil()
                     } else {
-                        RcDoc::text(format!("{} ", close))
+                        BoxDoc::text(format!("{} ", close))
                     }
                 }
             };

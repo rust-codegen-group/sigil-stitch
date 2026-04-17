@@ -4,7 +4,7 @@
 //! deduplicated, conflict-resolved, ready for language-specific rendering.
 
 /// A single resolved import entry.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ImportEntry {
     /// Module path (e.g., "./models", "std::collections", "net/http").
     pub module: String,
@@ -37,7 +37,7 @@ pub struct ImportGroup {
 
 /// Raw import reference collected from a CodeBlock tree walk (Pass 1).
 /// Not yet resolved (no dedup).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ImportRef {
     /// The module path to import from.
     pub module: String,

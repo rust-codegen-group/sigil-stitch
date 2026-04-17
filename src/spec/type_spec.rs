@@ -40,7 +40,8 @@ use crate::type_name::TypeName;
 /// tb.add_method(fb.build().unwrap());
 /// let type_spec = tb.build().unwrap();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct TypeSpec<L: CodeLang> {
     pub(crate) name: String,
     pub(crate) kind: TypeKind,
@@ -613,6 +614,7 @@ impl<L: CodeLang> TypeSpecBuilder<L> {
     /// # Errors
     ///
     /// Returns [`SigilStitchError::EmptyName`](crate::error::SigilStitchError::EmptyName) if `name` is empty.
+    /// Returns [`SigilStitchError::DuplicateFieldName`](crate::error::SigilStitchError::DuplicateFieldName) if any two fields share the same name.
     pub fn build(self) -> Result<TypeSpec<L>, crate::error::SigilStitchError> {
         snafu::ensure!(
             !self.name.is_empty(),
@@ -620,6 +622,18 @@ impl<L: CodeLang> TypeSpecBuilder<L> {
                 builder: "TypeSpecBuilder",
             }
         );
+
+        // Check for duplicate field names.
+        let mut seen = std::collections::HashSet::new();
+        for field in &self.fields {
+            if !seen.insert(field.name()) {
+                return Err(crate::error::SigilStitchError::DuplicateFieldName {
+                    type_name: self.name.clone(),
+                    field_name: field.name().to_string(),
+                });
+            }
+        }
+
         Ok(TypeSpec {
             name: self.name,
             kind: self.kind,
@@ -772,5 +786,48 @@ mod tests {
                 .to_string()
                 .contains("'name' must not be empty")
         );
+    }
+
+    #[test]
+    fn test_build_duplicate_field_name_errors() {
+        let mut tb = TypeSpec::<TypeScript>::builder("MyClass", TypeKind::Class);
+        tb.add_field(
+            FieldSpec::builder("name", TypeName::primitive("string"))
+                .build()
+                .unwrap(),
+        );
+        tb.add_field(
+            FieldSpec::builder("age", TypeName::primitive("number"))
+                .build()
+                .unwrap(),
+        );
+        tb.add_field(
+            FieldSpec::builder("name", TypeName::primitive("string"))
+                .build()
+                .unwrap(),
+        );
+        let result = tb.build();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("duplicate field name"));
+        assert!(err_msg.contains("name"));
+        assert!(err_msg.contains("MyClass"));
+    }
+
+    #[test]
+    fn test_build_no_duplicate_fields_ok() {
+        let mut tb = TypeSpec::<TypeScript>::builder("MyClass", TypeKind::Class);
+        tb.add_field(
+            FieldSpec::builder("name", TypeName::primitive("string"))
+                .build()
+                .unwrap(),
+        );
+        tb.add_field(
+            FieldSpec::builder("age", TypeName::primitive("number"))
+                .build()
+                .unwrap(),
+        );
+        let result = tb.build();
+        assert!(result.is_ok());
     }
 }

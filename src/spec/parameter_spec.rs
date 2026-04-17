@@ -26,7 +26,8 @@ use crate::type_name::TypeName;
 /// pb.default_value(default_val);
 /// let param = pb.build().unwrap();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct ParameterSpec<L: CodeLang> {
     pub(crate) name: String,
     pub(crate) param_type: TypeName<L>,

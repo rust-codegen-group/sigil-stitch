@@ -1,4 +1,4 @@
-use pretty::RcDoc;
+use pretty::BoxDoc;
 
 use crate::import::ImportRef;
 use crate::lang::CodeLang;
@@ -35,7 +35,8 @@ use crate::lang::CodeLang;
 /// // Optional: string | null
 /// let maybe_str = TypeName::<TypeScript>::optional(TypeName::primitive("string"));
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub enum TypeName<L: CodeLang> {
     /// A type that requires an import statement.
     Importable {
@@ -261,57 +262,57 @@ impl<L: CodeLang> TypeName<L> {
         }
     }
 
-    /// Render this type name to a `pretty::RcDoc` for width-aware formatting.
+    /// Render this type name to a `pretty::BoxDoc` for width-aware formatting.
     ///
     /// The `resolved_name` closure maps (module, name) -> display name,
     /// accounting for import aliases.
-    pub fn to_doc<F>(&self, resolve: &F) -> RcDoc<'static, ()>
+    pub fn to_doc<F>(&self, resolve: &F) -> BoxDoc<'static, ()>
     where
         F: Fn(&str, &str) -> String,
     {
         match self {
             TypeName::Importable { module, name, .. } => {
                 let display = resolve(module, name);
-                RcDoc::text(display)
+                BoxDoc::text(display)
             }
-            TypeName::Primitive(name) => RcDoc::text(name.clone()),
-            TypeName::Raw(s) => RcDoc::text(s.clone()),
+            TypeName::Primitive(name) => BoxDoc::text(name.clone()),
+            TypeName::Raw(s) => BoxDoc::text(s.clone()),
             TypeName::Array(inner) => {
                 // Default: TypeScript-style T[]
-                inner.to_doc(resolve).append(RcDoc::text("[]"))
+                inner.to_doc(resolve).append(BoxDoc::text("[]"))
             }
             TypeName::Generic { base, params } => {
                 let base_doc = base.to_doc(resolve);
                 let params_docs: Vec<_> = params.iter().map(|p| p.to_doc(resolve)).collect();
-                let sep = RcDoc::text(",").append(RcDoc::softline());
-                let params_doc = RcDoc::intersperse(params_docs, sep);
+                let sep = BoxDoc::text(",").append(BoxDoc::softline());
+                let params_doc = BoxDoc::intersperse(params_docs, sep);
                 base_doc
-                    .append(RcDoc::text("<"))
+                    .append(BoxDoc::text("<"))
                     .append(params_doc.nest(2).group())
-                    .append(RcDoc::text(">"))
+                    .append(BoxDoc::text(">"))
             }
             TypeName::Union(members) => {
                 let docs: Vec<_> = members.iter().map(|m| m.to_doc(resolve)).collect();
-                let sep = RcDoc::softline().append(RcDoc::text("| "));
-                RcDoc::intersperse(docs, sep).group()
+                let sep = BoxDoc::softline().append(BoxDoc::text("| "));
+                BoxDoc::intersperse(docs, sep).group()
             }
             TypeName::Intersection(members) => {
                 let docs: Vec<_> = members.iter().map(|m| m.to_doc(resolve)).collect();
-                let sep = RcDoc::softline().append(RcDoc::text("& "));
-                RcDoc::intersperse(docs, sep).group()
+                let sep = BoxDoc::softline().append(BoxDoc::text("& "));
+                BoxDoc::intersperse(docs, sep).group()
             }
-            TypeName::Pointer(inner) => RcDoc::text("*").append(inner.to_doc(resolve)),
-            TypeName::Slice(inner) => RcDoc::text("[]").append(inner.to_doc(resolve)),
-            TypeName::Map { key, value } => RcDoc::text("map[")
+            TypeName::Pointer(inner) => BoxDoc::text("*").append(inner.to_doc(resolve)),
+            TypeName::Slice(inner) => BoxDoc::text("[]").append(inner.to_doc(resolve)),
+            TypeName::Map { key, value } => BoxDoc::text("map[")
                 .append(key.to_doc(resolve))
-                .append(RcDoc::text("]"))
+                .append(BoxDoc::text("]"))
                 .append(value.to_doc(resolve)),
             TypeName::Optional(inner) => {
                 // Default: TypeScript-style T | null
                 let inner_doc = inner.to_doc(resolve);
                 inner_doc
-                    .append(RcDoc::softline())
-                    .append(RcDoc::text("| null"))
+                    .append(BoxDoc::softline())
+                    .append(BoxDoc::text("| null"))
                     .group()
             }
             TypeName::Function {
@@ -319,14 +320,14 @@ impl<L: CodeLang> TypeName<L> {
                 return_type,
             } => {
                 let params_docs: Vec<_> = params.iter().map(|p| p.to_doc(resolve)).collect();
-                let sep = RcDoc::text(",").append(RcDoc::softline());
-                let params_doc = RcDoc::intersperse(params_docs, sep);
-                RcDoc::text("(")
+                let sep = BoxDoc::text(",").append(BoxDoc::softline());
+                let params_doc = BoxDoc::intersperse(params_docs, sep);
+                BoxDoc::text("(")
                     .append(params_doc.nest(2).group())
-                    .append(RcDoc::text(") => "))
+                    .append(BoxDoc::text(") => "))
                     .append(return_type.to_doc(resolve))
             }
-            TypeName::_Phantom(_) => RcDoc::nil(),
+            TypeName::_Phantom(_) => BoxDoc::nil(),
         }
     }
 
@@ -354,7 +355,7 @@ impl<L: CodeLang> TypeName<L> {
 
     /// Language-aware variant of [`TypeName::to_doc`] that consults the lang for
     /// syntax differences (e.g., generic delimiters `<>` vs `[]`).
-    pub fn to_doc_with_lang<F>(&self, resolve: &F, lang: &L) -> RcDoc<'static, ()>
+    pub fn to_doc_with_lang<F>(&self, resolve: &F, lang: &L) -> BoxDoc<'static, ()>
     where
         F: Fn(&str, &str) -> String,
     {
@@ -365,48 +366,48 @@ impl<L: CodeLang> TypeName<L> {
                     .iter()
                     .map(|p| p.to_doc_with_lang(resolve, lang))
                     .collect();
-                let sep = RcDoc::text(",").append(RcDoc::softline());
-                let params_doc = RcDoc::intersperse(params_docs, sep);
+                let sep = BoxDoc::text(",").append(BoxDoc::softline());
+                let params_doc = BoxDoc::intersperse(params_docs, sep);
                 base_doc
-                    .append(RcDoc::text(lang.generic_open().to_string()))
+                    .append(BoxDoc::text(lang.generic_open().to_string()))
                     .append(params_doc.nest(2).group())
-                    .append(RcDoc::text(lang.generic_close().to_string()))
+                    .append(BoxDoc::text(lang.generic_close().to_string()))
             }
             // For variants with recursive sub-types, thread lang through.
             TypeName::Array(inner) => inner
                 .to_doc_with_lang(resolve, lang)
-                .append(RcDoc::text("[]")),
+                .append(BoxDoc::text("[]")),
             TypeName::Union(members) => {
                 let docs: Vec<_> = members
                     .iter()
                     .map(|m| m.to_doc_with_lang(resolve, lang))
                     .collect();
-                let sep = RcDoc::softline().append(RcDoc::text("| "));
-                RcDoc::intersperse(docs, sep).group()
+                let sep = BoxDoc::softline().append(BoxDoc::text("| "));
+                BoxDoc::intersperse(docs, sep).group()
             }
             TypeName::Intersection(members) => {
                 let docs: Vec<_> = members
                     .iter()
                     .map(|m| m.to_doc_with_lang(resolve, lang))
                     .collect();
-                let sep = RcDoc::softline().append(RcDoc::text("& "));
-                RcDoc::intersperse(docs, sep).group()
+                let sep = BoxDoc::softline().append(BoxDoc::text("& "));
+                BoxDoc::intersperse(docs, sep).group()
             }
             TypeName::Pointer(inner) => {
-                RcDoc::text("*").append(inner.to_doc_with_lang(resolve, lang))
+                BoxDoc::text("*").append(inner.to_doc_with_lang(resolve, lang))
             }
             TypeName::Slice(inner) => {
-                RcDoc::text("[]").append(inner.to_doc_with_lang(resolve, lang))
+                BoxDoc::text("[]").append(inner.to_doc_with_lang(resolve, lang))
             }
-            TypeName::Map { key, value } => RcDoc::text("map[")
+            TypeName::Map { key, value } => BoxDoc::text("map[")
                 .append(key.to_doc_with_lang(resolve, lang))
-                .append(RcDoc::text("]"))
+                .append(BoxDoc::text("]"))
                 .append(value.to_doc_with_lang(resolve, lang)),
             TypeName::Optional(inner) => {
                 let inner_doc = inner.to_doc_with_lang(resolve, lang);
                 inner_doc
-                    .append(RcDoc::softline())
-                    .append(RcDoc::text("| null"))
+                    .append(BoxDoc::softline())
+                    .append(BoxDoc::text("| null"))
                     .group()
             }
             TypeName::Function {
@@ -417,11 +418,11 @@ impl<L: CodeLang> TypeName<L> {
                     .iter()
                     .map(|p| p.to_doc_with_lang(resolve, lang))
                     .collect();
-                let sep = RcDoc::text(",").append(RcDoc::softline());
-                let params_doc = RcDoc::intersperse(params_docs, sep);
-                RcDoc::text("(")
+                let sep = BoxDoc::text(",").append(BoxDoc::softline());
+                let params_doc = BoxDoc::intersperse(params_docs, sep);
+                BoxDoc::text("(")
                     .append(params_doc.nest(2).group())
-                    .append(RcDoc::text(") => "))
+                    .append(BoxDoc::text(") => "))
                     .append(return_type.to_doc_with_lang(resolve, lang))
             }
             // Leaf variants delegate to to_doc (no recursion needed).

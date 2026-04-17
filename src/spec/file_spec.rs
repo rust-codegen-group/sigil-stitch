@@ -11,7 +11,8 @@ use crate::spec::type_spec::TypeSpec;
 use crate::type_name::TypeName;
 
 /// A member of a file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub enum FileMember<L: CodeLang> {
     /// A CodeBlock (e.g., module-level statements, class declarations).
     Code(CodeBlock<L>),
@@ -64,12 +65,14 @@ pub enum FileMember<L: CodeLang> {
 /// // output contains: import type { User } from './models'
 /// // output contains: const u: User = getUser();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound(serialize = "", deserialize = "L: Default"))]
 pub struct FileSpec<L: CodeLang> {
     filename: String,
     header: Option<CodeBlock<L>>,
     members: Vec<FileMember<L>>,
     explicit_imports: Vec<ImportSpec<L>>,
+    #[serde(skip)]
     lang: L,
 }
 

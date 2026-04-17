@@ -1,7 +1,7 @@
 //! Modifier types for structural specs: visibility, declaration context, type kind.
 
 /// Where a declaration appears: top-level file scope vs. inside a type body.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DeclarationContext {
     /// Top-level (file scope): e.g., `export class` (TS), `pub struct` (Rust).
     TopLevel,
@@ -10,7 +10,7 @@ pub enum DeclarationContext {
 }
 
 /// Visibility level for declarations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum Visibility {
     /// No explicit visibility keyword.
     #[default]
@@ -28,7 +28,7 @@ pub enum Visibility {
 }
 
 /// The kind of type declaration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TypeKind {
     /// TS: `class`, Rust: `struct` (struct-with-methods pattern).
     Class,
@@ -43,7 +43,7 @@ pub enum TypeKind {
 }
 
 /// How a `PropertySpec` renders: accessor methods or inline field body.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PropertyStyle {
     /// Emit getter/setter as separate accessor methods: `get name(): T { ... }` (TS/JS).
     Accessor,
@@ -52,7 +52,7 @@ pub enum PropertyStyle {
 }
 
 /// Where a constructor delegation call (`super(...)` / `this(...)`) is placed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ConstructorDelegationStyle {
     /// Delegation is the first statement in the constructor body.
     /// Used by TS, JS, Java, Dart, Swift, Python, C++.
@@ -63,7 +63,7 @@ pub enum ConstructorDelegationStyle {
 }
 
 /// Modifier flags for a declaration.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Modifiers {
     /// Visibility level for the declaration.
     pub visibility: Visibility,

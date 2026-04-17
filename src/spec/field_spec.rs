@@ -27,7 +27,8 @@ use crate::type_name::TypeName;
 /// fb.is_readonly();
 /// let field = fb.build().unwrap();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct FieldSpec<L: CodeLang> {
     pub(crate) name: String,
     pub(crate) field_type: TypeName<L>,

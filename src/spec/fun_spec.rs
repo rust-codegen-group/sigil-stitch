@@ -26,7 +26,8 @@ use crate::type_name::TypeName;
 /// let mut fb = FunSpec::<TypeScript>::builder("serialize");
 /// fb.add_type_param(tp);
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct TypeParamSpec<L: CodeLang> {
     pub(crate) name: String,
     pub(crate) bounds: Vec<TypeName<L>>,
@@ -107,7 +108,8 @@ pub fn render_type_params<L: CodeLang>(
 /// fb.body(body);
 /// let fun = fb.build().unwrap();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct FunSpec<L: CodeLang> {
     pub(crate) name: String,
     pub(crate) params: Vec<ParameterSpec<L>>,

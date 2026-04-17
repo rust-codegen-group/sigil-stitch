@@ -8,7 +8,11 @@ use snafu::prelude::*;
 #[non_exhaustive]
 pub enum SigilStitchError {
     /// Format string argument count mismatch.
-    #[snafu(display("format string {format:?} expects {expected} args but got {actual}"))]
+    #[snafu(display(
+        "format string {format:?} expects {expected} args but got {actual}\n  \
+         specifiers: {expected_specifiers:?}\n  \
+         arg kinds:  {actual_arg_kinds:?}"
+    ))]
     FormatArgCount {
         /// The format string that was passed.
         format: String,
@@ -16,6 +20,10 @@ pub enum SigilStitchError {
         expected: usize,
         /// Number of arguments actually provided.
         actual: usize,
+        /// The sequence of specifier names from the format string (e.g., `["%T", "%S", "%L"]`).
+        expected_specifiers: Vec<String>,
+        /// The variant names of the provided args (e.g., `["TypeName", "Literal", "Literal"]`).
+        actual_arg_kinds: Vec<String>,
     },
 
     /// A required name or filename field was empty.
@@ -65,5 +73,23 @@ pub enum SigilStitchError {
     InvalidModulePath {
         /// The error message.
         message: String,
+    },
+
+    /// Invalid format specifier in a format string.
+    #[snafu(display("invalid format specifier '%{specifier}' in format string {format:?}"))]
+    InvalidFormatSpecifier {
+        /// The format string that contained the invalid specifier.
+        format: String,
+        /// The unrecognized character after `%`.
+        specifier: char,
+    },
+
+    /// Duplicate field name in a type specification.
+    #[snafu(display("duplicate field name {field_name:?} in type {type_name:?}"))]
+    DuplicateFieldName {
+        /// The name of the type that contains the duplicate.
+        type_name: String,
+        /// The duplicated field name.
+        field_name: String,
     },
 }

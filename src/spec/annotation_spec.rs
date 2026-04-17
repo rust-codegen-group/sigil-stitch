@@ -39,14 +39,16 @@ use crate::type_name::TypeName;
 ///     .arg("test")
 ///     .arg("feature = \"nightly\"");
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct AnnotationSpec<L: CodeLang> {
     pub(crate) name: AnnotationName<L>,
     pub(crate) arguments: Vec<String>,
 }
 
 /// The name of an annotation — either a simple string or an import-tracked type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub(crate) enum AnnotationName<L: CodeLang> {
     /// A simple name string (e.g., "Override", "deprecated").
     Simple(String),

@@ -42,7 +42,8 @@ use crate::type_name::TypeName;
 ///
 /// let type_spec = tb.build().unwrap();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "")]
 pub struct EnumVariantSpec<L: CodeLang> {
     pub(crate) name: String,
     pub(crate) doc: Vec<String>,
