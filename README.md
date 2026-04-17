@@ -123,6 +123,8 @@ See the [Spec Layer](doc/src/spec_layer.md) chapter for examples and the full AP
 | Dart       | `.dart`   | yes        | package imports    |
 | C          | `.c`      | yes        | `#include`         |
 | C++        | `.cpp`    | yes        | `#include`/`using` |
+| Bash       | `.bash`   | no         | `source`           |
+| Zsh        | `.zsh`    | no         | `source`           |
 
 ## Documentation
 

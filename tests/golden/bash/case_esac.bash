@@ -1,0 +1,11 @@
+case "$1" in
+    start)
+        start_service
+    ;;
+    stop)
+        stop_service
+    ;;
+    *)
+        echo "Usage: $0 {start|stop}"
+    ;;
+esac

@@ -249,3 +249,4 @@ Study these existing implementations for patterns similar to your target:
 | Go | `src/lang/go_lang.rs` | Package-qualified names (`http.Server`), bracket generics, `func` keyword |
 | C | `src/lang/c_lang.rs` | Type-before-name, `#include`, `__attribute__`, struct close semicolon |
 | C++ | `src/lang/cpp_lang.rs` | `virtual` instead of `abstract`, `#include` + `using`, `[[attributes]]` |
+| Bash | `src/lang/bash.rs` | Keyword-based block closers (`fi`/`done`/`esac`), `source` imports, shell escaping |

@@ -1,3 +1,5 @@
+/// Bash shell language support.
+pub mod bash;
 /// C language support.
 pub mod c_lang;
 /// C++ language support.
@@ -20,6 +22,8 @@ pub mod rust_lang;
 pub mod swift;
 /// TypeScript language support.
 pub mod typescript;
+/// Zsh shell language support.
+pub mod zsh;
 
 use crate::import::ImportGroup;
 
