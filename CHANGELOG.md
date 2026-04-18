@@ -1,9 +1,12 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.1
 
 ### Added
 
+- `TypeName::ReadonlyArray` renders `readonly T[]` in TypeScript and falls back
+  to the same shape in other languages, so interface fields can express
+  read-only arrays without reaching for `Raw` or `Generic<ReadonlyArray<T>>`.
 - `FieldSpec::is_optional()` marks a field whose key may be absent. Rendering
   is language-specific and delegates to the new `CodeLang::optional_field_style`
   hook:
