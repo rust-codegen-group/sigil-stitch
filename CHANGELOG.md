@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2
+
+### Fixed
+
+- Multi-line literal indentation in `CodeRenderer::render_direct` so doc
+  comments (and any multi-line `%L`) inside indented blocks re-indent every
+  line.
+
 ## 0.2.1
 
 ### Added

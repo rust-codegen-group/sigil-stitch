@@ -75,8 +75,7 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
                         let prefix = self.lang.line_comment_prefix();
                         self.emit(&format!("{prefix} {comment_text}"));
                     } else {
-                        self.ensure_indent();
-                        self.emit(text);
+                        self.emit_possibly_multiline(text);
                     }
                 }
                 FormatPart::Type => {
@@ -143,8 +142,7 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
                     *arg_index += 1;
                     match arg {
                         Arg::Literal(s) => {
-                            self.ensure_indent();
-                            self.emit(s);
+                            self.emit_possibly_multiline(s);
                         }
                         Arg::Code(block) => {
                             let mut inner_idx = 0;
@@ -333,6 +331,26 @@ impl<'a, L: CodeLang> CodeRenderer<'a, L> {
         doc.group()
     }
 
+    /// Emit a literal string, re-indenting each line when it spans multiple
+    /// lines. Single-line input follows the fast path identical to
+    /// `ensure_indent` + `emit`.
+    fn emit_possibly_multiline(&mut self, text: &str) {
+        if !text.contains('\n') {
+            self.ensure_indent();
+            self.emit(text);
+            return;
+        }
+        for (i, line) in text.split('\n').enumerate() {
+            if i > 0 {
+                self.emit_newline();
+            }
+            if !line.is_empty() {
+                self.ensure_indent();
+                self.emit(line);
+            }
+        }
+    }
+
     fn ensure_indent(&mut self) {
         if self.at_line_start {
             let indent_str = self.lang.indent_unit();
@@ -469,5 +487,71 @@ mod tests {
         let block = b.build().unwrap();
         let output = render_block(&block, 80);
         assert!(output.contains("// This is a comment"));
+    }
+
+    #[test]
+    fn test_multiline_literal_via_percent_l_reindents_each_line() {
+        // Simulate the FieldSpec/FunSpec doc-comment path: a multi-line string
+        // flowing through %L (Arg::Literal) inside an indented block must have
+        // every continuation line re-indented, not just the first.
+        let mut b = CodeBlock::<TypeScript>::builder();
+        b.begin_control_flow("interface User", ());
+        b.add("%L", "/**\n * The user's name.\n */".to_string());
+        b.add_line();
+        b.add_statement("name: string", ());
+        b.end_control_flow();
+        let block = b.build().unwrap();
+        let output = render_block(&block, 80);
+
+        assert!(
+            output.contains("  /**"),
+            "first line of doc should be indented, got:\n{output}"
+        );
+        assert!(
+            output.contains("   * The user's name."),
+            "middle line of doc should be indented (indent + ' * ...'), got:\n{output}"
+        );
+        assert!(
+            output.contains("   */"),
+            "closing line of doc should be indented, got:\n{output}"
+        );
+        assert!(
+            !output.contains("\n * The user's name."),
+            "middle line must not be flush-left, got:\n{output}"
+        );
+        assert!(
+            !output.contains("\n */"),
+            "closing line must not be flush-left, got:\n{output}"
+        );
+    }
+
+    #[test]
+    fn test_multiline_literal_direct_reindents_each_line() {
+        // Exercises the FormatPart::Literal branch: the literal itself carries
+        // an embedded newline (no %L substitution involved).
+        let mut b = CodeBlock::<TypeScript>::builder();
+        b.begin_control_flow("function f()", ());
+        b.add("line1\nline2\nline3", ());
+        b.add_line();
+        b.end_control_flow();
+        let block = b.build().unwrap();
+        let output = render_block(&block, 80);
+
+        assert!(
+            output.contains("  line1"),
+            "first literal line should be indented, got:\n{output}"
+        );
+        assert!(
+            output.contains("  line2"),
+            "second literal line should be indented, got:\n{output}"
+        );
+        assert!(
+            output.contains("  line3"),
+            "third literal line should be indented, got:\n{output}"
+        );
+        assert!(
+            !output.contains("\nline2"),
+            "line2 must not be flush-left, got:\n{output}"
+        );
     }
 }
