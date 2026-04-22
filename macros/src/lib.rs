@@ -67,7 +67,7 @@ use proc_macro::TokenStream;
 /// - No space is inserted before `(` after identifiers: `if(x)` not `if (x)`
 /// - Template literals (`` `${expr}` ``) aren't supported; use `$L(expr)`
 ///
-/// See the full guide at `doc/src/sigil_quote.md` for more details and examples.
+/// See the full guide at `docs/src/sigil_quote.md` for more details and examples.
 ///
 /// # Examples
 ///

@@ -85,7 +85,7 @@ the equivalent `%T`/`%S`/`%N`/`%L` format specifiers at compile time.
 | `%]` | Statement end | (none) | End of statement (appends `;` if needed) |
 
 Bare `&str` maps to `%L`. Use `NameArg` for `%N` and `StringLitArg` for `%S`.
-See the [Format Specifiers](doc/src/format_specifiers.md) chapter for the full deep dive.
+See the [Format Specifiers](docs/src/format_specifiers.md) chapter for the full deep dive.
 
 ## The Spec Layer
 
@@ -106,7 +106,7 @@ Build structured declarations with the spec builders:
 | **CodeTemplate** | Reusable parameterized templates with named parameters |
 
 All specs emit `CodeBlock`s internally, so import tracking works everywhere.
-See the [Spec Layer](doc/src/spec_layer.md) chapter for examples and the full API.
+See [Building Functions & Fields](docs/src/functions_and_fields.md), [Building Types & Enums](docs/src/types_and_enums.md), and [Files & Projects](docs/src/files_and_projects.md) for examples and the full API.
 
 ## Supported Languages
 
@@ -128,16 +128,26 @@ See the [Spec Layer](doc/src/spec_layer.md) chapter for examples and the full AP
 
 ## Documentation
 
-The [sigil-stitch book](doc/src/SUMMARY.md) covers everything in depth:
+The [sigil-stitch book](docs/src/SUMMARY.md) covers everything in depth:
 
-- [Introduction](doc/src/introduction.md) -- what it is and how the pieces fit together
-- [Getting Started](doc/src/getting_started.md) -- first CodeBlock, first FileSpec, first output
-- [Format Specifiers](doc/src/format_specifiers.md) -- deep dive on `%T`, `%N`, `%S`, `%L`, `%W`, and friends
-- [The Spec Layer](doc/src/spec_layer.md) -- TypeSpec, FunSpec, FieldSpec, FileSpec, ProjectSpec
-- [sigil_quote! Macro](doc/src/sigil_quote.md) -- inline code with `$T`/`$S`/`$N`/`$L` interpolation
-- [Code Templates](doc/src/code_templates.md) -- reusable `#{name:K}` templates
-- [Adding a Language](doc/src/adding_a_language.md) -- implementing the CodeLang trait step by step
-- [Architecture](doc/src/architecture.md) -- four layers, three-pass pipeline, import resolution
+**User Guide:**
+
+- [Introduction](docs/src/introduction.md) -- what it is and how the pieces fit together
+- [Getting Started](docs/src/getting_started.md) -- first CodeBlock, first FileSpec, first output
+- [Format Specifiers](docs/src/format_specifiers.md) -- deep dive on `%T`, `%N`, `%S`, `%L`, `%W`, and friends
+- [TypeName](docs/src/type_name.md) -- type references, import tracking, cross-language rendering
+- [Building Functions & Fields](docs/src/functions_and_fields.md) -- ParameterSpec, FieldSpec, FunSpec
+- [Building Types & Enums](docs/src/types_and_enums.md) -- TypeSpec, PropertySpec, AnnotationSpec, EnumVariantSpec
+- [Files & Projects](docs/src/files_and_projects.md) -- ImportSpec, FileSpec, ProjectSpec
+- [sigil_quote! Macro](docs/src/sigil_quote.md) -- inline code with `$T`/`$S`/`$N`/`$L` interpolation
+- [Code Templates](docs/src/code_templates.md) -- reusable `#{name:K}` templates
+- [Language Cookbook](docs/src/language_cookbook.md) -- idiomatic recipes per language
+
+**Development Guide:**
+
+- [Architecture](docs/src/architecture.md) -- four layers, three-pass pipeline, import resolution
+- [Type Presentation](docs/src/type_presentation.md) -- data-driven cross-language type rendering
+- [Adding a Language](docs/src/adding_a_language.md) -- implementing the CodeLang trait step by step
 
 ## MSRV
 

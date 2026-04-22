@@ -165,6 +165,10 @@ into the `FileSpec` / `ProjectSpec` you want rendered with those settings.
 Now that you've seen the basics:
 
 - [Format Specifiers](format_specifiers.md) explains every `%` specifier in depth.
-- [The Spec Layer](spec_layer.md) covers TypeSpec, FunSpec, FieldSpec, and friends.
+- [TypeName](type_name.md) covers type references, import tracking, and cross-language rendering.
+- [Building Functions & Fields](functions_and_fields.md) covers ParameterSpec, FieldSpec, and FunSpec.
+- [Building Types & Enums](types_and_enums.md) covers TypeSpec, PropertySpec, AnnotationSpec, and EnumVariantSpec.
+- [Files & Projects](files_and_projects.md) covers ImportSpec, FileSpec, and ProjectSpec.
 - [sigil_quote! Macro](sigil_quote.md) has the full guide for the macro syntax.
 - [Code Templates](code_templates.md) covers reusable named-parameter templates.
+- [Language Cookbook](language_cookbook.md) has idiomatic recipes for each supported language.

@@ -62,7 +62,7 @@ jobs:
       - uses: peaceiris/actions-mdbook@v2
         with:
           mdbook-version: 'latest'
-      - run: mdbook build doc
+      - run: mdbook build docs
 
   basics:
     name: Basics

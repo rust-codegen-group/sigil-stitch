@@ -66,7 +66,7 @@
 //! Interpolation markers: `$T` (type), `$N` (name), `$S` (string literal),
 //! `$L` (literal), `$C` (nested code block), `$W` (soft line break), `$$` (escape).
 //!
-//! See the full guide at `doc/src/sigil_quote.md` for control flow, limitations,
+//! See the full guide at `docs/src/sigil_quote.md` for control flow, limitations,
 //! and advanced usage.
 
 /// Composable code fragments with format specifiers (`%T`, `%N`, `%S`, `%L`, etc.).

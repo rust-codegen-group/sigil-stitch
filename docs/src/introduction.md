@@ -1,7 +1,7 @@
 # Introduction
 
 sigil-stitch is a Rust library for type-safe, import-aware, width-aware code generation
-across 13 languages. It combines two ideas: JavaPoet's builder model for constructing
+across multiple languages. It combines two ideas: JavaPoet's builder model for constructing
 structured code, and the Wadler-Lindig algorithm for width-aware formatting. You describe
 code with builders and format specifiers, and the library handles imports, name conflicts,
 indentation, and line breaking.
@@ -12,7 +12,7 @@ indentation, and line breaking.
 with `CodeBlock` format strings and structural `Spec` types (TypeSpec, FunSpec, etc.).
 You write a format string like `"const user: %T = getUser()"`, pass a `TypeName` for
 the `%T` slot, and the library renders the type reference *and* tracks the import.
-sigil-stitch adopts this model directly, extending it from Java-only to 13 languages.
+sigil-stitch adopts this model directly, extending it from Java-only to multiple languages.
 
 **Wadler-Lindig pretty printing.** The `pretty` crate implements the Wadler-Lindig
 algorithm, which decides where to break lines based on a target width. sigil-stitch
