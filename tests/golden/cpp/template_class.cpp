@@ -1,7 +1,7 @@
 #pragma once
 
-template<typename T>
 /// A simple stack container.
+template<typename T>
 class Stack {
 private:
     std::vector<T> data_;

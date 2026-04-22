@@ -82,7 +82,21 @@ impl<L: CodeLang> FieldSpec<L> {
     ) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
         let mut cb = CodeBlock::<L>::builder();
 
-        // Annotations (structured specs first, then raw CodeBlocks).
+        let emit_doc = || -> Option<String> {
+            if self.doc.is_empty() {
+                return None;
+            }
+            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
+            Some(lang.render_doc_comment(&doc_lines))
+        };
+
+        if lang.doc_before_annotations()
+            && let Some(doc_str) = emit_doc()
+        {
+            cb.add("%L", doc_str);
+            cb.add_line();
+        }
+
         for spec in &self.annotation_specs {
             cb.add_code(spec.emit(lang)?);
             cb.add_line();
@@ -92,10 +106,9 @@ impl<L: CodeLang> FieldSpec<L> {
             cb.add_line();
         }
 
-        // Doc comment.
-        if !self.doc.is_empty() {
-            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-            let doc_str = lang.render_doc_comment(&doc_lines);
+        if !lang.doc_before_annotations()
+            && let Some(doc_str) = emit_doc()
+        {
             cb.add("%L", doc_str);
             cb.add_line();
         }

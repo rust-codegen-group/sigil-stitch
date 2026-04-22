@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
 /// Application configuration.
+#[derive(Serialize, Deserialize)]
 pub struct Config {
     pub name: String,
     pub values: HashMap<String, i64>,

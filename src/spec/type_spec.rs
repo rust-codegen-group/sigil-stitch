@@ -277,6 +277,21 @@ impl<L: CodeLang> TypeSpec<L> {
         for (i, variant) in self.variants.iter().enumerate() {
             // Emit variant parts directly here rather than calling variant.emit(),
             // because we need to append the separator before the trailing newline.
+            let emit_variant_doc = || -> Option<String> {
+                if variant.doc.is_empty() || lang.doc_comment_inside_body() {
+                    return None;
+                }
+                let doc_lines: Vec<&str> = variant.doc.iter().map(|s| s.as_str()).collect();
+                Some(lang.render_doc_comment(&doc_lines))
+            };
+
+            if lang.doc_before_annotations()
+                && let Some(doc_str) = emit_variant_doc()
+            {
+                cb.add("%L", doc_str);
+                cb.add_line();
+            }
+
             for spec in &variant.annotation_specs {
                 cb.add_code(spec.emit(lang)?);
                 cb.add_line();
@@ -285,9 +300,10 @@ impl<L: CodeLang> TypeSpec<L> {
                 cb.add_code(ann.clone());
                 cb.add_line();
             }
-            if !variant.doc.is_empty() && !lang.doc_comment_inside_body() {
-                let doc_lines: Vec<&str> = variant.doc.iter().map(|s| s.as_str()).collect();
-                let doc_str = lang.render_doc_comment(&doc_lines);
+
+            if !lang.doc_before_annotations()
+                && let Some(doc_str) = emit_variant_doc()
+            {
                 cb.add("%L", doc_str);
                 cb.add_line();
             }
@@ -380,6 +396,21 @@ impl<L: CodeLang> TypeSpec<L> {
         cb: &mut CodeBlockBuilder<L>,
         lang: &L,
     ) -> Result<(), crate::error::SigilStitchError> {
+        let emit_doc = || -> Option<String> {
+            if self.doc.is_empty() || lang.doc_comment_inside_body() {
+                return None;
+            }
+            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
+            Some(lang.render_doc_comment(&doc_lines))
+        };
+
+        if lang.doc_before_annotations()
+            && let Some(doc_str) = emit_doc()
+        {
+            cb.add("%L", doc_str);
+            cb.add_line();
+        }
+
         for spec in &self.annotation_specs {
             cb.add_code(spec.emit(lang)?);
             cb.add_line();
@@ -388,12 +419,14 @@ impl<L: CodeLang> TypeSpec<L> {
             cb.add_code(ann.clone());
             cb.add_line();
         }
-        if !self.doc.is_empty() && !lang.doc_comment_inside_body() {
-            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-            let doc_str = lang.render_doc_comment(&doc_lines);
+
+        if !lang.doc_before_annotations()
+            && let Some(doc_str) = emit_doc()
+        {
             cb.add("%L", doc_str);
             cb.add_line();
         }
+
         Ok(())
     }
 

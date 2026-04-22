@@ -165,7 +165,21 @@ impl<L: CodeLang> FunSpec<L> {
     ) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
         let mut cb = CodeBlock::<L>::builder();
 
-        // Annotations (structured specs first, then raw CodeBlocks).
+        let emit_doc = || -> Option<String> {
+            if self.doc.is_empty() || lang.doc_comment_inside_body() {
+                return None;
+            }
+            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
+            Some(lang.render_doc_comment(&doc_lines))
+        };
+
+        if lang.doc_before_annotations()
+            && let Some(doc_str) = emit_doc()
+        {
+            cb.add("%L", doc_str);
+            cb.add_line();
+        }
+
         for spec in &self.annotation_specs {
             cb.add_code(spec.emit(lang)?);
             cb.add_line();
@@ -175,11 +189,9 @@ impl<L: CodeLang> FunSpec<L> {
             cb.add_line();
         }
 
-        // Doc comment (above the declaration, unless lang puts it inside the body).
-        let doc_inside = lang.doc_comment_inside_body();
-        if !self.doc.is_empty() && !doc_inside {
-            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-            let doc_str = lang.render_doc_comment(&doc_lines);
+        if !lang.doc_before_annotations()
+            && let Some(doc_str) = emit_doc()
+        {
             cb.add("%L", doc_str);
             cb.add_line();
         }
@@ -281,7 +293,7 @@ impl<L: CodeLang> FunSpec<L> {
             cb.add_line();
             cb.add("%>", ());
             // Docstring inside body (Python).
-            if !self.doc.is_empty() && doc_inside {
+            if !self.doc.is_empty() && lang.doc_comment_inside_body() {
                 let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
                 let doc_str = lang.render_doc_comment(&doc_lines);
                 cb.add("%L", doc_str);
@@ -308,7 +320,7 @@ impl<L: CodeLang> FunSpec<L> {
                 cb.add_line();
                 cb.add("%>", ());
                 // Docstring inside body (Python).
-                if !self.doc.is_empty() && doc_inside {
+                if !self.doc.is_empty() && lang.doc_comment_inside_body() {
                     let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
                     let doc_str = lang.render_doc_comment(&doc_lines);
                     cb.add("%L", doc_str);
