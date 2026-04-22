@@ -98,7 +98,9 @@ pub mod prelude {
     pub use crate::lang::CodeLang;
     pub use crate::spec::field_spec::FieldSpec;
     pub use crate::spec::file_spec::FileSpec;
-    pub use crate::spec::fun_spec::{FunSpec, TypeParamKind, TypeParamSpec, WhereClauseStyle, WhereConstraint};
+    pub use crate::spec::fun_spec::{
+        FunSpec, TypeParamKind, TypeParamSpec, WhereClauseStyle, WhereConstraint,
+    };
     pub use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
     pub use crate::spec::parameter_spec::ParameterSpec;
     pub use crate::spec::project_spec::{ProjectSpec, RenderedFile};

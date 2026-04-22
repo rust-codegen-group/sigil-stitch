@@ -98,8 +98,10 @@ pub enum AssociatedTypeStyle<'a> {
         simple_sep: &'a str,
     },
     /// Dot access: `Base.Member` (Java, Kotlin, Python).
+    /// The qualifier is ignored — only `base.member` is emitted.
     DotAccess,
     /// Index access: `Base["Member"]` (TypeScript).
+    /// The qualifier is ignored — only `base["member"]` is emitted.
     IndexAccess {
         /// Opening delimiter (e.g., `"[\"`).
         open: &'a str,
@@ -746,7 +748,11 @@ impl<L: CodeLang> TypeName<L> {
                     .append(BoxDoc::intersperse(docs, sep).nest(2).group())
                     .append(BoxDoc::text(")"))
             }
-            TypeName::Reference { inner, mutable, lifetime } => {
+            TypeName::Reference {
+                inner,
+                mutable,
+                lifetime,
+            } => {
                 let mut prefix = String::from("&");
                 if let Some(lt) = lifetime {
                     prefix.push_str(lt);
@@ -792,19 +798,21 @@ impl<L: CodeLang> TypeName<L> {
             TypeName::ImplTrait { bounds } => {
                 let docs: Vec<_> = bounds.iter().map(|b| b.to_doc(resolve)).collect();
                 let sep = BoxDoc::text(" + ");
-                BoxDoc::text("impl ")
-                    .append(BoxDoc::intersperse(docs, sep))
+                BoxDoc::text("impl ").append(BoxDoc::intersperse(docs, sep))
             }
             TypeName::DynTrait { bounds } => {
                 let docs: Vec<_> = bounds.iter().map(|b| b.to_doc(resolve)).collect();
                 let sep = BoxDoc::text(" + ");
-                BoxDoc::text("dyn ")
-                    .append(BoxDoc::intersperse(docs, sep))
+                BoxDoc::text("dyn ").append(BoxDoc::intersperse(docs, sep))
             }
             TypeName::Wildcard {
                 upper_bound,
                 lower_bound,
             } => {
+                debug_assert!(
+                    upper_bound.is_none() || lower_bound.is_none(),
+                    "Wildcard cannot have both upper and lower bounds"
+                );
                 if let Some(ub) = upper_bound {
                     BoxDoc::text("? extends ").append(ub.to_doc(resolve))
                 } else if let Some(lb) = lower_bound {
@@ -955,7 +963,11 @@ impl<L: CodeLang> TypeName<L> {
                     .collect();
                 render_presentation(&lang.present_tuple(), docs, lang)
             }
-            TypeName::Reference { inner, mutable, lifetime } => {
+            TypeName::Reference {
+                inner,
+                mutable,
+                lifetime,
+            } => {
                 let inner_doc = inner.to_doc_with_lang(resolve, lang);
                 if let Some(lt) = lifetime {
                     let mut prefix = String::from("&");
@@ -1044,6 +1056,10 @@ impl<L: CodeLang> TypeName<L> {
                 upper_bound,
                 lower_bound,
             } => {
+                debug_assert!(
+                    upper_bound.is_none() || lower_bound.is_none(),
+                    "Wildcard cannot have both upper and lower bounds"
+                );
                 let pres = lang.present_wildcard();
                 if let Some(ub) = upper_bound {
                     let ub_doc = ub.to_doc_with_lang(resolve, lang);
@@ -1070,6 +1086,49 @@ mod tests {
         let _ = module;
         name.to_string()
     }
+
+    macro_rules! test_lang {
+        ($name:ident, $base:ty { $($override:tt)* }) => {
+            #[derive(Debug, Clone)]
+            struct $name(pub $base);
+            impl $name {
+                fn new() -> Self { Self(<$base>::new()) }
+            }
+            impl crate::lang::CodeLang for $name {
+                fn file_extension(&self) -> &str { self.0.file_extension() }
+                fn reserved_words(&self) -> &[&str] { self.0.reserved_words() }
+                fn render_imports(&self, imports: &crate::import::ImportGroup) -> String { self.0.render_imports(imports) }
+                fn render_string_literal(&self, s: &str) -> String { self.0.render_string_literal(s) }
+                fn render_doc_comment(&self, lines: &[&str]) -> String { self.0.render_doc_comment(lines) }
+                fn line_comment_prefix(&self) -> &str { self.0.line_comment_prefix() }
+                fn indent_unit(&self) -> &str { self.0.indent_unit() }
+                fn uses_semicolons(&self) -> bool { self.0.uses_semicolons() }
+                fn render_visibility(&self, vis: crate::spec::modifiers::Visibility, ctx: crate::spec::modifiers::DeclarationContext) -> &str { self.0.render_visibility(vis, ctx) }
+                fn function_keyword(&self, ctx: crate::spec::modifiers::DeclarationContext) -> &str { self.0.function_keyword(ctx) }
+                fn return_type_separator(&self) -> &str { self.0.return_type_separator() }
+                fn type_keyword(&self, kind: crate::spec::modifiers::TypeKind) -> &str { self.0.type_keyword(kind) }
+                fn field_terminator(&self) -> &str { self.0.field_terminator() }
+                fn methods_inside_type_body(&self, kind: crate::spec::modifiers::TypeKind) -> bool { self.0.methods_inside_type_body(kind) }
+                fn generic_constraint_keyword(&self) -> &str { self.0.generic_constraint_keyword() }
+                fn generic_constraint_separator(&self) -> &str { self.0.generic_constraint_separator() }
+                fn super_type_keyword(&self) -> &str { self.0.super_type_keyword() }
+                fn implements_keyword(&self) -> &str { self.0.implements_keyword() }
+                $($override)*
+            }
+        };
+    }
+
+    test_lang!(PrefixLang, TypeScript {
+        fn generic_application_style(&self) -> GenericApplicationStyle {
+            GenericApplicationStyle::PrefixJuxtaposition
+        }
+    });
+
+    test_lang!(PostfixLang, TypeScript {
+        fn generic_application_style(&self) -> GenericApplicationStyle {
+            GenericApplicationStyle::PostfixJuxtaposition
+        }
+    });
 
     #[test]
     fn test_primitive() {
@@ -1479,16 +1538,58 @@ mod tests {
 
     #[test]
     fn test_generic_prefix_juxtaposition() {
-        use crate::lang::typescript::TypeScript;
-        let lang = TypeScript::new();
-        let t = TypeName::<TypeScript>::generic(
+        let lang = PrefixLang::new();
+        let t = TypeName::<PrefixLang>::generic(
             TypeName::primitive("Maybe"),
             vec![TypeName::primitive("Int")],
         );
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
         doc.render(80, &mut buf).unwrap();
-        assert_eq!(String::from_utf8(buf).unwrap(), "Maybe<Int>");
+        assert_eq!(String::from_utf8(buf).unwrap(), "Maybe Int");
+    }
+
+    #[test]
+    fn test_generic_prefix_juxtaposition_compound_param() {
+        let lang = PrefixLang::new();
+        let inner = TypeName::<PrefixLang>::generic(
+            TypeName::primitive("Maybe"),
+            vec![TypeName::primitive("Int")],
+        );
+        let t = TypeName::<PrefixLang>::generic(
+            TypeName::primitive("Either"),
+            vec![TypeName::primitive("String"), inner],
+        );
+        let doc = t.to_doc_with_lang(&identity_resolve, &lang);
+        let mut buf = Vec::new();
+        doc.render(80, &mut buf).unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "Either String (Maybe Int)");
+    }
+
+    #[test]
+    fn test_generic_postfix_juxtaposition_single() {
+        let lang = PostfixLang::new();
+        let t = TypeName::<PostfixLang>::generic(
+            TypeName::primitive("option"),
+            vec![TypeName::primitive("int")],
+        );
+        let doc = t.to_doc_with_lang(&identity_resolve, &lang);
+        let mut buf = Vec::new();
+        doc.render(80, &mut buf).unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "int option");
+    }
+
+    #[test]
+    fn test_generic_postfix_juxtaposition_multi() {
+        let lang = PostfixLang::new();
+        let t = TypeName::<PostfixLang>::generic(
+            TypeName::primitive("result"),
+            vec![TypeName::primitive("int"), TypeName::primitive("string")],
+        );
+        let doc = t.to_doc_with_lang(&identity_resolve, &lang);
+        let mut buf = Vec::new();
+        doc.render(80, &mut buf).unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "(int, string) result");
     }
 
     #[test]
@@ -1501,12 +1602,9 @@ mod tests {
             TypeName::primitive("A"),
             TypeName::primitive("B"),
         ])));
-        assert!(is_compound_type(
-            &TypeName::<TypeScript>::intersection(vec![
-                TypeName::primitive("A"),
-                TypeName::primitive("B"),
-            ])
-        ));
+        assert!(is_compound_type(&TypeName::<TypeScript>::intersection(
+            vec![TypeName::primitive("A"), TypeName::primitive("B"),]
+        )));
         assert!(is_compound_type(&TypeName::<TypeScript>::function(
             vec![TypeName::primitive("A")],
             TypeName::primitive("B"),
@@ -1727,9 +1825,8 @@ mod tests {
 
     #[test]
     fn test_dyn_trait_collect_imports() {
-        let t = TypeName::<TypeScript>::dyn_trait(vec![
-            TypeName::importable("./errors", "AppError"),
-        ]);
+        let t =
+            TypeName::<TypeScript>::dyn_trait(vec![TypeName::importable("./errors", "AppError")]);
         let mut imports = Vec::new();
         t.collect_imports(&mut imports);
         assert_eq!(imports.len(), 1);
@@ -1737,9 +1834,7 @@ mod tests {
 
     #[test]
     fn test_wildcard_collect_imports() {
-        let t = TypeName::<TypeScript>::wildcard_extends(
-            TypeName::importable("./models", "User"),
-        );
+        let t = TypeName::<TypeScript>::wildcard_extends(TypeName::importable("./models", "User"));
         let mut imports = Vec::new();
         t.collect_imports(&mut imports);
         assert_eq!(imports.len(), 1);
@@ -1752,7 +1847,10 @@ mod tests {
             Some(TypeName::primitive("Iter")),
             "Item",
         );
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "<T as Iter>::Item");
+        assert_eq!(
+            t.render(80, &identity_resolve).unwrap(),
+            "<T as Iter>::Item"
+        );
     }
 
     #[test]
@@ -1779,17 +1877,21 @@ mod tests {
     #[test]
     fn test_wildcard_default_rendering() {
         assert_eq!(
-            TypeName::<TypeScript>::wildcard().render(80, &identity_resolve).unwrap(),
+            TypeName::<TypeScript>::wildcard()
+                .render(80, &identity_resolve)
+                .unwrap(),
             "?"
         );
         assert_eq!(
             TypeName::<TypeScript>::wildcard_extends(TypeName::primitive("T"))
-                .render(80, &identity_resolve).unwrap(),
+                .render(80, &identity_resolve)
+                .unwrap(),
             "? extends T"
         );
         assert_eq!(
             TypeName::<TypeScript>::wildcard_super(TypeName::primitive("T"))
-                .render(80, &identity_resolve).unwrap(),
+                .render(80, &identity_resolve)
+                .unwrap(),
             "? super T"
         );
     }
@@ -1800,10 +1902,7 @@ mod tests {
     fn test_reference_with_lifetime_rust() {
         use crate::lang::rust_lang::RustLang;
         let lang = RustLang::new();
-        let t = TypeName::<RustLang>::reference_with_lifetime(
-            TypeName::primitive("str"),
-            "'a",
-        );
+        let t = TypeName::<RustLang>::reference_with_lifetime(TypeName::primitive("str"), "'a");
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
         doc.render(80, &mut buf).unwrap();
@@ -1814,10 +1913,8 @@ mod tests {
     fn test_reference_mut_with_lifetime_rust() {
         use crate::lang::rust_lang::RustLang;
         let lang = RustLang::new();
-        let t = TypeName::<RustLang>::reference_mut_with_lifetime(
-            TypeName::primitive("String"),
-            "'a",
-        );
+        let t =
+            TypeName::<RustLang>::reference_mut_with_lifetime(TypeName::primitive("String"), "'a");
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
         doc.render(80, &mut buf).unwrap();
@@ -1826,10 +1923,7 @@ mod tests {
 
     #[test]
     fn test_reference_with_lifetime_default_rendering() {
-        let t = TypeName::<TypeScript>::reference_with_lifetime(
-            TypeName::primitive("str"),
-            "'a",
-        );
+        let t = TypeName::<TypeScript>::reference_with_lifetime(TypeName::primitive("str"), "'a");
         assert_eq!(t.render(80, &identity_resolve).unwrap(), "&'a str");
     }
 
