@@ -361,6 +361,36 @@ impl CodeLang for Kotlin {
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
     }
+
+    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "List" }
+    }
+
+    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
+        Some(crate::type_name::TypePresentation::GenericWrap { name: "List" })
+    }
+
+    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Postfix { suffix: "?" }
+    }
+
+    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "Map" }
+    }
+
+    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
+        crate::type_name::FunctionPresentation {
+            keyword: "",
+            params_open: "(",
+            params_sep: ", ",
+            params_close: ")",
+            arrow: " -> ",
+            return_first: false,
+            curried: false,
+            wrapper_open: "",
+            wrapper_close: "",
+        }
+    }
 }
 
 #[cfg(test)]

@@ -132,6 +132,91 @@ pub trait CodeLang: Sized + Clone + 'static {
         ">"
     }
 
+    // --- Type presentation (data-driven, no BoxDoc) ---
+
+    /// How `TypeName::Array(T)` renders.
+    ///
+    /// Default: `Postfix { suffix: "[]" }` (TypeScript `T[]`).
+    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Postfix { suffix: "[]" }
+    }
+
+    /// How `TypeName::ReadonlyArray(T)` renders.
+    ///
+    /// Default: `None` — renders as `readonly ` + the array presentation.
+    /// Override to return `Some(...)` for languages with distinct readonly array syntax.
+    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
+        None
+    }
+
+    /// How `TypeName::Optional(T)` renders.
+    ///
+    /// Default: `Infix { sep: " | " }` — renders `T | null` (TypeScript style).
+    /// When using `Infix`, the absent literal from `optional_absent_literal()` is
+    /// automatically appended as the second member.
+    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Infix { sep: " | " }
+    }
+
+    /// The literal used for the "absent" case in Optional when using `Infix` presentation.
+    ///
+    /// Default: `"null"`. Python: `"None"`.
+    fn optional_absent_literal(&self) -> &str {
+        "null"
+    }
+
+    /// How `TypeName::Map { K, V }` renders.
+    ///
+    /// Default: `GenericWrap { name: "Map" }`.
+    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "Map" }
+    }
+
+    /// How `TypeName::Union(members)` renders.
+    ///
+    /// Default: `Infix { sep: " | " }`.
+    fn present_union(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Infix { sep: " | " }
+    }
+
+    /// How `TypeName::Intersection(members)` renders.
+    ///
+    /// Default: `Infix { sep: " & " }`.
+    fn present_intersection(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Infix { sep: " & " }
+    }
+
+    /// How `TypeName::Pointer(T)` renders.
+    ///
+    /// Default: `Prefix { prefix: "*" }`.
+    fn present_pointer(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Prefix { prefix: "*" }
+    }
+
+    /// How `TypeName::Slice(T)` renders.
+    ///
+    /// Default: `Prefix { prefix: "[]" }`.
+    fn present_slice(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Prefix { prefix: "[]" }
+    }
+
+    /// How `TypeName::Function { params, return_type }` renders.
+    ///
+    /// Default: TypeScript `(A, B) => R`.
+    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
+        crate::type_name::FunctionPresentation {
+            keyword: "",
+            params_open: "(",
+            params_sep: ", ",
+            params_close: ")",
+            arrow: " => ",
+            return_first: false,
+            curried: false,
+            wrapper_open: "",
+            wrapper_close: "",
+        }
+    }
+
     /// Qualify an import name for rendering in code.
     ///
     /// Default: return the resolved name as-is (TS/Rust import individual symbols).
@@ -167,6 +252,14 @@ pub trait CodeLang: Sized + Clone + 'static {
     /// Default: `false`. Python overrides to `true` (docstrings go inside the body).
     fn doc_comment_inside_body(&self) -> bool {
         false
+    }
+
+    /// Whether doc comments should be emitted before annotations/attributes.
+    ///
+    /// Default: `true`. Most languages (Rust, Go, TypeScript) put doc comments
+    /// above annotations. Java overrides to `false` (`@Override` before Javadoc).
+    fn doc_before_annotations(&self) -> bool {
+        true
     }
 
     /// Closing delimiter for base class / implements list.

@@ -7,4 +7,5 @@
 - [sigil_quote! Macro](sigil_quote.md)
 - [Code Templates](code_templates.md)
 - [Adding a Language](adding_a_language.md)
+- [Type Presentation](type_presentation.md)
 - [Architecture](architecture.md)

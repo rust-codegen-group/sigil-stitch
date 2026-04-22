@@ -263,6 +263,52 @@ impl CodeLang for RustLang {
             close: ">",
         }
     }
+
+    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "Vec" }
+    }
+
+    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
+        Some(crate::type_name::TypePresentation::GenericWrap { name: "Vec" })
+    }
+
+    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "Option" }
+    }
+
+    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "HashMap" }
+    }
+
+    fn present_intersection(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Infix { sep: " + " }
+    }
+
+    fn present_pointer(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Prefix { prefix: "*const " }
+    }
+
+    fn present_slice(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Delimited {
+            open: "&[",
+            sep: "",
+            close: "]",
+        }
+    }
+
+    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
+        crate::type_name::FunctionPresentation {
+            keyword: "fn",
+            params_open: "(",
+            params_sep: ", ",
+            params_close: ")",
+            arrow: " -> ",
+            return_first: false,
+            curried: false,
+            wrapper_open: "",
+            wrapper_close: "",
+        }
+    }
 }
 
 #[cfg(test)]

@@ -47,6 +47,15 @@ Every variant that contains other types recursively collects imports via `collec
 
 TypeName also renders to `pretty::BoxDoc` for width-aware output of complex type signatures. `BoxDoc` is used (rather than `RcDoc`) so rendered documents are `Send + Sync` and can cross thread boundaries.
 
+#### Type Presentation Layer
+
+`TypeName` variants are *semantic* — `Array(T)` means "array of T" regardless of language. Cross-language rendering is handled by a **data-driven presentation layer**:
+
+1. Each `TypeName` variant asks the language for a `TypePresentation` — a data enum describing the syntactic pattern (e.g., `GenericWrap`, `Prefix`, `Postfix`, `Delimited`, `Infix`).
+2. A single rendering engine in `type_name.rs` interprets the pattern into `BoxDoc` output.
+
+`BoxDoc` never appears in the `CodeLang` trait. Languages return pure data; the engine does all rendering. See [Type Presentation](type_presentation.md) for the full design.
+
 ### Layer 3: CodeBlock
 
 `src/code_block.rs` is the core composition primitive. A `CodeBlock<L>` stores:

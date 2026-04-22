@@ -3,6 +3,67 @@ use pretty::BoxDoc;
 use crate::import::ImportRef;
 use crate::lang::CodeLang;
 
+/// Syntactic pattern for rendering a compound type construct.
+///
+/// Each variant describes a structural pattern for assembling already-rendered
+/// inner type docs into the output. The rendering engine in `type_name.rs`
+/// interprets these patterns — language implementations never build `BoxDoc`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TypePresentation<'a> {
+    /// `name<P1, P2>` — delimiters from `generic_open()`/`generic_close()`.
+    GenericWrap {
+        /// The wrapper type name (e.g., `"Vec"`, `"Option"`, `"HashMap"`).
+        name: &'a str,
+    },
+    /// `prefix inner` — `*T`, `&T`, `[]T`, `&mut T`.
+    Prefix {
+        /// The prefix string (e.g., `"*"`, `"[]"`, `"*const "`).
+        prefix: &'a str,
+    },
+    /// `inner suffix` — `T[]`, `T?`, `T*`.
+    Postfix {
+        /// The suffix string (e.g., `"[]"`, `"?"`).
+        suffix: &'a str,
+    },
+    /// `open P1 sep P2 sep ... close` — `(A, B)`, `[T]`, `[K: V]`, `dict[K, V]`.
+    Delimited {
+        /// Opening delimiter.
+        open: &'a str,
+        /// Separator between elements.
+        sep: &'a str,
+        /// Closing delimiter.
+        close: &'a str,
+    },
+    /// `P1 sep P2 sep ... Pn` — `A | B`, `A & B`, `A + B`.
+    Infix {
+        /// Separator between elements (e.g., `" | "`, `" & "`).
+        sep: &'a str,
+    },
+}
+
+/// Syntactic pattern for rendering a function type expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionPresentation<'a> {
+    /// Keyword before the param list (e.g., `"fn"`, `"func"`, `""`).
+    pub keyword: &'a str,
+    /// Opening delimiter for the param list (e.g., `"("`, `"Callable[["`).
+    pub params_open: &'a str,
+    /// Separator between params (e.g., `", "`).
+    pub params_sep: &'a str,
+    /// Closing delimiter for the param list (e.g., `")"`, `"]]"`).
+    pub params_close: &'a str,
+    /// Arrow/separator between params and return type (e.g., `" -> "`, `" => "`).
+    pub arrow: &'a str,
+    /// Whether the return type comes before the params (Dart: `R Function(A, B)`).
+    pub return_first: bool,
+    /// Whether to render curried (Haskell: `A -> B -> R` instead of `(A, B) -> R`).
+    pub curried: bool,
+    /// Outer wrapper opening (e.g., C++ `"std::function<"`).
+    pub wrapper_open: &'a str,
+    /// Outer wrapper closing (e.g., C++ `">"`).
+    pub wrapper_close: &'a str,
+}
+
 /// A type name reference in generated code.
 ///
 /// `TypeName` represents a type as it should appear in the output. The
@@ -93,6 +154,92 @@ pub enum TypeName<L: CodeLang> {
     /// Phantom data to carry L without requiring it in all variants.
     #[doc(hidden)]
     _Phantom(std::marker::PhantomData<L>),
+}
+
+fn render_presentation(
+    pres: &TypePresentation<'_>,
+    inner_docs: Vec<BoxDoc<'static, ()>>,
+    lang: &impl CodeLang,
+) -> BoxDoc<'static, ()> {
+    match pres {
+        TypePresentation::GenericWrap { name } => {
+            let sep = BoxDoc::text(",").append(BoxDoc::softline());
+            let params = BoxDoc::intersperse(inner_docs, sep);
+            BoxDoc::text(name.to_string())
+                .append(BoxDoc::text(lang.generic_open().to_string()))
+                .append(params.nest(2).group())
+                .append(BoxDoc::text(lang.generic_close().to_string()))
+        }
+        TypePresentation::Prefix { prefix } => {
+            debug_assert_eq!(inner_docs.len(), 1);
+            let inner = inner_docs.into_iter().next().unwrap_or_else(BoxDoc::nil);
+            BoxDoc::text(prefix.to_string()).append(inner)
+        }
+        TypePresentation::Postfix { suffix } => {
+            debug_assert_eq!(inner_docs.len(), 1);
+            let inner = inner_docs.into_iter().next().unwrap_or_else(BoxDoc::nil);
+            inner.append(BoxDoc::text(suffix.to_string()))
+        }
+        TypePresentation::Delimited { open, sep, close } => {
+            let separator = BoxDoc::text(sep.to_string());
+            let body = BoxDoc::intersperse(inner_docs, separator);
+            BoxDoc::text(open.to_string())
+                .append(body.nest(2).group())
+                .append(BoxDoc::text(close.to_string()))
+        }
+        TypePresentation::Infix { sep } => {
+            let sep_trimmed = sep.trim_start();
+            let separator = BoxDoc::softline().append(BoxDoc::text(sep_trimmed.to_string()));
+            BoxDoc::intersperse(inner_docs, separator).group()
+        }
+    }
+}
+
+fn render_function_presentation(
+    pres: &FunctionPresentation<'_>,
+    param_docs: Vec<BoxDoc<'static, ()>>,
+    return_doc: BoxDoc<'static, ()>,
+) -> BoxDoc<'static, ()> {
+    if pres.curried {
+        // Haskell style: A -> B -> R
+        let mut all = param_docs;
+        all.push(return_doc);
+        let sep = BoxDoc::text(pres.arrow.to_string());
+        return BoxDoc::intersperse(all, sep);
+    }
+
+    let sep = BoxDoc::text(pres.params_sep.to_string());
+    let params_doc = BoxDoc::intersperse(param_docs, sep);
+    let params_block = BoxDoc::text(pres.params_open.to_string())
+        .append(params_doc.nest(2).group())
+        .append(BoxDoc::text(pres.params_close.to_string()));
+
+    let keyword_doc = if pres.keyword.is_empty() {
+        BoxDoc::nil()
+    } else {
+        BoxDoc::text(pres.keyword.to_string())
+    };
+
+    let signature = if pres.return_first {
+        // C++/Dart: R keyword(A, B)
+        return_doc
+            .append(keyword_doc)
+            .append(params_block)
+    } else {
+        // TS/Rust/Go: keyword(A, B) -> R
+        keyword_doc
+            .append(params_block)
+            .append(BoxDoc::text(pres.arrow.to_string()))
+            .append(return_doc)
+    };
+
+    if pres.wrapper_open.is_empty() {
+        signature
+    } else {
+        BoxDoc::text(pres.wrapper_open.to_string())
+            .append(signature)
+            .append(BoxDoc::text(pres.wrapper_close.to_string()))
+    }
 }
 
 impl<L: CodeLang> TypeName<L> {
@@ -394,60 +541,70 @@ impl<L: CodeLang> TypeName<L> {
                     .append(params_doc.nest(2).group())
                     .append(BoxDoc::text(lang.generic_close().to_string()))
             }
-            // For variants with recursive sub-types, thread lang through.
-            TypeName::Array(inner) => inner
-                .to_doc_with_lang(resolve, lang)
-                .append(BoxDoc::text("[]")),
-            TypeName::ReadonlyArray(inner) => BoxDoc::text("readonly ")
-                .append(inner.to_doc_with_lang(resolve, lang))
-                .append(BoxDoc::text("[]")),
+            TypeName::Array(inner) => {
+                let inner_doc = inner.to_doc_with_lang(resolve, lang);
+                render_presentation(&lang.present_array(), vec![inner_doc], lang)
+            }
+            TypeName::ReadonlyArray(inner) => {
+                let inner_doc = inner.to_doc_with_lang(resolve, lang);
+                if let Some(pres) = lang.present_readonly_array() {
+                    render_presentation(&pres, vec![inner_doc], lang)
+                } else {
+                    // Default: "readonly " + array rendering
+                    let array_doc =
+                        render_presentation(&lang.present_array(), vec![inner_doc], lang);
+                    BoxDoc::text("readonly ").append(array_doc)
+                }
+            }
             TypeName::Union(members) => {
                 let docs: Vec<_> = members
                     .iter()
                     .map(|m| m.to_doc_with_lang(resolve, lang))
                     .collect();
-                let sep = BoxDoc::softline().append(BoxDoc::text("| "));
-                BoxDoc::intersperse(docs, sep).group()
+                render_presentation(&lang.present_union(), docs, lang)
             }
             TypeName::Intersection(members) => {
                 let docs: Vec<_> = members
                     .iter()
                     .map(|m| m.to_doc_with_lang(resolve, lang))
                     .collect();
-                let sep = BoxDoc::softline().append(BoxDoc::text("& "));
-                BoxDoc::intersperse(docs, sep).group()
+                render_presentation(&lang.present_intersection(), docs, lang)
             }
             TypeName::Pointer(inner) => {
-                BoxDoc::text("*").append(inner.to_doc_with_lang(resolve, lang))
+                let inner_doc = inner.to_doc_with_lang(resolve, lang);
+                render_presentation(&lang.present_pointer(), vec![inner_doc], lang)
             }
             TypeName::Slice(inner) => {
-                BoxDoc::text("[]").append(inner.to_doc_with_lang(resolve, lang))
+                let inner_doc = inner.to_doc_with_lang(resolve, lang);
+                render_presentation(&lang.present_slice(), vec![inner_doc], lang)
             }
-            TypeName::Map { key, value } => BoxDoc::text("map[")
-                .append(key.to_doc_with_lang(resolve, lang))
-                .append(BoxDoc::text("]"))
-                .append(value.to_doc_with_lang(resolve, lang)),
+            TypeName::Map { key, value } => {
+                let key_doc = key.to_doc_with_lang(resolve, lang);
+                let value_doc = value.to_doc_with_lang(resolve, lang);
+                render_presentation(&lang.present_map(), vec![key_doc, value_doc], lang)
+            }
             TypeName::Optional(inner) => {
                 let inner_doc = inner.to_doc_with_lang(resolve, lang);
-                inner_doc
-                    .append(BoxDoc::softline())
-                    .append(BoxDoc::text("| null"))
-                    .group()
+                let pres = lang.present_optional();
+                match &pres {
+                    TypePresentation::Infix { .. } => {
+                        let null_doc =
+                            BoxDoc::text(lang.optional_absent_literal().to_string());
+                        render_presentation(&pres, vec![inner_doc, null_doc], lang)
+                    }
+                    _ => render_presentation(&pres, vec![inner_doc], lang),
+                }
             }
             TypeName::Function {
                 params,
                 return_type,
             } => {
-                let params_docs: Vec<_> = params
+                let param_docs: Vec<_> = params
                     .iter()
                     .map(|p| p.to_doc_with_lang(resolve, lang))
                     .collect();
-                let sep = BoxDoc::text(",").append(BoxDoc::softline());
-                let params_doc = BoxDoc::intersperse(params_docs, sep);
-                BoxDoc::text("(")
-                    .append(params_doc.nest(2).group())
-                    .append(BoxDoc::text(") => "))
-                    .append(return_type.to_doc_with_lang(resolve, lang))
+                let return_doc = return_type.to_doc_with_lang(resolve, lang);
+                render_function_presentation(&lang.present_function(), param_docs, return_doc)
             }
             // Leaf variants delegate to to_doc (no recursion needed).
             _ => self.to_doc(resolve),

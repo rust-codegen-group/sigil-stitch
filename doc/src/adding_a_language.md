@@ -250,3 +250,60 @@ Study these existing implementations for patterns similar to your target:
 | C | `src/lang/c_lang.rs` | Type-before-name, `#include`, `__attribute__`, struct close semicolon |
 | C++ | `src/lang/cpp_lang.rs` | `virtual` instead of `abstract`, `#include` + `using`, `[[attributes]]` |
 | Bash | `src/lang/bash.rs` | Keyword-based block closers (`fi`/`done`/`esac`), `source` imports, shell escaping |
+
+## Type Presentation
+
+When your language uses type expressions (generics, arrays, optionals, maps, etc.), you'll need to declare how each semantic type concept renders. This is done through `present_*` methods that return `TypePresentation` data — you never build `BoxDoc` directly.
+
+### How it works
+
+Each `TypeName` variant (Array, Optional, Map, etc.) asks your language for a `TypePresentation` — a small enum describing the syntactic pattern:
+
+- `GenericWrap { name }` — `name<P1, P2>` using your `generic_open()`/`generic_close()`
+- `Prefix { prefix }` — `prefix inner` (e.g., Go `[]T`, Rust `*const T`)
+- `Postfix { suffix }` — `inner suffix` (e.g., TypeScript `T[]`, Kotlin `T?`)
+- `Delimited { open, sep, close }` — `open P1 sep P2 close` (e.g., Swift `[K: V]`, Go `map[K]V`)
+- `Infix { sep }` — `P1 sep P2` (e.g., TypeScript `A | B`, Rust `A + B`)
+
+### Methods to override
+
+All `present_*` methods have defaults matching TypeScript conventions. Override only when your language differs:
+
+```rust,ignore
+impl CodeLang for YourLang {
+    // Array: default is Postfix { suffix: "[]" } (TS: T[])
+    // Override for Rust-style Vec<T>:
+    fn present_array(&self) -> TypePresentation<'_> {
+        TypePresentation::GenericWrap { name: "Vec" }
+    }
+
+    // Optional: default is Infix { sep: " | " } with "null" literal
+    // Override for Kotlin-style T?:
+    fn present_optional(&self) -> TypePresentation<'_> {
+        TypePresentation::Postfix { suffix: "?" }
+    }
+
+    // Map: default is GenericWrap { name: "Map" }
+    // Override for Go-style map[K]V:
+    fn present_map(&self) -> TypePresentation<'_> {
+        TypePresentation::Delimited { open: "map[", sep: "]", close: "" }
+    }
+
+    // Function types: default is TypeScript (A, B) => R
+    fn present_function(&self) -> FunctionPresentation<'_> {
+        FunctionPresentation {
+            keyword: "fn",
+            params_open: "(",
+            params_sep: ", ",
+            params_close: ")",
+            arrow: " -> ",
+            return_first: false,
+            curried: false,
+            wrapper_open: "",
+            wrapper_close: "",
+        }
+    }
+}
+```
+
+See [Type Presentation](type_presentation.md) for the full enum definition, all available methods, and examples for every supported language.

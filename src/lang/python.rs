@@ -371,6 +371,40 @@ impl CodeLang for Python {
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::UnionWithNone(" | ")
     }
+
+    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "list" }
+    }
+
+    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
+        Some(crate::type_name::TypePresentation::GenericWrap { name: "list" })
+    }
+
+    fn optional_absent_literal(&self) -> &str {
+        "None"
+    }
+
+    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Delimited {
+            open: "dict[",
+            sep: ", ",
+            close: "]",
+        }
+    }
+
+    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
+        crate::type_name::FunctionPresentation {
+            keyword: "",
+            params_open: "Callable[[",
+            params_sep: ", ",
+            params_close: "]",
+            arrow: ", ",
+            return_first: false,
+            curried: false,
+            wrapper_open: "",
+            wrapper_close: "]",
+        }
+    }
 }
 
 /// Render a `from module import name1, name2` line.

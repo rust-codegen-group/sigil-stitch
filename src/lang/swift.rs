@@ -346,6 +346,34 @@ impl CodeLang for Swift {
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
     }
+
+    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Delimited {
+            open: "[",
+            sep: "",
+            close: "]",
+        }
+    }
+
+    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
+        Some(crate::type_name::TypePresentation::Delimited {
+            open: "[",
+            sep: "",
+            close: "]",
+        })
+    }
+
+    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Postfix { suffix: "?" }
+    }
+
+    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Delimited {
+            open: "[",
+            sep: ": ",
+            close: "]",
+        }
+    }
 }
 
 #[cfg(test)]

@@ -298,6 +298,24 @@ impl CodeLang for CLang {
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypePrefix("*")
     }
+
+    fn present_pointer(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::Postfix { suffix: "*" }
+    }
+
+    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
+        crate::type_name::FunctionPresentation {
+            keyword: "",
+            params_open: "(",
+            params_sep: ", ",
+            params_close: ")",
+            arrow: "",
+            return_first: true,
+            curried: false,
+            wrapper_open: "",
+            wrapper_close: "",
+        }
+    }
 }
 
 #[cfg(test)]

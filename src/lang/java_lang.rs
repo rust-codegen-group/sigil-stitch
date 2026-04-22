@@ -289,6 +289,22 @@ impl CodeLang for JavaLang {
             close: ">",
         }
     }
+
+    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "List" }
+    }
+
+    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
+        Some(crate::type_name::TypePresentation::GenericWrap { name: "List" })
+    }
+
+    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "Optional" }
+    }
+
+    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "Map" }
+    }
 }
 
 #[cfg(test)]

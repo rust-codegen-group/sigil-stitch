@@ -336,6 +336,10 @@ impl CodeLang for TypeScript {
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::NameSuffix("?")
     }
+
+    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
+        crate::type_name::TypePresentation::GenericWrap { name: "Record" }
+    }
 }
 
 #[cfg(test)]
