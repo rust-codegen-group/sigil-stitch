@@ -300,8 +300,12 @@ impl CodeLang for Python {
         " -> "
     }
 
-    fn type_keyword(&self, _kind: TypeKind) -> &str {
-        "class"
+    fn type_keyword(&self, kind: TypeKind) -> &str {
+        match kind {
+            TypeKind::TypeAlias => "type",
+            TypeKind::Newtype => "class",
+            _ => "class",
+        }
     }
 
     fn field_terminator(&self) -> &str {
@@ -309,8 +313,11 @@ impl CodeLang for Python {
     }
 
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
-        // Python always has methods inside the class body.
         true
+    }
+
+    fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
+        format!("{name} = NewType(\"{name}\", {inner})")
     }
 
     fn generic_constraint_keyword(&self) -> &str {

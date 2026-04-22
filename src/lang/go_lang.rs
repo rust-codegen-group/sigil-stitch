@@ -243,12 +243,18 @@ impl CodeLang for GoLang {
     }
 
     fn methods_inside_type_body(&self, kind: TypeKind) -> bool {
-        // Go interfaces have method signatures in the body.
-        // Go structs do not — methods are standalone with receivers.
         match kind {
             TypeKind::Interface | TypeKind::Trait => true,
-            TypeKind::Struct | TypeKind::Class | TypeKind::Enum => false,
+            TypeKind::Struct
+            | TypeKind::Class
+            | TypeKind::Enum
+            | TypeKind::TypeAlias
+            | TypeKind::Newtype => false,
         }
+    }
+
+    fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
+        format!("type {name} {inner}")
     }
 
     fn generic_constraint_keyword(&self) -> &str {
@@ -289,7 +295,7 @@ impl CodeLang for GoLang {
         match kind {
             TypeKind::Struct | TypeKind::Class => "struct",
             TypeKind::Interface | TypeKind::Trait => "interface",
-            TypeKind::Enum => "",
+            TypeKind::Enum | TypeKind::TypeAlias | TypeKind::Newtype => "",
         }
     }
 

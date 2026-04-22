@@ -245,9 +245,7 @@ fn render_function_presentation(
 
     let signature = if pres.return_first {
         // C++/Dart: R keyword(A, B)
-        return_doc
-            .append(keyword_doc)
-            .append(params_block)
+        return_doc.append(keyword_doc).append(params_block)
     } else {
         // TS/Rust/Go: keyword(A, B) -> R
         keyword_doc
@@ -656,8 +654,7 @@ impl<L: CodeLang> TypeName<L> {
                 let pres = lang.present_optional();
                 match &pres {
                     TypePresentation::Infix { .. } => {
-                        let null_doc =
-                            BoxDoc::text(lang.optional_absent_literal().to_string());
+                        let null_doc = BoxDoc::text(lang.optional_absent_literal().to_string());
                         render_presentation(&pres, vec![inner_doc, null_doc], lang)
                     }
                     _ => render_presentation(&pres, vec![inner_doc], lang),
@@ -957,10 +954,8 @@ mod tests {
     fn test_tuple_with_lang_python() {
         use crate::lang::python::Python;
         let lang = Python::new();
-        let t = TypeName::<Python>::tuple(vec![
-            TypeName::primitive("str"),
-            TypeName::primitive("int"),
-        ]);
+        let t =
+            TypeName::<Python>::tuple(vec![TypeName::primitive("str"), TypeName::primitive("int")]);
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
         doc.render(80, &mut buf).unwrap();

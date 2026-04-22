@@ -92,4 +92,15 @@ pub enum SigilStitchError {
         /// The duplicated field name.
         field_name: String,
     },
+
+    /// Invalid TypeAlias or Newtype declaration.
+    #[snafu(display("invalid {kind} {type_name:?}: {reason}"))]
+    InvalidTypeAlias {
+        /// The kind of declaration ("TypeAlias" or "Newtype").
+        kind: &'static str,
+        /// The type name.
+        type_name: String,
+        /// The reason the declaration is invalid.
+        reason: String,
+    },
 }

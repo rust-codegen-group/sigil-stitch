@@ -250,10 +250,9 @@ impl CodeLang for JavaScript {
     fn type_keyword(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Class | TypeKind::Struct => "class",
-            // JS has no interface/trait — map to class for fallback.
             TypeKind::Interface | TypeKind::Trait => "class",
-            // JS has no native enum — map to class for fallback.
             TypeKind::Enum => "class",
+            TypeKind::TypeAlias | TypeKind::Newtype => "class",
         }
     }
 

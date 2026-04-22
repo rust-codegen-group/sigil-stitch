@@ -226,6 +226,8 @@ impl CodeLang for DartLang {
             TypeKind::Class | TypeKind::Struct => "class",
             TypeKind::Interface | TypeKind::Trait => "abstract class",
             TypeKind::Enum => "enum",
+            TypeKind::TypeAlias => "typedef",
+            TypeKind::Newtype => "class",
         }
     }
 

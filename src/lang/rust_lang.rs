@@ -215,6 +215,8 @@ impl CodeLang for RustLang {
             TypeKind::Struct | TypeKind::Class => "struct",
             TypeKind::Trait | TypeKind::Interface => "trait",
             TypeKind::Enum => "enum",
+            TypeKind::TypeAlias => "type",
+            TypeKind::Newtype => "struct",
         }
     }
 
@@ -225,7 +227,11 @@ impl CodeLang for RustLang {
     fn methods_inside_type_body(&self, kind: TypeKind) -> bool {
         match kind {
             TypeKind::Trait | TypeKind::Interface => true,
-            TypeKind::Struct | TypeKind::Class | TypeKind::Enum => false,
+            TypeKind::Struct
+            | TypeKind::Class
+            | TypeKind::Enum
+            | TypeKind::TypeAlias
+            | TypeKind::Newtype => false,
         }
     }
 

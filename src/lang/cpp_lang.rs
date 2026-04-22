@@ -257,6 +257,8 @@ impl CodeLang for CppLang {
             TypeKind::Struct => "struct",
             TypeKind::Enum => "enum class",
             TypeKind::Interface | TypeKind::Trait => "class",
+            TypeKind::TypeAlias => "using",
+            TypeKind::Newtype => "struct",
         }
     }
 
@@ -267,7 +269,7 @@ impl CodeLang for CppLang {
     fn methods_inside_type_body(&self, kind: TypeKind) -> bool {
         match kind {
             TypeKind::Class | TypeKind::Interface | TypeKind::Trait => true,
-            TypeKind::Struct | TypeKind::Enum => false,
+            TypeKind::Struct | TypeKind::Enum | TypeKind::TypeAlias | TypeKind::Newtype => false,
         }
     }
 
@@ -371,9 +373,7 @@ impl CodeLang for CppLang {
     }
 
     fn present_tuple(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap {
-            name: "std::tuple",
-        }
+        crate::type_name::TypePresentation::GenericWrap { name: "std::tuple" }
     }
 }
 

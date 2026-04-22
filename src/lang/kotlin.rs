@@ -297,6 +297,8 @@ impl CodeLang for Kotlin {
             TypeKind::Struct => "data class",
             TypeKind::Interface | TypeKind::Trait => "interface",
             TypeKind::Enum => "enum class",
+            TypeKind::TypeAlias => "typealias",
+            TypeKind::Newtype => "value class",
         }
     }
 
@@ -306,6 +308,10 @@ impl CodeLang for Kotlin {
 
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         true
+    }
+
+    fn render_newtype_line(&self, vis: &str, name: &str, inner: &str) -> String {
+        format!("{vis}value class {name}(val value: {inner})")
     }
 
     fn generic_constraint_keyword(&self) -> &str {

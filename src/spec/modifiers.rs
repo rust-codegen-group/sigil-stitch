@@ -40,6 +40,10 @@ pub enum TypeKind {
     Trait,
     /// Both languages: `enum`.
     Enum,
+    /// Type alias: `type Foo = Bar;` (TS/Rust), `typedef Bar Foo;` (C), `using Foo = Bar;` (C++).
+    TypeAlias,
+    /// Newtype wrapper: Rust `struct Foo(Bar);`, Go `type Foo Bar`, Kotlin `value class Foo(val value: Bar)`.
+    Newtype,
 }
 
 /// How a `PropertySpec` renders: accessor methods or inline field body.

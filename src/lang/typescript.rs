@@ -298,6 +298,7 @@ impl CodeLang for TypeScript {
             TypeKind::Class | TypeKind::Struct => "class",
             TypeKind::Interface | TypeKind::Trait => "interface",
             TypeKind::Enum => "enum",
+            TypeKind::TypeAlias | TypeKind::Newtype => "type",
         }
     }
 

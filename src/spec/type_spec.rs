@@ -98,6 +98,11 @@ impl<L: CodeLang> TypeSpec<L> {
     /// Returns a `Vec` because Rust struct + impl = two separate blocks,
     /// while TypeScript class = one block.
     pub fn emit(&self, lang: &L) -> Result<Vec<CodeBlock<L>>, crate::error::SigilStitchError> {
+        match self.kind {
+            TypeKind::TypeAlias => return Ok(vec![self.emit_type_alias(lang)?]),
+            TypeKind::Newtype => return Ok(vec![self.emit_newtype(lang)?]),
+            _ => {}
+        }
         if lang.methods_inside_type_body(self.kind) {
             Ok(vec![self.emit_inline(lang)?])
         } else {
@@ -261,6 +266,73 @@ impl<L: CodeLang> TypeSpec<L> {
         }
 
         Ok(blocks)
+    }
+
+    /// Emit a type alias declaration: `type Name = Target;`.
+    fn emit_type_alias(&self, lang: &L) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
+        let mut cb = CodeBlock::<L>::builder();
+        let mut args: Vec<Arg<L>> = Vec::new();
+
+        self.emit_preamble(&mut cb, lang)?;
+
+        let vis = lang.render_visibility(self.modifiers.visibility, DeclarationContext::TopLevel);
+        let kw = lang.type_keyword(self.kind);
+        let tp_str = render_type_params(&self.type_params, lang, &mut args);
+
+        let target = self
+            .super_types
+            .first()
+            .cloned()
+            .unwrap_or_else(|| TypeName::primitive(""));
+
+        let semi = if lang.uses_semicolons() { ";" } else { "" };
+
+        let fmt = if lang.type_alias_target_first() {
+            // C typedef: `typedef target name;`
+            args.push(Arg::TypeName(target));
+            format!("{kw} %T {}{tp_str}{semi}", self.name)
+        } else {
+            // Normal: `{vis}type name<params> = target;`
+            args.push(Arg::TypeName(target));
+            format!("{vis}{kw} {}{tp_str} = %T{semi}", self.name)
+        };
+
+        cb.add(&fmt, args);
+        cb.add_line();
+        cb.build()
+    }
+
+    /// Emit a newtype wrapper declaration.
+    fn emit_newtype(&self, lang: &L) -> Result<CodeBlock<L>, crate::error::SigilStitchError> {
+        let mut cb = CodeBlock::<L>::builder();
+
+        self.emit_preamble(&mut cb, lang)?;
+
+        let vis = lang.render_visibility(self.modifiers.visibility, DeclarationContext::TopLevel);
+        let target = self
+            .super_types
+            .first()
+            .cloned()
+            .unwrap_or_else(|| TypeName::primitive(""));
+
+        let resolve = |_module: &str, name: &str| name.to_string();
+        let inner_str = target.render(80, &resolve).unwrap_or_default();
+
+        let mut tp_args: Vec<Arg<L>> = Vec::new();
+        let tp_str = render_type_params(&self.type_params, lang, &mut tp_args);
+        let name_with_params = format!("{}{tp_str}", self.name);
+
+        let line = lang.render_newtype_line(vis, &name_with_params, &inner_str);
+
+        // Build format string: the line is literal, but type param bounds need %T resolution.
+        if tp_args.is_empty() {
+            cb.add("%L", line);
+        } else {
+            // The line contains type param bound placeholders — pass args through.
+            cb.add(&line, tp_args);
+        }
+        cb.add_line();
+        cb.build()
     }
 
     /// Emit enum variants with language-aware separators.
@@ -667,6 +739,36 @@ impl<L: CodeLang> TypeSpecBuilder<L> {
             }
         }
 
+        // Validate TypeAlias / Newtype constraints.
+        if matches!(self.kind, TypeKind::TypeAlias | TypeKind::Newtype) {
+            let kind_str = if self.kind == TypeKind::TypeAlias {
+                "TypeAlias"
+            } else {
+                "Newtype"
+            };
+            if self.super_types.len() != 1 {
+                return Err(crate::error::SigilStitchError::InvalidTypeAlias {
+                    kind: kind_str,
+                    type_name: self.name.clone(),
+                    reason: format!(
+                        "expected exactly 1 super_type (the target type), got {}",
+                        self.super_types.len()
+                    ),
+                });
+            }
+            if !self.fields.is_empty()
+                || !self.methods.is_empty()
+                || !self.variants.is_empty()
+                || !self.properties.is_empty()
+            {
+                return Err(crate::error::SigilStitchError::InvalidTypeAlias {
+                    kind: kind_str,
+                    type_name: self.name.clone(),
+                    reason: "must not have fields, methods, variants, or properties".to_string(),
+                });
+            }
+        }
+
         Ok(TypeSpec {
             name: self.name,
             kind: self.kind,
@@ -862,5 +964,197 @@ mod tests {
         );
         let result = tb.build();
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_alias_rust() {
+        let mut tb = TypeSpec::<RustLang>::builder("Meters", TypeKind::TypeAlias);
+        tb.extends(TypeName::primitive("f64"));
+        let spec = tb.build().unwrap();
+        let lang = RustLang::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let output = render_blocks_rs(&blocks);
+        assert_eq!(output.trim(), "type Meters = f64;");
+    }
+
+    #[test]
+    fn test_type_alias_rust_pub() {
+        let mut tb = TypeSpec::<RustLang>::builder("Meters", TypeKind::TypeAlias);
+        tb.visibility(Visibility::Public);
+        tb.extends(TypeName::primitive("f64"));
+        let spec = tb.build().unwrap();
+        let lang = RustLang::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let output = render_blocks_rs(&blocks);
+        assert_eq!(output.trim(), "pub type Meters = f64;");
+    }
+
+    #[test]
+    fn test_type_alias_ts() {
+        let mut tb = TypeSpec::<TypeScript>::builder("UserId", TypeKind::TypeAlias);
+        tb.visibility(Visibility::Public);
+        tb.extends(TypeName::primitive("string"));
+        let spec = tb.build().unwrap();
+        let blocks = spec.emit(&TypeScript::new()).unwrap();
+        let output = render_blocks_ts(&blocks);
+        assert_eq!(output.trim(), "export type UserId = string;");
+    }
+
+    #[test]
+    fn test_type_alias_cpp() {
+        use crate::lang::cpp_lang::CppLang;
+        let mut tb = TypeSpec::<CppLang>::builder("Meters", TypeKind::TypeAlias);
+        tb.extends(TypeName::primitive("double"));
+        let spec = tb.build().unwrap();
+        let lang = CppLang::new();
+        let imports = crate::import::ImportGroup::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+        let output = renderer.render(&blocks[0]).unwrap();
+        assert_eq!(output.trim(), "using Meters = double;");
+    }
+
+    #[test]
+    fn test_type_alias_c() {
+        use crate::lang::c_lang::CLang;
+        let mut tb = TypeSpec::<CLang>::builder("Meters", TypeKind::TypeAlias);
+        tb.extends(TypeName::primitive("double"));
+        let spec = tb.build().unwrap();
+        let lang = CLang::new();
+        let imports = crate::import::ImportGroup::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+        let output = renderer.render(&blocks[0]).unwrap();
+        assert_eq!(output.trim(), "typedef double Meters;");
+    }
+
+    #[test]
+    fn test_type_alias_go() {
+        use crate::lang::go_lang::GoLang;
+        let mut tb = TypeSpec::<GoLang>::builder("Meters", TypeKind::TypeAlias);
+        tb.extends(TypeName::primitive("float64"));
+        let spec = tb.build().unwrap();
+        let lang = GoLang::new();
+        let imports = crate::import::ImportGroup::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+        let output = renderer.render(&blocks[0]).unwrap();
+        assert_eq!(output.trim(), "type Meters = float64");
+    }
+
+    #[test]
+    fn test_type_alias_python() {
+        use crate::lang::python::Python;
+        let mut tb = TypeSpec::<Python>::builder("UserId", TypeKind::TypeAlias);
+        tb.extends(TypeName::primitive("str"));
+        let spec = tb.build().unwrap();
+        let lang = Python::new();
+        let imports = crate::import::ImportGroup::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+        let output = renderer.render(&blocks[0]).unwrap();
+        assert_eq!(output.trim(), "type UserId = str");
+    }
+
+    #[test]
+    fn test_type_alias_kotlin() {
+        use crate::lang::kotlin::Kotlin;
+        let mut tb = TypeSpec::<Kotlin>::builder("Name", TypeKind::TypeAlias);
+        tb.visibility(Visibility::Public);
+        tb.extends(TypeName::primitive("String"));
+        let spec = tb.build().unwrap();
+        let lang = Kotlin::new();
+        let imports = crate::import::ImportGroup::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+        let output = renderer.render(&blocks[0]).unwrap();
+        assert_eq!(output.trim(), "typealias Name = String");
+    }
+
+    #[test]
+    fn test_newtype_rust() {
+        let mut tb = TypeSpec::<RustLang>::builder("Meters", TypeKind::Newtype);
+        tb.visibility(Visibility::Public);
+        tb.extends(TypeName::primitive("f64"));
+        let spec = tb.build().unwrap();
+        let lang = RustLang::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let output = render_blocks_rs(&blocks);
+        assert_eq!(output.trim(), "pub struct Meters(f64);");
+    }
+
+    #[test]
+    fn test_newtype_go() {
+        use crate::lang::go_lang::GoLang;
+        let mut tb = TypeSpec::<GoLang>::builder("Meters", TypeKind::Newtype);
+        tb.extends(TypeName::primitive("float64"));
+        let spec = tb.build().unwrap();
+        let lang = GoLang::new();
+        let imports = crate::import::ImportGroup::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+        let output = renderer.render(&blocks[0]).unwrap();
+        assert_eq!(output.trim(), "type Meters float64");
+    }
+
+    #[test]
+    fn test_newtype_kotlin() {
+        use crate::lang::kotlin::Kotlin;
+        let mut tb = TypeSpec::<Kotlin>::builder("Meters", TypeKind::Newtype);
+        tb.visibility(Visibility::Public);
+        tb.extends(TypeName::primitive("Double"));
+        let spec = tb.build().unwrap();
+        let lang = Kotlin::new();
+        let imports = crate::import::ImportGroup::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+        let output = renderer.render(&blocks[0]).unwrap();
+        assert_eq!(output.trim(), "value class Meters(val value: Double)");
+    }
+
+    #[test]
+    fn test_newtype_python() {
+        use crate::lang::python::Python;
+        let mut tb = TypeSpec::<Python>::builder("UserId", TypeKind::Newtype);
+        tb.extends(TypeName::primitive("str"));
+        let spec = tb.build().unwrap();
+        let lang = Python::new();
+        let imports = crate::import::ImportGroup::new();
+        let blocks = spec.emit(&lang).unwrap();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+        let output = renderer.render(&blocks[0]).unwrap();
+        assert_eq!(output.trim(), "UserId = NewType(\"UserId\", str)");
+    }
+
+    #[test]
+    fn test_type_alias_validation_no_super_type() {
+        let tb = TypeSpec::<TypeScript>::builder("Foo", TypeKind::TypeAlias);
+        let result = tb.build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("expected exactly 1 super_type")
+        );
+    }
+
+    #[test]
+    fn test_type_alias_validation_has_fields() {
+        let mut tb = TypeSpec::<TypeScript>::builder("Foo", TypeKind::TypeAlias);
+        tb.extends(TypeName::primitive("string"));
+        tb.add_field(
+            FieldSpec::builder("x", TypeName::primitive("number"))
+                .build()
+                .unwrap(),
+        );
+        let result = tb.build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must not have fields")
+        );
     }
 }

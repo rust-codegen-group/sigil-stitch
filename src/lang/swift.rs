@@ -289,6 +289,7 @@ impl CodeLang for Swift {
             TypeKind::Struct => "struct",
             TypeKind::Interface | TypeKind::Trait => "protocol",
             TypeKind::Enum => "enum",
+            TypeKind::TypeAlias | TypeKind::Newtype => "typealias",
         }
     }
 

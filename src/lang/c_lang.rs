@@ -251,6 +251,8 @@ impl CodeLang for CLang {
             TypeKind::Struct | TypeKind::Class => "struct",
             TypeKind::Enum => "enum",
             TypeKind::Interface | TypeKind::Trait => "struct",
+            TypeKind::TypeAlias => "typedef",
+            TypeKind::Newtype => "typedef",
         }
     }
 
@@ -259,8 +261,15 @@ impl CodeLang for CLang {
     }
 
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
-        // C structs/enums have no methods inside the body.
         false
+    }
+
+    fn type_alias_target_first(&self) -> bool {
+        true
+    }
+
+    fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
+        format!("typedef {inner} {name};")
     }
 
     fn generic_constraint_keyword(&self) -> &str {

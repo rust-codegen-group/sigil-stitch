@@ -257,6 +257,20 @@ pub trait CodeLang: Sized + Clone + 'static {
         ""
     }
 
+    /// Whether type alias uses reversed order (`typedef target name;` in C).
+    ///
+    /// Default: `false` (most languages: `type name = target`).
+    fn type_alias_target_first(&self) -> bool {
+        false
+    }
+
+    /// Render a newtype declaration line from pre-rendered components.
+    ///
+    /// Default: Rust tuple-struct `{vis}struct {name}({inner});`.
+    fn render_newtype_line(&self, vis: &str, name: &str, inner: &str) -> String {
+        format!("{vis}struct {name}({inner});")
+    }
+
     /// Opening block delimiter appended after a function signature or type header.
     ///
     /// Default: `" {"` (brace languages). Python overrides to `":"`.
