@@ -313,50 +313,50 @@ impl<L: CodeLang> Default for CodeBlockBuilder<L> {
 fn parse_format(format: &str) -> Result<Vec<FormatPart>, crate::error::SigilStitchError> {
     let mut parts = Vec::new();
     let mut current_literal = String::new();
-    let bytes = format.as_bytes();
-    let mut i = 0;
+    let mut chars = format.char_indices().peekable();
 
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 1 < bytes.len() {
-            let spec = bytes[i + 1];
-            let part = match spec {
-                b'T' => Some(FormatPart::Type),
-                b'N' => Some(FormatPart::Name),
-                b'S' => Some(FormatPart::StringLit),
-                b'L' => Some(FormatPart::Literal_),
-                b'W' => Some(FormatPart::Wrap),
-                b'>' => Some(FormatPart::Indent),
-                b'<' => Some(FormatPart::Dedent),
-                b'[' => Some(FormatPart::StatementBegin),
-                b']' => Some(FormatPart::StatementEnd),
-                b'%' => {
-                    current_literal.push('%');
-                    i += 2;
-                    continue;
+    while let Some(&(_, ch)) = chars.peek() {
+        if ch == '%' {
+            chars.next();
+            if let Some(&(_, spec)) = chars.peek() {
+                chars.next();
+                let part = match spec {
+                    'T' => Some(FormatPart::Type),
+                    'N' => Some(FormatPart::Name),
+                    'S' => Some(FormatPart::StringLit),
+                    'L' => Some(FormatPart::Literal_),
+                    'W' => Some(FormatPart::Wrap),
+                    '>' => Some(FormatPart::Indent),
+                    '<' => Some(FormatPart::Dedent),
+                    '[' => Some(FormatPart::StatementBegin),
+                    ']' => Some(FormatPart::StatementEnd),
+                    '%' => {
+                        current_literal.push('%');
+                        continue;
+                    }
+                    _ => {
+                        return Err(crate::error::SigilStitchError::InvalidFormatSpecifier {
+                            format: format.to_string(),
+                            specifier: spec,
+                        });
+                    }
+                };
+                if let Some(part) = part {
+                    if !current_literal.is_empty() {
+                        parts.push(FormatPart::Literal(std::mem::take(&mut current_literal)));
+                    }
+                    parts.push(part);
                 }
-                _ => {
-                    return Err(crate::error::SigilStitchError::InvalidFormatSpecifier {
-                        format: format.to_string(),
-                        specifier: spec as char,
-                    });
-                }
-            };
-            if let Some(part) = part {
-                if !current_literal.is_empty() {
-                    parts.push(FormatPart::Literal(std::mem::take(&mut current_literal)));
-                }
-                parts.push(part);
             }
-            i += 2;
-        } else if bytes[i] == b'\n' {
+        } else if ch == '\n' {
+            chars.next();
             if !current_literal.is_empty() {
                 parts.push(FormatPart::Literal(std::mem::take(&mut current_literal)));
             }
             parts.push(FormatPart::Newline);
-            i += 1;
         } else {
-            current_literal.push(bytes[i] as char);
-            i += 1;
+            chars.next();
+            current_literal.push(ch);
         }
     }
 
