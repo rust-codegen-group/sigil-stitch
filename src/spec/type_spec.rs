@@ -5,7 +5,9 @@ use crate::lang::CodeLang;
 use crate::spec::annotation_spec::AnnotationSpec;
 use crate::spec::enum_variant_spec::EnumVariantSpec;
 use crate::spec::field_spec::FieldSpec;
-use crate::spec::fun_spec::{FunSpec, TypeParamSpec, WhereConstraint, WhereClauseStyle, emit_where_block, render_type_params};
+use crate::spec::fun_spec::{
+    FunSpec, TypeParamSpec, WhereClauseStyle, WhereConstraint, emit_where_block, render_type_params,
+};
 use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::property_spec::PropertySpec;
@@ -738,7 +740,8 @@ impl<L: CodeLang> TypeSpecBuilder<L> {
         subject: TypeName<L>,
         bounds: Vec<TypeName<L>>,
     ) -> &mut Self {
-        self.where_constraints.push(WhereConstraint { subject, bounds });
+        self.where_constraints
+            .push(WhereConstraint { subject, bounds });
         self
     }
 
@@ -1209,8 +1212,18 @@ mod tests {
         let type_spec = tb.build().unwrap();
         let blocks = type_spec.emit(&RustLang::new()).unwrap();
         let output = render_blocks_rs(&blocks);
-        assert!(output.contains("pub struct Container<T>"), "header: {output}");
-        assert!(output.contains("where\n    T: Clone + Send,"), "where on struct: {output}");
+        assert!(
+            output.contains("pub struct Container<T>"),
+            "header: {output}"
+        );
+        assert!(
+            output.contains("where\n    T: Clone + Send,"),
+            "where on struct: {output}"
+        );
         assert!(output.contains("impl<T> Container<T>"), "impl: {output}");
+        assert!(
+            output.contains("impl<T> Container<T>\nwhere\n    T: Clone + Send,"),
+            "where on impl: {output}"
+        );
     }
 }

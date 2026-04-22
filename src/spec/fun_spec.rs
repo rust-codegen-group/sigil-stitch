@@ -468,12 +468,14 @@ pub(crate) fn emit_where_block<L: CodeLang>(
     lang: &L,
 ) {
     let constraint_sep = lang.generic_constraint_separator();
+    let indent = lang.indent_unit();
     fmt.push_str("\nwhere\n");
     for (i, wc) in constraints.iter().enumerate() {
         if i > 0 {
             fmt.push('\n');
         }
-        fmt.push_str("    %T");
+        fmt.push_str(indent);
+        fmt.push_str("%T");
         args.push(Arg::TypeName(wc.subject.clone()));
         fmt.push_str(lang.generic_constraint_keyword());
         for (j, bound) in wc.bounds.iter().enumerate() {
@@ -613,7 +615,8 @@ impl<L: CodeLang> FunSpecBuilder<L> {
         subject: TypeName<L>,
         bounds: Vec<TypeName<L>>,
     ) -> &mut Self {
-        self.where_constraints.push(WhereConstraint { subject, bounds });
+        self.where_constraints
+            .push(WhereConstraint { subject, bounds });
         self
     }
 
@@ -779,17 +782,20 @@ mod tests {
             TypeName::primitive("T"),
             vec![TypeName::primitive("Clone"), TypeName::primitive("Send")],
         );
-        fb.add_where_constraint(
-            TypeName::primitive("U"),
-            vec![TypeName::primitive("Debug")],
-        );
+        fb.add_where_constraint(TypeName::primitive("U"), vec![TypeName::primitive("Debug")]);
         fb.add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap());
         fb.add_param(ParameterSpec::new("b", TypeName::primitive("U")).unwrap());
         fb.body(CodeBlock::<RustLang>::of("todo!()", ()).unwrap());
         let fun = fb.build().unwrap();
         let output = emit_fun_rs(&fun, DeclarationContext::TopLevel);
-        assert!(output.contains("fn process<T, U>(a: T, b: U)"), "sig: {output}");
-        assert!(output.contains("where\n    T: Clone + Send,\n    U: Debug,"), "where: {output}");
+        assert!(
+            output.contains("fn process<T, U>(a: T, b: U)"),
+            "sig: {output}"
+        );
+        assert!(
+            output.contains("where\n    T: Clone + Send,\n    U: Debug,"),
+            "where: {output}"
+        );
         assert!(output.contains(" {"), "block_open: {output}");
     }
 
@@ -804,7 +810,10 @@ mod tests {
         fb.body(CodeBlock::<TypeScript>::of("return value", ()).unwrap());
         let fun = fb.build().unwrap();
         let output = emit_fun_ts(&fun, DeclarationContext::TopLevel);
-        assert!(!output.contains("where"), "TS should not emit where: {output}");
+        assert!(
+            !output.contains("where"),
+            "TS should not emit where: {output}"
+        );
         assert!(output.contains("function process<T>("), "sig: {output}");
     }
 
@@ -817,7 +826,10 @@ mod tests {
         fb.body(CodeBlock::<RustLang>::of("todo!()", ()).unwrap());
         let fun = fb.build().unwrap();
         let output = emit_fun_rs(&fun, DeclarationContext::TopLevel);
-        assert!(output.contains("where\n    T: Clone + Send,"), "where: {output}");
+        assert!(
+            output.contains("where\n    T: Clone + Send,"),
+            "where: {output}"
+        );
     }
 
     #[test]
@@ -837,7 +849,10 @@ mod tests {
         fb.body(CodeBlock::<RustLang>::of("todo!()", ()).unwrap());
         let fun = fb.build().unwrap();
         let output = emit_fun_rs(&fun, DeclarationContext::TopLevel);
-        assert!(output.contains("fn apply<F>()"), "default renders no kind suffix: {output}");
+        assert!(
+            output.contains("fn apply<F>()"),
+            "default renders no kind suffix: {output}"
+        );
     }
 
     #[test]
@@ -845,20 +860,38 @@ mod tests {
         let mut fb = FunSpec::<RustLang>::builder("longest");
         fb.add_type_param(TypeParamSpec::new("T"));
         fb.add_type_param(TypeParamSpec::lifetime("'a"));
-        fb.add_param(ParameterSpec::new(
-            "x",
-            TypeName::reference_with_lifetime(TypeName::primitive("str"), "'a"),
-        ).unwrap());
-        fb.add_param(ParameterSpec::new(
-            "y",
-            TypeName::reference_with_lifetime(TypeName::primitive("str"), "'a"),
-        ).unwrap());
-        fb.returns(TypeName::reference_with_lifetime(TypeName::primitive("str"), "'a"));
+        fb.add_param(
+            ParameterSpec::new(
+                "x",
+                TypeName::reference_with_lifetime(TypeName::primitive("str"), "'a"),
+            )
+            .unwrap(),
+        );
+        fb.add_param(
+            ParameterSpec::new(
+                "y",
+                TypeName::reference_with_lifetime(TypeName::primitive("str"), "'a"),
+            )
+            .unwrap(),
+        );
+        fb.returns(TypeName::reference_with_lifetime(
+            TypeName::primitive("str"),
+            "'a",
+        ));
         fb.body(CodeBlock::<RustLang>::of("x", ()).unwrap());
         let fun = fb.build().unwrap();
         let output = emit_fun_rs(&fun, DeclarationContext::TopLevel);
-        assert!(output.contains("fn longest<'a, T>("), "lifetime first: {output}");
-        assert!(output.contains("x: &'a str"), "lifetime ref param: {output}");
-        assert!(output.contains("-> &'a str"), "lifetime ref return: {output}");
+        assert!(
+            output.contains("fn longest<'a, T>("),
+            "lifetime first: {output}"
+        );
+        assert!(
+            output.contains("x: &'a str"),
+            "lifetime ref param: {output}"
+        );
+        assert!(
+            output.contains("-> &'a str"),
+            "lifetime ref return: {output}"
+        );
     }
 }

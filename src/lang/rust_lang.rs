@@ -325,10 +325,14 @@ impl CodeLang for RustLang {
     }
 
     fn present_wildcard(&self) -> crate::type_name::WildcardPresentation<'_> {
+        // Rust doesn't have Java/Kotlin-style bounded wildcards.
+        // Unbounded `_` is valid (type inference placeholder).
+        // Bounded: maps to `impl T` as the closest approximation.
+        // For precise Rust bounds, use `TypeName::impl_trait()` / `dyn_trait()` directly.
         crate::type_name::WildcardPresentation {
             unbounded: "_",
-            upper_keyword: "_ ",
-            lower_keyword: "_ ",
+            upper_keyword: "impl ",
+            lower_keyword: "impl ",
         }
     }
 
