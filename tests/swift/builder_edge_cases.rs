@@ -1,4 +1,4 @@
-use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::code_block::{CodeBlock, StringLitArg};
 use sigil_stitch::lang::swift::Swift;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -82,4 +82,27 @@ fn test_full_module() {
     let output = file.render(80).unwrap();
 
     golden::assert_golden("swift/full_module.swift", &output);
+}
+
+#[test]
+fn test_string_interpolation_escape() {
+    let body = CodeBlock::<Swift>::of(
+        "let greeting = %S\nlet escaped = %S\nprint(greeting)",
+        (
+            StringLitArg("Hello \\(name)!".into()),
+            StringLitArg("Use \\(expr) for interpolation".into()),
+        ),
+    )
+    .unwrap();
+    let mut fb = FunSpec::<Swift>::builder("greet");
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
+    fb.body(body);
+    let fun = fb.build().unwrap();
+
+    let mut file_b = FileSpec::builder_with("greet.swift", Swift::new());
+    file_b.add_function(fun);
+    let file = file_b.build().unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("swift/string_interpolation_escape.swift", &output);
 }

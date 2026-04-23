@@ -194,7 +194,6 @@ impl CodeLang for Scala {
                 .replace('\t', "\\t")
                 .replace('\r', "\\r")
                 .replace('\0', "\\0")
-                .replace('$', "$$")
         )
     }
 
@@ -273,6 +272,10 @@ impl CodeLang for Scala {
 
     fn super_type_keyword(&self) -> &str {
         " extends "
+    }
+
+    fn abstract_keyword(&self) -> &str {
+        ""
     }
 
     fn super_type_subsequent_separator(&self) -> Option<&str> {
@@ -556,7 +559,7 @@ mod tests {
         assert_eq!(sc.render_string_literal("hello"), "\"hello\"");
         assert_eq!(sc.render_string_literal("it\"s"), "\"it\\\"s\"");
         assert_eq!(sc.render_string_literal("new\nline"), "\"new\\nline\"");
-        assert_eq!(sc.render_string_literal("$name"), "\"$$name\"");
+        assert_eq!(sc.render_string_literal("$name"), "\"$name\"");
     }
 
     #[test]

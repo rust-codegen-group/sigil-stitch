@@ -1,4 +1,4 @@
-use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::code_block::{CodeBlock, StringLitArg};
 use sigil_stitch::lang::dart::DartLang;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -86,4 +86,27 @@ fn test_full_module() {
     let output = file.render(80).unwrap();
 
     golden::assert_golden("dart/full_module.dart", &output);
+}
+
+#[test]
+fn test_string_dollar_escape() {
+    let body = CodeBlock::<DartLang>::of(
+        "final greeting = %S;\nfinal template = %S;\nprint(greeting);",
+        (
+            StringLitArg("Hello ${name}!".into()),
+            StringLitArg("Price: $100".into()),
+        ),
+    )
+    .unwrap();
+    let mut fb = FunSpec::<DartLang>::builder("greet");
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
+    fb.body(body);
+    let fun = fb.build().unwrap();
+
+    let mut file_b = FileSpec::builder_with("greet.dart", DartLang::new());
+    file_b.add_function(fun);
+    let file = file_b.build().unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("dart/string_dollar_escape.dart", &output);
 }

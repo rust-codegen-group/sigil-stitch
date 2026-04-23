@@ -11,11 +11,14 @@ fn test_control_flow() {
     b.add_line();
     b.add("%>", ());
     b.begin_control_flow("if x > 0", ());
-    b.add_statement("\"positive\"", ());
+    b.add("\"positive\"", ());
+    b.add_line();
     b.next_control_flow("else if x < 0", ());
-    b.add_statement("\"negative\"", ());
+    b.add("\"negative\"", ());
+    b.add_line();
     b.next_control_flow("else", ());
-    b.add_statement("\"zero\"", ());
+    b.add("\"zero\"", ());
+    b.add_line();
     b.end_control_flow();
     b.add("%<", ());
     b.add("}", ());

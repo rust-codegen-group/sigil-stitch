@@ -1,4 +1,4 @@
-use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::code_block::{CodeBlock, StringLitArg};
 use sigil_stitch::lang::kotlin::Kotlin;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -77,4 +77,27 @@ fn test_full_module() {
     let output = file.render(80).unwrap();
 
     golden::assert_golden("kotlin/full_module.kt", &output);
+}
+
+#[test]
+fn test_string_dollar_escape() {
+    let body = CodeBlock::<Kotlin>::of(
+        "val greeting = %S\nval template = %S\nprintln(greeting)",
+        (
+            StringLitArg("Hello ${name}!".into()),
+            StringLitArg("Price: $100".into()),
+        ),
+    )
+    .unwrap();
+    let mut fb = FunSpec::<Kotlin>::builder("greet");
+    fb.add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap());
+    fb.body(body);
+    let fun = fb.build().unwrap();
+
+    let mut file_b = FileSpec::builder_with("greet.kt", Kotlin::new());
+    file_b.add_function(fun);
+    let file = file_b.build().unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("kotlin/string_dollar_escape.kt", &output);
 }

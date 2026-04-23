@@ -230,8 +230,6 @@ impl CodeLang for Swift {
                 .replace('\t', "\\t")
                 .replace('\r', "\\r")
                 .replace('\0', "\\0")
-                // Escape \( to prevent accidental string interpolation.
-                .replace("\\(", "\\\\(")
         )
     }
 

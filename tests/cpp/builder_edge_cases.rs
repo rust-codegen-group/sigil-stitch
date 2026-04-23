@@ -1,5 +1,6 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::lang::cpp_lang::CppLang;
+use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -126,4 +127,21 @@ fn test_full_header() {
     let output = file.render(80).unwrap();
 
     golden::assert_golden("cpp/full_header.cpp", &output);
+}
+
+#[test]
+fn test_annotation_attribute() {
+    let mut fb = FunSpec::<CppLang>::builder("compute");
+    fb.annotate(AnnotationSpec::new("nodiscard"));
+    fb.returns(TypeName::primitive("int"));
+    fb.body(CodeBlock::of("return 42;", ()).unwrap());
+    let fun = fb.build().unwrap();
+
+    let rendered = emit_fun(&fun);
+    let mut file_b = FileSpec::builder_with("compute.hpp", CppLang::header());
+    file_b.add_code(rendered);
+    let file = file_b.build().unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("cpp/annotation_attribute.cpp", &output);
 }

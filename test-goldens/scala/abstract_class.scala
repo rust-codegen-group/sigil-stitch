@@ -6,5 +6,5 @@ abstract class Shape {
     getClass.getSimpleName
   }
 
-  abstract def area(): Double
+  def area(): Double
 }

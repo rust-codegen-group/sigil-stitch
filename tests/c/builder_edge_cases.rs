@@ -1,5 +1,6 @@
 use sigil_stitch::code_block::{CodeBlock, StringLitArg};
 use sigil_stitch::lang::c_lang::CLang;
+use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -108,4 +109,28 @@ fn test_top_level_with_includes() {
     let output = file.render(80).unwrap();
 
     golden::assert_golden("c/top_level_with_includes.c", &output);
+}
+
+#[test]
+fn test_annotation_attribute() {
+    let mut tb = TypeSpec::<CLang>::builder("PackedData", TypeKind::Struct);
+    tb.annotate(AnnotationSpec::new("packed"));
+    tb.add_field(
+        FieldSpec::builder("flags", TypeName::primitive("uint8_t"))
+            .build()
+            .unwrap(),
+    );
+    tb.add_field(
+        FieldSpec::builder("value", TypeName::primitive("uint32_t"))
+            .build()
+            .unwrap(),
+    );
+    let ts = tb.build().unwrap();
+
+    let mut file_b = FileSpec::builder_with("packed.h", CLang::header());
+    file_b.add_type(ts);
+    let file = file_b.build().unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("c/annotation_attribute.c", &output);
 }

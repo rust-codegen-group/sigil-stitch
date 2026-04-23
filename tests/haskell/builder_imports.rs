@@ -27,13 +27,17 @@ fn test_function_with_imports() {
 
 #[test]
 fn test_import_grouping() {
+    let put_str_ln = TypeName::<Haskell>::importable("Prelude", "putStrLn");
     let map_type = TypeName::<Haskell>::importable("Data.Map", "Map");
     let from_list = TypeName::<Haskell>::importable("Data.Map", "fromList");
     let when_fn = TypeName::<Haskell>::importable("Control.Monad", "when");
     let user = TypeName::<Haskell>::importable("MyApp.Types", "User");
 
     let mut b = CodeBlock::<Haskell>::builder();
-    b.add("-- %T %T %T %T", (map_type, from_list, when_fn, user));
+    b.add(
+        "-- %T %T %T %T %T",
+        (put_str_ln, map_type, from_list, when_fn, user),
+    );
     b.add_line();
     let block = b.build().unwrap();
 
