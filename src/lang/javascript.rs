@@ -287,8 +287,12 @@ impl CodeLang for JavaScript {
         ""
     }
 
+    fn enum_variant_separator(&self) -> &str {
+        ""
+    }
+
     fn enum_variant_trailing_separator(&self) -> bool {
-        true
+        false
     }
 
     fn present_tuple(&self) -> crate::type_name::TypePresentation<'_> {

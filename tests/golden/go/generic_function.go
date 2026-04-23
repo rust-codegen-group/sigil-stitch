@@ -5,5 +5,4 @@ func Max[T comparable](a T, b T) T {
 		return a
 	}
 	return b
-
 }

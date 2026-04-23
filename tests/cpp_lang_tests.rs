@@ -40,7 +40,7 @@ fn test_cpp_namespace_wrapping() {
 
     let mut fb = FileSpec::builder_with("math.hpp", CppLang::header());
     fb.header(CodeBlock::<CppLang>::of("#pragma once", ()).unwrap());
-    fb.add_raw("\nnamespace math {\n");
+    fb.add_raw("namespace math {\n");
     fb.add_code(block);
     fb.add_raw("\n} // namespace math\n");
     let file = fb.build().unwrap();

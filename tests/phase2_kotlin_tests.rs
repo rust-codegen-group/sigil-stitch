@@ -51,18 +51,15 @@ fn test_kotlin_data_class() {
     tb.visibility(Visibility::Public);
     tb.doc("A user data class.");
 
-    // Data class fields as val properties.
-    let mut name_field = FieldSpec::builder("name", TypeName::primitive("String"));
-    name_field.is_readonly();
-    tb.add_field(name_field.build().unwrap());
-
-    let mut age_field = FieldSpec::builder("age", TypeName::primitive("Int"));
-    age_field.is_readonly();
-    tb.add_field(age_field.build().unwrap());
-
-    let mut email_field = FieldSpec::builder("email", TypeName::primitive("String"));
-    email_field.is_readonly();
-    tb.add_field(email_field.build().unwrap());
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("name", TypeName::primitive("String")).unwrap(),
+    );
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("age", TypeName::primitive("Int")).unwrap(),
+    );
+    tb.add_primary_constructor_param(
+        ParameterSpec::new("email", TypeName::primitive("String")).unwrap(),
+    );
 
     let ts = tb.build().unwrap();
 
@@ -232,9 +229,19 @@ fn test_kotlin_override_method() {
 
 #[test]
 fn test_kotlin_full_module() {
-    let list = TypeName::<Kotlin>::importable("kotlin.collections", "List");
-    let mutable_list = TypeName::<Kotlin>::importable("kotlin.collections", "MutableList");
-    let array_list = TypeName::<Kotlin>::importable("kotlin.collections", "ArrayList");
+    let user = TypeName::<Kotlin>::primitive("User");
+    let list = TypeName::generic(
+        TypeName::importable("kotlin.collections", "List"),
+        vec![user.clone()],
+    );
+    let mutable_list = TypeName::generic(
+        TypeName::importable("kotlin.collections", "MutableList"),
+        vec![user.clone()],
+    );
+    let array_list = TypeName::generic(
+        TypeName::importable("kotlin.collections", "ArrayList"),
+        vec![user],
+    );
 
     // Interface.
     let mut iface = TypeSpec::<Kotlin>::builder("UserRepository", TypeKind::Interface);

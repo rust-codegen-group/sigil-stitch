@@ -1,6 +1,5 @@
 #pragma once
 
-
 namespace math {
 
 int square(int x) {

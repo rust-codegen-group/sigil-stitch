@@ -10,7 +10,6 @@ function deploy() {
         return 1
     fi
     log_info "deploying to $target"
-
 }
 
 deploy "$@"
