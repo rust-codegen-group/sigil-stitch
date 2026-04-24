@@ -8,9 +8,9 @@ use crate::type_name::TypeName;
 /// A single enum variant (e.g., `Red`, `Up = 'UP'`, `case red`).
 ///
 /// Used with [`TypeSpec`](crate::spec::type_spec::TypeSpec) via `add_variant()`.
-/// The language's [`CodeLang::enum_variant_prefix`],
-/// [`CodeLang::enum_variant_separator`],
-/// and [`CodeLang::enum_variant_trailing_separator`]
+/// The language's [`EnumAndAnnotationConfig::variant_prefix`](crate::lang::config::EnumAndAnnotationConfig::variant_prefix),
+/// [`variant_separator`](crate::lang::config::EnumAndAnnotationConfig::variant_separator),
+/// and [`variant_trailing_separator`](crate::lang::config::EnumAndAnnotationConfig::variant_trailing_separator)
 /// control rendering.
 ///
 /// For simple variants use [`EnumVariantSpec::new()`]; for variants with values,
