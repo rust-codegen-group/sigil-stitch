@@ -2,8 +2,12 @@
 
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::CodeLang;
-use crate::lang::config::QuoteStyle;
+use crate::lang::config::{
+    BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
+    QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
+};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::type_name::{AssociatedTypeStyle, FunctionPresentation, TypePresentation};
 
 /// Python language implementation.
 ///
@@ -279,14 +283,6 @@ impl CodeLang for Python {
         "#"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        false
-    }
-
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
         // Python uses naming conventions (_private, __mangled), not keywords.
         ""
@@ -294,10 +290,6 @@ impl CodeLang for Python {
 
     fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
         "def"
-    }
-
-    fn return_type_separator(&self) -> &str {
-        " -> "
     }
 
     fn type_keyword(&self, kind: TypeKind) -> &str {
@@ -308,10 +300,6 @@ impl CodeLang for Python {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ""
-    }
-
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         true
     }
@@ -320,105 +308,96 @@ impl CodeLang for Python {
         format!("{name} = NewType(\"{name}\", {inner})")
     }
 
-    fn generic_constraint_keyword(&self) -> &str {
-        // Python uses TypeVar("T", bound=X) — not inline syntax.
-        ""
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        ""
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        // Python uses parenthesized bases: `class Foo(Base):`
-        "("
-    }
-
-    fn implements_keyword(&self) -> &str {
-        // Both super_types and impl_types go in the same parenthesized list.
-        ", "
-    }
-
-    fn generic_open(&self) -> &str {
-        "["
-    }
-
-    fn generic_close(&self) -> &str {
-        "]"
-    }
-
-    fn block_open(&self) -> &str {
-        ":"
-    }
-
-    fn block_close(&self) -> &str {
-        ""
-    }
-
     fn doc_comment_inside_body(&self) -> bool {
         true
     }
 
-    fn bases_close(&self) -> &str {
-        ")"
+    fn fun_block_open(&self) -> &str {
+        ":"
     }
 
-    fn empty_body(&self) -> &str {
-        "..."
-    }
-
-    fn enum_variant_separator(&self) -> &str {
-        ""
-    }
-
-    fn constructor_keyword(&self) -> &str {
-        "def"
+    fn type_header_block_open(&self, _kind: crate::spec::modifiers::TypeKind) -> &str {
+        ":"
     }
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::UnionWithNone(" | ")
     }
 
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "list" }
+    // --- Config struct accessors ---
+
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            array: TypePresentation::GenericWrap { name: "list" },
+            readonly_array: Some(TypePresentation::GenericWrap { name: "list" }),
+            optional_absent_literal: "None",
+            map: TypePresentation::Delimited {
+                open: "dict[",
+                sep: ", ",
+                close: "]",
+            },
+            tuple: TypePresentation::GenericWrap { name: "tuple" },
+            function: FunctionPresentation {
+                keyword: "",
+                params_open: "Callable[[",
+                params_sep: ", ",
+                params_close: "]",
+                arrow: ", ",
+                return_first: false,
+                curried: false,
+                wrapper_open: "",
+                wrapper_close: "]",
+            },
+            associated_type: AssociatedTypeStyle::DotAccess,
+            ..Default::default()
+        }
     }
 
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::GenericWrap { name: "list" })
-    }
-
-    fn optional_absent_literal(&self) -> &str {
-        "None"
-    }
-
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "dict[",
-            sep: ", ",
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            open: "[",
             close: "]",
+            constraint_keyword: "",
+            constraint_separator: "",
+            context_bound_keyword: "",
+            ..Default::default()
         }
     }
 
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "",
-            params_open: "Callable[[",
-            params_sep: ", ",
-            params_close: "]",
-            arrow: ", ",
-            return_first: false,
-            curried: false,
-            wrapper_open: "",
-            wrapper_close: "]",
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            block_open: ":",
+            block_close: "",
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: "",
+            bases_close: ")",
+            ..Default::default()
         }
     }
 
-    fn present_tuple(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "tuple" }
+    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
+        FunctionSyntaxConfig {
+            return_type_separator: " -> ",
+            constructor_keyword: "def",
+            empty_body: "...",
+            ..Default::default()
+        }
     }
 
-    fn present_associated_type(&self) -> crate::type_name::AssociatedTypeStyle<'_> {
-        crate::type_name::AssociatedTypeStyle::DotAccess
+    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
+        TypeDeclSyntaxConfig {
+            super_type_keyword: "(",
+            implements_keyword: ", ",
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
+        EnumAndAnnotationConfig {
+            variant_separator: "",
+            ..Default::default()
+        }
     }
 }
 
@@ -564,15 +543,15 @@ mod tests {
     #[test]
     fn test_block_delimiters() {
         let py = Python::new();
-        assert_eq!(py.block_open(), ":");
-        assert_eq!(py.block_close(), "");
+        assert_eq!(py.block_syntax().block_open, ":");
+        assert_eq!(py.block_syntax().block_close, "");
     }
 
     #[test]
     fn test_generic_delimiters() {
         let py = Python::new();
-        assert_eq!(py.generic_open(), "[");
-        assert_eq!(py.generic_close(), "]");
+        assert_eq!(py.generic_syntax().open, "[");
+        assert_eq!(py.generic_syntax().close, "]");
     }
 
     #[test]
@@ -595,7 +574,7 @@ mod tests {
     #[test]
     fn test_empty_body() {
         let py = Python::new();
-        assert_eq!(py.empty_body(), "...");
+        assert_eq!(py.function_syntax().empty_body, "...");
     }
 
     #[test]
@@ -605,7 +584,7 @@ mod tests {
             .with_extension("pyi")
             .with_indent("  ");
         assert_eq!(py.file_extension(), "pyi");
-        assert_eq!(py.indent_unit(), "  ");
+        assert_eq!(py.block_syntax().indent_unit, "  ");
         assert_eq!(py.render_string_literal("hi"), "\"hi\"");
     }
 }

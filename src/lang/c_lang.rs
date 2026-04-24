@@ -223,14 +223,6 @@ impl CodeLang for CLang {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        true
-    }
-
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
         // C has no visibility keywords.
         ""
@@ -239,11 +231,6 @@ impl CodeLang for CLang {
     fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
         // C has no function keyword.
         ""
-    }
-
-    fn return_type_separator(&self) -> &str {
-        // Unused when return_type_is_prefix() is true, but set for safety.
-        " "
     }
 
     fn type_keyword(&self, kind: TypeKind) -> &str {
@@ -256,84 +243,74 @@ impl CodeLang for CLang {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ";"
-    }
-
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         false
-    }
-
-    fn type_alias_target_first(&self) -> bool {
-        true
     }
 
     fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
         format!("typedef {inner} {name};")
     }
 
-    fn generic_constraint_keyword(&self) -> &str {
-        ""
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        ""
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        ""
-    }
-
-    fn implements_keyword(&self) -> &str {
-        ""
-    }
-
-    fn type_before_name(&self) -> bool {
-        true
-    }
-
-    fn return_type_is_prefix(&self) -> bool {
-        true
-    }
-
-    fn type_close_terminator(&self) -> &str {
-        ";"
-    }
-
-    fn render_annotation_prefix(&self) -> (&str, &str) {
-        ("__attribute__((", "))")
-    }
-
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypePrefix("*")
     }
 
-    fn present_pointer(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Postfix { suffix: "*" }
-    }
-
-    fn present_reference(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Surround {
-            prefix: "const ",
-            suffix: "*",
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            pointer: crate::type_name::TypePresentation::Postfix { suffix: "*" },
+            reference: crate::type_name::TypePresentation::Surround {
+                prefix: "const ",
+                suffix: "*",
+            },
+            reference_mut: crate::type_name::TypePresentation::Postfix { suffix: "*" },
+            function: crate::type_name::FunctionPresentation {
+                arrow: "",
+                return_first: true,
+                ..Default::default()
+            },
+            ..Default::default()
         }
     }
 
-    fn present_reference_mut(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Postfix { suffix: "*" }
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            constraint_keyword: "",
+            constraint_separator: "",
+            context_bound_keyword: "",
+            ..Default::default()
+        }
     }
 
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "",
-            params_open: "(",
-            params_sep: ", ",
-            params_close: ")",
-            arrow: "",
-            return_first: true,
-            curried: false,
-            wrapper_open: "",
-            wrapper_close: "",
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            field_terminator: ";",
+            type_close_terminator: ";",
+            ..Default::default()
+        }
+    }
+
+    fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
+        crate::lang::config::FunctionSyntaxConfig {
+            return_type_separator: " ",
+            ..Default::default()
+        }
+    }
+
+    fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
+        crate::lang::config::TypeDeclSyntaxConfig {
+            type_before_name: true,
+            return_type_is_prefix: true,
+            type_alias_target_first: true,
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
+        crate::lang::config::EnumAndAnnotationConfig {
+            annotation_prefix: "__attribute__((",
+            annotation_suffix: "))",
+            ..Default::default()
         }
     }
 }
@@ -490,19 +467,19 @@ mod tests {
     #[test]
     fn test_type_before_name() {
         let c = CLang::new();
-        assert!(c.type_before_name());
+        assert!(c.type_decl_syntax().type_before_name);
     }
 
     #[test]
     fn test_return_type_is_prefix() {
         let c = CLang::new();
-        assert!(c.return_type_is_prefix());
+        assert!(c.type_decl_syntax().return_type_is_prefix);
     }
 
     #[test]
     fn test_type_close_terminator() {
         let c = CLang::new();
-        assert_eq!(c.type_close_terminator(), ";");
+        assert_eq!(c.block_syntax().type_close_terminator, ";");
     }
 
     #[test]
@@ -518,6 +495,6 @@ mod tests {
     fn test_c_builder_fluent() {
         let c = CLang::new().with_indent("\t").with_extension("h");
         assert_eq!(c.file_extension(), "h");
-        assert_eq!(c.indent_unit(), "\t");
+        assert_eq!(c.block_syntax().indent_unit, "\t");
     }
 }

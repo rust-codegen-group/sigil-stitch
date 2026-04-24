@@ -144,10 +144,11 @@ pub fn render_type_params(
         return String::new();
     }
 
-    let constraint_kw = lang.generic_constraint_keyword();
-    let constraint_sep = lang.generic_constraint_separator();
+    let generic = lang.generic_syntax();
+    let constraint_kw = generic.constraint_keyword;
+    let constraint_sep = generic.constraint_separator;
 
-    let mut fmt = String::from(lang.generic_open());
+    let mut fmt = String::from(generic.open);
     let mut first = true;
 
     // Lifetimes first (Rust convention: `<'a, 'b, T, U>`).
@@ -188,7 +189,7 @@ pub fn render_type_params(
                 args.push(Arg::TypeName(bound.clone()));
             }
         }
-        let ctx_kw = lang.context_bound_keyword();
+        let ctx_kw = generic.context_bound_keyword;
         for ctx_bound in &tp.context_bounds {
             fmt.push_str(ctx_kw);
             fmt.push_str("%T");
@@ -197,7 +198,7 @@ pub fn render_type_params(
         first = false;
     }
 
-    fmt.push_str(lang.generic_close());
+    fmt.push_str(generic.close);
     fmt
 }
 
@@ -317,12 +318,12 @@ impl FunSpec {
         }
 
         // Build signature.
-        if lang.function_signature_style() == FunctionSignatureStyle::Split {
+        if lang.function_syntax().function_signature_style == FunctionSignatureStyle::Split {
             return self.emit_split_signature(cb, lang);
         }
         let vis = lang.render_visibility(self.modifiers.visibility, ctx);
         let fn_kw = if self.modifiers.is_constructor {
-            lang.constructor_keyword()
+            lang.function_syntax().constructor_keyword
         } else {
             lang.function_keyword(ctx)
         };
@@ -332,7 +333,7 @@ impl FunSpec {
 
         sig.push_str(vis);
         if self.modifiers.is_abstract {
-            sig.push_str(lang.abstract_keyword());
+            sig.push_str(lang.function_syntax().abstract_keyword);
         }
         if self.modifiers.is_static {
             sig.push_str("static ");
@@ -341,11 +342,11 @@ impl FunSpec {
             sig.push_str("override ");
         }
         if self.modifiers.is_async {
-            sig.push_str(lang.async_keyword());
+            sig.push_str(lang.function_syntax().async_keyword);
         }
 
         // Return type as prefix (C-style: `int add(...)`).
-        if lang.return_type_is_prefix()
+        if lang.type_decl_syntax().return_type_is_prefix
             && let Some(ret) = &self.return_type
         {
             sig.push_str("%T");
@@ -362,7 +363,7 @@ impl FunSpec {
         if let Some(recv) = &self.receiver {
             sig.push('(');
             sig.push_str(&lang.escape_reserved(&recv.name));
-            sig.push_str(lang.type_annotation_separator());
+            sig.push_str(lang.type_decl_syntax().type_annotation_separator);
             sig.push_str("%T");
             sig_args.push(Arg::TypeName(recv.param_type.clone()));
             sig.push_str(") ");
@@ -375,7 +376,7 @@ impl FunSpec {
         sig.push_str(&tp_str);
 
         // Parameters — build as a sub-block for %W support.
-        if lang.param_list_style() == ParamListStyle::Curried {
+        if lang.function_syntax().param_list_style == ParamListStyle::Curried {
             if !self.params.is_empty() {
                 sig.push(' ');
                 sig.push_str("%L");
@@ -397,17 +398,19 @@ impl FunSpec {
         }
 
         // Return type as suffix (TS/Rust/Go-style: `fn add(...) -> int`).
-        if !lang.return_type_is_prefix()
+        if !lang.type_decl_syntax().return_type_is_prefix
             && let Some(ret) = &self.return_type
         {
-            sig.push_str(lang.return_type_separator());
+            sig.push_str(lang.function_syntax().return_type_separator);
             sig.push_str("%T");
             sig_args.push(Arg::TypeName(ret.clone()));
         }
 
         // Constructor delegation — signature style (Kotlin: `constructor(x: Int) : this(x, 0)`).
         let delegation_in_body = if let Some(deleg) = &self.delegation {
-            if lang.constructor_delegation_style() == ConstructorDelegationStyle::Signature {
+            if lang.function_syntax().constructor_delegation_style
+                == ConstructorDelegationStyle::Signature
+            {
                 sig.push_str(" : %L");
                 sig_args.push(Arg::Code(deleg.clone()));
                 false
@@ -444,13 +447,13 @@ impl FunSpec {
                 cb.add_line();
             }
             cb.add("%<", ());
-            let close = lang.block_close();
+            let close = lang.block_syntax().block_close;
             if !close.is_empty() {
                 cb.add(close, ());
                 cb.add_line();
             }
         } else {
-            let empty = lang.empty_body();
+            let empty = lang.function_syntax().empty_body;
             if !empty.is_empty() {
                 // Language requires a body placeholder (e.g., Python `...`).
                 self.emit_where_and_open(&mut sig, &mut sig_args, lang);
@@ -470,13 +473,13 @@ impl FunSpec {
                 }
                 cb.add_statement(empty, ());
                 cb.add("%<", ());
-                let close = lang.block_close();
+                let close = lang.block_syntax().block_close;
                 if !close.is_empty() {
                     cb.add(close, ());
                     cb.add_line();
                 }
             } else {
-                if lang.uses_semicolons() {
+                if lang.block_syntax().uses_semicolons {
                     sig.push(';');
                 }
                 cb.add(&sig, sig_args);
@@ -519,7 +522,7 @@ impl FunSpec {
 
     fn emit_where_and_open(&self, sig: &mut String, sig_args: &mut Vec<Arg>, lang: &dyn CodeLang) {
         if !self.where_constraints.is_empty()
-            && lang.where_clause_style() == WhereClauseStyle::WhereBlock
+            && lang.function_syntax().where_clause_style == WhereClauseStyle::WhereBlock
         {
             emit_where_block(sig, sig_args, &self.where_constraints, lang);
         }
@@ -568,7 +571,7 @@ impl FunSpec {
             def.push(' ');
             def.push_str(&lang.escape_reserved(&param.name));
         }
-        def.push_str(lang.block_open());
+        def.push_str(lang.block_syntax().block_open);
 
         if let Some(body) = &self.body {
             cb.add(&def, ());
@@ -583,20 +586,20 @@ impl FunSpec {
                 cb.add_line();
             }
             cb.add("%<", ());
-            let close = lang.block_close();
+            let close = lang.block_syntax().block_close;
             if !close.is_empty() {
                 cb.add(close, ());
                 cb.add_line();
             }
         } else {
-            let empty = lang.empty_body();
+            let empty = lang.function_syntax().empty_body;
             if !empty.is_empty() {
                 cb.add(&def, ());
                 cb.add_line();
                 cb.add("%>", ());
                 cb.add_statement(empty, ());
                 cb.add("%<", ());
-                let close = lang.block_close();
+                let close = lang.block_syntax().block_close;
                 if !close.is_empty() {
                     cb.add(close, ());
                     cb.add_line();
@@ -622,8 +625,9 @@ pub(crate) fn emit_where_block(
     constraints: &[WhereConstraint],
     lang: &dyn CodeLang,
 ) {
-    let constraint_sep = lang.generic_constraint_separator();
-    let indent = lang.indent_unit();
+    let generic = lang.generic_syntax();
+    let constraint_sep = generic.constraint_separator;
+    let indent = lang.block_syntax().indent_unit;
     fmt.push_str("\nwhere\n");
     for (i, wc) in constraints.iter().enumerate() {
         if i > 0 {
@@ -632,7 +636,7 @@ pub(crate) fn emit_where_block(
         fmt.push_str(indent);
         fmt.push_str("%T");
         args.push(Arg::TypeName(wc.subject.clone()));
-        fmt.push_str(lang.generic_constraint_keyword());
+        fmt.push_str(lang.generic_syntax().constraint_keyword);
         for (j, bound) in wc.bounds.iter().enumerate() {
             if j > 0 {
                 fmt.push_str(constraint_sep);

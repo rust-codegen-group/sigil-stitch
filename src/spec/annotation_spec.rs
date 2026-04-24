@@ -108,7 +108,8 @@ impl AnnotationSpec {
     ///
     /// Called during spec `emit()` methods which have access to `&L`.
     pub fn emit(&self, lang: &dyn CodeLang) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let (prefix, suffix) = lang.render_annotation_prefix();
+        let ea = lang.enum_and_annotation();
+        let (prefix, suffix) = (ea.annotation_prefix, ea.annotation_suffix);
 
         // Build the argument list portion: "(arg1, arg2)" or empty.
         let args_str = if self.arguments.is_empty() {

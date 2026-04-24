@@ -41,10 +41,12 @@ use crate::import::ImportGroup;
 /// the same CodeBlock and TypeName structures to generate output for any
 /// supported language.
 ///
-/// Methods that may vary per configuration (indent_unit, uses_semicolons,
-/// render_string_literal) take `&self`. Methods that are truly invariant
-/// per language (file_extension, reserved_words) also take `&self` for
-/// consistency and future flexibility.
+/// Language-specific configuration is exposed through six config accessor
+/// methods (`type_presentation`, `generic_syntax`, `block_syntax`,
+/// `function_syntax`, `type_decl_syntax`, `enum_and_annotation`) that
+/// return config structs. Languages override these accessors to customise
+/// rendering. The remaining methods on the trait have real logic, take
+/// parameters, or are not representable as plain data.
 pub trait CodeLang: std::fmt::Debug + 'static {
     /// File extension for this language (e.g., "ts", "go", "rs").
     fn file_extension(&self) -> &str;
@@ -73,12 +75,6 @@ pub trait CodeLang: std::fmt::Debug + 'static {
         ""
     }
 
-    /// Indentation unit (e.g., "  " for 2-space, "\t" for tabs).
-    fn indent_unit(&self) -> &str;
-
-    /// Whether this language uses semicolons to terminate statements.
-    fn uses_semicolons(&self) -> bool;
-
     /// Escape a name if it collides with a reserved word.
     /// Default: append underscore.
     fn escape_reserved(&self, name: &str) -> String {
@@ -88,8 +84,6 @@ pub trait CodeLang: std::fmt::Debug + 'static {
             name.to_string()
         }
     }
-
-    // --- Phase 2: structural spec support ---
 
     /// Render a visibility modifier for the given declaration context.
     fn render_visibility(
@@ -101,210 +95,12 @@ pub trait CodeLang: std::fmt::Debug + 'static {
     /// The keyword used to declare a function (e.g., "fn", "function").
     fn function_keyword(&self, ctx: crate::spec::modifiers::DeclarationContext) -> &str;
 
-    /// Separator between a function and its return type (e.g., " -> ", ": ").
-    fn return_type_separator(&self) -> &str;
-
     /// The keyword for a type declaration (e.g., "struct", "class").
     fn type_keyword(&self, kind: crate::spec::modifiers::TypeKind) -> &str;
-
-    /// Terminator after a field declaration (e.g., "," for Rust, ";" for TS).
-    fn field_terminator(&self) -> &str;
 
     /// Whether methods are declared inside the type body (true for TS class, Rust trait)
     /// vs in a separate impl block (Rust struct/enum).
     fn methods_inside_type_body(&self, kind: crate::spec::modifiers::TypeKind) -> bool;
-
-    /// Keyword introducing a generic constraint (e.g., ": " for Rust, " extends " for TS).
-    fn generic_constraint_keyword(&self) -> &str;
-
-    /// Separator between multiple generic bounds (e.g., " + " for Rust, " & " for TS).
-    fn generic_constraint_separator(&self) -> &str;
-
-    /// Keyword for super type / base class (e.g., "" for Rust, " extends " for TS).
-    fn super_type_keyword(&self) -> &str;
-
-    /// Keyword for interface implementation (e.g., "" for Rust, " implements " for TS).
-    fn implements_keyword(&self) -> &str;
-
-    /// Separator between name and type annotation (e.g., ": ").
-    fn type_annotation_separator(&self) -> &str {
-        ": "
-    }
-
-    /// The async keyword with trailing space (e.g., "async ").
-    fn async_keyword(&self) -> &str {
-        "async "
-    }
-
-    /// Opening delimiter for generic type parameters (e.g., "<" for Rust/TS, "[" for Go).
-    fn generic_open(&self) -> &str {
-        "<"
-    }
-
-    /// Closing delimiter for generic type parameters (e.g., ">" for Rust/TS, "]" for Go).
-    fn generic_close(&self) -> &str {
-        ">"
-    }
-
-    /// How `TypeName::Generic` application is rendered.
-    ///
-    /// Default: `Delimited` — `Base<P1, P2>` using `generic_open()`/`generic_close()`.
-    fn generic_application_style(&self) -> crate::type_name::GenericApplicationStyle {
-        crate::type_name::GenericApplicationStyle::Delimited
-    }
-
-    // --- Type presentation (data-driven, no BoxDoc) ---
-
-    /// How `TypeName::Array(T)` renders.
-    ///
-    /// Default: `Postfix { suffix: "[]" }` (TypeScript `T[]`).
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Postfix { suffix: "[]" }
-    }
-
-    /// How `TypeName::ReadonlyArray(T)` renders.
-    ///
-    /// Default: `None` — renders as `readonly ` + the array presentation.
-    /// Override to return `Some(...)` for languages with distinct readonly array syntax.
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        None
-    }
-
-    /// How `TypeName::Optional(T)` renders.
-    ///
-    /// Default: `Infix { sep: " | " }` — renders `T | null` (TypeScript style).
-    /// When using `Infix`, the absent literal from `optional_absent_literal()` is
-    /// automatically appended as the second member.
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Infix { sep: " | " }
-    }
-
-    /// The literal used for the "absent" case in Optional when using `Infix` presentation.
-    ///
-    /// Default: `"null"`. Python: `"None"`.
-    fn optional_absent_literal(&self) -> &str {
-        "null"
-    }
-
-    /// How `TypeName::Map { K, V }` renders.
-    ///
-    /// Default: `GenericWrap { name: "Map" }`.
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Map" }
-    }
-
-    /// How `TypeName::Union(members)` renders.
-    ///
-    /// Default: `Infix { sep: " | " }`.
-    fn present_union(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Infix { sep: " | " }
-    }
-
-    /// How `TypeName::Intersection(members)` renders.
-    ///
-    /// Default: `Infix { sep: " & " }`.
-    fn present_intersection(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Infix { sep: " & " }
-    }
-
-    /// How `TypeName::Pointer(T)` renders.
-    ///
-    /// Default: `Prefix { prefix: "*" }`.
-    fn present_pointer(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "*" }
-    }
-
-    /// How `TypeName::Slice(T)` renders.
-    ///
-    /// Default: `Prefix { prefix: "[]" }`.
-    fn present_slice(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "[]" }
-    }
-
-    /// How `TypeName::Tuple(elements)` renders.
-    ///
-    /// Default: `Delimited { open: "(", sep: ", ", close: ")" }` (Rust/Swift `(A, B, C)`).
-    fn present_tuple(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "(",
-            sep: ", ",
-            close: ")",
-        }
-    }
-
-    /// How `TypeName::Reference { mutable: false }` renders.
-    ///
-    /// Default: `Prefix { prefix: "" }` — GC languages render as bare inner type.
-    fn present_reference(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "" }
-    }
-
-    /// How `TypeName::Reference { mutable: true }` renders.
-    ///
-    /// Default: `Prefix { prefix: "" }` — GC languages render as bare inner type.
-    fn present_reference_mut(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "" }
-    }
-
-    /// How `TypeName::Function { params, return_type }` renders.
-    ///
-    /// Default: TypeScript `(A, B) => R`.
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "",
-            params_open: "(",
-            params_sep: ", ",
-            params_close: ")",
-            arrow: " => ",
-            return_first: false,
-            curried: false,
-            wrapper_open: "",
-            wrapper_close: "",
-        }
-    }
-
-    /// How `TypeName::AssociatedType` renders.
-    ///
-    /// Default: Rust-style `<Base as Qual>::Member` / `Base::Member`.
-    fn present_associated_type(&self) -> crate::type_name::AssociatedTypeStyle<'_> {
-        crate::type_name::AssociatedTypeStyle::QualifiedPath {
-            open: "<",
-            as_kw: " as ",
-            close_sep: ">::",
-            simple_sep: "::",
-        }
-    }
-
-    /// How `TypeName::ImplTrait` bounds render.
-    ///
-    /// Default: Rust-style `impl Bound1 + Bound2`.
-    fn present_impl_trait(&self) -> crate::type_name::BoundsPresentation<'_> {
-        crate::type_name::BoundsPresentation {
-            keyword: "impl ",
-            separator: " + ",
-        }
-    }
-
-    /// How `TypeName::DynTrait` bounds render.
-    ///
-    /// Default: Rust-style `dyn Bound1 + Bound2`.
-    fn present_dyn_trait(&self) -> crate::type_name::BoundsPresentation<'_> {
-        crate::type_name::BoundsPresentation {
-            keyword: "dyn ",
-            separator: " + ",
-        }
-    }
-
-    /// How `TypeName::Wildcard` renders.
-    ///
-    /// Default: Java-style `?`, `? extends T`, `? super T`.
-    fn present_wildcard(&self) -> crate::type_name::WildcardPresentation<'_> {
-        crate::type_name::WildcardPresentation {
-            unbounded: "?",
-            upper_keyword: "? extends ",
-            lower_keyword: "? super ",
-        }
-    }
 
     /// Qualify an import name for rendering in code.
     ///
@@ -321,13 +117,6 @@ pub trait CodeLang: std::fmt::Debug + 'static {
         ""
     }
 
-    /// Whether type alias uses reversed order (`typedef target name;` in C).
-    ///
-    /// Default: `false` (most languages: `type name = target`).
-    fn type_alias_target_first(&self) -> bool {
-        false
-    }
-
     /// Render a newtype declaration line from pre-rendered components.
     ///
     /// Default: Rust tuple-struct `{vis}struct {name}({inner});`.
@@ -335,42 +124,20 @@ pub trait CodeLang: std::fmt::Debug + 'static {
         format!("{vis}struct {name}({inner});")
     }
 
-    /// Opening block delimiter appended after a function signature or type header.
-    ///
-    /// Default: `" {"` (brace languages). Python overrides to `":"`.
-    fn block_open(&self) -> &str {
-        " {"
-    }
-
     /// Opening block delimiter for function bodies specifically.
     ///
-    /// Default: delegates to `block_open()`.
+    /// Default: `" {"`.
     /// Scala overrides to `" = {"` since Scala function definitions use `=`.
     fn fun_block_open(&self) -> &str {
-        self.block_open()
+        " {"
     }
 
     /// Opening block delimiter for type headers, parameterized by type kind.
     ///
-    /// Default: delegates to `block_open()`.
+    /// Default: `" {"`.
     /// Haskell overrides: Trait -> `" where"`, others -> `" ="`.
     fn type_header_block_open(&self, _kind: crate::spec::modifiers::TypeKind) -> &str {
-        self.block_open()
-    }
-
-    /// How function parameter lists are formatted (tupled vs curried).
-    ///
-    /// Default: `Tupled` — `(a: T, b: U)`.
-    /// OCaml overrides to `Curried` — `(a : T) (b : U)`.
-    fn param_list_style(&self) -> crate::spec::fun_spec::ParamListStyle {
-        crate::spec::fun_spec::ParamListStyle::Tupled
-    }
-
-    /// Closing block delimiter emitted after a dedent at the end of a block.
-    ///
-    /// Default: `"}"` (brace languages). Python overrides to `""` (indent-only).
-    fn block_close(&self) -> &str {
-        "}"
+        " {"
     }
 
     /// Whether doc comments should be rendered inside the body (after block open)
@@ -389,71 +156,31 @@ pub trait CodeLang: std::fmt::Debug + 'static {
         true
     }
 
-    /// Closing delimiter for base class / implements list.
+    /// How this language expresses that a field is optional (key may be absent).
     ///
-    /// Default: `""`. Python overrides to `")"` to close `class Foo(Base):`.
-    fn bases_close(&self) -> &str {
-        ""
+    /// Consulted by `FieldSpec::emit()` when `is_optional` is set. Languages
+    /// that can't express optional fields return `OptionalFieldStyle::Ignored`
+    /// and the field is rendered as if it were required.
+    ///
+    /// Default: `OptionalFieldStyle::Ignored`.
+    fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
+        crate::lang::config::OptionalFieldStyle::Ignored
     }
 
-    /// Content to emit for an abstract method with no body.
+    /// How `PropertySpec` renders: accessor methods or inline field body.
     ///
-    /// Default: `""` (no body emitted). Python overrides to `"..."` (Ellipsis).
-    fn empty_body(&self) -> &str {
-        ""
+    /// Default: `Accessor` — emits `get name()` / `set name(v)` methods (TS/JS).
+    /// Swift and Kotlin override to `Field` — emits a field with inline `get`/`set` blocks.
+    fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
+        crate::spec::modifiers::PropertyStyle::Accessor
     }
 
-    /// Whether type annotations use type-before-name order (e.g., C: `int count`)
-    /// rather than name-before-type (e.g., Rust: `count: i32`).
+    /// The keyword for a property getter in field-style rendering.
     ///
-    /// Default: `false`. C overrides to `true`.
-    fn type_before_name(&self) -> bool {
-        false
-    }
-
-    /// Whether the return type appears before the function name (e.g., C: `int add(...)`)
-    /// rather than after the parameters (e.g., Rust: `fn add(...) -> int`).
-    ///
-    /// Default: `false`. C overrides to `true`.
-    fn return_type_is_prefix(&self) -> bool {
-        false
-    }
-
-    /// Terminator appended after a type declaration's closing brace.
-    ///
-    /// Default: `""`. C overrides to `";"` for `struct Config { ... };`.
-    fn type_close_terminator(&self) -> &str {
-        ""
-    }
-
-    /// The keyword emitted when `is_abstract` is set on a function.
-    ///
-    /// Default: `"abstract "` (TypeScript). C++ overrides to `"virtual "`.
-    fn abstract_keyword(&self) -> &str {
-        "abstract "
-    }
-
-    /// Separator between super types in an inheritance list.
-    ///
-    /// Default: `", "`. C++ overrides to `", public "` for `class D : public B1, public B2`.
-    fn super_type_separator(&self) -> &str {
-        ", "
-    }
-
-    /// Keyword for context bounds on type parameters (e.g., Scala `[T : Ordering]`).
-    ///
-    /// Default: delegates to `generic_constraint_keyword()`.
-    /// Scala overrides to `" : "`.
-    fn context_bound_keyword(&self) -> &str {
-        self.generic_constraint_keyword()
-    }
-
-    /// How function signatures are rendered.
-    ///
-    /// Default: `Merged` — single-line `fn add(x: Int) -> Int {`.
-    /// Haskell overrides to `Split` — separate type signature and definition.
-    fn function_signature_style(&self) -> crate::spec::fun_spec::FunctionSignatureStyle {
-        crate::spec::fun_spec::FunctionSignatureStyle::Merged
+    /// Default: `"get"` (Swift: `get { ... }`).
+    /// Kotlin overrides to `"get()"`.
+    fn property_getter_keyword(&self) -> &str {
+        "get"
     }
 
     /// Render a type context / constraint prefix for split function signatures.
@@ -492,159 +219,43 @@ pub trait CodeLang: std::fmt::Debug + 'static {
         String::new()
     }
 
-    /// Override separator for the 2nd+ super type in an inheritance list.
-    ///
-    /// When `Some(sep)`, the first super type uses `super_type_keyword()` and
-    /// subsequent ones use `sep` instead of `super_type_separator()`.
-    ///
-    /// Default: `None`. Scala overrides to `Some(" with ")` so that
-    /// `class Foo extends Base with Trait1 with Trait2` is emitted.
-    fn super_type_subsequent_separator(&self) -> Option<&str> {
-        None
-    }
-
-    /// Keyword emitted for readonly/immutable fields.
-    ///
-    /// In type-before-name languages (C/C++/Java): appears before the type.
-    /// In name-before-type languages (TS/Kotlin): appears before the name.
-    ///
-    /// Default: `"const "` (C/C++). Java overrides to `"final "`,
-    /// TypeScript to `"readonly "`, Kotlin to `"val "`.
-    fn readonly_keyword(&self) -> &str {
-        "const "
-    }
-
-    /// Keyword emitted for mutable fields in name-before-type languages.
-    ///
-    /// Default: `""` (most languages have no mutable keyword).
-    /// Kotlin overrides to `"var "`.
-    fn mutable_field_keyword(&self) -> &str {
-        ""
-    }
-
-    /// How this language expresses that a field is optional (key may be absent).
-    ///
-    /// Consulted by `FieldSpec::emit()` when `is_optional` is set. Languages
-    /// that can't express optional fields return `OptionalFieldStyle::Ignored`
-    /// and the field is rendered as if it were required.
-    ///
-    /// Default: `OptionalFieldStyle::Ignored`.
-    fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
-        crate::lang::config::OptionalFieldStyle::Ignored
-    }
-
-    // --- Phase 3: enum variant support ---
-
-    /// Prefix before each enum variant name.
-    ///
-    /// Default: `""`. Swift overrides to `"case "`.
-    fn enum_variant_prefix(&self) -> &str {
-        ""
-    }
-
-    /// Prefix before the first enum variant only.
-    ///
-    /// Default: delegates to `enum_variant_prefix()`.
-    /// Haskell overrides to `""` (first constructor after `=` has no prefix),
-    /// while subsequent constructors use `"| "` via `enum_variant_prefix()`.
-    fn enum_variant_prefix_first(&self) -> &str {
-        self.enum_variant_prefix()
-    }
-
-    /// Separator after each enum variant (e.g., `","` for most languages).
-    ///
-    /// Default: `","`. Python and Swift override to `""`.
-    fn enum_variant_separator(&self) -> &str {
-        ","
-    }
-
-    /// Whether the separator appears after the last variant too (trailing comma).
-    ///
-    /// Default: `false`. Rust and TypeScript override to `true`.
-    fn enum_variant_trailing_separator(&self) -> bool {
-        false
-    }
-
-    // --- Phase 3: annotation support ---
-
-    /// Prefix and suffix wrapping an annotation name.
-    ///
-    /// Default: `("@", "")` → `@Name(args)`.
-    /// Rust: `("#[", "]")` → `#[name(args)]`.
-    /// C++: `("[[", "]]")` → `[[name(args)]]`.
-    /// C: `("__attribute__((", "))")` → `__attribute__((name(args)))`.
-    fn render_annotation_prefix(&self) -> (&str, &str) {
-        ("@", "")
-    }
-
-    // --- Phase 3: constructor support ---
-
-    /// Function keyword used for constructors.
-    ///
-    /// When `FunSpec::is_constructor()` is set, this keyword is used instead of
-    /// `function_keyword()`. Default: `""` (no keyword prefix — works for TS/JS,
-    /// Java, C++, Dart, Swift, Kotlin where constructors have no function keyword).
-    ///
-    /// Python overrides to `"def"` (`def __init__`).
-    /// Rust overrides to `"fn"` (`fn new`).
-    fn constructor_keyword(&self) -> &str {
-        ""
-    }
-
-    /// Where a constructor delegation call (`super(...)` / `this(...)`) is placed.
-    ///
-    /// Default: `Body` — the delegation call is emitted as the first statement
-    /// in the constructor body (TS, JS, Java, Dart, Swift, Python, C++).
-    ///
-    /// Kotlin overrides to `Signature` — the delegation call appears between the
-    /// parameter list and the body: `constructor(x: Int) : this(x, 0) { ... }`.
-    fn constructor_delegation_style(&self) -> crate::spec::modifiers::ConstructorDelegationStyle {
-        crate::spec::modifiers::ConstructorDelegationStyle::Body
-    }
-
-    /// Whether this language supports primary constructors on type declarations.
-    ///
-    /// When true, `TypeSpec` will render primary constructor parameters after the
-    /// type name: `class Foo(val x: Int, val y: String)`.
-    ///
-    /// Default: `false`. Kotlin overrides to `true`.
-    fn supports_primary_constructor(&self) -> bool {
-        false
-    }
-
-    // --- Phase 3: property support ---
-
-    /// How `PropertySpec` renders: accessor methods or inline field body.
-    ///
-    /// Default: `Accessor` — emits `get name()` / `set name(v)` methods (TS/JS).
-    /// Swift and Kotlin override to `Field` — emits a field with inline `get`/`set` blocks.
-    fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
-        crate::spec::modifiers::PropertyStyle::Accessor
-    }
-
-    /// The keyword for a property getter in field-style rendering.
-    ///
-    /// Default: `"get"` (Swift: `get { ... }`).
-    /// Kotlin overrides to `"get()"`.
-    fn property_getter_keyword(&self) -> &str {
-        "get"
-    }
-
-    // --- Where clause support ---
-
-    /// How where-clause constraints are rendered.
-    ///
-    /// Default: `Inline` — bounds stay in the generic parameter list.
-    /// Rust overrides to `WhereBlock`.
-    fn where_clause_style(&self) -> crate::spec::fun_spec::WhereClauseStyle {
-        crate::spec::fun_spec::WhereClauseStyle::Inline
-    }
-
     /// Render a type parameter's kind annotation (for higher-kinded types).
     ///
     /// Default: empty string (no kind annotation).
     fn render_type_param_kind(&self, _kind: &crate::spec::fun_spec::TypeParamKind) -> String {
         String::new()
+    }
+
+    // --- Config struct accessors ---
+
+    /// How each compound `TypeName` variant renders.
+    fn type_presentation(&self) -> config::TypePresentationConfig<'_> {
+        config::TypePresentationConfig::default()
+    }
+
+    /// Generic type parameter delimiters and constraints.
+    fn generic_syntax(&self) -> config::GenericSyntaxConfig<'_> {
+        config::GenericSyntaxConfig::default()
+    }
+
+    /// Block delimiters, indentation, and statement termination.
+    fn block_syntax(&self) -> config::BlockSyntaxConfig<'_> {
+        config::BlockSyntaxConfig::default()
+    }
+
+    /// Function signature syntax.
+    fn function_syntax(&self) -> config::FunctionSyntaxConfig<'_> {
+        config::FunctionSyntaxConfig::default()
+    }
+
+    /// Type declaration syntax (inheritance, field order).
+    fn type_decl_syntax(&self) -> config::TypeDeclSyntaxConfig<'_> {
+        config::TypeDeclSyntaxConfig::default()
+    }
+
+    /// Enum variant formatting, annotation syntax, and field mutability keywords.
+    fn enum_and_annotation(&self) -> config::EnumAndAnnotationConfig<'_> {
+        config::EnumAndAnnotationConfig::default()
     }
 }
 

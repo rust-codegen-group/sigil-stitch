@@ -2,8 +2,12 @@
 
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::CodeLang;
-use crate::lang::config::QuoteStyle;
+use crate::lang::config::{
+    BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
+    QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
+};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::type_name::TypePresentation;
 
 /// JavaScript language implementation.
 ///
@@ -214,14 +218,6 @@ impl CodeLang for JavaScript {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        self.semicolons
-    }
-
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
         match ctx {
             DeclarationContext::TopLevel => match vis {
@@ -241,12 +237,6 @@ impl CodeLang for JavaScript {
         }
     }
 
-    fn return_type_separator(&self) -> &str {
-        // Not used in practice (JS users don't call .returns()),
-        // but kept for safety.
-        ": "
-    }
-
     fn type_keyword(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Class | TypeKind::Struct => "class",
@@ -256,50 +246,59 @@ impl CodeLang for JavaScript {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ";"
-    }
-
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         true
     }
 
-    fn generic_constraint_keyword(&self) -> &str {
-        // JavaScript has no generics.
-        ""
+    // --- Config struct accessors ---
+
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            tuple: TypePresentation::Delimited {
+                open: "[",
+                sep: ", ",
+                close: "]",
+            },
+            ..Default::default()
+        }
     }
 
-    fn generic_constraint_separator(&self) -> &str {
-        ""
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            constraint_keyword: "",
+            constraint_separator: "",
+            context_bound_keyword: "",
+            ..Default::default()
+        }
     }
 
-    fn super_type_keyword(&self) -> &str {
-        " extends "
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: self.semicolons,
+            field_terminator: ";",
+            ..Default::default()
+        }
     }
 
-    fn implements_keyword(&self) -> &str {
-        // JavaScript has no implements keyword.
-        ""
+    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
+        FunctionSyntaxConfig {
+            abstract_keyword: "",
+            ..Default::default()
+        }
     }
 
-    fn abstract_keyword(&self) -> &str {
-        // JavaScript has no abstract keyword.
-        ""
+    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
+        TypeDeclSyntaxConfig {
+            super_type_keyword: " extends ",
+            ..Default::default()
+        }
     }
 
-    fn enum_variant_separator(&self) -> &str {
-        ""
-    }
-
-    fn enum_variant_trailing_separator(&self) -> bool {
-        false
-    }
-
-    fn present_tuple(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "[",
-            sep: ", ",
-            close: "]",
+    fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
+        EnumAndAnnotationConfig {
+            variant_separator: "",
+            ..Default::default()
         }
     }
 }
@@ -497,9 +496,9 @@ mod tests {
             .with_quote_style(QuoteStyle::Double)
             .with_extension("mjs")
             .with_indent("    ");
-        assert!(!js.uses_semicolons());
+        assert!(!js.block_syntax().uses_semicolons);
         assert_eq!(js.file_extension(), "mjs");
-        assert_eq!(js.indent_unit(), "    ");
+        assert_eq!(js.block_syntax().indent_unit, "    ");
         assert_eq!(js.render_string_literal("hi"), "\"hi\"");
     }
 
@@ -537,13 +536,13 @@ mod tests {
     #[test]
     fn test_no_abstract() {
         let js = JavaScript::new();
-        assert_eq!(js.abstract_keyword(), "");
+        assert_eq!(js.function_syntax().abstract_keyword, "");
     }
 
     #[test]
     fn test_no_implements() {
         let js = JavaScript::new();
-        assert_eq!(js.implements_keyword(), "");
+        assert_eq!(js.type_decl_syntax().implements_keyword, "");
     }
 
     #[test]

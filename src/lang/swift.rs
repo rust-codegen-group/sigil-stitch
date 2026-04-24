@@ -254,14 +254,6 @@ impl CodeLang for Swift {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        false
-    }
-
     fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
         match vis {
             Visibility::Public => "public ",
@@ -277,10 +269,6 @@ impl CodeLang for Swift {
         "func"
     }
 
-    fn return_type_separator(&self) -> &str {
-        " -> "
-    }
-
     fn type_keyword(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Class => "class",
@@ -291,51 +279,8 @@ impl CodeLang for Swift {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ""
-    }
-
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         true
-    }
-
-    fn generic_constraint_keyword(&self) -> &str {
-        ": "
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        " & "
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        ": "
-    }
-
-    fn implements_keyword(&self) -> &str {
-        // Swift uses a single `:` list for both superclass and protocols.
-        // Put all conformances in super_types(); leave impl_types() empty.
-        ""
-    }
-
-    fn readonly_keyword(&self) -> &str {
-        "let "
-    }
-
-    fn mutable_field_keyword(&self) -> &str {
-        "var "
-    }
-
-    fn abstract_keyword(&self) -> &str {
-        // Swift protocols declare requirements by omitting the body — no keyword.
-        ""
-    }
-
-    fn enum_variant_prefix(&self) -> &str {
-        "case "
-    }
-
-    fn enum_variant_separator(&self) -> &str {
-        ""
     }
 
     fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
@@ -346,31 +291,68 @@ impl CodeLang for Swift {
         crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
     }
 
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "[",
-            sep: "",
-            close: "]",
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::Delimited {
+                open: "[",
+                sep: "",
+                close: "]",
+            },
+            readonly_array: Some(crate::type_name::TypePresentation::Delimited {
+                open: "[",
+                sep: "",
+                close: "]",
+            }),
+            optional: crate::type_name::TypePresentation::Postfix { suffix: "?" },
+            map: crate::type_name::TypePresentation::Delimited {
+                open: "[",
+                sep: ": ",
+                close: "]",
+            },
+            ..Default::default()
         }
     }
 
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::Delimited {
-            open: "[",
-            sep: "",
-            close: "]",
-        })
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            constraint_keyword: ": ",
+            constraint_separator: " & ",
+            context_bound_keyword: ": ",
+            ..Default::default()
+        }
     }
 
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Postfix { suffix: "?" }
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: "",
+            ..Default::default()
+        }
     }
 
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "[",
-            sep: ": ",
-            close: "]",
+    fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
+        crate::lang::config::FunctionSyntaxConfig {
+            return_type_separator: " -> ",
+            abstract_keyword: "",
+            ..Default::default()
+        }
+    }
+
+    fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
+        crate::lang::config::TypeDeclSyntaxConfig {
+            super_type_keyword: ": ",
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
+        crate::lang::config::EnumAndAnnotationConfig {
+            variant_prefix: "case ",
+            variant_separator: "",
+            readonly_keyword: "let ",
+            mutable_field_keyword: "var ",
+            ..Default::default()
         }
     }
 }
@@ -547,20 +529,20 @@ mod tests {
     #[test]
     fn test_no_semicolons() {
         let sw = Swift::new();
-        assert!(!sw.uses_semicolons());
+        assert!(!sw.block_syntax().uses_semicolons);
     }
 
     #[test]
     fn test_return_type_separator() {
         let sw = Swift::new();
-        assert_eq!(sw.return_type_separator(), " -> ");
+        assert_eq!(sw.function_syntax().return_type_separator, " -> ");
     }
 
     #[test]
     fn test_field_keywords() {
         let sw = Swift::new();
-        assert_eq!(sw.readonly_keyword(), "let ");
-        assert_eq!(sw.mutable_field_keyword(), "var ");
+        assert_eq!(sw.enum_and_annotation().readonly_keyword, "let ");
+        assert_eq!(sw.enum_and_annotation().mutable_field_keyword, "var ");
     }
 
     #[test]
@@ -583,7 +565,7 @@ mod tests {
     #[test]
     fn test_abstract_keyword_empty() {
         let sw = Swift::new();
-        assert_eq!(sw.abstract_keyword(), "");
+        assert_eq!(sw.function_syntax().abstract_keyword, "");
     }
 
     #[test]
@@ -592,6 +574,6 @@ mod tests {
             .with_indent("  ")
             .with_extension("swiftinterface");
         assert_eq!(sw.file_extension(), "swiftinterface");
-        assert_eq!(sw.indent_unit(), "  ");
+        assert_eq!(sw.block_syntax().indent_unit, "  ");
     }
 }

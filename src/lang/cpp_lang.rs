@@ -227,14 +227,6 @@ impl CodeLang for CppLang {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        true
-    }
-
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
         // C++ uses section-header access specifiers, not per-member keywords.
         // Users add `public:` / `private:` / `protected:` via extra_member.
@@ -244,11 +236,6 @@ impl CodeLang for CppLang {
     fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
         // C++ has no function keyword.
         ""
-    }
-
-    fn return_type_separator(&self) -> &str {
-        // Unused when return_type_is_prefix() is true, but set for safety.
-        " "
     }
 
     fn type_keyword(&self, kind: TypeKind) -> &str {
@@ -262,55 +249,11 @@ impl CodeLang for CppLang {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ";"
-    }
-
     fn methods_inside_type_body(&self, kind: TypeKind) -> bool {
         match kind {
             TypeKind::Class | TypeKind::Interface | TypeKind::Trait => true,
             TypeKind::Struct | TypeKind::Enum | TypeKind::TypeAlias | TypeKind::Newtype => false,
         }
-    }
-
-    fn generic_constraint_keyword(&self) -> &str {
-        ""
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        ""
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        " : public "
-    }
-
-    fn super_type_separator(&self) -> &str {
-        ", public "
-    }
-
-    fn implements_keyword(&self) -> &str {
-        ""
-    }
-
-    fn type_before_name(&self) -> bool {
-        true
-    }
-
-    fn return_type_is_prefix(&self) -> bool {
-        true
-    }
-
-    fn type_close_terminator(&self) -> &str {
-        ";"
-    }
-
-    fn abstract_keyword(&self) -> &str {
-        "virtual "
-    }
-
-    fn render_annotation_prefix(&self) -> (&str, &str) {
-        ("[[", "]]")
     }
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
@@ -321,59 +264,78 @@ impl CodeLang for CppLang {
         }
     }
 
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap {
-            name: "std::vector",
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::GenericWrap {
+                name: "std::vector",
+            },
+            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap {
+                name: "std::vector",
+            }),
+            optional: crate::type_name::TypePresentation::GenericWrap {
+                name: "std::optional",
+            },
+            map: crate::type_name::TypePresentation::GenericWrap { name: "std::map" },
+            pointer: crate::type_name::TypePresentation::Postfix { suffix: "*" },
+            reference: crate::type_name::TypePresentation::Surround {
+                prefix: "const ",
+                suffix: "&",
+            },
+            reference_mut: crate::type_name::TypePresentation::Postfix { suffix: "&" },
+            function: crate::type_name::FunctionPresentation {
+                arrow: "",
+                return_first: true,
+                wrapper_open: "std::function<",
+                wrapper_close: ">",
+                ..Default::default()
+            },
+            tuple: crate::type_name::TypePresentation::GenericWrap { name: "std::tuple" },
+            ..Default::default()
         }
     }
 
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::GenericWrap {
-            name: "std::vector",
-        })
-    }
-
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap {
-            name: "std::optional",
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            constraint_keyword: "",
+            constraint_separator: "",
+            context_bound_keyword: "",
+            ..Default::default()
         }
     }
 
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "std::map" }
-    }
-
-    fn present_pointer(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Postfix { suffix: "*" }
-    }
-
-    fn present_reference(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Surround {
-            prefix: "const ",
-            suffix: "&",
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            field_terminator: ";",
+            type_close_terminator: ";",
+            ..Default::default()
         }
     }
 
-    fn present_reference_mut(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Postfix { suffix: "&" }
-    }
-
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "",
-            params_open: "(",
-            params_sep: ", ",
-            params_close: ")",
-            arrow: "",
-            return_first: true,
-            curried: false,
-            wrapper_open: "std::function<",
-            wrapper_close: ">",
+    fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
+        crate::lang::config::FunctionSyntaxConfig {
+            return_type_separator: " ",
+            abstract_keyword: "virtual ",
+            ..Default::default()
         }
     }
 
-    fn present_tuple(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "std::tuple" }
+    fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
+        crate::lang::config::TypeDeclSyntaxConfig {
+            type_before_name: true,
+            return_type_is_prefix: true,
+            super_type_keyword: " : public ",
+            super_type_separator: ", public ",
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
+        crate::lang::config::EnumAndAnnotationConfig {
+            annotation_prefix: "[[",
+            annotation_suffix: "]]",
+            ..Default::default()
+        }
     }
 }
 
@@ -532,19 +494,19 @@ mod tests {
     #[test]
     fn test_type_before_name() {
         let cpp = CppLang::new();
-        assert!(cpp.type_before_name());
+        assert!(cpp.type_decl_syntax().type_before_name);
     }
 
     #[test]
     fn test_return_type_is_prefix() {
         let cpp = CppLang::new();
-        assert!(cpp.return_type_is_prefix());
+        assert!(cpp.type_decl_syntax().return_type_is_prefix);
     }
 
     #[test]
     fn test_type_close_terminator() {
         let cpp = CppLang::new();
-        assert_eq!(cpp.type_close_terminator(), ";");
+        assert_eq!(cpp.block_syntax().type_close_terminator, ";");
     }
 
     #[test]
@@ -559,19 +521,19 @@ mod tests {
     #[test]
     fn test_abstract_keyword() {
         let cpp = CppLang::new();
-        assert_eq!(cpp.abstract_keyword(), "virtual ");
+        assert_eq!(cpp.function_syntax().abstract_keyword, "virtual ");
     }
 
     #[test]
     fn test_super_type_keyword() {
         let cpp = CppLang::new();
-        assert_eq!(cpp.super_type_keyword(), " : public ");
+        assert_eq!(cpp.type_decl_syntax().super_type_keyword, " : public ");
     }
 
     #[test]
     fn test_super_type_separator() {
         let cpp = CppLang::new();
-        assert_eq!(cpp.super_type_separator(), ", public ");
+        assert_eq!(cpp.type_decl_syntax().super_type_separator, ", public ");
     }
 
     #[test]
@@ -596,6 +558,6 @@ mod tests {
     fn test_cpp_builder_fluent() {
         let cpp = CppLang::new().with_indent("  ").with_extension("cxx");
         assert_eq!(cpp.file_extension(), "cxx");
-        assert_eq!(cpp.indent_unit(), "  ");
+        assert_eq!(cpp.block_syntax().indent_unit, "  ");
     }
 }

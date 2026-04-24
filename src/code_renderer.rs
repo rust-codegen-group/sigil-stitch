@@ -166,7 +166,7 @@ impl<'a> CodeRenderer<'a> {
                     self.ensure_indent();
                 }
                 FormatPart::StatementEnd => {
-                    if self.lang.uses_semicolons() {
+                    if self.lang.block_syntax().uses_semicolons {
                         self.emit(";");
                     }
                 }
@@ -174,13 +174,13 @@ impl<'a> CodeRenderer<'a> {
                     self.emit_newline();
                 }
                 FormatPart::BlockOpen => {
-                    self.emit(self.lang.block_open());
+                    self.emit(self.lang.block_syntax().block_open);
                 }
                 FormatPart::BlockOpenOverride(s) => {
                     self.emit(s);
                 }
                 FormatPart::BlockClose => {
-                    let close = self.lang.block_close();
+                    let close = self.lang.block_syntax().block_close;
                     if !close.is_empty() {
                         self.ensure_indent();
                         self.emit(close);
@@ -188,7 +188,7 @@ impl<'a> CodeRenderer<'a> {
                     }
                 }
                 FormatPart::BlockCloseTransition => {
-                    let close = self.lang.block_close();
+                    let close = self.lang.block_syntax().block_close;
                     if !close.is_empty() {
                         self.ensure_indent();
                         self.emit(close);
@@ -306,17 +306,19 @@ impl<'a> CodeRenderer<'a> {
                 }
                 FormatPart::StatementBegin => BoxDoc::nil(),
                 FormatPart::StatementEnd => {
-                    if self.lang.uses_semicolons() {
+                    if self.lang.block_syntax().uses_semicolons {
                         BoxDoc::text(";")
                     } else {
                         BoxDoc::nil()
                     }
                 }
                 FormatPart::Newline => BoxDoc::hardline(),
-                FormatPart::BlockOpen => BoxDoc::text(self.lang.block_open().to_string()),
+                FormatPart::BlockOpen => {
+                    BoxDoc::text(self.lang.block_syntax().block_open.to_string())
+                }
                 FormatPart::BlockOpenOverride(s) => BoxDoc::text(s.clone()),
                 FormatPart::BlockClose => {
-                    let close = self.lang.block_close();
+                    let close = self.lang.block_syntax().block_close;
                     if close.is_empty() {
                         BoxDoc::nil()
                     } else {
@@ -324,7 +326,7 @@ impl<'a> CodeRenderer<'a> {
                     }
                 }
                 FormatPart::BlockCloseTransition => {
-                    let close = self.lang.block_close();
+                    let close = self.lang.block_syntax().block_close;
                     if close.is_empty() {
                         BoxDoc::nil()
                     } else {
@@ -360,7 +362,7 @@ impl<'a> CodeRenderer<'a> {
 
     fn ensure_indent(&mut self) {
         if self.at_line_start {
-            let indent_str = self.lang.indent_unit();
+            let indent_str = self.lang.block_syntax().indent_unit;
             for _ in 0..self.indent_level {
                 self.output.push_str(indent_str);
                 self.current_column += indent_str.len();

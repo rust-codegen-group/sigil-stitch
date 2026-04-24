@@ -210,24 +210,12 @@ impl CodeLang for Haskell {
         "--"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        false
-    }
-
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
         ""
     }
 
     fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
         ""
-    }
-
-    fn return_type_separator(&self) -> &str {
-        " -> "
     }
 
     fn type_keyword(&self, kind: TypeKind) -> &str {
@@ -240,60 +228,8 @@ impl CodeLang for Haskell {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ","
-    }
-
     fn methods_inside_type_body(&self, kind: TypeKind) -> bool {
         matches!(kind, TypeKind::Trait | TypeKind::Interface)
-    }
-
-    fn generic_constraint_keyword(&self) -> &str {
-        ""
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        ""
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        ""
-    }
-
-    fn implements_keyword(&self) -> &str {
-        ""
-    }
-
-    fn type_annotation_separator(&self) -> &str {
-        " :: "
-    }
-
-    fn generic_application_style(&self) -> crate::type_name::GenericApplicationStyle {
-        crate::type_name::GenericApplicationStyle::PrefixJuxtaposition
-    }
-
-    fn generic_open(&self) -> &str {
-        ""
-    }
-
-    fn generic_close(&self) -> &str {
-        ""
-    }
-
-    fn enum_variant_separator(&self) -> &str {
-        ""
-    }
-
-    fn enum_variant_prefix(&self) -> &str {
-        "| "
-    }
-
-    fn enum_variant_prefix_first(&self) -> &str {
-        ""
-    }
-
-    fn block_open(&self) -> &str {
-        " ="
     }
 
     fn type_header_block_open(&self, kind: crate::spec::modifiers::TypeKind) -> &str {
@@ -303,66 +239,12 @@ impl CodeLang for Haskell {
         }
     }
 
-    fn block_close(&self) -> &str {
-        ""
-    }
-
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "[",
-            sep: "",
-            close: "]",
-        }
-    }
-
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::Delimited {
-            open: "[",
-            sep: "",
-            close: "]",
-        })
-    }
-
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Maybe" }
-    }
-
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Map" }
-    }
-
-    fn present_tuple(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "(",
-            sep: ", ",
-            close: ")",
-        }
-    }
-
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "",
-            params_open: "",
-            params_sep: " -> ",
-            params_close: "",
-            arrow: " -> ",
-            return_first: false,
-            curried: true,
-            wrapper_open: "",
-            wrapper_close: "",
-        }
-    }
-
-    fn present_union(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Infix { sep: " | " }
+    fn fun_block_open(&self) -> &str {
+        " ="
     }
 
     fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
         format!("newtype {name} = {name} {inner}")
-    }
-
-    fn function_signature_style(&self) -> crate::spec::fun_spec::FunctionSignatureStyle {
-        crate::spec::fun_spec::FunctionSignatureStyle::Split
     }
 
     fn render_type_context(&self, type_params: &[crate::spec::fun_spec::TypeParamSpec]) -> String {
@@ -407,6 +289,77 @@ impl CodeLang for Haskell {
             return String::new();
         }
         format!("  deriving ({})", impl_types.join(", "))
+    }
+
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::Delimited {
+                open: "[",
+                sep: "",
+                close: "]",
+            },
+            readonly_array: Some(crate::type_name::TypePresentation::Delimited {
+                open: "[",
+                sep: "",
+                close: "]",
+            }),
+            optional: crate::type_name::TypePresentation::GenericWrap { name: "Maybe" },
+            function: crate::type_name::FunctionPresentation {
+                params_open: "",
+                params_sep: " -> ",
+                params_close: "",
+                arrow: " -> ",
+                curried: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            open: "",
+            close: "",
+            application_style: crate::type_name::GenericApplicationStyle::PrefixJuxtaposition,
+            constraint_keyword: "",
+            constraint_separator: "",
+            context_bound_keyword: "",
+        }
+    }
+
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            block_open: " =",
+            block_close: "",
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: ",",
+            ..Default::default()
+        }
+    }
+
+    fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
+        crate::lang::config::FunctionSyntaxConfig {
+            return_type_separator: " -> ",
+            function_signature_style: crate::spec::fun_spec::FunctionSignatureStyle::Split,
+            ..Default::default()
+        }
+    }
+
+    fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
+        crate::lang::config::TypeDeclSyntaxConfig {
+            type_annotation_separator: " :: ",
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
+        crate::lang::config::EnumAndAnnotationConfig {
+            variant_prefix: "| ",
+            variant_prefix_first: Some(""),
+            variant_separator: "",
+            ..Default::default()
+        }
     }
 }
 
@@ -552,14 +505,14 @@ mod tests {
     #[test]
     fn test_no_semicolons() {
         let hs = Haskell::new();
-        assert!(!hs.uses_semicolons());
+        assert!(!hs.block_syntax().uses_semicolons);
     }
 
     #[test]
     fn test_generic_application_style() {
         let hs = Haskell::new();
         assert!(matches!(
-            hs.generic_application_style(),
+            hs.generic_syntax().application_style,
             crate::type_name::GenericApplicationStyle::PrefixJuxtaposition
         ));
     }
@@ -567,14 +520,14 @@ mod tests {
     #[test]
     fn test_type_annotation_separator() {
         let hs = Haskell::new();
-        assert_eq!(hs.type_annotation_separator(), " :: ");
+        assert_eq!(hs.type_decl_syntax().type_annotation_separator, " :: ");
     }
 
     #[test]
     fn test_haskell_builder_fluent() {
         let hs = Haskell::new().with_indent("    ").with_extension("lhs");
         assert_eq!(hs.file_extension(), "lhs");
-        assert_eq!(hs.indent_unit(), "    ");
+        assert_eq!(hs.block_syntax().indent_unit, "    ");
     }
 
     #[test]
@@ -663,7 +616,7 @@ mod tests {
     fn test_function_signature_style() {
         let hs = Haskell::new();
         assert_eq!(
-            hs.function_signature_style(),
+            hs.function_syntax().function_signature_style,
             crate::spec::fun_spec::FunctionSignatureStyle::Split
         );
     }

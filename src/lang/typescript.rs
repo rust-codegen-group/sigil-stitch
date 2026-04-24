@@ -1,7 +1,13 @@
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::CodeLang;
-use crate::lang::config::QuoteStyle;
+use crate::lang::config::{
+    BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
+    QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
+};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::type_name::{
+    AssociatedTypeStyle, BoundsPresentation, TypePresentation, WildcardPresentation,
+};
 
 /// TypeScript language implementation.
 ///
@@ -259,14 +265,6 @@ impl CodeLang for TypeScript {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        self.uses_semicolons
-    }
-
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
         match ctx {
             DeclarationContext::TopLevel => match vis {
@@ -289,10 +287,6 @@ impl CodeLang for TypeScript {
         }
     }
 
-    fn return_type_separator(&self) -> &str {
-        ": "
-    }
-
     fn type_keyword(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Class | TypeKind::Struct => "class",
@@ -302,35 +296,7 @@ impl CodeLang for TypeScript {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ";"
-    }
-
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
-        true
-    }
-
-    fn generic_constraint_keyword(&self) -> &str {
-        " extends "
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        " & "
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        " extends "
-    }
-
-    fn implements_keyword(&self) -> &str {
-        " implements "
-    }
-
-    fn readonly_keyword(&self) -> &str {
-        "readonly "
-    }
-
-    fn enum_variant_trailing_separator(&self) -> bool {
         true
     }
 
@@ -338,37 +304,67 @@ impl CodeLang for TypeScript {
         crate::lang::config::OptionalFieldStyle::NameSuffix("?")
     }
 
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Record" }
-    }
+    // --- Config struct accessors ---
 
-    fn present_tuple(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "[",
-            sep: ", ",
-            close: "]",
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            map: TypePresentation::GenericWrap { name: "Record" },
+            tuple: TypePresentation::Delimited {
+                open: "[",
+                sep: ", ",
+                close: "]",
+            },
+            associated_type: AssociatedTypeStyle::IndexAccess {
+                open: "[\"",
+                close: "\"]",
+            },
+            impl_trait: BoundsPresentation {
+                keyword: "",
+                separator: " & ",
+            },
+            wildcard: WildcardPresentation {
+                unbounded: "unknown",
+                upper_keyword: "unknown ",
+                lower_keyword: "unknown ",
+            },
+            ..Default::default()
         }
     }
 
-    fn present_associated_type(&self) -> crate::type_name::AssociatedTypeStyle<'_> {
-        crate::type_name::AssociatedTypeStyle::IndexAccess {
-            open: "[\"",
-            close: "\"]",
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            constraint_keyword: " extends ",
+            constraint_separator: " & ",
+            ..Default::default()
         }
     }
 
-    fn present_impl_trait(&self) -> crate::type_name::BoundsPresentation<'_> {
-        crate::type_name::BoundsPresentation {
-            keyword: "",
-            separator: " & ",
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: self.uses_semicolons,
+            field_terminator: ";",
+            ..Default::default()
         }
     }
 
-    fn present_wildcard(&self) -> crate::type_name::WildcardPresentation<'_> {
-        crate::type_name::WildcardPresentation {
-            unbounded: "unknown",
-            upper_keyword: "unknown ",
-            lower_keyword: "unknown ",
+    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
+        FunctionSyntaxConfig::default()
+    }
+
+    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
+        TypeDeclSyntaxConfig {
+            super_type_keyword: " extends ",
+            implements_keyword: " implements ",
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
+        EnumAndAnnotationConfig {
+            readonly_keyword: "readonly ",
+            variant_trailing_separator: true,
+            ..Default::default()
         }
     }
 }
@@ -396,9 +392,9 @@ mod tests {
             .with_semicolons(false)
             .with_extension("tsx")
             .with_indent("    ");
-        assert!(!ts.uses_semicolons());
+        assert!(!ts.block_syntax().uses_semicolons);
         assert_eq!(ts.file_extension(), "tsx");
-        assert_eq!(ts.indent_unit(), "    ");
+        assert_eq!(ts.block_syntax().indent_unit, "    ");
 
         let imports = ImportGroup {
             entries: vec![ImportEntry {

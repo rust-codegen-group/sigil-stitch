@@ -258,14 +258,6 @@ impl CodeLang for Kotlin {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        false
-    }
-
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
         match ctx {
             DeclarationContext::TopLevel => match vis {
@@ -287,10 +279,6 @@ impl CodeLang for Kotlin {
         "fun"
     }
 
-    fn return_type_separator(&self) -> &str {
-        ": "
-    }
-
     fn type_keyword(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Class => "class",
@@ -302,50 +290,12 @@ impl CodeLang for Kotlin {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ""
-    }
-
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         true
     }
 
     fn render_newtype_line(&self, vis: &str, name: &str, inner: &str) -> String {
         format!("{vis}value class {name}(val value: {inner})")
-    }
-
-    fn generic_constraint_keyword(&self) -> &str {
-        " : "
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        ", "
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        " : "
-    }
-
-    fn implements_keyword(&self) -> &str {
-        // Kotlin uses a single `:` list for both extends and implements.
-        // Put all supertypes in super_types(); leave impl_types() empty.
-        ""
-    }
-
-    fn type_annotation_separator(&self) -> &str {
-        ": "
-    }
-
-    fn async_keyword(&self) -> &str {
-        "suspend "
-    }
-
-    fn readonly_keyword(&self) -> &str {
-        "val "
-    }
-
-    fn mutable_field_keyword(&self) -> &str {
-        "var "
     }
 
     fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
@@ -356,57 +306,77 @@ impl CodeLang for Kotlin {
         "get()"
     }
 
-    fn constructor_delegation_style(&self) -> crate::spec::modifiers::ConstructorDelegationStyle {
-        crate::spec::modifiers::ConstructorDelegationStyle::Signature
-    }
-
-    fn supports_primary_constructor(&self) -> bool {
-        true
-    }
-
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
     }
 
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "List" }
-    }
-
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::GenericWrap { name: "List" })
-    }
-
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Postfix { suffix: "?" }
-    }
-
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Map" }
-    }
-
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "",
-            params_open: "(",
-            params_sep: ", ",
-            params_close: ")",
-            arrow: " -> ",
-            return_first: false,
-            curried: false,
-            wrapper_open: "",
-            wrapper_close: "",
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::GenericWrap { name: "List" },
+            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap { name: "List" }),
+            optional: crate::type_name::TypePresentation::Postfix { suffix: "?" },
+            function: crate::type_name::FunctionPresentation {
+                keyword: "",
+                params_open: "(",
+                params_sep: ", ",
+                params_close: ")",
+                arrow: " -> ",
+                return_first: false,
+                curried: false,
+                wrapper_open: "",
+                wrapper_close: "",
+            },
+            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
+            wildcard: crate::type_name::WildcardPresentation {
+                unbounded: "*",
+                upper_keyword: "out ",
+                lower_keyword: "in ",
+            },
+            ..Default::default()
         }
     }
 
-    fn present_associated_type(&self) -> crate::type_name::AssociatedTypeStyle<'_> {
-        crate::type_name::AssociatedTypeStyle::DotAccess
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            constraint_keyword: " : ",
+            constraint_separator: ", ",
+            context_bound_keyword: " : ",
+            ..Default::default()
+        }
     }
 
-    fn present_wildcard(&self) -> crate::type_name::WildcardPresentation<'_> {
-        crate::type_name::WildcardPresentation {
-            unbounded: "*",
-            upper_keyword: "out ",
-            lower_keyword: "in ",
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: "",
+            ..Default::default()
+        }
+    }
+
+    fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
+        crate::lang::config::FunctionSyntaxConfig {
+            return_type_separator: ": ",
+            async_keyword: "suspend ",
+            constructor_delegation_style:
+                crate::spec::modifiers::ConstructorDelegationStyle::Signature,
+            ..Default::default()
+        }
+    }
+
+    fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
+        crate::lang::config::TypeDeclSyntaxConfig {
+            super_type_keyword: " : ",
+            supports_primary_constructor: true,
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
+        crate::lang::config::EnumAndAnnotationConfig {
+            readonly_keyword: "val ",
+            mutable_field_keyword: "var ",
+            ..Default::default()
         }
     }
 }
@@ -631,20 +601,20 @@ mod tests {
     #[test]
     fn test_no_semicolons() {
         let kt = Kotlin::new();
-        assert!(!kt.uses_semicolons());
+        assert!(!kt.block_syntax().uses_semicolons);
     }
 
     #[test]
     fn test_async_keyword() {
         let kt = Kotlin::new();
-        assert_eq!(kt.async_keyword(), "suspend ");
+        assert_eq!(kt.function_syntax().async_keyword, "suspend ");
     }
 
     #[test]
     fn test_field_keywords() {
         let kt = Kotlin::new();
-        assert_eq!(kt.readonly_keyword(), "val ");
-        assert_eq!(kt.mutable_field_keyword(), "var ");
+        assert_eq!(kt.enum_and_annotation().readonly_keyword, "val ");
+        assert_eq!(kt.enum_and_annotation().mutable_field_keyword, "var ");
     }
 
     #[test]
@@ -661,6 +631,6 @@ mod tests {
     fn test_kotlin_builder_fluent() {
         let kt = Kotlin::new().with_indent("  ").with_extension("kts");
         assert_eq!(kt.file_extension(), "kts");
-        assert_eq!(kt.indent_unit(), "  ");
+        assert_eq!(kt.block_syntax().indent_unit, "  ");
     }
 }

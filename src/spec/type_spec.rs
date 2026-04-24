@@ -198,10 +198,11 @@ impl TypeSpec {
             cb.add_line();
         }
         cb.add("%<", ());
-        let close = lang.block_close();
+        let block_syn = lang.block_syntax();
+        let close = block_syn.block_close;
         let type_close_suffix = self.render_impl_type_suffix(lang);
         if !close.is_empty() {
-            let term = lang.type_close_terminator();
+            let term = block_syn.type_close_terminator;
             cb.add(&format!("{close}{term}"), ());
             if !type_close_suffix.is_empty() {
                 cb.add("%L", type_close_suffix);
@@ -259,10 +260,11 @@ impl TypeSpec {
             cb.add_line();
         }
         cb.add("%<", ());
-        let close = lang.block_close();
+        let block_syn = lang.block_syntax();
+        let close = block_syn.block_close;
         let type_close_suffix = self.render_impl_type_suffix(lang);
         if !close.is_empty() {
-            let term = lang.type_close_terminator();
+            let term = block_syn.type_close_terminator;
             cb.add(&format!("{close}{term}"), ());
             if !type_close_suffix.is_empty() {
                 cb.add("%L", type_close_suffix);
@@ -286,23 +288,24 @@ impl TypeSpec {
             impl_fmt.push(' ');
             impl_fmt.push_str(&self.name);
             // Repeat bare type param names.
+            let gen_syn = lang.generic_syntax();
             if !self.type_params.is_empty() {
-                impl_fmt.push_str(lang.generic_open());
+                impl_fmt.push_str(gen_syn.open);
                 for (i, tp) in self.type_params.iter().enumerate() {
                     if i > 0 {
                         impl_fmt.push_str(", ");
                     }
                     impl_fmt.push_str(&tp.name);
                 }
-                impl_fmt.push_str(lang.generic_close());
+                impl_fmt.push_str(gen_syn.close);
             }
             // Where clause on impl block.
             if !self.where_constraints.is_empty()
-                && lang.where_clause_style() == WhereClauseStyle::WhereBlock
+                && lang.function_syntax().where_clause_style == WhereClauseStyle::WhereBlock
             {
                 emit_where_block(&mut impl_fmt, &mut impl_args, &self.where_constraints, lang);
             }
-            impl_fmt.push_str(lang.block_open());
+            impl_fmt.push_str(lang.block_syntax().block_open);
             impl_cb.add(&impl_fmt, impl_args);
             impl_cb.add_line();
 
@@ -326,7 +329,7 @@ impl TypeSpec {
                 impl_cb.add_code(method.emit(lang, DeclarationContext::Member)?);
             }
             impl_cb.add("%<", ());
-            let close = lang.block_close();
+            let close = lang.block_syntax().block_close;
             if !close.is_empty() {
                 impl_cb.add(close, ());
                 impl_cb.add_line();
@@ -358,9 +361,13 @@ impl TypeSpec {
             .cloned()
             .unwrap_or_else(|| TypeName::primitive(""));
 
-        let semi = if lang.uses_semicolons() { ";" } else { "" };
+        let semi = if lang.block_syntax().uses_semicolons {
+            ";"
+        } else {
+            ""
+        };
 
-        let fmt = if lang.type_alias_target_first() {
+        let fmt = if lang.type_decl_syntax().type_alias_target_first {
             // C typedef: `typedef target name;`
             args.push(Arg::TypeName(target));
             format!("{kw} %T {}{tp_str}{semi}", self.name)
@@ -417,10 +424,11 @@ impl TypeSpec {
         cb: &mut CodeBlockBuilder,
         lang: &dyn CodeLang,
     ) -> Result<(), crate::error::SigilStitchError> {
-        let sep = lang.enum_variant_separator();
-        let trailing = lang.enum_variant_trailing_separator();
+        let ea = lang.enum_and_annotation();
+        let sep = ea.variant_separator;
+        let trailing = ea.variant_trailing_separator;
         let count = self.variants.len();
-        let field_term = lang.field_terminator();
+        let field_term = lang.block_syntax().field_terminator;
 
         for (i, variant) in self.variants.iter().enumerate() {
             // Emit variant parts directly here rather than calling variant.emit(),
@@ -457,9 +465,9 @@ impl TypeSpec {
             }
 
             let prefix = if i == 0 {
-                lang.enum_variant_prefix_first()
+                ea.variant_prefix_first.unwrap_or(ea.variant_prefix)
             } else {
-                lang.enum_variant_prefix()
+                ea.variant_prefix
             };
             let mut fmt = String::new();
             let mut args: Vec<Arg> = Vec::new();
@@ -496,7 +504,8 @@ impl TypeSpec {
                     let mut f_fmt = String::new();
                     let mut f_args: Vec<Arg> = Vec::new();
                     f_fmt.push_str(vis);
-                    if lang.type_before_name() {
+                    let tds = lang.type_decl_syntax();
+                    if tds.type_before_name {
                         if !field.field_type.is_empty() {
                             f_fmt.push_str("%T");
                             f_args.push(Arg::TypeName(field.field_type.clone()));
@@ -506,7 +515,7 @@ impl TypeSpec {
                     } else {
                         f_fmt.push_str(&field.name);
                         if !field.field_type.is_empty() {
-                            let type_sep = lang.type_annotation_separator();
+                            let type_sep = tds.type_annotation_separator;
                             f_fmt.push_str(type_sep);
                             f_fmt.push_str("%T");
                             f_args.push(Arg::TypeName(field.field_type.clone()));
@@ -621,8 +630,10 @@ impl TypeSpec {
         let tp_str = render_type_params(&self.type_params, lang, &mut args);
         fmt.push_str(&tp_str);
 
+        let tds = lang.type_decl_syntax();
+
         // Primary constructor parameters (Kotlin: `class Foo(val x: Int, val y: String)`).
-        if !self.primary_constructor.is_empty() && lang.supports_primary_constructor() {
+        if !self.primary_constructor.is_empty() && tds.supports_primary_constructor {
             fmt.push('(');
             fmt.push_str("%L");
             let params_block = self.build_primary_constructor_block(lang)?;
@@ -632,11 +643,11 @@ impl TypeSpec {
 
         // Super types (extends).
         if !self.super_types.is_empty() {
-            let super_kw = lang.super_type_keyword();
+            let super_kw = tds.super_type_keyword;
             if !super_kw.is_empty() {
                 fmt.push_str(super_kw);
-                let sep = lang.super_type_separator();
-                let subsequent_sep = lang.super_type_subsequent_separator();
+                let sep = tds.super_type_separator;
+                let subsequent_sep = tds.super_type_subsequent_separator;
                 for (i, st) in self.super_types.iter().enumerate() {
                     if i > 0 {
                         fmt.push_str(subsequent_sep.unwrap_or(sep));
@@ -649,7 +660,7 @@ impl TypeSpec {
 
         // Implements.
         if !self.impl_types.is_empty() {
-            let impl_kw = lang.implements_keyword();
+            let impl_kw = tds.implements_keyword;
             if !impl_kw.is_empty() {
                 fmt.push_str(impl_kw);
                 for (i, it) in self.impl_types.iter().enumerate() {
@@ -671,7 +682,7 @@ impl TypeSpec {
 
         // Close bases list (e.g., Python: ")").
         if !self.super_types.is_empty() || !self.impl_types.is_empty() {
-            let bases_close = lang.bases_close();
+            let bases_close = lang.block_syntax().bases_close;
             if !bases_close.is_empty() {
                 fmt.push_str(bases_close);
             }
@@ -679,7 +690,7 @@ impl TypeSpec {
 
         // Where clause (Rust-style).
         if !self.where_constraints.is_empty()
-            && lang.where_clause_style() == WhereClauseStyle::WhereBlock
+            && lang.function_syntax().where_clause_style == WhereClauseStyle::WhereBlock
         {
             emit_where_block(&mut fmt, &mut args, &self.where_constraints, lang);
         }

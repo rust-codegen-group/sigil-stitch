@@ -217,14 +217,6 @@ impl CodeLang for Scala {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        false
-    }
-
     fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
         match vis {
             Visibility::Public | Visibility::Inherited => "",
@@ -239,10 +231,6 @@ impl CodeLang for Scala {
         "def"
     }
 
-    fn return_type_separator(&self) -> &str {
-        ": "
-    }
-
     fn type_keyword(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Class => "class",
@@ -254,63 +242,7 @@ impl CodeLang for Scala {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ""
-    }
-
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
-        true
-    }
-
-    fn generic_constraint_keyword(&self) -> &str {
-        " <: "
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        " with "
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        " extends "
-    }
-
-    fn abstract_keyword(&self) -> &str {
-        ""
-    }
-
-    fn super_type_subsequent_separator(&self) -> Option<&str> {
-        Some(" with ")
-    }
-
-    fn context_bound_keyword(&self) -> &str {
-        " : "
-    }
-
-    fn implements_keyword(&self) -> &str {
-        " with "
-    }
-
-    fn type_annotation_separator(&self) -> &str {
-        ": "
-    }
-
-    fn generic_open(&self) -> &str {
-        "["
-    }
-
-    fn generic_close(&self) -> &str {
-        "]"
-    }
-
-    fn readonly_keyword(&self) -> &str {
-        "val "
-    }
-
-    fn mutable_field_keyword(&self) -> &str {
-        "var "
-    }
-
-    fn supports_primary_constructor(&self) -> bool {
         true
     }
 
@@ -318,52 +250,6 @@ impl CodeLang for Scala {
         crate::lang::config::OptionalFieldStyle::TypeWrap {
             open: "Option[",
             close: "]",
-        }
-    }
-
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Array" }
-    }
-
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::GenericWrap { name: "List" })
-    }
-
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Option" }
-    }
-
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Map" }
-    }
-
-    fn present_intersection(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Infix { sep: " with " }
-    }
-
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "",
-            params_open: "(",
-            params_sep: ", ",
-            params_close: ")",
-            arrow: " => ",
-            return_first: false,
-            curried: false,
-            wrapper_open: "",
-            wrapper_close: "",
-        }
-    }
-
-    fn present_associated_type(&self) -> crate::type_name::AssociatedTypeStyle<'_> {
-        crate::type_name::AssociatedTypeStyle::DotAccess
-    }
-
-    fn present_wildcard(&self) -> crate::type_name::WildcardPresentation<'_> {
-        crate::type_name::WildcardPresentation {
-            unbounded: "_",
-            upper_keyword: "_ <: ",
-            lower_keyword: "_ >: ",
         }
     }
 
@@ -379,12 +265,69 @@ impl CodeLang for Scala {
         format!("{vis}class {name}(val value: {inner})")
     }
 
-    fn enum_variant_trailing_separator(&self) -> bool {
-        false
-    }
-
     fn fun_block_open(&self) -> &str {
         " = {"
+    }
+
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::GenericWrap { name: "Array" },
+            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap { name: "List" }),
+            optional: crate::type_name::TypePresentation::GenericWrap { name: "Option" },
+            intersection: crate::type_name::TypePresentation::Infix { sep: " with " },
+            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
+            wildcard: crate::type_name::WildcardPresentation {
+                unbounded: "_",
+                upper_keyword: "_ <: ",
+                lower_keyword: "_ >: ",
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            open: "[",
+            close: "]",
+            constraint_keyword: " <: ",
+            constraint_separator: " with ",
+            context_bound_keyword: " : ",
+            ..Default::default()
+        }
+    }
+
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: "",
+            ..Default::default()
+        }
+    }
+
+    fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
+        crate::lang::config::FunctionSyntaxConfig {
+            abstract_keyword: "",
+            ..Default::default()
+        }
+    }
+
+    fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
+        crate::lang::config::TypeDeclSyntaxConfig {
+            super_type_keyword: " extends ",
+            super_type_subsequent_separator: Some(" with "),
+            implements_keyword: " with ",
+            supports_primary_constructor: true,
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
+        crate::lang::config::EnumAndAnnotationConfig {
+            readonly_keyword: "val ",
+            mutable_field_keyword: "var ",
+            ..Default::default()
+        }
     }
 }
 
@@ -593,21 +536,21 @@ mod tests {
     #[test]
     fn test_no_semicolons() {
         let sc = Scala::new();
-        assert!(!sc.uses_semicolons());
+        assert!(!sc.block_syntax().uses_semicolons);
     }
 
     #[test]
     fn test_generic_brackets() {
         let sc = Scala::new();
-        assert_eq!(sc.generic_open(), "[");
-        assert_eq!(sc.generic_close(), "]");
+        assert_eq!(sc.generic_syntax().open, "[");
+        assert_eq!(sc.generic_syntax().close, "]");
     }
 
     #[test]
     fn test_field_keywords() {
         let sc = Scala::new();
-        assert_eq!(sc.readonly_keyword(), "val ");
-        assert_eq!(sc.mutable_field_keyword(), "var ");
+        assert_eq!(sc.enum_and_annotation().readonly_keyword, "val ");
+        assert_eq!(sc.enum_and_annotation().mutable_field_keyword, "var ");
     }
 
     #[test]
@@ -641,19 +584,22 @@ mod tests {
     fn test_scala_builder_fluent() {
         let sc = Scala::new().with_indent("\t").with_extension("sc");
         assert_eq!(sc.file_extension(), "sc");
-        assert_eq!(sc.indent_unit(), "\t");
+        assert_eq!(sc.block_syntax().indent_unit, "\t");
     }
 
     #[test]
     fn test_super_type_subsequent_separator() {
         let sc = Scala::new();
-        assert_eq!(sc.super_type_subsequent_separator(), Some(" with "));
+        assert_eq!(
+            sc.type_decl_syntax().super_type_subsequent_separator,
+            Some(" with ")
+        );
     }
 
     #[test]
     fn test_context_bound_keyword() {
         let sc = Scala::new();
-        assert_eq!(sc.context_bound_keyword(), " : ");
+        assert_eq!(sc.generic_syntax().context_bound_keyword, " : ");
     }
 
     #[test]
