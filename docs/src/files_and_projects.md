@@ -11,19 +11,19 @@ use sigil_stitch::spec::import_spec::ImportSpec;
 use sigil_stitch::lang::typescript::TypeScript;
 
 // Forced named import (even without %T usage in code)
-let spec = ImportSpec::<TypeScript>::named("./models", "User");
+let spec = ImportSpec::named("./models", "User");
 
 // Aliased import: import { User as MyUser } from './models'
-let spec = ImportSpec::<TypeScript>::named_as("./models", "User", "MyUser");
+let spec = ImportSpec::named_as("./models", "User", "MyUser");
 
 // Type-only import: import type { User } from './models'
-let spec = ImportSpec::<TypeScript>::named_type("./models", "User");
+let spec = ImportSpec::named_type("./models", "User");
 
 // Side-effect import: import './polyfill'
-let spec = ImportSpec::<TypeScript>::side_effect("./polyfill");
+let spec = ImportSpec::side_effect("./polyfill");
 
 // Wildcard import: import * from './utils'
-let spec = ImportSpec::<TypeScript>::wildcard("./utils");
+let spec = ImportSpec::wildcard("./utils");
 ```
 
 Most of the time you do not need `ImportSpec` -- imports driven by `%T` and `TypeName::importable()` handle the common case. Use `ImportSpec` for forced imports, side-effect imports, and wildcard imports.
@@ -40,15 +40,16 @@ The top-level file orchestrator. Combines code blocks, type declarations, and fu
 use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let user = TypeName::<TypeScript>::importable_type("./models", "User");
+let user = TypeName::importable_type("./models", "User");
 
-let mut cb = CodeBlock::<TypeScript>::builder();
+let mut cb = CodeBlock::builder();
 cb.add_statement("const u: %T = getUser()", (user,));
 let block = cb.build().unwrap();
 
-let mut fb = FileSpec::<TypeScript>::builder("user.ts");
-fb.add_code(block);
-let file = fb.build().unwrap();
+let file = FileSpec::builder("user.ts")
+    .add_code(block)
+    .build()
+    .unwrap();
 
 let output = file.render(80).unwrap();
 // import type { User } from './models'
@@ -61,14 +62,15 @@ You can mix member types freely: `add_code()` for raw CodeBlocks, `add_type()` f
 A file header (license comment, package declaration) can be set with `.header()`:
 
 ```rust,ignore
-let mut header_b = CodeBlock::<TypeScript>::builder();
+let mut header_b = CodeBlock::builder();
 header_b.add("// License: MIT", ());
 let header = header_b.build().unwrap();
 
-let mut fb = FileSpec::<TypeScript>::builder("service.ts");
-fb.header(header);
-fb.add_type(service_type);
-let file = fb.build().unwrap();
+let file = FileSpec::builder("service.ts")
+    .header(header)
+    .add_type(service_type)
+    .build()
+    .unwrap();
 ```
 
 ## ProjectSpec
@@ -80,21 +82,23 @@ use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
 // Build individual files
-let mut models_b = FileSpec::<TypeScript>::builder("src/models.ts");
-models_b.add_type(
-    TypeSpec::builder("User", TypeKind::Interface).build().unwrap(),
-);
-let models = models_b.build().unwrap();
+let models = FileSpec::builder("src/models.ts")
+    .add_type(
+        TypeSpec::builder("User", TypeKind::Interface).build().unwrap(),
+    )
+    .build()
+    .unwrap();
 
-let mut index_b = FileSpec::<TypeScript>::builder("src/index.ts");
-index_b.add_code(CodeBlock::of("export {}", ()).unwrap());
-let index = index_b.build().unwrap();
+let index = FileSpec::builder("src/index.ts")
+    .add_code(CodeBlock::of("export {}", ()).unwrap())
+    .build()
+    .unwrap();
 
 // Combine into a project
-let mut pb = ProjectSpec::<TypeScript>::builder();
-pb.add_file(models);
-pb.add_file(index);
-let project = pb.build();
+let project = ProjectSpec::builder()
+    .add_file(models)
+    .add_file(index)
+    .build();
 
 // Render all files in memory
 let rendered = project.render(80).unwrap();
@@ -117,45 +121,53 @@ use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
 // Define an imported type
-let repo_type = TypeName::<TypeScript>::importable_type("./repository", "UserRepository");
+let repo_type = TypeName::importable_type("./repository", "UserRepository");
 
 // Build the class
-let mut tb = TypeSpec::<TypeScript>::builder("UserService", TypeKind::Class);
-tb.visibility(Visibility::Public);
+let user_type = TypeName::importable_type("./models", "User");
+let ctor_body = CodeBlock::of("this.repo = repo", ()).unwrap();
+let method_body = CodeBlock::of("return this.repo.findById(id)", ()).unwrap();
 
-// Field: private readonly repo: UserRepository;
-let mut field_b = FieldSpec::builder("repo", repo_type.clone());
-field_b.visibility(Visibility::Private);
-field_b.is_readonly();
-tb.add_field(field_b.build().unwrap());
-
-// Constructor
-let mut ctor = FunSpec::<TypeScript>::builder("constructor");
-ctor.is_constructor();
-ctor.add_param(ParameterSpec::new("repo", repo_type.clone()).unwrap());
-let ctor_body = CodeBlock::<TypeScript>::of("this.repo = repo", ()).unwrap();
-ctor.body(ctor_body);
-tb.add_method(ctor.build().unwrap());
-
-// Method: async getUser(id: string): Promise<User>
-let user_type = TypeName::<TypeScript>::importable_type("./models", "User");
-let mut method = FunSpec::<TypeScript>::builder("getUser");
-method.is_async();
-method.add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap());
-method.returns(TypeName::generic(
-    TypeName::primitive("Promise"),
-    vec![user_type],
-));
-let method_body = CodeBlock::<TypeScript>::of("return this.repo.findById(id)", ()).unwrap();
-method.body(method_body);
-tb.add_method(method.build().unwrap());
-
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("UserService", TypeKind::Class)
+    .visibility(Visibility::Public)
+    // Field: private readonly repo: UserRepository;
+    .add_field(
+        FieldSpec::builder("repo", repo_type.clone())
+            .visibility(Visibility::Private)
+            .is_readonly()
+            .build()
+            .unwrap(),
+    )
+    // Constructor
+    .add_method(
+        FunSpec::builder("constructor")
+            .is_constructor()
+            .add_param(ParameterSpec::new("repo", repo_type.clone()).unwrap())
+            .body(ctor_body)
+            .build()
+            .unwrap(),
+    )
+    // Method: async getUser(id: string): Promise<User>
+    .add_method(
+        FunSpec::builder("getUser")
+            .is_async()
+            .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
+            .returns(TypeName::generic(
+                TypeName::primitive("Promise"),
+                vec![user_type],
+            ))
+            .body(method_body)
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
 
 // Build the file
-let mut fb = FileSpec::<TypeScript>::builder("user_service.ts");
-fb.add_type(type_spec);
-let file = fb.build().unwrap();
+let file = FileSpec::builder("user_service.ts")
+    .add_type(type_spec)
+    .build()
+    .unwrap();
 
 let output = file.render(80).unwrap();
 ```

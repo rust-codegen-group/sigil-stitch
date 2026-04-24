@@ -12,6 +12,15 @@
 - [sigil_quote! Macro](sigil_quote.md)
 - [Code Templates](code_templates.md)
 - [Language Cookbook](language_cookbook.md)
+  - [TypeScript](cookbook_typescript.md)
+  - [Rust](cookbook_rust.md)
+  - [Go](cookbook_go.md)
+  - [Python](cookbook_python.md)
+  - [Java](cookbook_java.md)
+  - [Kotlin](cookbook_kotlin.md)
+  - [Swift](cookbook_swift.md)
+  - [C++](cookbook_cpp.md)
+  - [C](cookbook_c.md)
 
 ---
 

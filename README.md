@@ -29,11 +29,10 @@ the same import tracking and rendering.
 ```rust
 use sigil_stitch::prelude::*;
 use sigil_stitch::code_block::StringLitArg;
-use sigil_stitch::lang::typescript::TypeScript;
 
-let user_type = TypeName::<TypeScript>::importable_type("./models", "User");
+let user_type = TypeName::importable_type("./models", "User");
 
-let mut cb = CodeBlock::<TypeScript>::builder();
+let mut cb = CodeBlock::builder();
 cb.add_statement(
     "const user: %T = await getUser(%S)",
     (user_type.clone(), StringLitArg("id".into())),
@@ -41,9 +40,10 @@ cb.add_statement(
 cb.add_statement("return user", ());
 let body = cb.build().unwrap();
 
-let mut fb = FileSpec::<TypeScript>::builder("user.ts");
-fb.add_code(body);
-let file = fb.build().unwrap();
+let file = FileSpec::builder("user.ts")
+    .add_code(body)
+    .build()
+    .unwrap();
 
 let output = file.render(80).unwrap();
 assert!(output.contains("import type { User } from './models'"));
@@ -56,7 +56,7 @@ assert!(output.contains("const user: User = await getUser('id');"));
 use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let user_type = TypeName::<TypeScript>::importable_type("./models", "User");
+let user_type = TypeName::importable_type("./models", "User");
 
 let body = sigil_quote!(TypeScript {
     const user: $T(user_type) = await getUser($S("id"));
@@ -74,10 +74,10 @@ the equivalent `%T`/`%S`/`%N`/`%L` format specifiers at compile time.
 
 | Specifier | Name | Argument Type | Purpose |
 |-----------|------|---------------|---------|
-| `%T` | Type | `TypeName<L>` | Emit type reference, track import |
+| `%T` | Type | `TypeName` | Emit type reference, track import |
 | `%N` | Name | `NameArg` | Emit identifier name |
 | `%S` | String | `StringLitArg` | Emit escaped string literal |
-| `%L` | Literal | `&str`, number, `CodeBlock<L>` | Emit raw value or nested block |
+| `%L` | Literal | `&str`, number, `CodeBlock` | Emit raw value or nested block |
 | `%W` | Wrap | (none) | Soft line break point |
 | `%>` | Indent | (none) | Increase indent level |
 | `%<` | Dedent | (none) | Decrease indent level |
@@ -121,6 +121,9 @@ See [Building Functions & Fields](docs/src/functions_and_fields.md), [Building T
 | Kotlin     | `.kt`     | no         | package imports    |
 | Swift      | `.swift`  | no         | `import` module    |
 | Dart       | `.dart`   | yes        | package imports    |
+| Scala      | `.scala`  | no         | `import` paths     |
+| Haskell    | `.hs`     | no         | `import` module    |
+| OCaml      | `.ml`     | no         | `open` module      |
 | C          | `.c`      | yes        | `#include`         |
 | C++        | `.cpp`    | yes        | `#include`/`using` |
 | Bash       | `.bash`   | no         | `source`           |

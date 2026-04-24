@@ -1,6 +1,6 @@
 # Building Types & Enums
 
-This chapter covers type declarations (classes, structs, interfaces, enums, type aliases, newtypes), computed properties, annotations, and enum variants. These specs follow the same builder pattern described in [Building Functions & Fields](functions_and_fields.md): `&mut self` for setters, `self` for `.build()`, and a `let mut` binding instead of chaining `.build()` after setters.
+This chapter covers type declarations (classes, structs, interfaces, enums, type aliases, newtypes), computed properties, annotations, and enum variants. These specs follow the same builder pattern described in [Building Functions & Fields](functions_and_fields.md): `mut self` for setters that return `Self`, `self` for `.build()`, and fluent chaining: `Builder::new(...).method().method().build()`.
 
 ## TypeSpec
 
@@ -16,20 +16,25 @@ When `lang.methods_inside_type_body(kind)` returns `true`, TypeSpec emits a sing
 use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let mut tb = TypeSpec::<TypeScript>::builder("UserService", TypeKind::Class);
-tb.visibility(Visibility::Public);
+let body = CodeBlock::of("return this.name", ()).unwrap();
 
-let mut field_b = FieldSpec::builder("name", TypeName::primitive("string"));
-field_b.visibility(Visibility::Private);
-tb.add_field(field_b.build().unwrap());
-
-let body = CodeBlock::<TypeScript>::of("return this.name", ()).unwrap();
-let mut fb = FunSpec::builder("getName");
-fb.returns(TypeName::primitive("string"));
-fb.body(body);
-tb.add_method(fb.build().unwrap());
-
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("UserService", TypeKind::Class)
+    .visibility(Visibility::Public)
+    .add_field(
+        FieldSpec::builder("name", TypeName::primitive("string"))
+            .visibility(Visibility::Private)
+            .build()
+            .unwrap(),
+    )
+    .add_method(
+        FunSpec::builder("getName")
+            .returns(TypeName::primitive("string"))
+            .body(body)
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
 let blocks = type_spec.emit(&TypeScript::new()).unwrap();
 // blocks.len() == 1
 //
@@ -50,22 +55,27 @@ When `methods_inside_type_body(kind)` returns `false` (Rust structs and enums), 
 use sigil_stitch::prelude::*;
 use sigil_stitch::lang::rust_lang::RustLang;
 
-let mut tb = TypeSpec::<RustLang>::builder("Config", TypeKind::Struct);
-tb.visibility(Visibility::Public);
+let body = CodeBlock::of("Self { name: name.to_string() }", ()).unwrap();
 
-let mut field_b = FieldSpec::builder("name", TypeName::primitive("String"));
-field_b.visibility(Visibility::Public);
-tb.add_field(field_b.build().unwrap());
-
-let body = CodeBlock::<RustLang>::of("Self { name: name.to_string() }", ()).unwrap();
-let mut fb = FunSpec::<RustLang>::builder("new");
-fb.visibility(Visibility::Public);
-fb.add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap());
-fb.returns(TypeName::primitive("Self"));
-fb.body(body);
-tb.add_method(fb.build().unwrap());
-
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("Config", TypeKind::Struct)
+    .visibility(Visibility::Public)
+    .add_field(
+        FieldSpec::builder("name", TypeName::primitive("String"))
+            .visibility(Visibility::Public)
+            .build()
+            .unwrap(),
+    )
+    .add_method(
+        FunSpec::builder("new")
+            .visibility(Visibility::Public)
+            .add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap())
+            .returns(TypeName::primitive("Self"))
+            .body(body)
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
 let blocks = type_spec.emit(&RustLang::new()).unwrap();
 // blocks.len() == 2
 //
@@ -87,11 +97,12 @@ This split is the key structural decision. It is fully automatic -- you build on
 ### Extends and implements
 
 ```rust,ignore
-let mut tb = TypeSpec::<TypeScript>::builder("AdminService", TypeKind::Class);
-tb.visibility(Visibility::Public);
-tb.extends(TypeName::primitive("BaseService"));
-tb.implements(TypeName::primitive("Serializable"));
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("AdminService", TypeKind::Class)
+    .visibility(Visibility::Public)
+    .extends(TypeName::primitive("BaseService"))
+    .implements(TypeName::primitive("Serializable"))
+    .build()
+    .unwrap();
 // export class AdminService extends BaseService implements Serializable {
 // }
 ```
@@ -106,22 +117,24 @@ use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::lang::rust_lang::RustLang;
 
 // TypeScript: export type UserId = string;
-let mut tb = TypeSpec::<TypeScript>::builder("UserId", TypeKind::TypeAlias);
-tb.visibility(Visibility::Public);
-tb.extends(TypeName::primitive("string"));
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("UserId", TypeKind::TypeAlias)
+    .visibility(Visibility::Public)
+    .extends(TypeName::primitive("string"))
+    .build()
+    .unwrap();
 
 // Rust: pub type Meters = f64;
-let mut tb = TypeSpec::<RustLang>::builder("Meters", TypeKind::TypeAlias);
-tb.visibility(Visibility::Public);
-tb.extends(TypeName::primitive("f64"));
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("Meters", TypeKind::TypeAlias)
+    .visibility(Visibility::Public)
+    .extends(TypeName::primitive("f64"))
+    .build()
+    .unwrap();
 ```
 
 Per-language rendering is controlled by `type_keyword(TypeKind::TypeAlias)`:
 - TypeScript/Rust: `type Foo = Bar;`
 - C++: `using Foo = Bar;`
-- C: `typedef Bar Foo;` (target-first, via `type_alias_target_first()`)
+- C: `typedef Bar Foo;` (target-first, via `type_decl_syntax().type_alias_target_first`)
 - Go: `type Foo = Bar`
 - Kotlin: `typealias Foo = Bar`
 - Python: `type Foo = Bar`
@@ -130,14 +143,15 @@ Type aliases support type parameters:
 
 ```rust,ignore
 // Rust: pub type Result<T> = std::result::Result<T, MyError>;
-let mut tb = TypeSpec::<RustLang>::builder("Result", TypeKind::TypeAlias);
-tb.visibility(Visibility::Public);
-tb.add_type_param(TypeParamSpec::new("T"));
-tb.extends(TypeName::generic(
-    TypeName::primitive("std::result::Result"),
-    vec![TypeName::primitive("T"), TypeName::primitive("MyError")],
-));
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("Result", TypeKind::TypeAlias)
+    .visibility(Visibility::Public)
+    .add_type_param(TypeParamSpec::new("T"))
+    .extends(TypeName::generic(
+        TypeName::primitive("std::result::Result"),
+        vec![TypeName::primitive("T"), TypeName::primitive("MyError")],
+    ))
+    .build()
+    .unwrap();
 ```
 
 ### Newtype wrappers
@@ -150,15 +164,17 @@ use sigil_stitch::lang::rust_lang::RustLang;
 use sigil_stitch::lang::go_lang::GoLang;
 
 // Rust: pub struct Meters(f64);
-let mut tb = TypeSpec::<RustLang>::builder("Meters", TypeKind::Newtype);
-tb.visibility(Visibility::Public);
-tb.extends(TypeName::primitive("f64"));
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("Meters", TypeKind::Newtype)
+    .visibility(Visibility::Public)
+    .extends(TypeName::primitive("f64"))
+    .build()
+    .unwrap();
 
 // Go: type Meters float64
-let mut tb = TypeSpec::<GoLang>::builder("Meters", TypeKind::Newtype);
-tb.extends(TypeName::primitive("float64"));
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("Meters", TypeKind::Newtype)
+    .extends(TypeName::primitive("float64"))
+    .build()
+    .unwrap();
 ```
 
 Newtype syntax varies across languages and is controlled by `render_newtype_line()`:
@@ -177,14 +193,21 @@ use sigil_stitch::prelude::*;
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let mut tb = TypeSpec::<TypeScript>::builder("Direction", TypeKind::Enum);
-let mut v = EnumVariantSpec::builder("Up");
-v.value(CodeBlock::<TypeScript>::of("'UP'", ()).unwrap());
-tb.add_variant(v.build().unwrap());
-let mut v = EnumVariantSpec::builder("Down");
-v.value(CodeBlock::<TypeScript>::of("'DOWN'", ()).unwrap());
-tb.add_variant(v.build().unwrap());
-let type_spec = tb.build().unwrap();
+let type_spec = TypeSpec::builder("Direction", TypeKind::Enum)
+    .add_variant(
+        EnumVariantSpec::builder("Up")
+            .value(CodeBlock::of("'UP'", ()).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .add_variant(
+        EnumVariantSpec::builder("Down")
+            .value(CodeBlock::of("'DOWN'", ()).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
 // enum Direction {
 //     Up = 'UP',
 //     Down = 'DOWN',
@@ -203,13 +226,14 @@ use sigil_stitch::prelude::*;
 use sigil_stitch::spec::property_spec::PropertySpec;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let getter_body = CodeBlock::<TypeScript>::of("return this._name", ()).unwrap();
-let setter_body = CodeBlock::<TypeScript>::of("this._name = value", ()).unwrap();
+let getter_body = CodeBlock::of("return this._name", ()).unwrap();
+let setter_body = CodeBlock::of("this._name = value", ()).unwrap();
 
-let mut pb = PropertySpec::builder("name", TypeName::<TypeScript>::primitive("string"));
-pb.getter(getter_body);
-pb.setter("value", setter_body);
-let prop = pb.build().unwrap();
+let prop = PropertySpec::builder("name", TypeName::primitive("string"))
+    .getter(getter_body)
+    .setter("value", setter_body)
+    .build()
+    .unwrap();
 // TypeScript (Accessor style):
 // get name(): string {
 //     return this._name
@@ -237,10 +261,10 @@ use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::lang::rust_lang::RustLang;
 
 // Simple annotation: #[allow(dead_code)]
-let ann = AnnotationSpec::<RustLang>::new("allow").arg("dead_code");
+let ann = AnnotationSpec::new("allow").arg("dead_code");
 
 // Multiple arguments: #[cfg(test, feature = "nightly")]
-let ann = AnnotationSpec::<RustLang>::new("cfg")
+let ann = AnnotationSpec::new("cfg")
     .arg("test")
     .arg("feature = \"nightly\"");
 ```
@@ -252,7 +276,7 @@ use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::type_name::TypeName;
 
-let type_name = TypeName::<TypeScript>::importable("./decorators", "Component");
+let type_name = TypeName::importable("./decorators", "Component");
 let ann = AnnotationSpec::importable(type_name);
 // TS: @Component (with import { Component } from './decorators')
 ```
@@ -269,7 +293,7 @@ Individual enum variants. Four forms are supported:
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::lang::rust_lang::RustLang;
 
-let v = EnumVariantSpec::<RustLang>::new("Red").unwrap();
+let v = EnumVariantSpec::new("Red").unwrap();
 // Rust: Red,
 ```
 
@@ -279,9 +303,10 @@ let v = EnumVariantSpec::<RustLang>::new("Red").unwrap();
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let mut v = EnumVariantSpec::<TypeScript>::builder("Up");
-v.value(CodeBlock::<TypeScript>::of("'UP'", ()).unwrap());
-let variant = v.build().unwrap();
+let variant = EnumVariantSpec::builder("Up")
+    .value(CodeBlock::of("'UP'", ()).unwrap())
+    .build()
+    .unwrap();
 // TypeScript: Up = 'UP',
 ```
 
@@ -291,16 +316,18 @@ let variant = v.build().unwrap();
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::lang::rust_lang::RustLang;
 
-let mut v = EnumVariantSpec::<RustLang>::builder("Literal");
-v.associated_type(TypeName::primitive("i64"));
-let variant = v.build().unwrap();
+let variant = EnumVariantSpec::builder("Literal")
+    .associated_type(TypeName::primitive("i64"))
+    .build()
+    .unwrap();
 // Rust: Literal(i64),
 
 // Multi-element tuple
-let mut v = EnumVariantSpec::<RustLang>::builder("Pair");
-v.associated_type(TypeName::primitive("String"));
-v.associated_type(TypeName::primitive("i32"));
-let variant = v.build().unwrap();
+let variant = EnumVariantSpec::builder("Pair")
+    .associated_type(TypeName::primitive("String"))
+    .associated_type(TypeName::primitive("i32"))
+    .build()
+    .unwrap();
 // Rust: Pair(String, i32),
 ```
 
@@ -311,14 +338,15 @@ use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::lang::rust_lang::RustLang;
 
-let mut v = EnumVariantSpec::<RustLang>::builder("Move");
-v.add_field(
-    FieldSpec::builder("x", TypeName::primitive("i32")).build().unwrap(),
-);
-v.add_field(
-    FieldSpec::builder("y", TypeName::primitive("i32")).build().unwrap(),
-);
-let variant = v.build().unwrap();
+let variant = EnumVariantSpec::builder("Move")
+    .add_field(
+        FieldSpec::builder("x", TypeName::primitive("i32")).build().unwrap(),
+    )
+    .add_field(
+        FieldSpec::builder("y", TypeName::primitive("i32")).build().unwrap(),
+    )
+    .build()
+    .unwrap();
 // Rust:
 // Move {
 //     x: i32,
@@ -326,4 +354,4 @@ let variant = v.build().unwrap();
 // },
 ```
 
-Variants are added to a TypeSpec via `add_variant()`. The language controls separators (`enum_variant_separator`), trailing separators (`enum_variant_trailing_separator`), and prefixes (Swift's `case`).
+Variants are added to a TypeSpec via `add_variant()`. The language controls separators (`enum_and_annotation().variant_separator`), trailing separators (`enum_and_annotation().variant_trailing_separator`), and prefixes (Swift's `case`).

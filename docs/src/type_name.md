@@ -1,8 +1,8 @@
 # TypeName
 
-`TypeName<L>` is the type reference enum at the heart of sigil-stitch's import tracking. When you use a `TypeName` with the `%T` format specifier in a `CodeBlock`, the library renders the type name in the output *and* records the import. At render time, `FileSpec` collects all recorded imports, deduplicates them, resolves naming conflicts, and emits the import header automatically.
+`TypeName` is the type reference enum at the heart of sigil-stitch's import tracking. When you use a `TypeName` with the `%T` format specifier in a `CodeBlock`, the library renders the type name in the output *and* records the import. At render time, `FileSpec` collects all recorded imports, deduplicates them, resolves naming conflicts, and emits the import header automatically.
 
-Every `TypeName` is parameterized by `L: CodeLang`, so a `TypeName<TypeScript>` cannot be mixed with a `TypeName<Rust>`. The compiler enforces this -- no runtime checks needed.
+`TypeName` is language-agnostic — it carries no generic parameter. The same `TypeName` value can be rendered for any target language at `FileSpec::render()` time.
 
 ## Import tracking
 
@@ -13,10 +13,10 @@ use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
 // Value import: import { User } from './models'
-let user = TypeName::<TypeScript>::importable("./models", "User");
+let user = TypeName::importable("./models", "User");
 
 // Type-only import: import type { User } from './models'
-let user = TypeName::<TypeScript>::importable_type("./models", "User");
+let user = TypeName::importable_type("./models", "User");
 ```
 
 When these types appear in a `CodeBlock` via `%T`, the import is tracked automatically. At file render time, all imports are collected, deduplicated, and emitted. If two modules export the same name, the first keeps the simple name and the second gets an auto-generated alias.
@@ -24,7 +24,7 @@ When these types appear in a `CodeBlock` via `%T`, the import is tracked automat
 You can also set an explicit alias:
 
 ```rust,ignore
-let user = TypeName::<TypeScript>::importable("./other", "User")
+let user = TypeName::importable("./other", "User")
     .with_alias("OtherUser");
 // import { User as OtherUser } from './other'
 // Rendered as: OtherUser
@@ -35,9 +35,9 @@ let user = TypeName::<TypeScript>::importable("./other", "User")
 Types that don't need imports -- built-in language types, type parameters, or any name that's already in scope:
 
 ```rust,ignore
-let s = TypeName::<TypeScript>::primitive("string");
-let n = TypeName::<TypeScript>::primitive("number");
-let t = TypeName::<TypeScript>::primitive("T");  // type parameter
+let s = TypeName::primitive("string");
+let n = TypeName::primitive("number");
+let t = TypeName::primitive("T");  // type parameter
 ```
 
 ## Collections
@@ -46,20 +46,20 @@ let t = TypeName::<TypeScript>::primitive("T");  // type parameter
 
 ```rust,ignore
 // TypeScript: string[]
-// Rust:       Vec<String>  (via present_array)
+// Rust:       Vec<String>  (via type_presentation().array)
 // Go:         []string
-let arr = TypeName::<TypeScript>::array(TypeName::primitive("string"));
+let arr = TypeName::array(TypeName::primitive("string"));
 
 // TypeScript: readonly number[]
-let ro = TypeName::<TypeScript>::readonly_array(TypeName::primitive("number"));
+let ro = TypeName::readonly_array(TypeName::primitive("number"));
 ```
 
 ### Maps
 
 ```rust,ignore
 // Go:         map[string]User
-// TypeScript: Record<string, User>  (via present_map)
-let m = TypeName::<TypeScript>::map(
+// TypeScript: Record<string, User>  (via type_presentation().map)
+let m = TypeName::map(
     TypeName::primitive("string"),
     TypeName::importable("./models", "User"),
 );
@@ -72,20 +72,20 @@ let m = TypeName::<TypeScript>::map(
 // TS:     [string, number]
 // Python: tuple[str, int]
 // C++:    std::tuple<string, int>
-let t = TypeName::<TypeScript>::tuple(vec![
+let t = TypeName::tuple(vec![
     TypeName::primitive("string"),
     TypeName::primitive("number"),
 ]);
 
 // Unit type (empty tuple): Rust ()
-let unit = TypeName::<TypeScript>::unit();
+let unit = TypeName::unit();
 ```
 
 ### Slices
 
 ```rust,ignore
 // Go: []User
-let s = TypeName::<TypeScript>::slice(TypeName::primitive("User"));
+let s = TypeName::slice(TypeName::primitive("User"));
 ```
 
 ## Generics
@@ -94,13 +94,13 @@ Wrap a base type with type parameters:
 
 ```rust,ignore
 // TypeScript: Promise<User>
-let promise = TypeName::<TypeScript>::generic(
+let promise = TypeName::generic(
     TypeName::primitive("Promise"),
     vec![TypeName::importable("./models", "User")],
 );
 
 // Rust: HashMap<String, Vec<User>>
-let map = TypeName::<TypeScript>::generic(
+let map = TypeName::generic(
     TypeName::primitive("HashMap"),
     vec![
         TypeName::primitive("String"),
@@ -118,14 +118,14 @@ Nesting works to any depth. Imports are collected recursively -- every `Importab
 
 ```rust,ignore
 // TypeScript: string | number | boolean
-let u = TypeName::<TypeScript>::union(vec![
+let u = TypeName::union(vec![
     TypeName::primitive("string"),
     TypeName::primitive("number"),
     TypeName::primitive("boolean"),
 ]);
 
 // TypeScript: Serializable & Loggable
-let i = TypeName::<TypeScript>::intersection(vec![
+let i = TypeName::intersection(vec![
     TypeName::primitive("Serializable"),
     TypeName::primitive("Loggable"),
 ]);
@@ -141,22 +141,22 @@ These are primarily useful for TypeScript. Other languages render them using the
 // Go:         *string
 // Kotlin:     String?
 // Swift:      String?
-let opt = TypeName::<TypeScript>::optional(TypeName::primitive("string"));
+let opt = TypeName::optional(TypeName::primitive("string"));
 ```
 
-The rendering adapts per language through `present_optional()` in the `CodeLang` trait.
+The rendering adapts per language through the `optional` field in `lang.type_presentation()`.
 
 ## Pointer and reference types
 
 ```rust,ignore
 // Go: *User
-let ptr = TypeName::<TypeScript>::pointer(TypeName::primitive("User"));
+let ptr = TypeName::pointer(TypeName::primitive("User"));
 
 // Rust: &str
-let r = TypeName::<TypeScript>::reference(TypeName::primitive("str"));
+let r = TypeName::reference(TypeName::primitive("str"));
 
 // Rust: &mut Vec<i32>
-let rm = TypeName::<TypeScript>::reference_mut(TypeName::primitive("Vec<i32>"));
+let rm = TypeName::reference_mut(TypeName::primitive("Vec<i32>"));
 ```
 
 Reference rendering is language-aware:
@@ -174,20 +174,20 @@ Reference rendering is language-aware:
 // Python:     Callable[[str, int], bool]
 // C++:        std::function<bool(string, int)>
 // Dart:       bool Function(String, int)
-let f = TypeName::<TypeScript>::function(
+let f = TypeName::function(
     vec![TypeName::primitive("string"), TypeName::primitive("number")],
     TypeName::primitive("boolean"),
 );
 ```
 
-Function type rendering varies significantly across languages. The `present_function()` trait method returns a `FunctionPresentation` struct that controls keyword, delimiters, arrow syntax, parameter order, and optional outer wrappers.
+Function type rendering varies significantly across languages. The `function` field in `lang.type_presentation()` returns a `FunctionPresentation` struct that controls keyword, delimiters, arrow syntax, parameter order, and optional outer wrappers.
 
 ## Raw escape hatch
 
 For type expressions not covered by the built-in variants:
 
 ```rust,ignore
-let t = TypeName::<TypeScript>::raw("keyof User");
+let t = TypeName::raw("keyof User");
 ```
 
 `Raw` emits the string verbatim with no import tracking. Use it sparingly -- prefer the structured variants when possible.
@@ -212,10 +212,10 @@ See [Type Presentation](type_presentation.md) for the full technical details of 
 
 ```rust,ignore
 // Check if a type renders to empty string (used internally by ParameterSpec)
-let empty = TypeName::<TypeScript>::primitive("");
+let empty = TypeName::primitive("");
 assert!(empty.is_empty());
 
 // Get the simple name (for import resolution lookups)
-let t = TypeName::<TypeScript>::importable("./models", "User");
+let t = TypeName::importable("./models", "User");
 assert_eq!(t.simple_name(), Some("User"));
 ```

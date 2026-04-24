@@ -8,10 +8,10 @@ Templates use `#{name:K}` for named parameters, where `K` specifies the kind:
 
 | Kind | Specifier | Argument Type |
 |------|-----------|---------------|
-| `T`  | `%T`      | `TypeName<L>` |
+| `T`  | `%T`      | `TypeName` |
 | `N`  | `%N`      | `NameArg`     |
 | `S`  | `%S`      | `StringLitArg`|
-| `L`  | `%L`      | `&str`, `String`, or `CodeBlock<L>` |
+| `L`  | `%L`      | `&str`, `String`, or `CodeBlock` |
 
 Use `##` to emit a literal `#` character.
 
@@ -27,16 +27,16 @@ use sigil_stitch::type_name::TypeName;
 
 let tmpl = CodeTemplate::new("const #{var:N}: #{type:T} = #{init:L}").unwrap();
 
-let block = tmpl.apply::<TypeScript>()
+let block = tmpl.apply()
     .set("var", NameArg("user".into()))
-    .set("type", TypeName::<TypeScript>::primitive("string"))
+    .set("type", TypeName::primitive("string"))
     .set("init", "null")
     .build()
     .unwrap();
 // Output: const user: string = null
 ```
 
-The template is parsed once by `CodeTemplate::new()`. The language enters at `.apply::<TypeScript>()` time.
+The template is parsed once by `CodeTemplate::new()`. Arguments are supplied via `.apply().set(...).build()`, producing a language-agnostic `CodeBlock`.
 
 ## Reuse Across Types
 
@@ -46,16 +46,16 @@ The same template works for different types and values:
 let field_tmpl = CodeTemplate::new("#{name:N}: #{type:T}").unwrap();
 
 // Apply for a string field
-let string_field = field_tmpl.apply::<TypeScript>()
+let string_field = field_tmpl.apply()
     .set("name", NameArg("username".into()))
-    .set("type", TypeName::<TypeScript>::primitive("string"))
+    .set("type", TypeName::primitive("string"))
     .build()
     .unwrap();
 
 // Apply for a number field
-let number_field = field_tmpl.apply::<TypeScript>()
+let number_field = field_tmpl.apply()
     .set("name", NameArg("age".into()))
-    .set("type", TypeName::<TypeScript>::primitive("number"))
+    .set("type", TypeName::primitive("number"))
     .build()
     .unwrap();
 ```
@@ -70,17 +70,17 @@ use sigil_stitch::lang::rust_lang::RustLang;
 let decl = CodeTemplate::new("#{name:N}: #{type:T} = #{value:L}").unwrap();
 
 // TypeScript
-let ts_block = decl.apply::<TypeScript>()
+let ts_block = decl.apply()
     .set("name", NameArg("count".into()))
-    .set("type", TypeName::<TypeScript>::primitive("number"))
+    .set("type", TypeName::primitive("number"))
     .set("value", "0")
     .build()
     .unwrap();
 
 // Rust
-let rs_block = decl.apply::<RustLang>()
+let rs_block = decl.apply()
     .set("name", NameArg("count".into()))
-    .set("type", TypeName::<RustLang>::primitive("i32"))
+    .set("type", TypeName::primitive("i32"))
     .set("value", "0")
     .build()
     .unwrap();
@@ -93,8 +93,8 @@ The same parameter name can appear multiple times. The value you set is used at 
 ```rust,ignore
 let tmpl = CodeTemplate::new("#{type:T} -> #{type:T}").unwrap();
 
-let block = tmpl.apply::<TypeScript>()
-    .set("type", TypeName::<TypeScript>::primitive("string"))
+let block = tmpl.apply()
+    .set("type", TypeName::primitive("string"))
     .build()
     .unwrap();
 // Output: string -> string
@@ -106,9 +106,9 @@ Templates using `#{name:T}` track imports just like `%T` in CodeBlocks. When the
 
 ```rust,ignore
 let tmpl = CodeTemplate::new("const #{var:N}: #{type:T} = new #{type:T}()").unwrap();
-let user = TypeName::<TypeScript>::importable_type("./models", "User");
+let user = TypeName::importable_type("./models", "User");
 
-let block = tmpl.apply::<TypeScript>()
+let block = tmpl.apply()
     .set("var", NameArg("user".into()))
     .set("type", user)
     .build()
@@ -127,7 +127,7 @@ let block = tmpl.apply::<TypeScript>()
 let tmpl = CodeTemplate::new("#{name:N}: #{type:T}").unwrap();
 
 // Missing parameter
-let result = tmpl.apply::<TypeScript>()
+let result = tmpl.apply()
     .set("name", NameArg("x".into()))
     // forgot to set "type"
     .build();

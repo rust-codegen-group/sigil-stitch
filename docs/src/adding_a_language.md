@@ -1,6 +1,6 @@
 # Adding a Language
 
-sigil-stitch supports new languages by implementing the `CodeLang` trait. The trait has 63 methods: 18 required (no default implementation) and 45 with sensible defaults. You only need to override the defaults when your language diverges from the common patterns.
+sigil-stitch supports new languages by implementing the `CodeLang` trait. The trait has 33 methods: 10 required (no default) plus 6 config struct accessors and 17 override methods — all with sensible defaults. You only need to override the defaults when your language diverges from the common patterns.
 
 This guide walks through the process using a hypothetical language, with references to real implementations you can study.
 
@@ -17,7 +17,7 @@ Adding a language takes four steps:
 
 The trait methods fall into natural groups.
 
-### Core Methods (8 required)
+### Core Methods (6 required)
 
 These are enough for CodeBlock-level code generation:
 
@@ -29,12 +29,10 @@ These are enough for CodeBlock-level code generation:
 | `render_string_literal()` | `'hello'` | Language-specific string quoting |
 | `render_doc_comment()` | `/** ... */` | Doc comment block |
 | `line_comment_prefix()` | `"//"` | Single-line comment prefix |
-| `indent_unit()` | `"  "` (2 spaces) | Indentation per level |
-| `uses_semicolons()` | `true` | Statement terminator behavior |
 
 `render_imports()` is the most complex. It receives an `ImportGroup` (deduplicated, with aliases resolved) and must emit the full import header string. Study `src/lang/typescript.rs` for ES module imports or `src/lang/rust_lang.rs` for `use` paths.
 
-### Spec Support Methods (10 required)
+### Spec Support Methods (4 required)
 
 These enable TypeSpec, FunSpec, and FieldSpec rendering:
 
@@ -42,14 +40,8 @@ These enable TypeSpec, FunSpec, and FieldSpec rendering:
 |--------|---------|---------|
 | `render_visibility()` | `"public "`, `"pub "` | Visibility prefix |
 | `function_keyword()` | `"function"`, `"fn"` | Function declaration keyword |
-| `return_type_separator()` | `": "`, `" -> "` | Between params and return type |
 | `type_keyword()` | `"class"`, `"struct"` | Type declaration keyword |
-| `field_terminator()` | `","`, `";"` | After each field |
 | `methods_inside_type_body()` | `true` / `false` | Key structural decision (see below) |
-| `generic_constraint_keyword()` | `" extends "`, `": "` | Generic bounds |
-| `generic_constraint_separator()` | `" & "`, `" + "` | Between multiple bounds |
-| `super_type_keyword()` | `" extends "` | Inheritance keyword |
-| `implements_keyword()` | `" implements "` | Interface keyword |
 
 #### The `methods_inside_type_body` Decision
 
@@ -60,52 +52,109 @@ This is the most important method for structural correctness. It determines whet
 
 The method takes a `TypeKind` parameter, so you can vary by type. Rust returns `true` for `TypeKind::Trait` (trait methods go inside) but `false` for `TypeKind::Struct` and `TypeKind::Enum`.
 
-### Default Methods (45 methods)
+### Config Struct Accessors and Default Methods
 
-These have defaults that work for most C-family languages. Override when your language differs.
+Instead of dozens of individual trait methods, the v2.0 API groups related configuration into 6 config structs returned by accessor methods. Each struct uses `..Default::default()` so you only specify fields where your language differs. The remaining standalone override methods cover cases that don't fit neatly into a struct.
 
-**Block delimiters:**
-- `block_open()` -- default `" {"`. Python overrides to `":"`.
-- `block_close()` -- default `"}"`. Python overrides to `""` (indent-only).
-- `empty_body()` -- default `""`. Python overrides to `"..."` (Ellipsis for abstract methods).
+#### `block_syntax()`
 
-**Type annotations:**
-- `type_annotation_separator()` -- default `": "`. Most languages use this.
-- `type_before_name()` -- default `false`. C/C++/Java override to `true` for `int count` instead of `count: i32`.
-- `return_type_is_prefix()` -- default `false`. C/C++/Java override to `true` for `int add(...)` instead of `fn add(...) -> int`.
+Returns `BlockSyntaxConfig` controlling block delimiters and formatting:
 
-**Generics:**
-- `generic_open()` / `generic_close()` -- default `"<"` / `">"`. Go overrides to `"["` / `"]"`.
+| Field | Default | Purpose |
+|-------|---------|---------|
+| `block_open` | `" {"` | Opening delimiter. Python overrides to `":"`. |
+| `block_close` | `"}"` | Closing delimiter. Python overrides to `""` (indent-only). |
+| `indent_unit` | `"  "` (2 spaces) | Indentation per level. |
+| `uses_semicolons` | `true` | Statement terminator behavior. |
+| `field_terminator` | `","` | After each field. Java/C++ override to `";"`. |
+| `type_close_terminator` | (default) | Terminator after closing brace for types. |
+| `bases_close` | (default) | Closing syntax for base-class lists. |
 
-**Imports:**
+#### `function_syntax()`
+
+Returns `FunctionSyntaxConfig` controlling function declarations:
+
+| Field | Default | Purpose |
+|-------|---------|---------|
+| `return_type_separator` | `": "` | Between params and return type. Rust overrides to `" -> "`. |
+| `async_keyword` | `"async "` | Async function prefix. |
+| `abstract_keyword` | `"abstract "` | Abstract method prefix. C++ overrides to `"virtual "`. |
+| `param_list_style` | (default) | How parameter lists are formatted. |
+| `function_signature_style` | (default) | Controls overall signature layout. |
+| `constructor_keyword` | `""` | Constructor keyword. Python: `"def"`. Rust: `"fn"`. |
+| `constructor_delegation_style` | (default `Body`) | Super/this call placement. Kotlin: `Signature`. |
+| `where_clause_style` | (default) | How `where` clauses are rendered. |
+| `empty_body` | `""` | Empty method body. Python overrides to `"..."`. |
+
+#### `type_decl_syntax()`
+
+Returns `TypeDeclSyntaxConfig` controlling type declarations:
+
+| Field | Default | Purpose |
+|-------|---------|---------|
+| `type_before_name` | `false` | C/C++/Java override to `true` for `int count`. |
+| `return_type_is_prefix` | `false` | C/C++/Java override to `true` for `int add(...)`. |
+| `type_annotation_separator` | `": "` | Between name and type annotation. |
+| `super_type_keyword` | (default) | Inheritance keyword, e.g. `" extends "`. |
+| `super_type_separator` | (default) | Separator between multiple super types. |
+| `super_type_subsequent_separator` | (default) | Separator for subsequent super types. |
+| `implements_keyword` | (default) | Interface keyword, e.g. `" implements "`. |
+| `type_alias_target_first` | `false` | C overrides to `true` for `typedef target name;`. |
+| `supports_primary_constructor` | `false` | Kotlin overrides to `true`. |
+
+#### `generic_syntax()`
+
+Returns `GenericSyntaxConfig` controlling generic/type-parameter syntax:
+
+| Field | Default | Purpose |
+|-------|---------|---------|
+| `open` | `"<"` | Generic opening bracket. Go overrides to `"["`. |
+| `close` | `">"` | Generic closing bracket. Go overrides to `"]"`. |
+| `application_style` | (default) | How generics are applied to types. |
+| `constraint_keyword` | `": "` | Generic bounds keyword. Java/TS override to `" extends "`. |
+| `constraint_separator` | `" + "` | Between multiple bounds. Java/TS override to `" & "`. |
+| `context_bound_keyword` | (default) | Context bound syntax (e.g. Scala's `:`). |
+
+#### `enum_and_annotation()`
+
+Returns `EnumAndAnnotationConfig` controlling enums, annotations, and field modifiers:
+
+| Field | Default | Purpose |
+|-------|---------|---------|
+| `variant_prefix` | `""` | Enum variant prefix. Swift overrides to `"case "`. |
+| `variant_prefix_first` | (default) | Prefix for the first variant specifically. |
+| `variant_separator` | `","` | Between enum variants. Python/Swift override to `""`. |
+| `variant_trailing_separator` | `false` | Rust/TypeScript override to `true`. |
+| `annotation_prefix` | `"@"` | Annotation opening. Rust: `"#["`. C++: `"[["`. |
+| `annotation_suffix` | `""` | Annotation closing. Rust: `"]"`. C++: `"]]"`. |
+| `readonly_keyword` | `"const "` | TS: `"readonly "`. Kotlin: `"val "`. Java: `"final "`. |
+| `mutable_field_keyword` | `""` | Kotlin overrides to `"var "`. |
+
+#### `type_presentation()`
+
+Returns `TypePresentationConfig` controlling how semantic types (arrays, optionals, maps, tuples, references, function types, etc.) are rendered. See the [Type Presentation](#type-presentation) section below for details.
+
+#### Standalone Override Methods
+
+These methods don't belong to a config struct but have sensible defaults you can override:
+
+- `escape_reserved()` -- how reserved words are escaped.
 - `qualify_import_name()` -- default passthrough. Go overrides to return `"http.Server"` (package-qualified names).
-
-**Keywords:**
-- `async_keyword()` -- default `"async "`.
-- `abstract_keyword()` -- default `"abstract "`. C++ overrides to `"virtual "`.
-- `readonly_keyword()` -- default `"const "`. TS uses `"readonly "`, Kotlin uses `"val "`, Java uses `"final "`.
-- `mutable_field_keyword()` -- default `""`. Kotlin overrides to `"var "`.
-
-**Enum support:**
-- `enum_variant_prefix()` -- default `""`. Swift overrides to `"case "`.
-- `enum_variant_separator()` -- default `","`. Python/Swift override to `""`.
-- `enum_variant_trailing_separator()` -- default `false`. Rust/TypeScript override to `true`.
-
-**Annotation support:**
-- `render_annotation_prefix()` -- default `("@", "")`. Rust: `("#[", "]")`. C++: `("[[", "]]")`. C: `("__attribute__((", "))")`.
-
-**Constructor support:**
-- `constructor_keyword()` -- default `""`. Python: `"def"`. Rust: `"fn"`.
-- `constructor_delegation_style()` -- default `Body` (super/this call in body). Kotlin: `Signature` (call in signature: `constructor(x) : this(x, 0)`).
-- `supports_primary_constructor()` -- default `false`. Kotlin: `true`.
-
-**Property support:**
+- `type_kind_suffix()` -- suffix after type close for specific type kinds.
+- `render_newtype_line()` -- default emits Rust tuple struct `struct Name(Inner);`. Go: `type Name Inner`, Kotlin: `value class Name(val value: Inner)`, Python: `Name = NewType("Name", Inner)`, C: `typedef Inner Name;`.
+- `fun_block_open()` -- custom block opener for functions.
+- `type_header_block_open()` -- custom block opener for type headers.
+- `doc_comment_inside_body()` -- whether doc comments go inside the body (Python docstrings).
+- `doc_before_annotations()` -- whether doc comments appear before annotations.
+- `optional_field_style()` -- how optional fields are represented.
 - `property_style()` -- default `Accessor` (TS/JS: `get name()`). Swift/Kotlin: `Field` (inline get/set).
 - `property_getter_keyword()` -- default `"get"`. Kotlin: `"get()"`.
-
-**Type alias and newtype support:**
-- `type_alias_target_first()` -- default `false`. C overrides to `true` for `typedef target name;` syntax (target comes before name).
-- `render_newtype_line()` -- default emits Rust tuple struct `struct Name(Inner);`. Go overrides to `type Name Inner`, Kotlin to `value class Name(val value: Inner)`, Python to `Name = NewType("Name", Inner)`, C to `typedef Inner Name;`.
+- `render_type_context()` -- additional context for type rendering.
+- `type_body_prefix()` -- content emitted before the type body.
+- `type_body_suffix()` -- content emitted after the type body.
+- `render_type_close_suffix()` -- suffix after type close brace.
+- `render_type_param_kind()` -- how type parameters are annotated with variance.
+- `line_comment_suffix()` -- suffix for line comments (default `""`).
 
 ## Step-by-Step Walkthrough
 
@@ -132,8 +181,6 @@ const RESERVED: &[&str] = &["if", "else", "for", "while", /* ... */];
 impl CodeLang for YourLang {
     fn file_extension(&self) -> &str { "yl" }
     fn reserved_words(&self) -> &[&str] { RESERVED }
-    fn uses_semicolons(&self) -> bool { true }
-    fn indent_unit(&self) -> &str { "    " }
     fn line_comment_prefix(&self) -> &str { "//" }
 
     fn render_string_literal(&self, s: &str) -> String {
@@ -159,7 +206,7 @@ impl CodeLang for YourLang {
         out
     }
 
-    // Phase 2 methods...
+    // Spec support methods...
     fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
         match vis {
             Visibility::Public => "public ",
@@ -170,7 +217,6 @@ impl CodeLang for YourLang {
     }
 
     fn function_keyword(&self, _ctx: DeclarationContext) -> &str { "function" }
-    fn return_type_separator(&self) -> &str { ": " }
     fn type_keyword(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Class => "class",
@@ -181,12 +227,37 @@ impl CodeLang for YourLang {
             TypeKind::Newtype => "class",
         }
     }
-    fn field_terminator(&self) -> &str { ";" }
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool { true }
-    fn generic_constraint_keyword(&self) -> &str { " extends " }
-    fn generic_constraint_separator(&self) -> &str { " & " }
-    fn super_type_keyword(&self) -> &str { " extends " }
-    fn implements_keyword(&self) -> &str { " implements " }
+
+    // Config struct overrides...
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            uses_semicolons: true,
+            indent_unit: "    ",
+            field_terminator: ";",
+            ..Default::default()
+        }
+    }
+    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
+        TypeDeclSyntaxConfig {
+            super_type_keyword: " extends ",
+            implements_keyword: " implements ",
+            ..Default::default()
+        }
+    }
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            constraint_keyword: " extends ",
+            constraint_separator: " & ",
+            ..Default::default()
+        }
+    }
+    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
+        FunctionSyntaxConfig {
+            return_type_separator: ": ",
+            ..Default::default()
+        }
+    }
 }
 ```
 
@@ -212,7 +283,7 @@ use sigil_stitch::type_name::TypeName;
 
 #[test]
 fn test_basic_statement() {
-    let mut cb = CodeBlock::<YourLang>::builder();
+    let mut cb = CodeBlock::builder();
     cb.add_statement("const x = 1", ());
     let block = cb.build().unwrap();
 
@@ -237,11 +308,11 @@ This runs all tests with `BLESS=1`, which creates `tests/golden/your_lang/*.yl` 
 
 ### 5. Override defaults
 
-Run the full test suite and review golden file output. Override default methods where your language's syntax differs. Common overrides:
+Run the full test suite and review golden file output. Override config struct accessors and default methods where your language's syntax differs. Common overrides:
 
-- If your language uses indentation instead of braces: override `block_open`, `block_close`, `empty_body`
-- If types come before names (`int x` instead of `x: int`): override `type_before_name`, `return_type_is_prefix`
-- If generics use brackets instead of angle brackets: override `generic_open`, `generic_close`
+- If your language uses indentation instead of braces: override `block_syntax()` to set `block_open`, `block_close`; override `function_syntax()` to set `empty_body`
+- If types come before names (`int x` instead of `x: int`): override `type_decl_syntax()` to set `type_before_name`, `return_type_is_prefix`
+- If generics use brackets instead of angle brackets: override `generic_syntax()` to set `open`, `close`
 
 ## Reference Implementations
 
@@ -259,76 +330,64 @@ Study these existing implementations for patterns similar to your target:
 
 ## Type Presentation
 
-When your language uses type expressions (generics, arrays, optionals, maps, etc.), you'll need to declare how each semantic type concept renders. This is done through `present_*` methods that return `TypePresentation` data — you never build `BoxDoc` directly.
+When your language uses type expressions (generics, arrays, optionals, maps, etc.), you configure how each semantic type concept renders by returning a `TypePresentationConfig` from the `type_presentation()` accessor. You never build `BoxDoc` directly.
 
 ### How it works
 
-Each `TypeName` variant (Array, Optional, Map, etc.) asks your language for a `TypePresentation` — a small enum describing the syntactic pattern:
+Each `TypeName` variant (Array, Optional, Map, etc.) uses your language's `TypePresentationConfig` to determine the syntactic pattern via `TypePresentation` — a small enum:
 
-- `GenericWrap { name }` — `name<P1, P2>` using your `generic_open()`/`generic_close()`
+- `GenericWrap { name }` — `name<P1, P2>` using your `generic_syntax().open`/`generic_syntax().close`
 - `Prefix { prefix }` — `prefix inner` (e.g., Go `[]T`, Rust `*const T`)
 - `Postfix { suffix }` — `inner suffix` (e.g., TypeScript `T[]`, Kotlin `T?`)
 - `Surround { prefix, suffix }` — `prefix inner suffix` (e.g., C++ `const T&`, C `const T*`)
 - `Delimited { open, sep, close }` — `open P1 sep P2 close` (e.g., Swift `[K: V]`, Go `map[K]V`)
 - `Infix { sep }` — `P1 sep P2` (e.g., TypeScript `A | B`, Rust `A + B`)
 
-### Methods to override
+### Configuring type presentation
 
-All `present_*` methods have defaults matching TypeScript conventions. Override only when your language differs:
+All fields in `TypePresentationConfig` have defaults matching TypeScript conventions. Override only when your language differs:
 
 ```rust,ignore
 impl CodeLang for YourLang {
-    // Array: default is Postfix { suffix: "[]" } (TS: T[])
-    // Override for Rust-style Vec<T>:
-    fn present_array(&self) -> TypePresentation<'_> {
-        TypePresentation::GenericWrap { name: "Vec" }
-    }
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            // Array: default is Postfix { suffix: "[]" } (TS: T[])
+            // Override for Rust-style Vec<T>:
+            array: TypePresentation::GenericWrap { name: "Vec" },
 
-    // Optional: default is Infix { sep: " | " } with "null" literal
-    // Override for Kotlin-style T?:
-    fn present_optional(&self) -> TypePresentation<'_> {
-        TypePresentation::Postfix { suffix: "?" }
-    }
+            // Optional: default is Infix { sep: " | " } with "null" literal
+            // Override for Kotlin-style T?:
+            optional: TypePresentation::Postfix { suffix: "?" },
 
-    // Map: default is GenericWrap { name: "Map" }
-    // Override for Go-style map[K]V:
-    fn present_map(&self) -> TypePresentation<'_> {
-        TypePresentation::Delimited { open: "map[", sep: "]", close: "" }
-    }
+            // Map: default is GenericWrap { name: "Map" }
+            // Override for Go-style map[K]V:
+            map: TypePresentation::Delimited { open: "map[", sep: "]", close: "" },
 
-    // Tuple: default is Delimited { open: "[", sep: ", ", close: "]" } (TS: [A, B])
-    // Override for Rust-style (A, B):
-    fn present_tuple(&self) -> TypePresentation<'_> {
-        TypePresentation::Delimited { open: "(", sep: ", ", close: ")" }
-    }
+            // Tuple: default is Delimited { open: "(", sep: ", ", close: ")" }
+            // TS overrides to "[", "]" for [A, B] syntax. This shows Go-style (A, B):
+            tuple: TypePresentation::Delimited { open: "(", sep: ", ", close: ")" },
 
-    // Reference: default is Prefix { prefix: "" } (identity — for GC languages)
-    // Override for Rust-style &T:
-    fn present_reference(&self) -> TypePresentation<'_> {
-        TypePresentation::Prefix { prefix: "&" }
-    }
+            // Reference: default is Prefix { prefix: "" } (identity — for GC languages)
+            // Override for Rust-style &T:
+            reference: TypePresentation::Prefix { prefix: "&" },
 
-    // Mutable reference: default is Prefix { prefix: "" } (identity)
-    // Override for C++-style T&:
-    fn present_reference_mut(&self) -> TypePresentation<'_> {
-        TypePresentation::Postfix { suffix: "&" }
-    }
+            // Function types: default is TypeScript (A, B) => R
+            function: FunctionPresentation {
+                keyword: "fn",
+                params_open: "(",
+                params_sep: ", ",
+                params_close: ")",
+                arrow: " -> ",
+                return_first: false,
+                curried: false,
+                wrapper_open: "",
+                wrapper_close: "",
+            },
 
-    // Function types: default is TypeScript (A, B) => R
-    fn present_function(&self) -> FunctionPresentation<'_> {
-        FunctionPresentation {
-            keyword: "fn",
-            params_open: "(",
-            params_sep: ", ",
-            params_close: ")",
-            arrow: " -> ",
-            return_first: false,
-            curried: false,
-            wrapper_open: "",
-            wrapper_close: "",
+            ..Default::default()
         }
     }
 }
 ```
 
-See [Type Presentation](type_presentation.md) for the full enum definition, all available methods, and examples for every supported language.
+See [Type Presentation](type_presentation.md) for the full enum definition, all available fields, and examples for every supported language.
