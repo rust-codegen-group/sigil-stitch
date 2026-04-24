@@ -117,19 +117,19 @@ impl PropertySpec {
             sig.push_str("()");
 
             if !self.property_type.is_empty() {
-                sig.push_str(lang.return_type_separator());
+                sig.push_str(lang.function_syntax().return_type_separator);
                 sig.push_str("%T");
                 sig_args.push(Arg::TypeName(self.property_type.clone()));
             }
 
-            sig.push_str(lang.block_open());
+            sig.push_str(lang.block_syntax().block_open);
             cb.add(&sig, sig_args);
             cb.add_line();
             cb.add("%>", ());
             cb.add_code(getter_body.clone());
             cb.add_line();
             cb.add("%<", ());
-            let close = lang.block_close();
+            let close = lang.block_syntax().block_close;
             if !close.is_empty() {
                 cb.add(close, ());
                 cb.add_line();
@@ -156,20 +156,20 @@ impl PropertySpec {
             sig.push_str(&lang.escape_reserved(&setter.param_name));
 
             if !self.property_type.is_empty() {
-                sig.push_str(lang.type_annotation_separator());
+                sig.push_str(lang.type_decl_syntax().type_annotation_separator);
                 sig.push_str("%T");
                 sig_args.push(Arg::TypeName(self.property_type.clone()));
             }
 
             sig.push(')');
-            sig.push_str(lang.block_open());
+            sig.push_str(lang.block_syntax().block_open);
             cb.add(&sig, sig_args);
             cb.add_line();
             cb.add("%>", ());
             cb.add_code(setter.body.clone());
             cb.add_line();
             cb.add("%<", ());
-            let close = lang.block_close();
+            let close = lang.block_syntax().block_close;
             if !close.is_empty() {
                 cb.add(close, ());
                 cb.add_line();
@@ -205,20 +205,20 @@ impl PropertySpec {
         }
 
         if has_setter {
-            sig.push_str(lang.mutable_field_keyword());
+            sig.push_str(lang.enum_and_annotation().mutable_field_keyword);
         } else {
-            sig.push_str(lang.readonly_keyword());
+            sig.push_str(lang.enum_and_annotation().readonly_keyword);
         }
 
         sig.push_str(&lang.escape_reserved(&self.name));
 
         if !self.property_type.is_empty() {
-            sig.push_str(lang.type_annotation_separator());
+            sig.push_str(lang.type_decl_syntax().type_annotation_separator);
             sig.push_str("%T");
             sig_args.push(Arg::TypeName(self.property_type.clone()));
         }
 
-        sig.push_str(lang.block_open());
+        sig.push_str(lang.block_syntax().block_open);
         cb.add(&sig, sig_args);
         cb.add_line();
         cb.add("%>", ());
@@ -226,14 +226,14 @@ impl PropertySpec {
         // Getter block.
         if let Some(getter_body) = &self.getter {
             let getter_kw = lang.property_getter_keyword();
-            let getter_sig = format!("{getter_kw}{}", lang.block_open());
+            let getter_sig = format!("{getter_kw}{}", lang.block_syntax().block_open);
             cb.add(&getter_sig, ());
             cb.add_line();
             cb.add("%>", ());
             cb.add_code(getter_body.clone());
             cb.add_line();
             cb.add("%<", ());
-            let close = lang.block_close();
+            let close = lang.block_syntax().block_close;
             if !close.is_empty() {
                 cb.add(close, ());
                 cb.add_line();
@@ -242,14 +242,18 @@ impl PropertySpec {
 
         // Setter block.
         if let Some(setter) = &self.setter {
-            let setter_sig = format!("set({}){}", setter.param_name, lang.block_open());
+            let setter_sig = format!(
+                "set({}){}",
+                setter.param_name,
+                lang.block_syntax().block_open
+            );
             cb.add(&setter_sig, ());
             cb.add_line();
             cb.add("%>", ());
             cb.add_code(setter.body.clone());
             cb.add_line();
             cb.add("%<", ());
-            let close = lang.block_close();
+            let close = lang.block_syntax().block_close;
             if !close.is_empty() {
                 cb.add(close, ());
                 cb.add_line();
@@ -257,7 +261,7 @@ impl PropertySpec {
         }
 
         cb.add("%<", ());
-        let close = lang.block_close();
+        let close = lang.block_syntax().block_close;
         if !close.is_empty() {
             cb.add(close, ());
             cb.add_line();

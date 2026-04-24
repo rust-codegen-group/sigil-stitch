@@ -2,6 +2,10 @@
 
 use crate::import::ImportGroup;
 use crate::lang::CodeLang;
+use crate::lang::config::{
+    BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
+    TypeDeclSyntaxConfig, TypePresentationConfig,
+};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Bash shell language implementation.
@@ -187,14 +191,6 @@ impl CodeLang for Bash {
         "#"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        false
-    }
-
     // --- Spec support ---
     // Shell has no visibility, generics, inheritance, or interfaces.
     // Return empty/no-op for all structural methods.
@@ -207,15 +203,7 @@ impl CodeLang for Bash {
         "function"
     }
 
-    fn return_type_separator(&self) -> &str {
-        ""
-    }
-
     fn type_keyword(&self, _kind: TypeKind) -> &str {
-        ""
-    }
-
-    fn field_terminator(&self) -> &str {
         ""
     }
 
@@ -223,20 +211,42 @@ impl CodeLang for Bash {
         true
     }
 
-    fn generic_constraint_keyword(&self) -> &str {
-        ""
+    // --- Config struct accessors ---
+
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig::default()
     }
 
-    fn generic_constraint_separator(&self) -> &str {
-        ""
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            constraint_keyword: "",
+            constraint_separator: "",
+            ..Default::default()
+        }
     }
 
-    fn super_type_keyword(&self) -> &str {
-        ""
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: "",
+            ..Default::default()
+        }
     }
 
-    fn implements_keyword(&self) -> &str {
-        ""
+    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
+        FunctionSyntaxConfig {
+            return_type_separator: "",
+            ..Default::default()
+        }
+    }
+
+    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
+        TypeDeclSyntaxConfig::default()
+    }
+
+    fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
+        EnumAndAnnotationConfig::default()
     }
 }
 
@@ -382,7 +392,7 @@ mod tests {
     #[test]
     fn test_no_semicolons() {
         let bash = Bash::new();
-        assert!(!bash.uses_semicolons());
+        assert!(!bash.block_syntax().uses_semicolons);
     }
 
     #[test]
@@ -403,14 +413,14 @@ mod tests {
     #[test]
     fn test_block_delimiters() {
         let bash = Bash::new();
-        assert_eq!(bash.block_open(), " {");
-        assert_eq!(bash.block_close(), "}");
+        assert_eq!(bash.block_syntax().block_open, " {");
+        assert_eq!(bash.block_syntax().block_close, "}");
     }
 
     #[test]
     fn test_bash_builder_fluent() {
         let bash = Bash::new().with_indent("  ").with_extension("sh");
         assert_eq!(bash.file_extension(), "sh");
-        assert_eq!(bash.indent_unit(), "  ");
+        assert_eq!(bash.block_syntax().indent_unit, "  ");
     }
 }

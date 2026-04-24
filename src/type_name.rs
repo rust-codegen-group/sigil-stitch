@@ -8,7 +8,7 @@ use crate::lang::CodeLang;
 /// Each variant describes a structural pattern for assembling already-rendered
 /// inner type docs into the output. The rendering engine in `type_name.rs`
 /// interprets these patterns — language implementations never build `BoxDoc`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypePresentation<'a> {
     /// `name<P1, P2>` — delimiters from `generic_open()`/`generic_close()`.
     GenericWrap {
@@ -61,7 +61,7 @@ pub enum GenericApplicationStyle {
 }
 
 /// Syntactic pattern for rendering a function type expression.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FunctionPresentation<'a> {
     /// Keyword before the param list (e.g., `"fn"`, `"func"`, `""`).
     pub keyword: &'a str,
@@ -83,8 +83,24 @@ pub struct FunctionPresentation<'a> {
     pub wrapper_close: &'a str,
 }
 
+impl Default for FunctionPresentation<'_> {
+    fn default() -> Self {
+        Self {
+            keyword: "",
+            params_open: "(",
+            params_sep: ", ",
+            params_close: ")",
+            arrow: " => ",
+            return_first: false,
+            curried: false,
+            wrapper_open: "",
+            wrapper_close: "",
+        }
+    }
+}
+
 /// How `TypeName::AssociatedType` renders across languages.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AssociatedTypeStyle<'a> {
     /// Rust-style: `<Base as Qual>::Member` or `Base::Member`.
     QualifiedPath {
@@ -111,7 +127,7 @@ pub enum AssociatedTypeStyle<'a> {
 }
 
 /// How `impl Trait` / `dyn Trait` bounds render.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BoundsPresentation<'a> {
     /// Keyword prefix (e.g., `"impl "`, `"dyn "`).
     pub keyword: &'a str,
@@ -120,7 +136,7 @@ pub struct BoundsPresentation<'a> {
 }
 
 /// How wildcard types render.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WildcardPresentation<'a> {
     /// Unbounded wildcard (e.g., `"?"`, `"*"`, `"_"`, `"any"`).
     pub unbounded: &'a str,
@@ -258,16 +274,16 @@ pub enum TypeName {
 fn render_presentation(
     pres: &TypePresentation<'_>,
     inner_docs: Vec<BoxDoc<'static, ()>>,
-    lang: &dyn CodeLang,
+    gs: &crate::lang::config::GenericSyntaxConfig<'_>,
 ) -> BoxDoc<'static, ()> {
     match pres {
         TypePresentation::GenericWrap { name } => {
             let sep = BoxDoc::text(",").append(BoxDoc::softline());
             let params = BoxDoc::intersperse(inner_docs, sep);
             BoxDoc::text(name.to_string())
-                .append(BoxDoc::text(lang.generic_open().to_string()))
+                .append(BoxDoc::text(gs.open.to_string()))
                 .append(params.nest(2).group())
-                .append(BoxDoc::text(lang.generic_close().to_string()))
+                .append(BoxDoc::text(gs.close.to_string()))
         }
         TypePresentation::Prefix { prefix } => {
             debug_assert_eq!(inner_docs.len(), 1);
@@ -843,6 +859,9 @@ impl TypeName {
     where
         F: Fn(&str, &str) -> String,
     {
+        let tp = lang.type_presentation();
+        let gs = lang.generic_syntax();
+
         match self {
             TypeName::Generic { base, params } => {
                 let base_doc = base.to_doc_with_lang(resolve, lang);
@@ -850,14 +869,14 @@ impl TypeName {
                     .iter()
                     .map(|p| p.to_doc_with_lang(resolve, lang))
                     .collect();
-                match lang.generic_application_style() {
+                match gs.application_style {
                     GenericApplicationStyle::Delimited => {
                         let sep = BoxDoc::text(",").append(BoxDoc::softline());
                         let params_doc = BoxDoc::intersperse(params_docs, sep);
                         base_doc
-                            .append(BoxDoc::text(lang.generic_open().to_string()))
+                            .append(BoxDoc::text(gs.open.to_string()))
                             .append(params_doc.nest(2).group())
-                            .append(BoxDoc::text(lang.generic_close().to_string()))
+                            .append(BoxDoc::text(gs.close.to_string()))
                     }
                     GenericApplicationStyle::PrefixJuxtaposition => {
                         let mut doc = base_doc;
@@ -895,16 +914,14 @@ impl TypeName {
             }
             TypeName::Array(inner) => {
                 let inner_doc = inner.to_doc_with_lang(resolve, lang);
-                render_presentation(&lang.present_array(), vec![inner_doc], lang)
+                render_presentation(&tp.array, vec![inner_doc], &gs)
             }
             TypeName::ReadonlyArray(inner) => {
                 let inner_doc = inner.to_doc_with_lang(resolve, lang);
-                if let Some(pres) = lang.present_readonly_array() {
-                    render_presentation(&pres, vec![inner_doc], lang)
+                if let Some(pres) = tp.readonly_array {
+                    render_presentation(&pres, vec![inner_doc], &gs)
                 } else {
-                    // Default: "readonly " + array rendering
-                    let array_doc =
-                        render_presentation(&lang.present_array(), vec![inner_doc], lang);
+                    let array_doc = render_presentation(&tp.array, vec![inner_doc], &gs);
                     BoxDoc::text("readonly ").append(array_doc)
                 }
             }
@@ -913,37 +930,36 @@ impl TypeName {
                     .iter()
                     .map(|m| m.to_doc_with_lang(resolve, lang))
                     .collect();
-                render_presentation(&lang.present_union(), docs, lang)
+                render_presentation(&tp.union, docs, &gs)
             }
             TypeName::Intersection(members) => {
                 let docs: Vec<_> = members
                     .iter()
                     .map(|m| m.to_doc_with_lang(resolve, lang))
                     .collect();
-                render_presentation(&lang.present_intersection(), docs, lang)
+                render_presentation(&tp.intersection, docs, &gs)
             }
             TypeName::Pointer(inner) => {
                 let inner_doc = inner.to_doc_with_lang(resolve, lang);
-                render_presentation(&lang.present_pointer(), vec![inner_doc], lang)
+                render_presentation(&tp.pointer, vec![inner_doc], &gs)
             }
             TypeName::Slice(inner) => {
                 let inner_doc = inner.to_doc_with_lang(resolve, lang);
-                render_presentation(&lang.present_slice(), vec![inner_doc], lang)
+                render_presentation(&tp.slice, vec![inner_doc], &gs)
             }
             TypeName::Map { key, value } => {
                 let key_doc = key.to_doc_with_lang(resolve, lang);
                 let value_doc = value.to_doc_with_lang(resolve, lang);
-                render_presentation(&lang.present_map(), vec![key_doc, value_doc], lang)
+                render_presentation(&tp.map, vec![key_doc, value_doc], &gs)
             }
             TypeName::Optional(inner) => {
                 let inner_doc = inner.to_doc_with_lang(resolve, lang);
-                let pres = lang.present_optional();
-                match &pres {
+                match &tp.optional {
                     TypePresentation::Infix { .. } => {
-                        let null_doc = BoxDoc::text(lang.optional_absent_literal().to_string());
-                        render_presentation(&pres, vec![inner_doc, null_doc], lang)
+                        let null_doc = BoxDoc::text(tp.optional_absent_literal.to_string());
+                        render_presentation(&tp.optional, vec![inner_doc, null_doc], &gs)
                     }
-                    _ => render_presentation(&pres, vec![inner_doc], lang),
+                    _ => render_presentation(&tp.optional, vec![inner_doc], &gs),
                 }
             }
             TypeName::Tuple(elements) => {
@@ -951,7 +967,7 @@ impl TypeName {
                     .iter()
                     .map(|e| e.to_doc_with_lang(resolve, lang))
                     .collect();
-                render_presentation(&lang.present_tuple(), docs, lang)
+                render_presentation(&tp.tuple, docs, &gs)
             }
             TypeName::Reference {
                 inner,
@@ -969,11 +985,11 @@ impl TypeName {
                     BoxDoc::text(prefix).append(inner_doc)
                 } else {
                     let pres = if *mutable {
-                        lang.present_reference_mut()
+                        tp.reference_mut
                     } else {
-                        lang.present_reference()
+                        tp.reference
                     };
-                    render_presentation(&pres, vec![inner_doc], lang)
+                    render_presentation(&pres, vec![inner_doc], &gs)
                 }
             }
             TypeName::Function {
@@ -985,7 +1001,7 @@ impl TypeName {
                     .map(|p| p.to_doc_with_lang(resolve, lang))
                     .collect();
                 let return_doc = return_type.to_doc_with_lang(resolve, lang);
-                render_function_presentation(&lang.present_function(), param_docs, return_doc)
+                render_function_presentation(&tp.function, param_docs, return_doc)
             }
             TypeName::AssociatedType {
                 base,
@@ -993,8 +1009,7 @@ impl TypeName {
                 member,
             } => {
                 let base_doc = base.to_doc_with_lang(resolve, lang);
-                let style = lang.present_associated_type();
-                match style {
+                match tp.associated_type {
                     AssociatedTypeStyle::QualifiedPath {
                         open,
                         as_kw,
@@ -1029,18 +1044,18 @@ impl TypeName {
                     .iter()
                     .map(|b| b.to_doc_with_lang(resolve, lang))
                     .collect();
-                let pres = lang.present_impl_trait();
-                let sep = BoxDoc::text(pres.separator.to_string());
-                BoxDoc::text(pres.keyword.to_string()).append(BoxDoc::intersperse(docs, sep))
+                let sep = BoxDoc::text(tp.impl_trait.separator.to_string());
+                BoxDoc::text(tp.impl_trait.keyword.to_string())
+                    .append(BoxDoc::intersperse(docs, sep))
             }
             TypeName::DynTrait { bounds } => {
                 let docs: Vec<_> = bounds
                     .iter()
                     .map(|b| b.to_doc_with_lang(resolve, lang))
                     .collect();
-                let pres = lang.present_dyn_trait();
-                let sep = BoxDoc::text(pres.separator.to_string());
-                BoxDoc::text(pres.keyword.to_string()).append(BoxDoc::intersperse(docs, sep))
+                let sep = BoxDoc::text(tp.dyn_trait.separator.to_string());
+                BoxDoc::text(tp.dyn_trait.keyword.to_string())
+                    .append(BoxDoc::intersperse(docs, sep))
             }
             TypeName::Wildcard {
                 upper_bound,
@@ -1050,15 +1065,14 @@ impl TypeName {
                     upper_bound.is_none() || lower_bound.is_none(),
                     "Wildcard cannot have both upper and lower bounds"
                 );
-                let pres = lang.present_wildcard();
                 if let Some(ub) = upper_bound {
                     let ub_doc = ub.to_doc_with_lang(resolve, lang);
-                    BoxDoc::text(pres.upper_keyword.to_string()).append(ub_doc)
+                    BoxDoc::text(tp.wildcard.upper_keyword.to_string()).append(ub_doc)
                 } else if let Some(lb) = lower_bound {
                     let lb_doc = lb.to_doc_with_lang(resolve, lang);
-                    BoxDoc::text(pres.lower_keyword.to_string()).append(lb_doc)
+                    BoxDoc::text(tp.wildcard.lower_keyword.to_string()).append(lb_doc)
                 } else {
-                    BoxDoc::text(pres.unbounded.to_string())
+                    BoxDoc::text(tp.wildcard.unbounded.to_string())
                 }
             }
             // Leaf variants delegate to to_doc (no recursion needed).
@@ -1091,32 +1105,35 @@ mod tests {
                 fn render_string_literal(&self, s: &str) -> String { self.0.render_string_literal(s) }
                 fn render_doc_comment(&self, lines: &[&str]) -> String { self.0.render_doc_comment(lines) }
                 fn line_comment_prefix(&self) -> &str { self.0.line_comment_prefix() }
-                fn indent_unit(&self) -> &str { self.0.indent_unit() }
-                fn uses_semicolons(&self) -> bool { self.0.uses_semicolons() }
                 fn render_visibility(&self, vis: crate::spec::modifiers::Visibility, ctx: crate::spec::modifiers::DeclarationContext) -> &str { self.0.render_visibility(vis, ctx) }
                 fn function_keyword(&self, ctx: crate::spec::modifiers::DeclarationContext) -> &str { self.0.function_keyword(ctx) }
-                fn return_type_separator(&self) -> &str { self.0.return_type_separator() }
                 fn type_keyword(&self, kind: crate::spec::modifiers::TypeKind) -> &str { self.0.type_keyword(kind) }
-                fn field_terminator(&self) -> &str { self.0.field_terminator() }
                 fn methods_inside_type_body(&self, kind: crate::spec::modifiers::TypeKind) -> bool { self.0.methods_inside_type_body(kind) }
-                fn generic_constraint_keyword(&self) -> &str { self.0.generic_constraint_keyword() }
-                fn generic_constraint_separator(&self) -> &str { self.0.generic_constraint_separator() }
-                fn super_type_keyword(&self) -> &str { self.0.super_type_keyword() }
-                fn implements_keyword(&self) -> &str { self.0.implements_keyword() }
+                fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> { self.0.type_presentation() }
+                fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> { self.0.block_syntax() }
+                fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> { self.0.function_syntax() }
+                fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> { self.0.type_decl_syntax() }
+                fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> { self.0.enum_and_annotation() }
                 $($override)*
             }
         };
     }
 
     test_lang!(PrefixLang, TypeScript {
-        fn generic_application_style(&self) -> GenericApplicationStyle {
-            GenericApplicationStyle::PrefixJuxtaposition
+        fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+            crate::lang::config::GenericSyntaxConfig {
+                application_style: GenericApplicationStyle::PrefixJuxtaposition,
+                ..self.0.generic_syntax()
+            }
         }
     });
 
     test_lang!(PostfixLang, TypeScript {
-        fn generic_application_style(&self) -> GenericApplicationStyle {
-            GenericApplicationStyle::PostfixJuxtaposition
+        fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+            crate::lang::config::GenericSyntaxConfig {
+                application_style: GenericApplicationStyle::PostfixJuxtaposition,
+                ..self.0.generic_syntax()
+            }
         }
     });
 

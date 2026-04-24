@@ -198,14 +198,6 @@ impl CodeLang for DartLang {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        true
-    }
-
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
         // Dart has no visibility keywords; privacy is via _ prefix naming.
         ""
@@ -214,11 +206,6 @@ impl CodeLang for DartLang {
     fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
         // Dart has no function keyword (like Java/C).
         ""
-    }
-
-    fn return_type_separator(&self) -> &str {
-        // Unused when return_type_is_prefix() is true, but set for safety.
-        " "
     }
 
     fn type_keyword(&self, kind: TypeKind) -> &str {
@@ -231,79 +218,73 @@ impl CodeLang for DartLang {
         }
     }
 
-    fn field_terminator(&self) -> &str {
-        ";"
-    }
-
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         true
-    }
-
-    fn generic_constraint_keyword(&self) -> &str {
-        " extends "
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        ", "
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        " extends "
-    }
-
-    fn implements_keyword(&self) -> &str {
-        " implements "
-    }
-
-    fn type_before_name(&self) -> bool {
-        true
-    }
-
-    fn return_type_is_prefix(&self) -> bool {
-        true
-    }
-
-    fn async_keyword(&self) -> &str {
-        // Dart's `async` is a body modifier, not a signature prefix.
-        // Use Future<T> as return type instead.
-        ""
-    }
-
-    fn readonly_keyword(&self) -> &str {
-        "final "
     }
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
     }
 
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "List" }
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::GenericWrap { name: "List" },
+            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap { name: "List" }),
+            optional: crate::type_name::TypePresentation::Postfix { suffix: "?" },
+            function: crate::type_name::FunctionPresentation {
+                keyword: " Function",
+                params_open: "(",
+                params_sep: ", ",
+                params_close: ")",
+                arrow: "",
+                return_first: true,
+                curried: false,
+                wrapper_open: "",
+                wrapper_close: "",
+            },
+            ..Default::default()
+        }
     }
 
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::GenericWrap { name: "List" })
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            constraint_keyword: " extends ",
+            constraint_separator: ", ",
+            context_bound_keyword: " extends ",
+            ..Default::default()
+        }
     }
 
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Postfix { suffix: "?" }
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            field_terminator: ";",
+            ..Default::default()
+        }
     }
 
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Map" }
+    fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
+        crate::lang::config::FunctionSyntaxConfig {
+            return_type_separator: " ",
+            async_keyword: "",
+            ..Default::default()
+        }
     }
 
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: " Function",
-            params_open: "(",
-            params_sep: ", ",
-            params_close: ")",
-            arrow: "",
-            return_first: true,
-            curried: false,
-            wrapper_open: "",
-            wrapper_close: "",
+    fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
+        crate::lang::config::TypeDeclSyntaxConfig {
+            type_before_name: true,
+            return_type_is_prefix: true,
+            super_type_keyword: " extends ",
+            implements_keyword: " implements ",
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
+        crate::lang::config::EnumAndAnnotationConfig {
+            readonly_keyword: "final ",
+            ..Default::default()
         }
     }
 }
@@ -504,25 +485,25 @@ mod tests {
     #[test]
     fn test_type_before_name() {
         let d = DartLang::new();
-        assert!(d.type_before_name());
+        assert!(d.type_decl_syntax().type_before_name);
     }
 
     #[test]
     fn test_return_type_is_prefix() {
         let d = DartLang::new();
-        assert!(d.return_type_is_prefix());
+        assert!(d.type_decl_syntax().return_type_is_prefix);
     }
 
     #[test]
     fn test_readonly_keyword() {
         let d = DartLang::new();
-        assert_eq!(d.readonly_keyword(), "final ");
+        assert_eq!(d.enum_and_annotation().readonly_keyword, "final ");
     }
 
     #[test]
     fn test_no_async_keyword() {
         let d = DartLang::new();
-        assert_eq!(d.async_keyword(), "");
+        assert_eq!(d.function_syntax().async_keyword, "");
     }
 
     #[test]
@@ -539,6 +520,6 @@ mod tests {
     fn test_dart_builder_fluent() {
         let d = DartLang::new().with_indent("    ").with_extension("g.dart");
         assert_eq!(d.file_extension(), "g.dart");
-        assert_eq!(d.indent_unit(), "    ");
+        assert_eq!(d.block_syntax().indent_unit, "    ");
     }
 }

@@ -128,7 +128,7 @@ impl FieldSpec {
 
         // Build the field line.
         let vis = lang.render_visibility(self.modifiers.visibility, ctx);
-        let term = lang.field_terminator();
+        let term = lang.block_syntax().field_terminator;
 
         let mut fmt = String::new();
         let mut args: Vec<Arg> = Vec::new();
@@ -144,7 +144,7 @@ impl FieldSpec {
         } else {
             OptionalFieldStyle::Ignored
         };
-        let type_before = lang.type_before_name();
+        let type_before = lang.type_decl_syntax().type_before_name;
 
         let name_suffix: &str = match opt_style {
             OptionalFieldStyle::NameSuffix(s) => s,
@@ -169,7 +169,7 @@ impl FieldSpec {
         if type_before {
             // C-style: type name
             if self.modifiers.is_readonly {
-                fmt.push_str(lang.readonly_keyword());
+                fmt.push_str(lang.enum_and_annotation().readonly_keyword);
             }
             if !self.field_type.is_empty() {
                 fmt.push_str(&type_pre);
@@ -184,9 +184,9 @@ impl FieldSpec {
         } else {
             // TS/Rust/Go/Python-style: name sep type
             if self.modifiers.is_readonly {
-                fmt.push_str(lang.readonly_keyword());
+                fmt.push_str(lang.enum_and_annotation().readonly_keyword);
             } else {
-                let mk = lang.mutable_field_keyword();
+                let mk = lang.enum_and_annotation().mutable_field_keyword;
                 if !mk.is_empty() {
                     fmt.push_str(mk);
                 }
@@ -196,7 +196,7 @@ impl FieldSpec {
 
             // Skip type annotation when the type is empty (e.g., Python enum members).
             if !self.field_type.is_empty() {
-                let sep = lang.type_annotation_separator();
+                let sep = lang.type_decl_syntax().type_annotation_separator;
                 fmt.push_str(sep);
                 fmt.push_str(&type_pre);
                 fmt.push_str("%T");

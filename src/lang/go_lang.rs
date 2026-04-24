@@ -2,7 +2,12 @@
 
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::CodeLang;
+use crate::lang::config::{
+    BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
+    TypeDeclSyntaxConfig, TypePresentationConfig,
+};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::type_name::{FunctionPresentation, TypePresentation, WildcardPresentation};
 
 /// Go language implementation.
 ///
@@ -206,14 +211,6 @@ impl CodeLang for GoLang {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        false
-    }
-
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
         // Go uses name capitalization for visibility, not keywords.
         ""
@@ -228,18 +225,10 @@ impl CodeLang for GoLang {
         }
     }
 
-    fn return_type_separator(&self) -> &str {
-        " "
-    }
-
     fn type_keyword(&self, _kind: TypeKind) -> &str {
         // Go uses `type Name struct/interface`, so the prefix keyword is always `type`.
         // The kind-specific keyword (struct/interface) is handled by `type_kind_suffix`.
         "type"
-    }
-
-    fn field_terminator(&self) -> &str {
-        ""
     }
 
     fn methods_inside_type_body(&self, kind: TypeKind) -> bool {
@@ -257,35 +246,6 @@ impl CodeLang for GoLang {
         format!("type {name} {inner}")
     }
 
-    fn generic_constraint_keyword(&self) -> &str {
-        " "
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        // Not commonly used; Go multi-constraints use `interface{ A; B }`.
-        " "
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        ""
-    }
-
-    fn implements_keyword(&self) -> &str {
-        ""
-    }
-
-    fn type_annotation_separator(&self) -> &str {
-        " "
-    }
-
-    fn generic_open(&self) -> &str {
-        "["
-    }
-
-    fn generic_close(&self) -> &str {
-        "]"
-    }
-
     fn qualify_import_name(&self, module: &str, resolved_name: &str) -> String {
         let pkg = package_name(module);
         format!("{pkg}.{resolved_name}")
@@ -299,65 +259,83 @@ impl CodeLang for GoLang {
         }
     }
 
-    fn enum_variant_separator(&self) -> &str {
-        ""
-    }
-
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypePrefix("*")
     }
 
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "[]" }
-    }
+    // --- Config struct accessors ---
 
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::Prefix { prefix: "[]" })
-    }
-
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "*" }
-    }
-
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "map[",
-            sep: "]",
-            close: "",
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            array: TypePresentation::Prefix { prefix: "[]" },
+            readonly_array: Some(TypePresentation::Prefix { prefix: "[]" }),
+            optional: TypePresentation::Prefix { prefix: "*" },
+            map: TypePresentation::Delimited {
+                open: "map[",
+                sep: "]",
+                close: "",
+            },
+            pointer: TypePresentation::Prefix { prefix: "*" },
+            slice: TypePresentation::Prefix { prefix: "[]" },
+            reference_mut: TypePresentation::Prefix { prefix: "*" },
+            function: FunctionPresentation {
+                keyword: "func",
+                params_open: "(",
+                params_sep: ", ",
+                params_close: ")",
+                arrow: " ",
+                return_first: false,
+                curried: false,
+                wrapper_open: "",
+                wrapper_close: "",
+            },
+            wildcard: WildcardPresentation {
+                unbounded: "any",
+                upper_keyword: "any ",
+                lower_keyword: "any ",
+            },
+            ..Default::default()
         }
     }
 
-    fn present_pointer(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "*" }
-    }
-
-    fn present_slice(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "[]" }
-    }
-
-    fn present_reference_mut(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "*" }
-    }
-
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "func",
-            params_open: "(",
-            params_sep: ", ",
-            params_close: ")",
-            arrow: " ",
-            return_first: false,
-            curried: false,
-            wrapper_open: "",
-            wrapper_close: "",
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            open: "[",
+            close: "]",
+            constraint_keyword: " ",
+            constraint_separator: " ",
+            context_bound_keyword: " ",
+            ..Default::default()
         }
     }
 
-    fn present_wildcard(&self) -> crate::type_name::WildcardPresentation<'_> {
-        crate::type_name::WildcardPresentation {
-            unbounded: "any",
-            upper_keyword: "any ",
-            lower_keyword: "any ",
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: "",
+            ..Default::default()
+        }
+    }
+
+    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
+        FunctionSyntaxConfig {
+            return_type_separator: " ",
+            ..Default::default()
+        }
+    }
+
+    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
+        TypeDeclSyntaxConfig {
+            type_annotation_separator: " ",
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
+        EnumAndAnnotationConfig {
+            variant_separator: "",
+            ..Default::default()
         }
     }
 }
@@ -513,8 +491,8 @@ mod tests {
     #[test]
     fn test_generic_delimiters() {
         let go = GoLang::new();
-        assert_eq!(go.generic_open(), "[");
-        assert_eq!(go.generic_close(), "]");
+        assert_eq!(go.generic_syntax().open, "[");
+        assert_eq!(go.generic_syntax().close, "]");
     }
 
     #[test]
@@ -529,6 +507,6 @@ mod tests {
     fn test_go_builder_fluent() {
         let go = GoLang::new().with_indent("    ").with_extension("go2");
         assert_eq!(go.file_extension(), "go2");
-        assert_eq!(go.indent_unit(), "    ");
+        assert_eq!(go.block_syntax().indent_unit, "    ");
     }
 }

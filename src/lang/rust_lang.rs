@@ -1,6 +1,12 @@
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::CodeLang;
+use crate::lang::config::{
+    BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
+    TypeDeclSyntaxConfig, TypePresentationConfig,
+};
+use crate::spec::fun_spec::WhereClauseStyle;
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::type_name::{FunctionPresentation, TypePresentation, WildcardPresentation};
 
 /// Rust language implementation.
 #[derive(Debug, Clone)]
@@ -173,16 +179,6 @@ impl CodeLang for RustLang {
         "//"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        // Rust uses semicolons for statements but not for the last expression.
-        // For code generation purposes, we default to true.
-        true
-    }
-
     fn escape_reserved(&self, name: &str) -> String {
         if self.reserved_words().contains(&name) {
             format!("r#{name}")
@@ -206,10 +202,6 @@ impl CodeLang for RustLang {
         "fn"
     }
 
-    fn return_type_separator(&self) -> &str {
-        " -> "
-    }
-
     fn type_keyword(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Struct | TypeKind::Class => "struct",
@@ -218,10 +210,6 @@ impl CodeLang for RustLang {
             TypeKind::TypeAlias => "type",
             TypeKind::Newtype => "struct",
         }
-    }
-
-    fn field_terminator(&self) -> &str {
-        ","
     }
 
     fn methods_inside_type_body(&self, kind: TypeKind) -> bool {
@@ -235,34 +223,6 @@ impl CodeLang for RustLang {
         }
     }
 
-    fn generic_constraint_keyword(&self) -> &str {
-        ": "
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        " + "
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        ""
-    }
-
-    fn implements_keyword(&self) -> &str {
-        ""
-    }
-
-    fn enum_variant_trailing_separator(&self) -> bool {
-        true
-    }
-
-    fn render_annotation_prefix(&self) -> (&str, &str) {
-        ("#[", "]")
-    }
-
-    fn constructor_keyword(&self) -> &str {
-        "fn"
-    }
-
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeWrap {
             open: "Option<",
@@ -270,74 +230,74 @@ impl CodeLang for RustLang {
         }
     }
 
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Vec" }
-    }
+    // --- Config struct accessors ---
 
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::GenericWrap { name: "Vec" })
-    }
-
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "Option" }
-    }
-
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "HashMap" }
-    }
-
-    fn present_intersection(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Infix { sep: " + " }
-    }
-
-    fn present_pointer(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "*const " }
-    }
-
-    fn present_slice(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "&[",
-            sep: "",
-            close: "]",
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            array: TypePresentation::GenericWrap { name: "Vec" },
+            readonly_array: Some(TypePresentation::GenericWrap { name: "Vec" }),
+            optional: TypePresentation::GenericWrap { name: "Option" },
+            map: TypePresentation::GenericWrap { name: "HashMap" },
+            intersection: TypePresentation::Infix { sep: " + " },
+            pointer: TypePresentation::Prefix { prefix: "*const " },
+            slice: TypePresentation::Delimited {
+                open: "&[",
+                sep: "",
+                close: "]",
+            },
+            reference: TypePresentation::Prefix { prefix: "&" },
+            reference_mut: TypePresentation::Prefix { prefix: "&mut " },
+            function: FunctionPresentation {
+                keyword: "fn",
+                params_open: "(",
+                params_sep: ", ",
+                params_close: ")",
+                arrow: " -> ",
+                return_first: false,
+                curried: false,
+                wrapper_open: "",
+                wrapper_close: "",
+            },
+            wildcard: WildcardPresentation {
+                unbounded: "_",
+                upper_keyword: "impl ",
+                lower_keyword: "impl ",
+            },
+            ..Default::default()
         }
     }
 
-    fn present_reference(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "&" }
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig::default()
     }
 
-    fn present_reference_mut(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Prefix { prefix: "&mut " }
-    }
-
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "fn",
-            params_open: "(",
-            params_sep: ", ",
-            params_close: ")",
-            arrow: " -> ",
-            return_first: false,
-            curried: false,
-            wrapper_open: "",
-            wrapper_close: "",
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            ..Default::default()
         }
     }
 
-    fn present_wildcard(&self) -> crate::type_name::WildcardPresentation<'_> {
-        // Rust doesn't have Java/Kotlin-style bounded wildcards.
-        // Unbounded `_` is valid (type inference placeholder).
-        // Bounded: maps to `impl T` as the closest approximation.
-        // For precise Rust bounds, use `TypeName::impl_trait()` / `dyn_trait()` directly.
-        crate::type_name::WildcardPresentation {
-            unbounded: "_",
-            upper_keyword: "impl ",
-            lower_keyword: "impl ",
+    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
+        FunctionSyntaxConfig {
+            return_type_separator: " -> ",
+            constructor_keyword: "fn",
+            where_clause_style: WhereClauseStyle::WhereBlock,
+            ..Default::default()
         }
     }
 
-    fn where_clause_style(&self) -> crate::spec::fun_spec::WhereClauseStyle {
-        crate::spec::fun_spec::WhereClauseStyle::WhereBlock
+    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
+        TypeDeclSyntaxConfig::default()
+    }
+
+    fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
+        EnumAndAnnotationConfig {
+            variant_trailing_separator: true,
+            annotation_prefix: "#[",
+            annotation_suffix: "]",
+            ..Default::default()
+        }
     }
 }
 
@@ -450,6 +410,6 @@ mod tests {
     fn test_rust_builder_fluent() {
         let rs = RustLang::new().with_indent("\t").with_extension("rsi");
         assert_eq!(rs.file_extension(), "rsi");
-        assert_eq!(rs.indent_unit(), "\t");
+        assert_eq!(rs.block_syntax().indent_unit, "\t");
     }
 }

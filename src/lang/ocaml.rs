@@ -2,7 +2,14 @@
 
 use crate::import::ImportGroup;
 use crate::lang::CodeLang;
+use crate::lang::config::{
+    BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
+    TypeDeclSyntaxConfig, TypePresentationConfig,
+};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::type_name::{
+    AssociatedTypeStyle, FunctionPresentation, GenericApplicationStyle, TypePresentation,
+};
 
 /// OCaml language implementation.
 ///
@@ -198,14 +205,6 @@ impl CodeLang for OCaml {
         " *)"
     }
 
-    fn indent_unit(&self) -> &str {
-        &self.indent
-    }
-
-    fn uses_semicolons(&self) -> bool {
-        false
-    }
-
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
         ""
     }
@@ -214,110 +213,20 @@ impl CodeLang for OCaml {
         "let"
     }
 
-    fn return_type_separator(&self) -> &str {
-        " : "
-    }
-
     fn type_keyword(&self, _kind: TypeKind) -> &str {
         "type"
-    }
-
-    fn field_terminator(&self) -> &str {
-        ";"
     }
 
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         false
     }
 
-    fn generic_constraint_keyword(&self) -> &str {
-        ""
-    }
-
-    fn generic_constraint_separator(&self) -> &str {
-        ""
-    }
-
-    fn super_type_keyword(&self) -> &str {
-        ""
-    }
-
-    fn implements_keyword(&self) -> &str {
-        ""
-    }
-
-    fn type_annotation_separator(&self) -> &str {
-        " : "
-    }
-
-    fn generic_application_style(&self) -> crate::type_name::GenericApplicationStyle {
-        crate::type_name::GenericApplicationStyle::PostfixJuxtaposition
-    }
-
-    fn generic_open(&self) -> &str {
-        "("
-    }
-
-    fn generic_close(&self) -> &str {
-        ")"
-    }
-
-    fn block_open(&self) -> &str {
+    fn fun_block_open(&self) -> &str {
         " ="
     }
 
-    fn block_close(&self) -> &str {
-        ""
-    }
-
-    fn present_array(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "list" }
-    }
-
-    fn present_readonly_array(&self) -> Option<crate::type_name::TypePresentation<'_>> {
-        Some(crate::type_name::TypePresentation::GenericWrap { name: "list" })
-    }
-
-    fn present_optional(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::GenericWrap { name: "option" }
-    }
-
-    fn present_map(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Delimited {
-            open: "(",
-            sep: ", ",
-            close: ") Hashtbl.t",
-        }
-    }
-
-    fn present_tuple(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Infix { sep: " * " }
-    }
-
-    fn present_function(&self) -> crate::type_name::FunctionPresentation<'_> {
-        crate::type_name::FunctionPresentation {
-            keyword: "",
-            params_open: "",
-            params_sep: " -> ",
-            params_close: "",
-            arrow: " -> ",
-            return_first: false,
-            curried: true,
-            wrapper_open: "",
-            wrapper_close: "",
-        }
-    }
-
-    fn present_associated_type(&self) -> crate::type_name::AssociatedTypeStyle<'_> {
-        crate::type_name::AssociatedTypeStyle::DotAccess
-    }
-
-    fn present_union(&self) -> crate::type_name::TypePresentation<'_> {
-        crate::type_name::TypePresentation::Infix { sep: " | " }
-    }
-
-    fn param_list_style(&self) -> crate::spec::fun_spec::ParamListStyle {
-        crate::spec::fun_spec::ParamListStyle::Curried
+    fn type_header_block_open(&self, _kind: TypeKind) -> &str {
+        " ="
     }
 
     fn type_body_prefix(&self, _name: &str, kind: crate::spec::modifiers::TypeKind) -> String {
@@ -332,6 +241,77 @@ impl CodeLang for OCaml {
             crate::spec::modifiers::TypeKind::Struct => "}".to_string(),
             _ => String::new(),
         }
+    }
+
+    // --- Config struct accessors ---
+
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            array: TypePresentation::GenericWrap { name: "list" },
+            readonly_array: Some(TypePresentation::GenericWrap { name: "list" }),
+            optional: TypePresentation::GenericWrap { name: "option" },
+            map: TypePresentation::Delimited {
+                open: "(",
+                sep: ", ",
+                close: ") Hashtbl.t",
+            },
+            tuple: TypePresentation::Infix { sep: " * " },
+            function: FunctionPresentation {
+                keyword: "",
+                params_open: "",
+                params_sep: " -> ",
+                params_close: "",
+                arrow: " -> ",
+                return_first: false,
+                curried: true,
+                wrapper_open: "",
+                wrapper_close: "",
+            },
+            associated_type: AssociatedTypeStyle::DotAccess,
+            union: TypePresentation::Infix { sep: " | " },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            open: "(",
+            close: ")",
+            application_style: GenericApplicationStyle::PostfixJuxtaposition,
+            constraint_keyword: "",
+            constraint_separator: "",
+            ..Default::default()
+        }
+    }
+
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            block_open: " =",
+            block_close: "",
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: ";",
+            ..Default::default()
+        }
+    }
+
+    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
+        FunctionSyntaxConfig {
+            return_type_separator: " : ",
+            param_list_style: crate::spec::fun_spec::ParamListStyle::Curried,
+            ..Default::default()
+        }
+    }
+
+    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
+        TypeDeclSyntaxConfig {
+            type_annotation_separator: " : ",
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
+        EnumAndAnnotationConfig::default()
     }
 }
 
@@ -460,14 +440,14 @@ mod tests {
     #[test]
     fn test_no_semicolons() {
         let ml = OCaml::new();
-        assert!(!ml.uses_semicolons());
+        assert!(!ml.block_syntax().uses_semicolons);
     }
 
     #[test]
     fn test_generic_application_style() {
         let ml = OCaml::new();
         assert!(matches!(
-            ml.generic_application_style(),
+            ml.generic_syntax().application_style,
             crate::type_name::GenericApplicationStyle::PostfixJuxtaposition
         ));
     }
@@ -476,6 +456,6 @@ mod tests {
     fn test_ocaml_builder_fluent() {
         let ml = OCaml::new().with_indent("\t").with_extension("mli");
         assert_eq!(ml.file_extension(), "mli");
-        assert_eq!(ml.indent_unit(), "\t");
+        assert_eq!(ml.block_syntax().indent_unit, "\t");
     }
 }

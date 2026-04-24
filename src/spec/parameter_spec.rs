@@ -74,7 +74,7 @@ impl ParameterSpec {
         let mut fmt = String::new();
         let mut args: Vec<Arg> = Vec::new();
 
-        if lang.type_before_name() {
+        if lang.type_decl_syntax().type_before_name {
             // C-style: type name
             if !self.param_type.is_empty() {
                 fmt.push_str("%T");
@@ -91,7 +91,7 @@ impl ParameterSpec {
 
             // Skip type annotation when the type is empty (e.g., Python's bare `self`).
             if !self.param_type.is_empty() {
-                let sep = lang.type_annotation_separator();
+                let sep = lang.type_decl_syntax().type_annotation_separator;
                 fmt.push_str(sep);
                 fmt.push_str("%T");
                 args.push(Arg::TypeName(self.param_type.clone()));
