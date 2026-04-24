@@ -62,3 +62,122 @@ let type_spec = TypeSpec::builder("StringVec", TypeKind::TypeAlias)
 ```cpp
 using StringVec = std::vector<std::string>;
 ```
+
+## Enum class
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+let type_spec = TypeSpec::builder("Color", TypeKind::Enum)
+    .doc("Available colors.")
+    .add_variant(EnumVariantSpec::new("Red").unwrap())
+    .add_variant(EnumVariantSpec::new("Green").unwrap())
+    .add_variant(EnumVariantSpec::new("Blue").unwrap())
+    .build()
+    .unwrap();
+```
+
+```cpp
+/// Available colors.
+enum class Color {
+    Red,
+    Green,
+    Blue
+};
+```
+
+## Virtual method
+
+C++ abstract classes with pure virtual methods require the `extra_member` escape hatch. Use `FunSpec::emit()` to render each method signature as a `CodeBlock`, then attach it to the type via `extra_member`.
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+use sigil_stitch::lang::cpp_lang::CppLang;
+
+fn emit_fun(fun: &FunSpec) -> CodeBlock {
+    let lang = CppLang::new();
+    fun.emit(&lang, DeclarationContext::Member).unwrap()
+}
+
+let mut pub_section = CodeBlock::builder();
+pub_section.add("%<", ());
+pub_section.add("public:", ());
+pub_section.add_line();
+pub_section.add("%>", ());
+
+pub_section.add_code(emit_fun(
+    &FunSpec::builder("area")
+        .is_abstract()
+        .returns(TypeName::primitive("double"))
+        .suffix("const")
+        .suffix("= 0")
+        .build()
+        .unwrap(),
+));
+
+pub_section.add_line();
+pub_section.add_code(emit_fun(
+    &FunSpec::builder("~Shape")
+        .is_abstract()
+        .suffix("= default")
+        .build()
+        .unwrap(),
+));
+
+let type_spec = TypeSpec::builder("Shape", TypeKind::Class)
+    .doc("Abstract shape base class.")
+    .extra_member(pub_section.build().unwrap())
+    .build()
+    .unwrap();
+```
+
+```cpp
+/// Abstract shape base class.
+class Shape {
+public:
+    virtual double area() const = 0;
+
+    virtual ~Shape() = default;
+};
+```
+
+## Namespace wrapping
+
+Use `FileSpec::add_raw` to wrap generated code in a namespace block.
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+let mut b = CodeBlock::builder();
+b.add("int square(int x) {", ());
+b.add_line();
+b.add("%>", ());
+b.add("return x * x;", ());
+b.add_line();
+b.add("%<", ());
+b.add("}", ());
+b.add_line();
+let block = b.build().unwrap();
+
+let file = FileSpec::builder("math.hpp")
+    .header(CodeBlock::of("#pragma once", ()).unwrap())
+    .add_raw("namespace math {\n")
+    .add_code(block)
+    .add_raw("\n} // namespace math\n")
+    .build()
+    .unwrap();
+let output = file.render(80).unwrap();
+```
+
+```cpp
+#pragma once
+
+namespace math {
+
+int square(int x) {
+    return x * x;
+}
+
+
+} // namespace math
+```

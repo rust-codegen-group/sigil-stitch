@@ -102,3 +102,86 @@ let type_spec = TypeSpec::builder("UserId", TypeKind::TypeAlias)
 ```typescript
 export type UserId = string;
 ```
+
+## Enum
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+let type_spec = TypeSpec::builder("Direction", TypeKind::Enum)
+    .visibility(Visibility::Public)
+    .add_variant(
+        EnumVariantSpec::builder("Up")
+            .value(CodeBlock::of("'UP'", ()).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .add_variant(
+        EnumVariantSpec::builder("Down")
+            .value(CodeBlock::of("'DOWN'", ()).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .add_variant(
+        EnumVariantSpec::builder("Left")
+            .value(CodeBlock::of("'LEFT'", ()).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .add_variant(
+        EnumVariantSpec::builder("Right")
+            .value(CodeBlock::of("'RIGHT'", ()).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
+```
+
+```typescript
+export enum Direction {
+  Up = 'UP',
+  Down = 'DOWN',
+  Left = 'LEFT',
+  Right = 'RIGHT',
+}
+```
+
+## Abstract class
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+let body = CodeBlock::of("console.log('handled')", ()).unwrap();
+
+let type_spec = TypeSpec::builder("BaseController", TypeKind::Class)
+    .visibility(Visibility::Public)
+    .is_abstract()
+    .add_method(
+        FunSpec::builder("handleRequest")
+            .is_abstract()
+            .add_param(ParameterSpec::new("req", TypeName::primitive("Request")).unwrap())
+            .returns(TypeName::primitive("Response"))
+            .build()
+            .unwrap(),
+    )
+    .add_method(
+        FunSpec::builder("log")
+            .visibility(Visibility::Protected)
+            .body(body)
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
+```
+
+```typescript
+export abstract class BaseController {
+  abstract handleRequest(req: Request): Response;
+
+  protected log() {
+    console.log('handled')
+  }
+}
+```

@@ -104,3 +104,59 @@ let type_spec = TypeSpec::builder("Meters", TypeKind::Newtype)
 ```rust
 pub struct Meters(f64);
 ```
+
+## Trait
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+let type_spec = TypeSpec::builder("Summary", TypeKind::Trait)
+    .visibility(Visibility::Public)
+    .add_method(
+        FunSpec::builder("summarize")
+            .add_param(ParameterSpec::new("&self", TypeName::primitive("")).unwrap())
+            .returns(TypeName::primitive("String"))
+            .build()
+            .unwrap(),
+    )
+    .add_method(
+        FunSpec::builder("preview")
+            .add_param(ParameterSpec::new("&self", TypeName::primitive("")).unwrap())
+            .returns(TypeName::primitive("String"))
+            .body(CodeBlock::of("self.summarize()[..50].to_string()", ()).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
+```
+
+```rust
+pub trait Summary {
+    fn summarize(&self) -> String;
+
+    fn preview(&self) -> String {
+        self.summarize()[..50].to_string()
+    }
+}
+```
+
+## Type alias
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+let type_spec = TypeSpec::builder("Result", TypeKind::TypeAlias)
+    .visibility(Visibility::Public)
+    .add_type_param(TypeParamSpec::new("T"))
+    .extends(TypeName::generic(
+        TypeName::primitive("std::result::Result"),
+        vec![TypeName::primitive("T"), TypeName::primitive("MyError")],
+    ))
+    .build()
+    .unwrap();
+```
+
+```rust
+pub type Result<T> = std::result::Result<T, MyError>;
+```

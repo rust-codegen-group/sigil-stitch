@@ -21,6 +21,9 @@
   - [Swift](cookbook_swift.md)
   - [C++](cookbook_cpp.md)
   - [C](cookbook_c.md)
+  - [Scala](cookbook_scala.md)
+  - [Haskell](cookbook_haskell.md)
+  - [OCaml](cookbook_ocaml.md)
 
 ---
 

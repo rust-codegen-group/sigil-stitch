@@ -327,6 +327,9 @@ Study these existing implementations for patterns similar to your target:
 | C | `src/lang/c_lang.rs` | Type-before-name, `#include`, `__attribute__`, struct close semicolon |
 | C++ | `src/lang/cpp_lang.rs` | `virtual` instead of `abstract`, `#include` + `using`, `[[attributes]]` |
 | Bash | `src/lang/bash.rs` | Keyword-based block closers (`fi`/`done`/`esac`), `source` imports, shell escaping |
+| Scala | `src/lang/scala.rs` | `case class`, `trait`, `[T]` generics, `<:` bounds, `= {`/`}` blocks |
+| Haskell | `src/lang/haskell.rs` | Split signature style, `where`/indentation blocks, postfix generics, `deriving` |
+| OCaml | `src/lang/ocaml.rs` | Postfix generics, `let` keyword, `= `/indentation blocks, `open Module` imports, `module_block` helper |
 
 ## Type Presentation
 

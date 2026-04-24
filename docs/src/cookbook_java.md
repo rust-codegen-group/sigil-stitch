@@ -44,3 +44,120 @@ public class UserService {
     }
 }
 ```
+
+## Interface
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+let type_spec = TypeSpec::builder("Repository", TypeKind::Interface)
+    .visibility(Visibility::Public)
+    .add_type_param(TypeParamSpec::new("T"))
+    .doc("Generic data repository.")
+    .add_method(
+        FunSpec::builder("findById")
+            .returns(TypeName::primitive("T"))
+            .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .add_method(
+        FunSpec::builder("save")
+            .returns(TypeName::primitive("void"))
+            .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .add_method(
+        FunSpec::builder("delete")
+            .returns(TypeName::primitive("void"))
+            .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
+```
+
+```java
+/**
+ * Generic data repository.
+ */
+public interface Repository<T> {
+    T findById(String id);
+
+    void save(T entity);
+
+    void delete(String id);
+}
+```
+
+## Enum
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+let type_spec = TypeSpec::builder("Color", TypeKind::Enum)
+    .visibility(Visibility::Public)
+    .doc("Supported colors.")
+    .add_variant(EnumVariantSpec::new("RED").unwrap())
+    .add_variant(EnumVariantSpec::new("GREEN").unwrap())
+    .add_variant(EnumVariantSpec::new("BLUE").unwrap())
+    .build()
+    .unwrap();
+```
+
+```java
+/**
+ * Supported colors.
+ */
+public enum Color {
+    RED,
+    GREEN,
+    BLUE
+}
+```
+
+## Abstract class
+
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+let desc_body = CodeBlock::of("return this.getClass().getSimpleName();", ()).unwrap();
+
+let type_spec = TypeSpec::builder("Shape", TypeKind::Class)
+    .visibility(Visibility::Public)
+    .doc("Abstract shape.")
+    .add_method(
+        FunSpec::builder("describe")
+            .visibility(Visibility::Public)
+            .returns(TypeName::primitive("String"))
+            .body(desc_body)
+            .build()
+            .unwrap(),
+    )
+    .add_method(
+        FunSpec::builder("area")
+            .visibility(Visibility::Public)
+            .is_abstract()
+            .returns(TypeName::primitive("double"))
+            .build()
+            .unwrap(),
+    )
+    .is_abstract()
+    .build()
+    .unwrap();
+```
+
+```java
+/**
+ * Abstract shape.
+ */
+public abstract class Shape {
+    public String describe() {
+        return this.getClass().getSimpleName();
+    }
+
+    public abstract double area();
+}
+```
