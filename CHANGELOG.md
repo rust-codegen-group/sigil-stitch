@@ -1,5 +1,75 @@
 # Changelog
 
+## 0.3.0
+
+### Breaking
+
+- **Erased `<L: CodeLang>` generic from all public types.** `CodeBlock`,
+  `TypeName`, all spec types, and `FileSpec` are no longer parameterized by
+  language. The language enters at render time via `&dyn CodeLang`.
+- **Spec builders use owning-chain `(mut self) -> Self` pattern.** `TypeSpec`,
+  `FunSpec`, `FieldSpec`, `FileSpec`, and all other spec builders now consume
+  `self` and return `Self`. Chain calls fluently instead of using `&mut self`.
+  `CodeBlockBuilder` is unchanged (still `&mut self`).
+- **`CodeBlock` internals replaced with `Vec<CodeNode>` tree IR.** The parallel
+  vectors (`formats`, `args`, etc.) are replaced by a single `Vec<CodeNode>`
+  containing typed nodes. External API is unchanged but internal
+  representations differ.
+- **`CodeLang` trait reorganized into 6 config struct accessors.** The many
+  individual trait methods are now grouped into `block_syntax()`,
+  `function_syntax()`, `type_decl_syntax()`, `generic_syntax()`,
+  `enum_and_annotation()`, and `type_presentation()`. Each returns a config
+  struct with `..Default::default()` support.
+
+### Added
+
+- Data-driven `TypePresentation` layer: languages declare syntactic patterns
+  (GenericWrap, Prefix, Postfix, Surround, Delimited, Infix) instead of
+  building `BoxDoc` directly. A single rendering engine handles all patterns.
+- `FunctionPresentation` struct for declarative function type rendering across
+  all languages.
+- `TypeName::Tuple` variant with cross-language rendering.
+- `TypeName::Reference` variant with mutable/immutable distinction.
+- `TypePresentation::Surround` for C++ `const T&` and similar patterns.
+- `TypeKind::TypeAlias` and `TypeKind::Newtype` with cross-language emission.
+- `GenericApplicationStyle` enum: `AngleBracket`, `SquareBracket`,
+  `PostfixJuxtaposition` (OCaml), `PrefixJuxtaposition` (Haskell).
+- `AssociatedTypeStyle` for TypeScript `Foo["bar"]`, Rust `Foo::Bar`, etc.
+- `ImplTrait` and `DynTrait` TypeName variants.
+- `Wildcard` TypeName variant with language-specific rendering.
+- Where-clause support for `FunSpec` and `TypeSpec`.
+- `TypeParamKind` for higher-kinded type parameters and lifetime parameters.
+- Scala language support (`sigil_stitch::lang::scala::Scala`).
+- Haskell language support (`sigil_stitch::lang::haskell::Haskell`), including
+  split signature style, `deriving` via `.implements()`, and Haddock comments.
+- OCaml language support (`sigil_stitch::lang::ocaml::OCaml`), including
+  postfix generics, `module_block`/`module_sig_block` helpers, and OCamldoc.
+- `sigil_quote!` improvements: `$open("text")` for custom block openers,
+  `$>`/`$<` for explicit indent/dedent control.
+- Per-language `sigil_quote!` golden tests for all 16 languages.
+
+### Fixed
+
+- String escaping for Swift (backslash and interpolation escaping) and Scala
+  (triple-quote and interpolation escaping).
+- Wildcard rendering across all languages.
+- Where-clause indentation alignment.
+- Doc-comment emission unified across all spec emitters.
+- Format parser byte indexing replaced with `char_indices` for correct
+  handling of multi-byte characters.
+- Multi-line literal re-indentation in `CodeRenderer`.
+- Golden file quality improvements for Go, Kotlin, JavaScript, C++, and Bash.
+
+### Documentation
+
+- Complete documentation rewrite for the 0.3.0 API across 13 mdbook chapters.
+- Per-language cookbook pages expanded to 12 languages (TypeScript, Rust, Go,
+  Python, Java, Kotlin, Swift, C++, C, Scala, Haskell, OCaml) with 4–5
+  recipes each.
+- New chapters: Type Presentation, Code Templates.
+- Architecture chapter rewritten to cover CodeNode IR, config structs, and
+  the three-pillar refactoring.
+
 ## 0.2.2
 
 ### Fixed
