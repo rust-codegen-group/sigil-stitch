@@ -423,8 +423,13 @@ mod tests {
         let ty = TypeName::primitive("number");
         let block = tmpl.apply().set("t", ty).build().unwrap();
         assert!(!block.is_empty());
-        // Should have 2 args (one for each occurrence).
-        assert_eq!(block.args.len(), 2);
+        // Should have 2 type refs (one for each occurrence).
+        let type_ref_count = block
+            .nodes
+            .iter()
+            .filter(|n| matches!(n, crate::code_node::CodeNode::TypeRef(_)))
+            .count();
+        assert_eq!(type_ref_count, 2);
     }
 
     #[test]

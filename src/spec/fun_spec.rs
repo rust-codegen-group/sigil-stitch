@@ -1,6 +1,6 @@
 //! Function/method specification.
 
-use crate::code_block::{Arg, CodeBlock, FormatPart};
+use crate::code_block::{Arg, CodeBlock};
 use crate::lang::CodeLang;
 use crate::spec::annotation_spec::AnnotationSpec;
 use crate::spec::modifiers::{
@@ -439,11 +439,7 @@ impl FunSpec {
                 cb.add_statement("%L", deleg.clone());
             }
             cb.add_code(body.clone());
-            let body_ends_with_newline = body
-                .parts
-                .last()
-                .is_some_and(|p| matches!(p, FormatPart::Newline | FormatPart::BlockClose));
-            if !body_ends_with_newline {
+            if !body.ends_with_newline_or_block_close() {
                 cb.add_line();
             }
             cb.add("%<", ());
@@ -578,11 +574,7 @@ impl FunSpec {
             cb.add_line();
             cb.add("%>", ());
             cb.add_code(body.clone());
-            let body_ends_with_newline = body
-                .parts
-                .last()
-                .is_some_and(|p| matches!(p, FormatPart::Newline | FormatPart::BlockClose));
-            if !body_ends_with_newline {
+            if !body.ends_with_newline_or_block_close() {
                 cb.add_line();
             }
             cb.add("%<", ());

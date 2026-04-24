@@ -1,10 +1,11 @@
+use crate::code_node::{CodeNode, parts_args_to_nodes};
 use crate::import::ImportRef;
 use crate::lang::CodeLang;
 use crate::type_name::TypeName;
 
 /// A parsed format specifier from a format string.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum FormatPart {
+pub(crate) enum FormatPart {
     /// Literal text (no interpolation).
     Literal(String),
     /// `%T` - type reference (consumes an Arg::TypeName).
@@ -61,11 +62,11 @@ pub enum Arg {
 
 /// An immutable code fragment with embedded type references.
 ///
-/// `CodeBlock` is the core composition primitive in sigil-stitch. It stores parsed
-/// format parts (from format strings using `%T`, `%N`, `%S`, `%L`, etc.) alongside
-/// their corresponding arguments. CodeBlocks are produced by [`CodeBlockBuilder`] and
-/// consumed by [`FileSpec`](crate::spec::file_spec::FileSpec) during rendering. Type
-/// references embedded via `%T` are automatically tracked for import resolution.
+/// `CodeBlock` is the core composition primitive in sigil-stitch. It stores a tree
+/// of [`CodeNode`] nodes — self-contained IR nodes produced from format strings
+/// (`%T`, `%N`, `%S`, `%L`, etc.). CodeBlocks are produced by [`CodeBlockBuilder`]
+/// and consumed by [`FileSpec`](crate::spec::file_spec::FileSpec) during rendering.
+/// Type references embedded via `%T` are automatically tracked for import resolution.
 ///
 /// Use [`CodeBlock::builder()`] to construct a block incrementally, or
 /// [`CodeBlock::of()`] for simple one-liners.
@@ -89,8 +90,7 @@ pub enum Arg {
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CodeBlock {
-    pub(crate) parts: Vec<FormatPart>,
-    pub(crate) args: Vec<Arg>,
+    pub(crate) nodes: Vec<CodeNode>,
 }
 
 impl CodeBlock {
@@ -108,18 +108,24 @@ impl CodeBlock {
 
     /// Check if this code block is empty.
     pub fn is_empty(&self) -> bool {
-        self.parts.is_empty()
+        self.nodes.is_empty()
+    }
+
+    /// Check if this code block ends with a newline or block close.
+    pub(crate) fn ends_with_newline_or_block_close(&self) -> bool {
+        fn check_last(nodes: &[CodeNode]) -> bool {
+            match nodes.last() {
+                Some(CodeNode::Newline | CodeNode::BlockClose) => true,
+                Some(CodeNode::Sequence(children)) => check_last(children),
+                _ => false,
+            }
+        }
+        check_last(&self.nodes)
     }
 
     /// Collect all import references from this code block.
     pub fn collect_imports(&self, out: &mut Vec<ImportRef>) {
-        for arg in &self.args {
-            match arg {
-                Arg::TypeName(tn) => tn.collect_imports(out),
-                Arg::Code(cb) => cb.collect_imports(out),
-                _ => {}
-            }
-        }
+        collect_imports_from_nodes(&self.nodes, out);
     }
 
     /// Render this code block to a string without import resolution.
@@ -135,6 +141,17 @@ impl CodeBlock {
         let imports = crate::import::ImportGroup::new();
         let mut renderer = crate::code_renderer::CodeRenderer::new(lang, &imports, width);
         renderer.render(self)
+    }
+}
+
+fn collect_imports_from_nodes(nodes: &[CodeNode], out: &mut Vec<ImportRef>) {
+    for node in nodes {
+        match node {
+            CodeNode::TypeRef(tn) => tn.collect_imports(out),
+            CodeNode::Nested(block) => block.collect_imports(out),
+            CodeNode::Sequence(children) => collect_imports_from_nodes(children, out),
+            _ => {}
+        }
     }
 }
 
@@ -161,8 +178,7 @@ impl CodeBlock {
 /// ```
 #[derive(Debug)]
 pub struct CodeBlockBuilder {
-    parts: Vec<FormatPart>,
-    args: Vec<Arg>,
+    nodes: Vec<CodeNode>,
     indent_depth: i32,
     errors: Vec<crate::error::SigilStitchError>,
 }
@@ -171,8 +187,7 @@ impl CodeBlockBuilder {
     /// Create a new empty code block builder.
     pub fn new() -> Self {
         Self {
-            parts: Vec::new(),
-            args: Vec::new(),
+            nodes: Vec::new(),
             indent_depth: 0,
             errors: Vec::new(),
         }
@@ -224,26 +239,26 @@ impl CodeBlockBuilder {
             return self;
         }
 
-        self.parts.extend(parsed);
-        self.args.extend(arg_vec);
+        let new_nodes = parts_args_to_nodes(&parsed, &arg_vec);
+        self.nodes.extend(new_nodes);
         self
     }
 
     /// Add a statement (wraps in %[...%] and appends language semicolon).
     pub fn add_statement(&mut self, format: &str, args: impl IntoArgs) -> &mut Self {
-        self.parts.push(FormatPart::StatementBegin);
+        self.nodes.push(CodeNode::StatementBegin);
         self.add(format, args);
-        self.parts.push(FormatPart::StatementEnd);
-        self.parts.push(FormatPart::Newline);
+        self.nodes.push(CodeNode::StatementEnd);
+        self.nodes.push(CodeNode::Newline);
         self
     }
 
     /// Begin a control flow block (e.g., "if foo" -> "if foo {\n" + indent).
     pub fn begin_control_flow(&mut self, format: &str, args: impl IntoArgs) -> &mut Self {
         self.add(format, args);
-        self.parts.push(FormatPart::BlockOpen);
-        self.parts.push(FormatPart::Newline);
-        self.parts.push(FormatPart::Indent);
+        self.nodes.push(CodeNode::BlockOpen);
+        self.nodes.push(CodeNode::Newline);
+        self.nodes.push(CodeNode::Indent);
         self.indent_depth += 1;
         self
     }
@@ -261,55 +276,52 @@ impl CodeBlockBuilder {
     ) -> &mut Self {
         self.add(format, args);
         if !custom_open.is_empty() {
-            self.parts
-                .push(FormatPart::BlockOpenOverride(custom_open.to_string()));
+            self.nodes
+                .push(CodeNode::BlockOpenOverride(custom_open.to_string()));
         }
-        self.parts.push(FormatPart::Newline);
-        self.parts.push(FormatPart::Indent);
+        self.nodes.push(CodeNode::Newline);
+        self.nodes.push(CodeNode::Indent);
         self.indent_depth += 1;
         self
     }
 
     /// Add an else/else-if clause (e.g., "} else {" or "elif ...:" for Python).
     pub fn next_control_flow(&mut self, format: &str, args: impl IntoArgs) -> &mut Self {
-        self.parts.push(FormatPart::Dedent);
+        self.nodes.push(CodeNode::Dedent);
         self.indent_depth -= 1;
-        self.parts.push(FormatPart::BlockCloseTransition);
+        self.nodes.push(CodeNode::BlockCloseTransition);
         self.add(format, args);
-        self.parts.push(FormatPart::BlockOpen);
-        self.parts.push(FormatPart::Newline);
-        self.parts.push(FormatPart::Indent);
+        self.nodes.push(CodeNode::BlockOpen);
+        self.nodes.push(CodeNode::Newline);
+        self.nodes.push(CodeNode::Indent);
         self.indent_depth += 1;
         self
     }
 
     /// End a control flow block (emits "}" or nothing for Python, and decreases indent).
     pub fn end_control_flow(&mut self) -> &mut Self {
-        self.parts.push(FormatPart::Dedent);
+        self.nodes.push(CodeNode::Dedent);
         self.indent_depth -= 1;
-        self.parts.push(FormatPart::BlockClose);
+        self.nodes.push(CodeNode::BlockClose);
         self
     }
 
     /// Add a blank line.
     pub fn add_line(&mut self) -> &mut Self {
-        self.parts.push(FormatPart::Newline);
+        self.nodes.push(CodeNode::Newline);
         self
     }
 
     /// Add an inline comment.
     pub fn add_comment(&mut self, text: &str) -> &mut Self {
-        // Comment prefix is added during rendering based on language.
-        self.parts
-            .push(FormatPart::Literal(format!("__COMMENT__{text}")));
-        self.parts.push(FormatPart::Newline);
+        self.nodes.push(CodeNode::Comment(text.to_string()));
+        self.nodes.push(CodeNode::Newline);
         self
     }
 
     /// Add a nested CodeBlock inline.
     pub fn add_code(&mut self, block: CodeBlock) -> &mut Self {
-        self.parts.push(FormatPart::Literal_);
-        self.args.push(Arg::Code(block));
+        self.nodes.push(CodeNode::Nested(block));
         self
     }
 
@@ -327,10 +339,7 @@ impl CodeBlockBuilder {
                 depth: self.indent_depth,
             });
         }
-        Ok(CodeBlock {
-            parts: self.parts,
-            args: self.args,
-        })
+        Ok(CodeBlock { nodes: self.nodes })
     }
 
     /// Build the CodeBlock, panicking on error.
@@ -565,6 +574,7 @@ impl_into_args_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code_node::CodeNode;
 
     #[test]
     fn test_parse_all_specifiers() {
@@ -612,8 +622,16 @@ mod tests {
         let block = b.build().unwrap();
 
         assert!(!block.is_empty());
-        assert!(block.parts.contains(&FormatPart::StatementBegin));
-        assert!(block.parts.contains(&FormatPart::StatementEnd));
+        let has_stmt_begin = block
+            .nodes
+            .iter()
+            .any(|n| matches!(n, CodeNode::StatementBegin));
+        let has_stmt_end = block
+            .nodes
+            .iter()
+            .any(|n| matches!(n, CodeNode::StatementEnd));
+        assert!(has_stmt_begin);
+        assert!(has_stmt_end);
     }
 
     #[test]
@@ -713,8 +731,11 @@ mod tests {
         let mut b = CodeBlock::builder();
         b.add("this.%N()", (NameArg("getUser".to_string()),));
         let block = b.build().unwrap();
-        assert_eq!(block.args.len(), 1);
-        assert!(matches!(&block.args[0], Arg::Name(s) if s == "getUser"));
+        let has_name = block
+            .nodes
+            .iter()
+            .any(|n| matches!(n, CodeNode::NameRef(s) if s == "getUser"));
+        assert!(has_name);
     }
 
     #[test]
@@ -722,8 +743,11 @@ mod tests {
         let mut b = CodeBlock::builder();
         b.add("const x = %S", (StringLitArg("hello".to_string()),));
         let block = b.build().unwrap();
-        assert_eq!(block.args.len(), 1);
-        assert!(matches!(&block.args[0], Arg::StringLit(s) if s == "hello"));
+        let has_str_lit = block
+            .nodes
+            .iter()
+            .any(|n| matches!(n, CodeNode::StringLit(s) if s == "hello"));
+        assert!(has_str_lit);
     }
 
     #[test]
@@ -769,14 +793,11 @@ mod tests {
         b.end_control_flow();
         let block = b.build().unwrap();
         let has_override = block
-            .parts
+            .nodes
             .iter()
-            .any(|p| matches!(p, FormatPart::BlockOpenOverride(s) if s == " where"));
+            .any(|n| matches!(n, CodeNode::BlockOpenOverride(s) if s == " where"));
         assert!(has_override, "should contain BlockOpenOverride(\" where\")");
-        let has_block_open = block
-            .parts
-            .iter()
-            .any(|p| matches!(p, FormatPart::BlockOpen));
+        let has_block_open = block.nodes.iter().any(|n| matches!(n, CodeNode::BlockOpen));
         assert!(
             !has_block_open,
             "should NOT contain BlockOpen when override is used"
@@ -792,17 +813,14 @@ mod tests {
         b.end_control_flow();
         let block = b.build().unwrap();
         let has_override = block
-            .parts
+            .nodes
             .iter()
-            .any(|p| matches!(p, FormatPart::BlockOpenOverride(_)));
+            .any(|n| matches!(n, CodeNode::BlockOpenOverride(_)));
         assert!(
             !has_override,
             "empty custom_open should skip BlockOpenOverride"
         );
-        let has_block_open = block
-            .parts
-            .iter()
-            .any(|p| matches!(p, FormatPart::BlockOpen));
+        let has_block_open = block.nodes.iter().any(|n| matches!(n, CodeNode::BlockOpen));
         assert!(!has_block_open, "should NOT contain BlockOpen either");
     }
 }

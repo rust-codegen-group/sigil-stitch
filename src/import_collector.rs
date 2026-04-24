@@ -1,4 +1,5 @@
-use crate::code_block::{Arg, CodeBlock};
+use crate::code_block::CodeBlock;
+use crate::code_node::CodeNode;
 use crate::import::ImportRef;
 
 /// Pass 1 of the three-pass rendering model.
@@ -7,19 +8,21 @@ use crate::import::ImportRef;
 /// references. No rendering, no column tracking, no pretty printing.
 pub fn collect_imports(block: &CodeBlock) -> Vec<ImportRef> {
     let mut refs = Vec::new();
-    walk_parts(block, &mut refs);
+    walk_nodes(&block.nodes, &mut refs);
     refs
 }
 
-fn walk_parts(block: &CodeBlock, refs: &mut Vec<ImportRef>) {
-    // Walk args (which contain the actual TypeName/CodeBlock data).
-    for arg in &block.args {
-        match arg {
-            Arg::TypeName(tn) => {
+fn walk_nodes(nodes: &[CodeNode], refs: &mut Vec<ImportRef>) {
+    for node in nodes {
+        match node {
+            CodeNode::TypeRef(tn) => {
                 tn.collect_imports(refs);
             }
-            Arg::Code(inner) => {
-                walk_parts(inner, refs);
+            CodeNode::Nested(inner) => {
+                walk_nodes(&inner.nodes, refs);
+            }
+            CodeNode::Sequence(children) => {
+                walk_nodes(children, refs);
             }
             _ => {}
         }
@@ -30,7 +33,7 @@ fn walk_parts(block: &CodeBlock, refs: &mut Vec<ImportRef>) {
 pub fn collect_imports_many(blocks: &[&CodeBlock]) -> Vec<ImportRef> {
     let mut refs = Vec::new();
     for block in blocks {
-        walk_parts(block, &mut refs);
+        walk_nodes(&block.nodes, &mut refs);
     }
     refs
 }
@@ -96,7 +99,6 @@ mod tests {
 
     #[test]
     fn test_collect_from_raw_content() {
-        // Raw types should not produce imports.
         let raw = TypeName::raw("any");
         let mut builder = CodeBlock::builder();
         builder.add_statement("const x: %T = null", (raw,));

@@ -71,7 +71,9 @@
 
 /// Composable code fragments with format specifiers (`%T`, `%N`, `%S`, `%L`, etc.).
 pub mod code_block;
-/// Rendering engine that walks `CodeBlock` format parts into final output.
+/// Tree-based intermediate representation for code generation.
+pub mod code_node;
+/// Rendering engine that walks `CodeNode` trees into final output.
 pub mod code_renderer;
 /// Reusable named-parameter templates that produce `CodeBlock`s.
 pub mod code_template;

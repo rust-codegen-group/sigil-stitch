@@ -1,6 +1,7 @@
 use pretty::BoxDoc;
 
-use crate::code_block::{Arg, CodeBlock, FormatPart};
+use crate::code_block::CodeBlock;
+use crate::code_node::CodeNode;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::CodeLang;
@@ -38,148 +39,113 @@ impl<'a> CodeRenderer<'a> {
 
     /// Render a CodeBlock to string.
     pub fn render(&mut self, block: &CodeBlock) -> Result<String, SigilStitchError> {
-        let mut arg_index = 0;
-        self.render_parts(&block.parts, &block.args, &mut arg_index)?;
+        self.render_nodes(&block.nodes)?;
         Ok(std::mem::take(&mut self.output))
     }
 
-    fn render_parts(
-        &mut self,
-        parts: &[FormatPart],
-        args: &[Arg],
-        arg_index: &mut usize,
-    ) -> Result<(), SigilStitchError> {
-        // Check if this sequence of parts contains any %W (soft breaks).
-        // If so, we build the whole thing as a BoxDoc and let pretty decide.
-        let has_wrap = parts.iter().any(|p| matches!(p, FormatPart::Wrap));
-
-        if has_wrap {
-            self.render_with_pretty(parts, args, arg_index)
+    fn render_nodes(&mut self, nodes: &[CodeNode]) -> Result<(), SigilStitchError> {
+        if contains_soft_break(nodes) {
+            self.render_nodes_pretty(nodes)
         } else {
-            self.render_direct(parts, args, arg_index)
+            self.render_nodes_direct(nodes)
         }
     }
 
-    /// Direct string rendering (no %W in this segment).
-    fn render_direct(
-        &mut self,
-        parts: &[FormatPart],
-        args: &[Arg],
-        arg_index: &mut usize,
-    ) -> Result<(), SigilStitchError> {
-        for part in parts {
-            match part {
-                FormatPart::Literal(text) => {
-                    if let Some(comment_text) = text.strip_prefix("__COMMENT__") {
-                        self.ensure_indent();
-                        let prefix = self.lang.line_comment_prefix();
-                        let suffix = self.lang.line_comment_suffix();
-                        self.emit(&format!("{prefix} {comment_text}{suffix}"));
-                    } else {
-                        self.emit_possibly_multiline(text);
-                    }
+    fn resolve_type_doc(&self, tn: &crate::type_name::TypeName) -> BoxDoc<'static, ()> {
+        let lang = self.lang;
+        let resolve = |module: &str, name: &str| -> String {
+            let resolved = self
+                .imports
+                .resolved_name(module, name)
+                .unwrap_or(name)
+                .to_string();
+            lang.qualify_import_name(module, &resolved)
+        };
+        tn.to_doc_with_lang(&resolve, self.lang)
+    }
+
+    /// Direct string rendering (no SoftBreak in this segment).
+    fn render_nodes_direct(&mut self, nodes: &[CodeNode]) -> Result<(), SigilStitchError> {
+        for node in nodes {
+            match node {
+                CodeNode::Literal(text) => {
+                    self.emit_possibly_multiline(text);
                 }
-                FormatPart::Type => {
-                    let arg = &args[*arg_index];
-                    *arg_index += 1;
-                    if let Arg::TypeName(tn) = arg {
-                        self.ensure_indent();
-                        let remaining_width = self.width.saturating_sub(self.current_column);
-                        let lang = self.lang;
-                        let resolve = |module: &str, name: &str| -> String {
-                            let resolved = self
-                                .imports
-                                .resolved_name(module, name)
-                                .unwrap_or(name)
-                                .to_string();
-                            lang.qualify_import_name(module, &resolved)
-                        };
-                        let doc = tn.to_doc_with_lang(&resolve, self.lang);
-                        let mut buf = Vec::new();
-                        doc.render(remaining_width, &mut buf).map_err(|e| {
-                            SigilStitchError::Render {
-                                context: "CodeRenderer::render_direct %T".to_string(),
-                                message: e.to_string(),
-                            }
+                CodeNode::TypeRef(tn) => {
+                    self.ensure_indent();
+                    let remaining_width = self.width.saturating_sub(self.current_column);
+                    let doc = self.resolve_type_doc(tn);
+                    let mut buf = Vec::new();
+                    doc.render(remaining_width, &mut buf).map_err(|e| {
+                        SigilStitchError::Render {
+                            context: "CodeRenderer::render_nodes_direct TypeRef".to_string(),
+                            message: e.to_string(),
+                        }
+                    })?;
+                    let rendered =
+                        String::from_utf8(buf).map_err(|e| SigilStitchError::Render {
+                            context: "CodeRenderer::render_nodes_direct TypeRef UTF-8".to_string(),
+                            message: e.to_string(),
                         })?;
-                        let rendered =
-                            String::from_utf8(buf).map_err(|e| SigilStitchError::Render {
-                                context: "CodeRenderer::render_direct %T UTF-8".to_string(),
-                                message: e.to_string(),
-                            })?;
-                        // Handle multi-line output: indent continuation lines.
-                        let lines: Vec<&str> = rendered.split('\n').collect();
-                        for (i, line) in lines.iter().enumerate() {
-                            if i > 0 {
-                                self.emit_newline();
-                                self.ensure_indent();
-                                // Add continuation indent to align with first line.
-                                let padding = " ".repeat(self.current_column);
-                                self.emit(&padding);
-                            }
-                            self.emit(line);
+                    let lines: Vec<&str> = rendered.split('\n').collect();
+                    for (i, line) in lines.iter().enumerate() {
+                        if i > 0 {
+                            self.emit_newline();
+                            self.ensure_indent();
+                            let padding = " ".repeat(self.current_column);
+                            self.emit(&padding);
                         }
+                        self.emit(line);
                     }
                 }
-                FormatPart::Name => {
-                    let arg = &args[*arg_index];
-                    *arg_index += 1;
-                    if let Arg::Name(name) = arg {
-                        self.ensure_indent();
-                        self.emit(name);
-                    }
+                CodeNode::NameRef(name) => {
+                    self.ensure_indent();
+                    self.emit(name);
                 }
-                FormatPart::StringLit => {
-                    let arg = &args[*arg_index];
-                    *arg_index += 1;
-                    if let Arg::StringLit(s) = arg {
-                        self.ensure_indent();
-                        let rendered = self.lang.render_string_literal(s);
-                        self.emit(&rendered);
-                    }
+                CodeNode::StringLit(s) => {
+                    self.ensure_indent();
+                    let rendered = self.lang.render_string_literal(s);
+                    self.emit(&rendered);
                 }
-                FormatPart::Literal_ => {
-                    let arg = &args[*arg_index];
-                    *arg_index += 1;
-                    match arg {
-                        Arg::Literal(s) => {
-                            self.emit_possibly_multiline(s);
-                        }
-                        Arg::Code(block) => {
-                            let mut inner_idx = 0;
-                            self.render_parts(&block.parts, &block.args, &mut inner_idx)?;
-                        }
-                        _ => {}
-                    }
+                CodeNode::InlineLiteral(s) => {
+                    self.emit_possibly_multiline(s);
                 }
-                FormatPart::Wrap => {
-                    // Should not reach here in direct mode, but just emit a space.
+                CodeNode::Nested(block) => {
+                    self.render_nodes(&block.nodes)?;
+                }
+                CodeNode::Comment(text) => {
+                    self.ensure_indent();
+                    let prefix = self.lang.line_comment_prefix();
+                    let suffix = self.lang.line_comment_suffix();
+                    self.emit(&format!("{prefix} {text}{suffix}"));
+                }
+                CodeNode::SoftBreak => {
                     self.emit(" ");
                 }
-                FormatPart::Indent => {
+                CodeNode::Indent => {
                     self.indent_level += 1;
                 }
-                FormatPart::Dedent => {
+                CodeNode::Dedent => {
                     self.indent_level = self.indent_level.saturating_sub(1);
                 }
-                FormatPart::StatementBegin => {
+                CodeNode::StatementBegin => {
                     self.ensure_indent();
                 }
-                FormatPart::StatementEnd => {
+                CodeNode::StatementEnd => {
                     if self.lang.block_syntax().uses_semicolons {
                         self.emit(";");
                     }
                 }
-                FormatPart::Newline => {
+                CodeNode::Newline => {
                     self.emit_newline();
                 }
-                FormatPart::BlockOpen => {
+                CodeNode::BlockOpen => {
                     self.emit(self.lang.block_syntax().block_open);
                 }
-                FormatPart::BlockOpenOverride(s) => {
+                CodeNode::BlockOpenOverride(s) => {
                     self.emit(s);
                 }
-                FormatPart::BlockClose => {
+                CodeNode::BlockClose => {
                     let close = self.lang.block_syntax().block_close;
                     if !close.is_empty() {
                         self.ensure_indent();
@@ -187,7 +153,7 @@ impl<'a> CodeRenderer<'a> {
                         self.emit_newline();
                     }
                 }
-                FormatPart::BlockCloseTransition => {
+                CodeNode::BlockCloseTransition => {
                     let close = self.lang.block_syntax().block_close;
                     if !close.is_empty() {
                         self.ensure_indent();
@@ -195,29 +161,26 @@ impl<'a> CodeRenderer<'a> {
                         self.emit(" ");
                     }
                 }
+                CodeNode::Sequence(children) => {
+                    self.render_nodes(children)?;
+                }
             }
         }
         Ok(())
     }
 
-    /// Render a segment containing %W using the pretty crate.
-    fn render_with_pretty(
-        &mut self,
-        parts: &[FormatPart],
-        args: &[Arg],
-        arg_index: &mut usize,
-    ) -> Result<(), SigilStitchError> {
-        // Build a BoxDoc from the parts, using softline() for %W.
-        let doc = self.build_doc_from_parts(parts, args, arg_index);
+    /// Render a segment containing SoftBreak using the pretty crate.
+    fn render_nodes_pretty(&mut self, nodes: &[CodeNode]) -> Result<(), SigilStitchError> {
+        let doc = self.nodes_to_doc(nodes);
         let remaining_width = self.width.saturating_sub(self.current_column);
         let mut buf = Vec::new();
         doc.render(remaining_width, &mut buf)
             .map_err(|e| SigilStitchError::Render {
-                context: "CodeRenderer::render_with_pretty".to_string(),
+                context: "CodeRenderer::render_nodes_pretty".to_string(),
                 message: e.to_string(),
             })?;
         let rendered = String::from_utf8(buf).map_err(|e| SigilStitchError::Render {
-            context: "CodeRenderer::render_with_pretty UTF-8".to_string(),
+            context: "CodeRenderer::render_nodes_pretty UTF-8".to_string(),
             message: e.to_string(),
         })?;
 
@@ -232,92 +195,38 @@ impl<'a> CodeRenderer<'a> {
         Ok(())
     }
 
-    fn build_doc_from_parts(
-        &self,
-        parts: &[FormatPart],
-        args: &[Arg],
-        arg_index: &mut usize,
-    ) -> BoxDoc<'static, ()> {
+    fn nodes_to_doc(&self, nodes: &[CodeNode]) -> BoxDoc<'static, ()> {
         let mut doc = BoxDoc::nil();
 
-        for part in parts {
-            let part_doc = match part {
-                FormatPart::Literal(text) => {
-                    if let Some(comment_text) = text.strip_prefix("__COMMENT__") {
-                        let prefix = self.lang.line_comment_prefix();
-                        let suffix = self.lang.line_comment_suffix();
-                        BoxDoc::text(format!("{prefix} {comment_text}{suffix}"))
-                    } else {
-                        BoxDoc::text(text.clone())
-                    }
+        for node in nodes {
+            let node_doc = match node {
+                CodeNode::Literal(text) => BoxDoc::text(text.clone()),
+                CodeNode::TypeRef(tn) => self.resolve_type_doc(tn),
+                CodeNode::NameRef(name) => BoxDoc::text(name.clone()),
+                CodeNode::StringLit(s) => BoxDoc::text(self.lang.render_string_literal(s)),
+                CodeNode::InlineLiteral(s) => BoxDoc::text(s.clone()),
+                CodeNode::Nested(block) => self.nodes_to_doc(&block.nodes),
+                CodeNode::Comment(text) => {
+                    let prefix = self.lang.line_comment_prefix();
+                    let suffix = self.lang.line_comment_suffix();
+                    BoxDoc::text(format!("{prefix} {text}{suffix}"))
                 }
-                FormatPart::Type => {
-                    let arg = &args[*arg_index];
-                    *arg_index += 1;
-                    if let Arg::TypeName(tn) = arg {
-                        let lang = self.lang;
-                        let resolve = |module: &str, name: &str| -> String {
-                            let resolved = self
-                                .imports
-                                .resolved_name(module, name)
-                                .unwrap_or(name)
-                                .to_string();
-                            lang.qualify_import_name(module, &resolved)
-                        };
-                        tn.to_doc_with_lang(&resolve, self.lang)
-                    } else {
-                        BoxDoc::nil()
-                    }
-                }
-                FormatPart::Name => {
-                    let arg = &args[*arg_index];
-                    *arg_index += 1;
-                    if let Arg::Name(name) = arg {
-                        BoxDoc::text(name.clone())
-                    } else {
-                        BoxDoc::nil()
-                    }
-                }
-                FormatPart::StringLit => {
-                    let arg = &args[*arg_index];
-                    *arg_index += 1;
-                    if let Arg::StringLit(s) = arg {
-                        BoxDoc::text(self.lang.render_string_literal(s))
-                    } else {
-                        BoxDoc::nil()
-                    }
-                }
-                FormatPart::Literal_ => {
-                    let arg = &args[*arg_index];
-                    *arg_index += 1;
-                    match arg {
-                        Arg::Literal(s) => BoxDoc::text(s.clone()),
-                        Arg::Code(block) => {
-                            let mut inner_idx = 0;
-                            self.build_doc_from_parts(&block.parts, &block.args, &mut inner_idx)
-                        }
-                        _ => BoxDoc::nil(),
-                    }
-                }
-                FormatPart::Wrap => BoxDoc::softline(),
-                FormatPart::Indent | FormatPart::Dedent => {
-                    // Indent/dedent in pretty mode is handled by nest().
-                    BoxDoc::nil()
-                }
-                FormatPart::StatementBegin => BoxDoc::nil(),
-                FormatPart::StatementEnd => {
+                CodeNode::SoftBreak => BoxDoc::softline(),
+                CodeNode::Indent | CodeNode::Dedent => BoxDoc::nil(),
+                CodeNode::StatementBegin => BoxDoc::nil(),
+                CodeNode::StatementEnd => {
                     if self.lang.block_syntax().uses_semicolons {
                         BoxDoc::text(";")
                     } else {
                         BoxDoc::nil()
                     }
                 }
-                FormatPart::Newline => BoxDoc::hardline(),
-                FormatPart::BlockOpen => {
+                CodeNode::Newline => BoxDoc::hardline(),
+                CodeNode::BlockOpen => {
                     BoxDoc::text(self.lang.block_syntax().block_open.to_string())
                 }
-                FormatPart::BlockOpenOverride(s) => BoxDoc::text(s.clone()),
-                FormatPart::BlockClose => {
+                CodeNode::BlockOpenOverride(s) => BoxDoc::text(s.clone()),
+                CodeNode::BlockClose => {
                     let close = self.lang.block_syntax().block_close;
                     if close.is_empty() {
                         BoxDoc::nil()
@@ -325,7 +234,7 @@ impl<'a> CodeRenderer<'a> {
                         BoxDoc::text(close.to_string()).append(BoxDoc::hardline())
                     }
                 }
-                FormatPart::BlockCloseTransition => {
+                CodeNode::BlockCloseTransition => {
                     let close = self.lang.block_syntax().block_close;
                     if close.is_empty() {
                         BoxDoc::nil()
@@ -333,8 +242,9 @@ impl<'a> CodeRenderer<'a> {
                         BoxDoc::text(format!("{} ", close))
                     }
                 }
+                CodeNode::Sequence(children) => self.nodes_to_doc(children),
             };
-            doc = doc.append(part_doc);
+            doc = doc.append(node_doc);
         }
 
         doc.group()
@@ -373,7 +283,6 @@ impl<'a> CodeRenderer<'a> {
 
     fn emit(&mut self, text: &str) {
         self.output.push_str(text);
-        // Update column tracking. Only count from last newline.
         if let Some(last_nl) = text.rfind('\n') {
             self.current_column = text.len() - last_nl - 1;
         } else {
@@ -386,6 +295,14 @@ impl<'a> CodeRenderer<'a> {
         self.current_column = 0;
         self.at_line_start = true;
     }
+}
+
+fn contains_soft_break(nodes: &[CodeNode]) -> bool {
+    nodes.iter().any(|n| match n {
+        CodeNode::SoftBreak => true,
+        CodeNode::Sequence(children) => contains_soft_break(children),
+        _ => false,
+    })
 }
 
 #[cfg(test)]
@@ -500,9 +417,6 @@ mod tests {
 
     #[test]
     fn test_multiline_literal_via_percent_l_reindents_each_line() {
-        // Simulate the FieldSpec/FunSpec doc-comment path: a multi-line string
-        // flowing through %L (Arg::Literal) inside an indented block must have
-        // every continuation line re-indented, not just the first.
         let mut b = CodeBlock::builder();
         b.begin_control_flow("interface User", ());
         b.add("%L", "/**\n * The user's name.\n */".to_string());
@@ -536,8 +450,6 @@ mod tests {
 
     #[test]
     fn test_multiline_literal_direct_reindents_each_line() {
-        // Exercises the FormatPart::Literal branch: the literal itself carries
-        // an embedded newline (no %L substitution involved).
         let mut b = CodeBlock::builder();
         b.begin_control_flow("function f()", ());
         b.add("line1\nline2\nline3", ());
