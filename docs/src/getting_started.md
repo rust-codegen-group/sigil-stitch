@@ -24,11 +24,10 @@ A `CodeBlock` is a composable code fragment built from format strings and typed 
 ```rust,ignore
 use sigil_stitch::prelude::*;
 use sigil_stitch::code_block::StringLitArg;
-use sigil_stitch::lang::typescript::TypeScript;
 
-let user_type = TypeName::<TypeScript>::importable_type("./models", "User");
+let user_type = TypeName::importable_type("./models", "User");
 
-let mut cb = CodeBlock::<TypeScript>::builder();
+let mut cb = CodeBlock::builder();
 cb.add_statement(
     "const user: %T = await getUser(%S)",
     (user_type.clone(), StringLitArg("id".into())),
@@ -36,9 +35,10 @@ cb.add_statement(
 cb.add_statement("return user", ());
 let body = cb.build().unwrap();
 
-let mut fb = FileSpec::<TypeScript>::builder("user.ts");
-fb.add_code(body);
-let file = fb.build().unwrap();
+let file = FileSpec::builder("user.ts")
+    .add_code(body)
+    .build()
+    .unwrap();
 
 let output = file.render(80).unwrap();
 println!("{output}");
@@ -68,7 +68,7 @@ The `sigil_quote!` macro lets you write target-language code inline, with less c
 use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let user_type = TypeName::<TypeScript>::importable_type("./models", "User");
+let user_type = TypeName::importable_type("./models", "User");
 
 let body = sigil_quote!(TypeScript {
     const user: $T(user_type) = await getUser($S("id"));
@@ -90,20 +90,22 @@ Here's a function declaration:
 use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let user_type = TypeName::<TypeScript>::importable_type("./models", "User");
+let user_type = TypeName::importable_type("./models", "User");
 
-let mut fun = FunSpec::builder("getActiveUsers");
-fun.returns(TypeName::array(user_type.clone()));
-fun.is_async();
-fun.body(sigil_quote!(TypeScript {
-    const users = await fetchAll();
-    return users.filter(u => u.active);
-}).unwrap());
-let fun = fun.build().unwrap();
+let fun = FunSpec::builder("getActiveUsers")
+    .returns(TypeName::array(user_type.clone()))
+    .is_async()
+    .body(sigil_quote!(TypeScript {
+        const users = await fetchAll();
+        return users.filter(u => u.active);
+    }).unwrap())
+    .build()
+    .unwrap();
 
-let mut file = FileSpec::<TypeScript>::builder("users.ts");
-file.add_function(fun);
-let file = file.build().unwrap();
+let file = FileSpec::builder("users.ts")
+    .add_function(fun)
+    .build()
+    .unwrap();
 
 let output = file.render(80).unwrap();
 println!("{output}");
@@ -111,7 +113,7 @@ println!("{output}");
 
 This produces a complete TypeScript file with the function declaration, including the `async` keyword, the `User[]` return type annotation, and the import for `User`.
 
-Notice the builder pattern: setter methods like `.returns()`, `.is_async()`, and `.body()` take `&mut self` and return `&mut Self` for chaining. The `.build()` call consumes the builder and returns `Result<FunSpec<TypeScript>>`. Keep the builder in a `let mut` binding and call `.build()` as a separate step.
+Notice the builder pattern: spec builders like `FunSpec::builder()` and `FileSpec::builder()` use an owning chain pattern -- setter methods like `.returns()`, `.is_async()`, and `.body()` take `mut self` and return `Self`, so you chain them fluently. The `.build()` call at the end consumes the builder and returns `Result<FunSpec>`. (`CodeBlockBuilder` is different: it uses `&mut self`, so you keep it in a `let mut` binding.)
 
 ## Specs Emit CodeBlocks
 

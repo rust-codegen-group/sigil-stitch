@@ -12,6 +12,7 @@ sigil-stitch is a Rust library for type-safe, import-aware, width-aware code gen
 sigil-stitch/
 ├── src/                    # Main library crate
 │   ├── code_block.rs       # CodeBlock and format string parsing
+│   ├── code_node.rs        # CodeNode IR (tree nodes for CodeBlock)
 │   ├── code_renderer.rs    # Three-pass rendering pipeline
 │   ├── code_template.rs    # Named-parameter templates
 │   ├── type_name.rs        # TypeName enum and TypePresentation rendering engine
@@ -19,11 +20,13 @@ sigil-stitch/
 │   ├── import_collector.rs # Import extraction from CodeBlock trees
 │   ├── name_allocator.rs   # Alias generation for import conflicts
 │   ├── error.rs            # Error types (snafu)
-│   ├── lang/               # CodeLang trait + language implementations
-│   │   ├── mod.rs          # CodeLang trait (63 methods)
+│   ├── lang/               # CodeLang trait + 6 config struct accessors + language implementations
+│   │   ├── mod.rs          # CodeLang trait (33 methods)
+│   │   ├── config.rs       # Config structs (BlockSyntaxConfig, FunctionSyntaxConfig, etc.)
 │   │   ├── typescript.rs   # One file per language: typescript, javascript,
 │   │   └── ...             # rust_lang, go_lang, python, java_lang, kotlin,
-│   │                       # swift, dart, c_lang, cpp_lang, bash, zsh
+│   │                       # swift, dart, scala, haskell, ocaml, c_lang,
+│   │                       # cpp_lang, bash, zsh
 │   └── spec/               # Structural builders (emit CodeBlocks)
 │       ├── type_spec.rs    # Class, struct, interface, trait, enum, type alias, newtype
 │       ├── fun_spec.rs     # Functions and methods
@@ -74,9 +77,9 @@ CI runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo do
 - **Linting:** `cargo clippy -- -D warnings`. All warnings are errors in CI (`RUSTFLAGS=-Dwarnings`).
 - **No comments by default.** Only add a comment when the _why_ is non-obvious — a hidden constraint, a workaround, a surprising invariant. Don't explain what the code does; well-named identifiers do that.
 - **No unnecessary abstractions.** Three similar lines are better than a premature helper. Don't add features, refactoring, or error handling beyond what the task requires.
-- **Builder pattern:** Setters take `&mut self`, `.build()` consumes `self`. Don't chain `.build()` after setters — use a `let mut` binding.
-- **Phantom type parameter `L: CodeLang`:** Every public type carries the language parameter. This prevents cross-language mixing at compile time.
-- **`BoxDoc` never appears in `CodeLang`:** Language implementations return pure data (`TypePresentation`, `FunctionPresentation`). The rendering engine in `type_name.rs` interprets the data into `BoxDoc`. This is a hard invariant.
+- **Builder pattern:** Spec builders (`TypeSpec`, `FunSpec`, `FieldSpec`, `FileSpec`, etc.) take `mut self` and return `Self` for every setter -- chain them fluently: `FunSpec::builder("f").returns(t).body(b).build()`. `CodeBlockBuilder` takes `&mut self` -- use a `let mut` binding and call methods on it.
+- **Trait objects for language:** Public types no longer carry a language generic. The language enters at render time as `&dyn CodeLang`. `FileSpec` stores the language internally; `CodeBlock`, `TypeName`, and all specs are language-agnostic.
+- **`BoxDoc` never appears in `CodeLang`:** Language implementations return pure data (`TypePresentation`, config structs). The rendering engine in `type_name.rs` and `code_renderer.rs` interprets the data into `BoxDoc`. This is a hard invariant.
 
 ## Testing
 

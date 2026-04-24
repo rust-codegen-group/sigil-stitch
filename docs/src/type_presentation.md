@@ -27,10 +27,10 @@ Each variant needs language-specific rendering, but the rendering follows a smal
               └──────┬───────┘
                      │ to_doc_with_lang(resolve, lang)
                      ▼
-          ┌─────────────────────┐
-          │  lang.present_*(…)  │  CodeLang returns TypePresentation (DATA)
-          └──────────┬──────────┘
-                     ▼
+          ┌──────────────────────────────┐
+          │  lang.type_presentation()    │  CodeLang returns TypePresentationConfig (DATA)
+          └──────────────┬───────────────┘
+                         ▼
           ┌─────────────────────┐
           │  Rendering engine   │  Single function: (TypePresentation, inner docs) → BoxDoc
           │  (one place)        │  Lives in type_name.rs, NEVER in CodeLang impls
@@ -53,7 +53,7 @@ This separates three concerns that were previously tangled:
 
 ```rust,ignore
 pub enum TypePresentation<'a> {
-    /// `name<P1, P2>` — delimiters from generic_open()/generic_close().
+    /// `name<P1, P2>` — delimiters from generic_syntax().open/.close.
     /// Vec<T>, Option<T>, HashMap<K,V>, List<T>.
     GenericWrap { name: &'a str },
 
@@ -100,29 +100,41 @@ pub struct FunctionPresentation<'a> {
 
 This declaratively covers TypeScript `(A, B) => R`, Rust `fn(A, B) -> R`, Python `Callable[[A, B], R]`, C++ `std::function<R(A, B)>`, Dart `R Function(A, B)`, and Haskell `A -> B -> R` — all from a single rendering engine interpreting the data.
 
-## CodeLang Trait Methods
+## CodeLang Trait Method
 
-Languages declare their type syntax through `present_*` methods on the `CodeLang` trait. Each method returns data — never `BoxDoc`:
+Languages declare their type syntax by returning a `TypePresentationConfig` from a single method on the `CodeLang` trait:
 
 ```rust,ignore
 trait CodeLang {
-    fn present_array(&self) -> TypePresentation<'_>;
-    fn present_readonly_array(&self) -> Option<TypePresentation<'_>>;
-    fn present_optional(&self) -> TypePresentation<'_>;
-    fn optional_absent_literal(&self) -> &str;
-    fn present_map(&self) -> TypePresentation<'_>;
-    fn present_union(&self) -> TypePresentation<'_>;
-    fn present_intersection(&self) -> TypePresentation<'_>;
-    fn present_pointer(&self) -> TypePresentation<'_>;
-    fn present_slice(&self) -> TypePresentation<'_>;
-    fn present_tuple(&self) -> TypePresentation<'_>;
-    fn present_reference(&self) -> TypePresentation<'_>;
-    fn present_reference_mut(&self) -> TypePresentation<'_>;
-    fn present_function(&self) -> FunctionPresentation<'_>;
+    fn type_presentation(&self) -> TypePresentationConfig<'_>;
 }
 ```
 
-Every method has a sensible default. TypeScript needs almost no overrides. Most languages override 3–5 methods with one-line data returns.
+`TypePresentationConfig` bundles every type-rendering decision into one struct — never `BoxDoc`:
+
+```rust,ignore
+pub struct TypePresentationConfig<'a> {
+    pub array: TypePresentation<'a>,
+    pub readonly_array: Option<TypePresentation<'a>>,
+    pub optional: TypePresentation<'a>,
+    pub optional_absent_literal: &'a str,
+    pub map: TypePresentation<'a>,
+    pub union: TypePresentation<'a>,
+    pub intersection: TypePresentation<'a>,
+    pub pointer: TypePresentation<'a>,
+    pub slice: TypePresentation<'a>,
+    pub tuple: TypePresentation<'a>,
+    pub reference: TypePresentation<'a>,
+    pub reference_mut: TypePresentation<'a>,
+    pub function: FunctionPresentation<'a>,
+    pub associated_type: AssociatedTypeStyle<'a>,
+    pub impl_trait: BoundsPresentation<'a>,
+    pub dyn_trait: BoundsPresentation<'a>,
+    pub wildcard: WildcardPresentation<'a>,
+}
+```
+
+Every field has a sensible default via `Default::default()`. TypeScript needs almost no overrides. Most languages override 3–5 fields with struct-update syntax (`..Default::default()`).
 
 ## Rendering Engine
 
@@ -132,11 +144,11 @@ A single private function in `type_name.rs` interprets presentations:
 fn render_presentation(
     pres: &TypePresentation<'_>,
     inner_docs: Vec<BoxDoc<'static, ()>>,
-    lang: &impl CodeLang,
+    gs: &GenericSyntaxConfig<'_>,
 ) -> BoxDoc<'static, ()> {
     match pres {
         TypePresentation::GenericWrap { name } => {
-            // name<P1, P2> using lang.generic_open()/generic_close()
+            // name<P1, P2> using lang.generic_syntax().open / .close
         }
         TypePresentation::Prefix { prefix } => {
             // prefix inner
@@ -166,48 +178,65 @@ Each `TypeName` variant in `to_doc_with_lang` becomes a three-step process:
 ```rust,ignore
 TypeName::Array(inner) => {
     let inner_doc = inner.to_doc_with_lang(resolve, lang);
-    render_presentation(&lang.present_array(), vec![inner_doc], lang)
+    let tp = lang.type_presentation();
+    let gs = lang.generic_syntax();
+    render_presentation(&tp.array, vec![inner_doc], &gs)
 }
 ```
 
 ## Per-Language Examples
 
-### TypeScript (mostly defaults)
+### TypeScript
+
+TypeScript overrides five fields from the defaults:
 
 ```rust,ignore
-fn present_map(&self) -> TypePresentation<'_> {
-    TypePresentation::GenericWrap { name: "Record" }
+fn type_presentation(&self) -> TypePresentationConfig<'_> {
+    TypePresentationConfig {
+        map: TypePresentation::GenericWrap { name: "Record" },
+        tuple: TypePresentation::Delimited { open: "[", sep: ", ", close: "]" },
+        associated_type: AssociatedTypeStyle::IndexAccess { open: "[\"", close: "\"]" },
+        impl_trait: BoundsPresentation { keyword: "", separator: " & " },
+        wildcard: WildcardPresentation { unbounded: "unknown", .. },
+        ..Default::default()
+    }
 }
 ```
 
-Everything else uses defaults: `Array` → `Postfix { suffix: "[]" }`, `Optional` → `Infix { sep: " | " }` with `optional_absent_literal()` returning `"null"`.
+The remaining fields use defaults: `Array` → `Postfix { suffix: "[]" }`, `Optional` → `Infix { sep: " | " }` with `optional_absent_literal` set to `"null"`.
 
 ### Rust
 
 ```rust,ignore
-fn present_array(&self) -> TypePresentation<'_> { GenericWrap { name: "Vec" } }
-fn present_optional(&self) -> TypePresentation<'_> { GenericWrap { name: "Option" } }
-fn present_map(&self) -> TypePresentation<'_> { GenericWrap { name: "HashMap" } }
-fn present_intersection(&self) -> TypePresentation<'_> { Infix { sep: " + " } }
-fn present_pointer(&self) -> TypePresentation<'_> { Prefix { prefix: "*const " } }
-fn present_slice(&self) -> TypePresentation<'_> {
-    Delimited { open: "&[", sep: "", close: "]" }
+fn type_presentation(&self) -> TypePresentationConfig<'_> {
+    TypePresentationConfig {
+        array: TypePresentation::GenericWrap { name: "Vec" },
+        optional: TypePresentation::GenericWrap { name: "Option" },
+        map: TypePresentation::GenericWrap { name: "HashMap" },
+        intersection: TypePresentation::Infix { sep: " + " },
+        pointer: TypePresentation::Prefix { prefix: "*const " },
+        slice: TypePresentation::Delimited { open: "&[", sep: "", close: "]" },
+        reference: TypePresentation::Prefix { prefix: "&" },
+        reference_mut: TypePresentation::Prefix { prefix: "&mut " },
+        ..Default::default()
+    }
 }
-fn present_reference(&self) -> TypePresentation<'_> { Prefix { prefix: "&" } }
-fn present_reference_mut(&self) -> TypePresentation<'_> { Prefix { prefix: "&mut " } }
 ```
 
 ### C++
 
 ```rust,ignore
-fn present_array(&self) -> TypePresentation<'_> { GenericWrap { name: "std::vector" } }
-fn present_optional(&self) -> TypePresentation<'_> { GenericWrap { name: "std::optional" } }
-fn present_pointer(&self) -> TypePresentation<'_> { Postfix { suffix: "*" } }
-fn present_reference(&self) -> TypePresentation<'_> {
-    Surround { prefix: "const ", suffix: "&" }
+fn type_presentation(&self) -> TypePresentationConfig<'_> {
+    TypePresentationConfig {
+        array: TypePresentation::GenericWrap { name: "std::vector" },
+        optional: TypePresentation::GenericWrap { name: "std::optional" },
+        pointer: TypePresentation::Postfix { suffix: "*" },
+        reference: TypePresentation::Surround { prefix: "const ", suffix: "&" },
+        reference_mut: TypePresentation::Postfix { suffix: "&" },
+        tuple: TypePresentation::GenericWrap { name: "std::tuple" },
+        ..Default::default()
+    }
 }
-fn present_reference_mut(&self) -> TypePresentation<'_> { Postfix { suffix: "&" } }
-fn present_tuple(&self) -> TypePresentation<'_> { GenericWrap { name: "std::tuple" } }
 ```
 
 The `Surround` variant was introduced specifically for C++'s `const T&` pattern, where a type needs both a prefix and a suffix. C uses it similarly for `const T*`.
@@ -215,31 +244,35 @@ The `Surround` variant was introduced specifically for C++'s `const T&` pattern,
 ### Go
 
 ```rust,ignore
-fn present_array(&self) -> TypePresentation<'_> { Prefix { prefix: "[]" } }
-fn present_map(&self) -> TypePresentation<'_> {
-    Delimited { open: "map[", sep: "]", close: "" }
+fn type_presentation(&self) -> TypePresentationConfig<'_> {
+    TypePresentationConfig {
+        array: TypePresentation::Prefix { prefix: "[]" },
+        map: TypePresentation::Delimited { open: "map[", sep: "]", close: "" },
+        ..Default::default()
+    }
 }
 ```
 
-Note that `GenericWrap` reuses `generic_open()`/`generic_close()`, so Go's `List[T]` works automatically because Go already sets `generic_open()` to `"["`.
+Note that `GenericWrap` reuses `generic_syntax().open`/`.close`, so Go's `List[T]` works automatically because Go already sets `generic_syntax().open` to `"["`.
 
 ### Swift
 
 ```rust,ignore
-fn present_array(&self) -> TypePresentation<'_> {
-    Delimited { open: "[", sep: "", close: "]" }
-}
-fn present_optional(&self) -> TypePresentation<'_> { Postfix { suffix: "?" } }
-fn present_map(&self) -> TypePresentation<'_> {
-    Delimited { open: "[", sep: ": ", close: "]" }
+fn type_presentation(&self) -> TypePresentationConfig<'_> {
+    TypePresentationConfig {
+        array: TypePresentation::Delimited { open: "[", sep: "", close: "]" },
+        optional: TypePresentation::Postfix { suffix: "?" },
+        map: TypePresentation::Delimited { open: "[", sep: ": ", close: "]" },
+        ..Default::default()
+    }
 }
 ```
 
 ## Design Properties
 
 1. **`BoxDoc` never appears in `CodeLang`** — languages declare data, the engine renders.
-2. **Adding a `TypeName` variant** requires one new `present_*` method returning data. No per-language render code needed.
-3. **~13 methods** replace what would otherwise be ~20+ render methods. Each is a 1-line return.
+2. **Adding a `TypeName` variant** requires one new field on `TypePresentationConfig`. No per-language render code needed.
+3. **17 fields** on `TypePresentationConfig` replace what would otherwise be ~20+ render methods. Each override is a single struct field.
 4. **One rendering engine** in `type_name.rs` handles all patterns uniformly.
 5. **Semantic types are preserved** — `Array(T)` stays `Array(T)`. The language says "render Array as GenericWrap(Vec)" not "rewrite Array to Generic('Vec', [T])".
-6. **`GenericWrap` reuses `generic_open()`/`generic_close()`** — languages that already configure these delimiters get correct rendering automatically.
+6. **`GenericWrap` reuses `generic_syntax().open`/`.close`** — languages that already configure these delimiters get correct rendering automatically.

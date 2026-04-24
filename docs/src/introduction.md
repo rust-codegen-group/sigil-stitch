@@ -22,11 +22,10 @@ is rendered with direct string concatenation (no pretty-printer overhead).
 
 ## Four key properties
 
-**Type-safe.** Every type in sigil-stitch is parameterized by `L: CodeLang`. A
-`CodeBlock<TypeScript>` cannot accept a `TypeName<Go>`. A `FunSpec<Rust>` cannot be
-added to a `FileSpec<Python>`. The compiler prevents cross-language mixing entirely --
-there is no runtime check, no language tag to compare. If it compiles, the language
-parameter is consistent.
+**Ergonomic multi-language.** `CodeBlock`, `TypeName`, and all spec types are
+language-agnostic — no generic parameter. The language enters at render time when
+you call `FileSpec::render()` or pass `&dyn CodeLang` to a renderer. You can build
+code blocks once and render them for different languages.
 
 **Import-aware.** When you use `%T` with a `TypeName::Importable`, the library records
 that import. At render time, `FileSpec` collects all imports from every code block,
@@ -43,18 +42,19 @@ and the same code blocks produce different layouts for different widths.
 **Multi-language.** The `CodeLang` trait abstracts everything that varies between
 languages: string delimiters, statement terminators, import syntax, visibility keywords,
 type formatting, annotation style, and more. sigil-stitch ships with implementations
-for TypeScript, JavaScript, Rust, Go, Python, Java, Kotlin, Swift, Dart, C, C++,
-Bash, and Zsh.
+for TypeScript, JavaScript, Rust, Go, Python, Java, Kotlin, Swift, Dart, Scala,
+Haskell, OCaml, C, C++, Bash, and Zsh.
 The same `CodeBlock`, `TypeName`, and `Spec` types work across all of them -- only the
-`L` parameter changes.
+language passed to `render()` changes.
 
 ## Design philosophy
 
 **Specs emit CodeBlocks, never raw strings.** A `FunSpec` produces a `CodeBlock` via
-its `.emit()` method. A `TypeSpec` does the same. The renderer and import system only
-ever see `CodeBlock` trees. This means you can add new spec types -- or build your
-own -- without touching the renderer or import collector. The format-specifier system
-and the spec system are fully decoupled.
+its `.emit()` method. A `TypeSpec` produces one or two `CodeBlock`s (depending on
+whether the language places methods inside or outside the type body). The renderer
+and import system only ever see `CodeBlock` trees. This means you can add new spec
+types -- or build your own -- without touching the renderer or import collector.
+The format-specifier system and the spec system are fully decoupled.
 
 **Minimal dependencies.** The runtime dependencies are `pretty` (v0.12) for
 Wadler-Lindig formatting, `serde` (v1, with `derive`) so every spec can round-trip
@@ -62,15 +62,27 @@ to JSON or YAML, and `snafu` for structured errors. Everything else -- parsing
 format strings, collecting imports, resolving conflicts, rendering output -- is
 implemented in sigil-stitch itself.
 
-**Builder pattern with `&mut Self` returns.** Builders use `&mut Self` for chaining
-setter calls, and `self` for the final `.build()`. This means you should *not* chain
-`.build()` after setters in a single expression. Instead, use a `let mut` binding:
+**Two builder flavours.** Spec builders (`TypeSpec`, `FunSpec`, `FieldSpec`,
+`FileSpec`, `EnumVariantSpec`, `PropertySpec`, `AnnotationSpec`, `ProjectSpec`) use an
+owning chain pattern -- every setter takes `mut self` and returns `Self`, so you
+chain calls fluently:
 
 ```rust,ignore
-let mut fun = FunSpec::builder("greet");
-fun.returns(TypeName::primitive("string"));
-fun.body(body);
-let fun = fun.build().unwrap();
+let fun = FunSpec::builder("greet")
+    .returns(TypeName::primitive("string"))
+    .body(body)
+    .build()
+    .unwrap();
+```
+
+`CodeBlockBuilder` is different: its methods take `&mut self` and return
+`&mut Self`, so you keep the builder in a `let mut` binding and call methods
+on it:
+
+```rust,ignore
+let mut cb = CodeBlock::builder();
+cb.add_statement("return user", ());
+let block = cb.build().unwrap();
 ```
 
 ## Quick orientation

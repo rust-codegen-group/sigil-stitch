@@ -14,7 +14,7 @@ For background on the `%` format specifiers that `sigil_quote!` expands to, see
 use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let user_type = TypeName::<TypeScript>::importable_type("./models", "User");
+let user_type = TypeName::importable_type("./models", "User");
 
 let block = sigil_quote!(TypeScript {
     const user: $T(user_type) = await getUser($S("id"));
@@ -26,17 +26,17 @@ let block = sigil_quote!(TypeScript {
 ```
 
 The macro takes a language type followed by a braced body of target-language code.
-It returns `Result<CodeBlock<LangType>, SigilStitchError>`.
+It returns `Result<CodeBlock, SigilStitchError>`.
 
 ## Interpolation Markers
 
 | Syntax | Specifier | Argument Type | Purpose |
 |--------|-----------|---------------|---------|
-| `$T(expr)` | `%T` | `TypeName<L>` | Type reference, tracks imports |
+| `$T(expr)` | `%T` | `TypeName` | Type reference, tracks imports |
 | `$N(expr)` | `%N` | `impl ToString` | Name identifier |
 | `$S(expr)` | `%S` | `impl ToString` | String literal (quoted in output) |
-| `$L(expr)` | `%L` | `impl Into<Arg<L>>` | Literal value or nested code |
-| `$C(expr)` | `%L` | `CodeBlock<L>` | Nested code block |
+| `$L(expr)` | `%L` | `impl Into<Arg>` | Literal value or nested code |
+| `$C(expr)` | `%L` | `CodeBlock` | Nested code block |
 | `$W` | `%W` | (none) | Soft line-break point |
 | `$open("text")` | — | (none) | Custom block opener override |
 | `$>` | `%>` | (none) | Increase indent level |
@@ -46,7 +46,7 @@ It returns `Result<CodeBlock<LangType>, SigilStitchError>`.
 ### Types (`$T`)
 
 ```rust,ignore
-let user_type = TypeName::<TypeScript>::importable_type("./models", "User");
+let user_type = TypeName::importable_type("./models", "User");
 let block = sigil_quote!(TypeScript {
     const user: $T(user_type) = getUser();
 }).unwrap();
@@ -86,7 +86,7 @@ let block = sigil_quote!(TypeScript {
 ### Nested Code Blocks (`$C`)
 
 ```rust,ignore
-let inner = CodeBlock::<TypeScript>::of("doSomething()", ()).unwrap();
+let inner = CodeBlock::of("doSomething()", ()).unwrap();
 let block = sigil_quote!(TypeScript {
     $C(inner);
 }).unwrap();
@@ -240,7 +240,7 @@ sigil_quote!(TypeScript {
 ### Interpolation in Conditions
 
 ```rust,ignore
-let error_type = TypeName::<TypeScript>::importable_type("./errors", "NotFoundError");
+let error_type = TypeName::importable_type("./errors", "NotFoundError");
 sigil_quote!(TypeScript {
     if (!user) {
         throw new $T(error_type)($S("not found"));
@@ -250,7 +250,7 @@ sigil_quote!(TypeScript {
 
 ## Custom Block Openers (`$open`)
 
-By default, `{ ... }` in `sigil_quote!` uses the language's `block_open()`:
+By default, `{ ... }` in `sigil_quote!` uses the language's `block_syntax().block_open`:
 - Brace languages (TypeScript, Go, etc.): `" {"`
 - Python: `":"`
 - Haskell: `" ="`
@@ -380,7 +380,7 @@ token stream. Any valid Rust expression works:
 
 ```rust,ignore
 sigil_quote!(TypeScript {
-    const x: $T(TypeName::<TypeScript>::primitive("string")) = $S("hello".to_uppercase());
+    const x: $T(TypeName::primitive("string")) = $S("hello".to_uppercase());
 })
 ```
 

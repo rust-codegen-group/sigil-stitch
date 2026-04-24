@@ -21,7 +21,7 @@ use proc_macro::TokenStream;
 /// })
 /// ```
 ///
-/// Returns `Result<CodeBlock<LangType>, SigilStitchError>`.
+/// Returns `Result<CodeBlock, SigilStitchError>`.
 ///
 /// ## Interpolation Markers
 ///
@@ -66,7 +66,7 @@ use proc_macro::TokenStream;
 ///
 /// ## Custom Block Openers (`$open`)
 ///
-/// By default, `{ ... }` uses the language's `block_open()` (e.g., `" {"` for
+/// By default, `{ ... }` uses the language's `block_syntax().block_open` (e.g., `" {"` for
 /// brace languages, `":"` for Python, `" ="` for Haskell). Use `$open("text")`
 /// before `{` to override the opener for that block:
 ///

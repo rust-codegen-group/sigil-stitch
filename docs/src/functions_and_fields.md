@@ -1,22 +1,23 @@
 # Building Functions & Fields
 
-Specs are structural builders that produce `Vec<CodeBlock<L>>`. They encapsulate common declaration patterns -- classes, functions, fields, enums -- so you work with named concepts instead of raw format strings. Every spec takes a `&L` language reference at emit time, which means the same builder definition renders correctly for any target language.
+Specs are structural builders that produce `Vec<CodeBlock>`. They encapsulate common declaration patterns -- classes, functions, fields, enums -- so you work with named concepts instead of raw format strings. Every spec takes a `&dyn CodeLang` language reference at emit time, which means the same builder definition renders correctly for any target language.
 
 All spec types live in `src/spec/`. They follow a consistent builder pattern:
 
-- **`&mut Self` for setters** -- chainable configuration methods
+- **`mut self` for setters** -- owning chainable configuration methods that return `Self`
 - **`self` for `.build()`** -- consumes the builder and returns `Result<Spec, SigilStitchError>`
-- **Never chain `.build()` after setters** -- use a `let mut` binding instead
+- **Chain calls fluently** -- `Builder::new(...).method().method().build()`
 
 ```rust,ignore
 // Correct:
-let mut fb = FunSpec::<TypeScript>::builder("greet");
-fb.returns(TypeName::primitive("string"));
-fb.body(body);
-let fun = fb.build().unwrap();
-
-// Wrong -- .build() consumes self, so you can't chain it after &mut Self setters
+let fun = FunSpec::builder("greet")
+    .returns(TypeName::primitive("string"))
+    .body(body)
+    .build()
+    .unwrap();
 ```
+
+(`CodeBlockBuilder` is different: it uses `&mut self`, so you keep it in a `let mut` binding and call methods on it.)
 
 Every spec type (including `CodeBlock`, `TypeName`, `FileSpec`, and `ProjectSpec`) derives `serde::Serialize` and `serde::Deserialize`, so you can round-trip specs through JSON, YAML, or any other serde format. This is useful for caching materialized specs, shipping them across process boundaries, or diffing them in tests.
 
@@ -29,18 +30,20 @@ use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
 // Simple parameter
-let p = ParameterSpec::<TypeScript>::new("name", TypeName::primitive("string")).unwrap();
+let p = ParameterSpec::new("name", TypeName::primitive("string")).unwrap();
 
 // Parameter with default value
-let mut pb = ParameterSpec::builder("count", TypeName::<TypeScript>::primitive("number"));
-pb.default_value(CodeBlock::<TypeScript>::of("0", ()).unwrap());
-let p = pb.build().unwrap();
+let p = ParameterSpec::builder("count", TypeName::primitive("number"))
+    .default_value(CodeBlock::of("0", ()).unwrap())
+    .build()
+    .unwrap();
 // Output: count: number = 0
 
 // Variadic parameter
-let mut pb = ParameterSpec::builder("args", TypeName::<TypeScript>::primitive("string"));
-pb.variadic();
-let p = pb.build().unwrap();
+let p = ParameterSpec::builder("args", TypeName::primitive("string"))
+    .variadic()
+    .build()
+    .unwrap();
 // Output: ...args: string
 ```
 
@@ -55,33 +58,37 @@ use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::lang::rust_lang::RustLang;
 
-let mut fb = FieldSpec::builder("name", TypeName::<TypeScript>::primitive("string"));
-fb.visibility(Visibility::Private);
-fb.is_readonly();
-let field = fb.build().unwrap();
+let field = FieldSpec::builder("name", TypeName::primitive("string"))
+    .visibility(Visibility::Private)
+    .is_readonly()
+    .build()
+    .unwrap();
 // TypeScript: private readonly name: string;
 
-let mut fb = FieldSpec::builder("name", TypeName::<RustLang>::primitive("String"));
-fb.visibility(Visibility::Public);
-let field = fb.build().unwrap();
+let field = FieldSpec::builder("name", TypeName::primitive("String"))
+    .visibility(Visibility::Public)
+    .build()
+    .unwrap();
 // Rust: pub name: String,
 ```
 
 Fields support initializers for default values:
 
 ```rust,ignore
-let mut fb = FieldSpec::builder("count", TypeName::<TypeScript>::primitive("number"));
-fb.initializer(CodeBlock::<TypeScript>::of("0", ()).unwrap());
-let field = fb.build().unwrap();
+let field = FieldSpec::builder("count", TypeName::primitive("number"))
+    .initializer(CodeBlock::of("0", ()).unwrap())
+    .build()
+    .unwrap();
 // TypeScript: count: number = 0;
 ```
 
 For Go, use `.tag()` to attach struct tags:
 
 ```rust,ignore
-let mut fb = FieldSpec::builder("Name", TypeName::<Go>::primitive("string"));
-fb.tag("json:\"name\" db:\"name\"");
-let field = fb.build().unwrap();
+let field = FieldSpec::builder("Name", TypeName::primitive("string"))
+    .tag("json:\"name\" db:\"name\"")
+    .build()
+    .unwrap();
 // Go: Name string `json:"name" db:"name"`
 ```
 
@@ -92,9 +99,10 @@ can be `null`). Rendering is language-specific, delegated to
 `CodeLang::optional_field_style()`:
 
 ```rust,ignore
-let mut fb = FieldSpec::builder("email", TypeName::<TypeScript>::primitive("string"));
-fb.is_optional();
-let field = fb.build().unwrap();
+let field = FieldSpec::builder("email", TypeName::primitive("string"))
+    .is_optional()
+    .build()
+    .unwrap();
 // TypeScript:  email?: string;
 // JavaScript:  email;                (marker stripped — no optionality in JS)
 // Rust:        email: Option<String>,
@@ -120,12 +128,13 @@ A function or method: parameters, return type, body, modifiers (async, static, a
 use sigil_stitch::prelude::*;
 use sigil_stitch::lang::typescript::TypeScript;
 
-let body = CodeBlock::<TypeScript>::of("return this.name", ()).unwrap();
+let body = CodeBlock::of("return this.name", ()).unwrap();
 
-let mut fb = FunSpec::<TypeScript>::builder("getName");
-fb.returns(TypeName::primitive("string"));
-fb.body(body);
-let fun = fb.build().unwrap();
+let fun = FunSpec::builder("getName")
+    .returns(TypeName::primitive("string"))
+    .body(body)
+    .build()
+    .unwrap();
 // function getName(): string {
 //     return this.name
 // }
@@ -134,17 +143,18 @@ let fun = fb.build().unwrap();
 ### Async methods
 
 ```rust,ignore
-let mut fb = FunSpec::<TypeScript>::builder("fetchUser");
-fb.is_async();
-fb.visibility(Visibility::Public);
-fb.add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap());
-fb.returns(TypeName::generic(
-    TypeName::primitive("Promise"),
-    vec![TypeName::primitive("User")],
-));
-let body = CodeBlock::<TypeScript>::of("return await db.find(id)", ()).unwrap();
-fb.body(body);
-let fun = fb.build().unwrap();
+let body = CodeBlock::of("return await db.find(id)", ()).unwrap();
+let fun = FunSpec::builder("fetchUser")
+    .is_async()
+    .visibility(Visibility::Public)
+    .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
+    .returns(TypeName::generic(
+        TypeName::primitive("Promise"),
+        vec![TypeName::primitive("User")],
+    ))
+    .body(body)
+    .build()
+    .unwrap();
 // public async fetchUser(id: string): Promise<User> {
 //     return await db.find(id)
 // }
@@ -153,16 +163,17 @@ let fun = fb.build().unwrap();
 ### Type parameters
 
 ```rust,ignore
-let tp = TypeParamSpec::<TypeScript>::new("T")
+let tp = TypeParamSpec::new("T")
     .with_bound(TypeName::primitive("Serializable"));
 
-let mut fb = FunSpec::<TypeScript>::builder("serialize");
-fb.add_type_param(tp);
-fb.add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap());
-fb.returns(TypeName::primitive("string"));
-let body = CodeBlock::<TypeScript>::of("return JSON.stringify(value)", ()).unwrap();
-fb.body(body);
-let fun = fb.build().unwrap();
+let body = CodeBlock::of("return JSON.stringify(value)", ()).unwrap();
+let fun = FunSpec::builder("serialize")
+    .add_type_param(tp)
+    .add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap())
+    .returns(TypeName::primitive("string"))
+    .body(body)
+    .build()
+    .unwrap();
 // function serialize<T extends Serializable>(value: T): string {
 //     return JSON.stringify(value)
 // }
@@ -173,10 +184,11 @@ let fun = fb.build().unwrap();
 When no body is provided, the function renders as a declaration. Combined with `is_abstract()`, this produces abstract method signatures:
 
 ```rust,ignore
-let mut fb = FunSpec::<TypeScript>::builder("validate");
-fb.is_abstract();
-fb.returns(TypeName::primitive("boolean"));
-let fun = fb.build().unwrap();
+let fun = FunSpec::builder("validate")
+    .is_abstract()
+    .returns(TypeName::primitive("boolean"))
+    .build()
+    .unwrap();
 // abstract validate(): boolean;
 ```
 
@@ -185,13 +197,14 @@ let fun = fb.build().unwrap();
 Use `.delegation()` to emit `super(...)` or `this(...)` calls. The placement is language-dependent: body-style (TS, Java, Dart, Swift) emits it as the first statement; signature-style (Kotlin) emits it after the parameter list.
 
 ```rust,ignore
-let mut fb = FunSpec::<TypeScript>::builder("constructor");
-fb.is_constructor();
-fb.add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap());
-fb.delegation(CodeBlock::<TypeScript>::of("super(name)", ()).unwrap());
-let body = CodeBlock::<TypeScript>::of("this.name = name", ()).unwrap();
-fb.body(body);
-let fun = fb.build().unwrap();
+let body = CodeBlock::of("this.name = name", ()).unwrap();
+let fun = FunSpec::builder("constructor")
+    .is_constructor()
+    .add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap())
+    .delegation(CodeBlock::of("super(name)", ()).unwrap())
+    .body(body)
+    .build()
+    .unwrap();
 // constructor(name: string) {
 //     super(name);
 //     this.name = name
