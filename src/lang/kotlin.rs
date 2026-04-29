@@ -380,6 +380,9 @@ impl CodeLang for Kotlin {
         crate::lang::config::EnumAndAnnotationConfig {
             readonly_keyword: "val ",
             mutable_field_keyword: "var ",
+            variant_value_format: crate::lang::config::VariantValueFormat::ConstructorArg,
+            variants_before_fields: true,
+            variant_section_terminator: ";",
             ..Default::default()
         }
     }
@@ -619,6 +622,18 @@ mod tests {
         let kt = Kotlin::new();
         assert_eq!(kt.enum_and_annotation().readonly_keyword, "val ");
         assert_eq!(kt.enum_and_annotation().mutable_field_keyword, "var ");
+    }
+
+    #[test]
+    fn test_enum_config() {
+        let kt = Kotlin::new();
+        let ea = kt.enum_and_annotation();
+        assert_eq!(
+            ea.variant_value_format,
+            crate::lang::config::VariantValueFormat::ConstructorArg
+        );
+        assert!(ea.variants_before_fields);
+        assert_eq!(ea.variant_section_terminator, ";");
     }
 
     #[test]

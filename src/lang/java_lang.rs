@@ -293,6 +293,9 @@ impl CodeLang for JavaLang {
     fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
         crate::lang::config::EnumAndAnnotationConfig {
             readonly_keyword: "final ",
+            variant_value_format: crate::lang::config::VariantValueFormat::ConstructorArg,
+            variants_before_fields: true,
+            variant_section_terminator: ";",
             ..Default::default()
         }
     }
@@ -549,5 +552,17 @@ mod tests {
     fn test_module_separator() {
         let java = JavaLang::new();
         assert_eq!(java.module_separator(), Some("."));
+    }
+
+    #[test]
+    fn test_enum_and_annotation_config() {
+        let java = JavaLang::new();
+        let ea = java.enum_and_annotation();
+        assert_eq!(
+            ea.variant_value_format,
+            crate::lang::config::VariantValueFormat::ConstructorArg
+        );
+        assert!(ea.variants_before_fields);
+        assert_eq!(ea.variant_section_terminator, ";");
     }
 }

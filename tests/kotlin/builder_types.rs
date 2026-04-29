@@ -199,6 +199,46 @@ fn test_enum_class() {
 }
 
 #[test]
+fn test_enum_with_values() {
+    let ts = TypeSpec::builder("Status", TypeKind::Enum)
+        .add_variant(
+            EnumVariantSpec::builder("ACTIVE")
+                .value(CodeBlock::of("\"active\"", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_variant(
+            EnumVariantSpec::builder("INACTIVE")
+                .value(CodeBlock::of("\"inactive\"", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_field(
+            FieldSpec::builder("value", TypeName::primitive("String"))
+                .is_readonly()
+                .build()
+                .unwrap(),
+        )
+        .add_method(
+            FunSpec::builder("getValue")
+                .returns(TypeName::primitive("String"))
+                .body(CodeBlock::of("return value", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let file = FileSpec::builder_with("Status.kt", Kotlin::new())
+        .add_type(ts)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("kotlin/enum_with_values.kt", &output);
+}
+
+#[test]
 fn test_override_method() {
     let body = CodeBlock::of(
         "return %S",

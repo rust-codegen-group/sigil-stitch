@@ -314,6 +314,16 @@ impl Default for TypeDeclSyntaxConfig<'_> {
     }
 }
 
+/// How an enum variant's value is formatted.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum VariantValueFormat {
+    /// `NAME = value` — TypeScript, Rust, C, Swift, etc.
+    #[default]
+    Assignment,
+    /// `NAME(value)` — Java, Kotlin constructor-arg style.
+    ConstructorArg,
+}
+
 /// Enum variant formatting, annotation syntax, and field mutability keywords.
 #[derive(Debug, Clone, Copy)]
 pub struct EnumAndAnnotationConfig<'a> {
@@ -325,6 +335,12 @@ pub struct EnumAndAnnotationConfig<'a> {
     pub variant_separator: &'a str,
     /// Whether the separator appears after the last variant too.
     pub variant_trailing_separator: bool,
+    /// How the variant value is rendered (assignment `= val` vs constructor `(val)`).
+    pub variant_value_format: VariantValueFormat,
+    /// Whether enum variants are emitted before fields (Java/Kotlin pattern).
+    pub variants_before_fields: bool,
+    /// Terminator emitted after the last variant when fields/methods follow (e.g. `";"`).
+    pub variant_section_terminator: &'a str,
     /// Prefix wrapping an annotation name (e.g. `"@"`, `"#["`).
     pub annotation_prefix: &'a str,
     /// Suffix closing an annotation (e.g. `""`, `"]"`).
@@ -342,6 +358,9 @@ impl Default for EnumAndAnnotationConfig<'_> {
             variant_prefix_first: None,
             variant_separator: ",",
             variant_trailing_separator: false,
+            variant_value_format: VariantValueFormat::Assignment,
+            variants_before_fields: false,
+            variant_section_terminator: "",
             annotation_prefix: "@",
             annotation_suffix: "",
             readonly_keyword: "const ",

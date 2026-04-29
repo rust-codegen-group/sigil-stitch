@@ -198,6 +198,62 @@ fn test_enum() {
 }
 
 #[test]
+fn test_enum_with_values() {
+    let ts = TypeSpec::builder("PetStatus", TypeKind::Enum)
+        .visibility(Visibility::Public)
+        .add_variant(
+            EnumVariantSpec::builder("AVAILABLE")
+                .value(CodeBlock::of("\"available\"", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_variant(
+            EnumVariantSpec::builder("PENDING")
+                .value(CodeBlock::of("\"pending\"", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_variant(
+            EnumVariantSpec::builder("SOLD")
+                .value(CodeBlock::of("\"sold\"", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_field(
+            FieldSpec::builder("value", TypeName::primitive("String"))
+                .visibility(Visibility::Private)
+                .is_readonly()
+                .build()
+                .unwrap(),
+        )
+        .add_method(
+            FunSpec::builder("PetStatus")
+                .add_param(ParameterSpec::new("value", TypeName::primitive("String")).unwrap())
+                .body(CodeBlock::of("this.value = value;", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_method(
+            FunSpec::builder("getValue")
+                .visibility(Visibility::Public)
+                .returns(TypeName::primitive("String"))
+                .body(CodeBlock::of("return this.value;", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let file = FileSpec::builder_with("PetStatus.java", JavaLang::new())
+        .add_type(ts)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("java/enum_with_values.java", &output);
+}
+
+#[test]
 fn test_generic_class() {
     let tp = TypeParamSpec::new("T")
         .with_bound(TypeName::primitive("Comparable"))

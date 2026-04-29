@@ -147,18 +147,35 @@ impl TypeSpec {
             cb.add("%L", doc_str);
             cb.add_line();
         }
-        for (i, field) in self.fields.iter().enumerate() {
-            if i > 0 {
-                // No extra blank line between fields.
+        let ea = lang.enum_and_annotation();
+        let has_trailing_members =
+            !self.fields.is_empty() || !self.properties.is_empty() || !self.methods.is_empty();
+
+        if ea.variants_before_fields {
+            // Variants first (Java/Kotlin pattern).
+            if !self.variants.is_empty() {
+                self.emit_variants(&mut cb, lang, has_trailing_members)?;
             }
-            cb.add_code(field.emit(lang, DeclarationContext::Member)?);
-        }
-        // Enum variants.
-        if !self.variants.is_empty() {
-            if !self.fields.is_empty() {
-                cb.add_line();
+            for (i, field) in self.fields.iter().enumerate() {
+                if i == 0 && !self.variants.is_empty() {
+                    cb.add_line();
+                }
+                cb.add_code(field.emit(lang, DeclarationContext::Member)?);
             }
-            self.emit_variants(&mut cb, lang)?;
+        } else {
+            // Fields first, then variants (default).
+            for (i, field) in self.fields.iter().enumerate() {
+                if i > 0 {
+                    // No extra blank line between fields.
+                }
+                cb.add_code(field.emit(lang, DeclarationContext::Member)?);
+            }
+            if !self.variants.is_empty() {
+                if !self.fields.is_empty() {
+                    cb.add_line();
+                }
+                self.emit_variants(&mut cb, lang, has_trailing_members)?;
+            }
         }
         let has_body_above = !self.fields.is_empty() || !self.variants.is_empty();
         // Properties (after fields, before methods).
@@ -245,7 +262,8 @@ impl TypeSpec {
             if !self.fields.is_empty() {
                 cb.add_line();
             }
-            self.emit_variants(&mut cb, lang)?;
+            let has_trailing = !self.extra_members.is_empty();
+            self.emit_variants(&mut cb, lang, has_trailing)?;
         }
         for extra in &self.extra_members {
             cb.add_code(extra.clone());
@@ -423,6 +441,7 @@ impl TypeSpec {
         &self,
         cb: &mut CodeBlockBuilder,
         lang: &dyn CodeLang,
+        has_trailing_members: bool,
     ) -> Result<(), crate::error::SigilStitchError> {
         let ea = lang.enum_and_annotation();
         let sep = ea.variant_separator;
@@ -490,7 +509,6 @@ impl TypeSpec {
             // Struct fields: Name { field: Type, ... }
             if !variant.fields.is_empty() {
                 let is_last = i == count - 1;
-                let needs_sep = !sep.is_empty() && (!is_last || trailing);
 
                 fmt.push_str(" {");
                 cb.add(&fmt, args);
@@ -526,7 +544,9 @@ impl TypeSpec {
                     cb.add_line();
                 }
                 cb.add("%<", ());
-                if needs_sep {
+                if is_last && has_trailing_members && !ea.variant_section_terminator.is_empty() {
+                    cb.add(&format!("}}{}", ea.variant_section_terminator), ());
+                } else if !sep.is_empty() && (!is_last || trailing) {
                     cb.add(&format!("}}{sep}"), ());
                 } else {
                     cb.add("}", ());
@@ -536,12 +556,21 @@ impl TypeSpec {
             }
 
             if let Some(val) = &variant.value {
-                fmt.push_str(" = %L");
+                match ea.variant_value_format {
+                    crate::lang::config::VariantValueFormat::Assignment => {
+                        fmt.push_str(" = %L");
+                    }
+                    crate::lang::config::VariantValueFormat::ConstructorArg => {
+                        fmt.push_str("(%L)");
+                    }
+                }
                 args.push(Arg::Code(val.clone()));
             }
 
             let is_last = i == count - 1;
-            if !sep.is_empty() && (!is_last || trailing) {
+            if is_last && has_trailing_members && !ea.variant_section_terminator.is_empty() {
+                fmt.push_str(ea.variant_section_terminator);
+            } else if !sep.is_empty() && (!is_last || trailing) {
                 fmt.push_str(sep);
             }
 
