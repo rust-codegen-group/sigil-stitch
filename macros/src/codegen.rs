@@ -5,7 +5,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::parse::{InterpolationKind, ParsedInput, Statement, TypedArg};
+use crate::parse::{InterpolationKind, MetaBranch, ParsedInput, Statement, TypedArg};
 
 /// Generate the output token stream from a parsed `sigil_quote!` input.
 pub(crate) fn generate(input: ParsedInput) -> TokenStream {
@@ -86,6 +86,19 @@ fn generate_statements(statements: &[Statement]) -> Vec<TokenStream> {
                     __sigil_builder.end_control_flow();
                 });
             }
+            Statement::SpliceEach { expr } => {
+                calls.push(quote! {
+                    for __sigil_item in #expr {
+                        __sigil_builder.add_code(
+                            ::std::convert::Into::<::sigil_stitch::code_block::CodeBlock>::into(__sigil_item)
+                        );
+                    }
+                });
+            }
+            Statement::MetaIf { branches } => {
+                let meta_if = generate_meta_if(branches);
+                calls.push(meta_if);
+            }
         }
     }
     calls
@@ -124,4 +137,40 @@ fn build_args_tuple(args: &[TypedArg]) -> TokenStream {
             .collect();
         quote! { (#(#arg_exprs,)*) }
     }
+}
+
+/// Generate a Rust if/else-if/else chain for meta-conditional branches.
+fn generate_meta_if(branches: &[MetaBranch]) -> TokenStream {
+    let mut result = TokenStream::new();
+
+    for (i, branch) in branches.iter().enumerate() {
+        let body_calls = generate_statements(&branch.body);
+        let body_block = quote! { #(#body_calls)* };
+
+        if i == 0 {
+            // First branch: `if cond { ... }`
+            let cond = branch.condition.as_ref().unwrap();
+            result = quote! {
+                if #cond {
+                    #body_block
+                }
+            };
+        } else if let Some(ref cond) = branch.condition {
+            // Middle branch: `else if cond { ... }`
+            result = quote! {
+                #result else if #cond {
+                    #body_block
+                }
+            };
+        } else {
+            // Final branch: `else { ... }`
+            result = quote! {
+                #result else {
+                    #body_block
+                }
+            };
+        }
+    }
+
+    result
 }

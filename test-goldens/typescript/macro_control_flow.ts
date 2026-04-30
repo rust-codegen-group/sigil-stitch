@@ -1,6 +1,6 @@
 import type { NotFoundError } from './errors';
 
-if(!user) {
+if (!user) {
   throw new NotFoundError('not found');
 } else {
   return user;

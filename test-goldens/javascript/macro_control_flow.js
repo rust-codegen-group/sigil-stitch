@@ -1,6 +1,6 @@
-if(x > 0) {
+if (x > 0) {
   return 'positive';
-} else if(x < 0) {
+} else if (x < 0) {
   return 'negative';
 } else {
   return 'zero';

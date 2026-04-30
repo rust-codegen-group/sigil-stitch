@@ -1,0 +1,86 @@
+//! Token stream parser for `sigil_quote!`.
+//!
+//! Parses the macro input into a structured `ParsedInput` containing the
+//! language type and a list of statements.
+
+mod format;
+mod statements;
+mod types;
+mod util;
+
+pub(crate) use types::*;
+
+use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
+
+use statements::parse_one_statement;
+
+/// Parse the full `sigil_quote!` input.
+///
+/// Expected form: `LangType { body }`
+pub(crate) fn parse_input(input: TokenStream) -> Result<ParsedInput, CompileError> {
+    let tokens: Vec<TokenTree> = input.into_iter().collect();
+    if tokens.is_empty() {
+        return Err(CompileError::new(
+            Span::call_site(),
+            "sigil_quote! requires a language type and body",
+        ));
+    }
+
+    // Find the body group (last token must be a brace group).
+    let last = &tokens[tokens.len() - 1];
+    let body_group = match last {
+        TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => g.clone(),
+        _ => {
+            return Err(CompileError::new(
+                last.span(),
+                "sigil_quote! body must be enclosed in braces: sigil_quote!(Type { ... })",
+            ));
+        }
+    };
+
+    // Everything before the body group is the language type.
+    let lang_tokens: TokenStream = tokens[..tokens.len() - 1].iter().cloned().collect();
+    if lang_tokens.is_empty() {
+        return Err(CompileError::new(
+            Span::call_site(),
+            "sigil_quote! requires a language type before the body: sigil_quote!(Type { ... })",
+        ));
+    }
+
+    let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
+    let statements = parse_body(&body_tokens)?;
+
+    Ok(ParsedInput {
+        lang_type: lang_tokens,
+        statements,
+    })
+}
+
+/// Parse the body tokens into a list of statements.
+pub(super) fn parse_body(tokens: &[TokenTree]) -> Result<Vec<Statement>, CompileError> {
+    let mut statements = Vec::new();
+    let mut pos = 0;
+
+    // Track the line of the last consumed token for blank-line detection.
+    let mut prev_line: Option<usize> = None;
+
+    while pos < tokens.len() {
+        // Detect blank lines via span-location gaps.
+        let current_line = tokens[pos].span().start().line;
+        if let Some(pl) = prev_line {
+            for _ in 0..(current_line.saturating_sub(pl).saturating_sub(1)) {
+                statements.push(Statement::BlankLine);
+            }
+        }
+
+        let (stmt, next_pos) = parse_one_statement(tokens, pos)?;
+        // Track the line of the last token consumed.
+        if next_pos > pos {
+            prev_line = Some(tokens[next_pos - 1].span().end().line);
+        }
+        statements.push(stmt);
+        pos = next_pos;
+    }
+
+    Ok(statements)
+}
