@@ -66,3 +66,8 @@ book:
 # Serve the mdbook with live reload
 book-serve:
     mdbook serve docs --open
+
+# Publish to crates.io (macros crate first, then main crate)
+publish:
+    cargo publish -p sigil-stitch-macros
+    cargo publish -p sigil-stitch

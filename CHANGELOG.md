@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.3
+
+### Added
+
+- `$C_each(iter)` in `sigil_quote!` — splice each `CodeBlock` from an iterable
+  into the builder sequentially.
+- `$if(cond) { ... } $else_if(cond) { ... } $else { ... }` in `sigil_quote!` —
+  meta-conditionals that control which builder calls are emitted at runtime.
+- `$join(sep, iter)` in `sigil_quote!` — inline separator-joined list rendering.
+- Keyword spacing in `sigil_quote!` — control-flow keywords (`if`, `for`,
+  `while`, etc.) now emit a space before `(` in the format string.
+
+### Changed
+
+- `macros/src/parse.rs` split into `parse/{mod,types,statements,format,util}.rs`
+  for navigability.
+- CI workflows now use `just` commands from the Justfile.
+- Justfile recipes aligned with CI (`--workspace`, `--all-targets`).
+
 ## 0.3.2
 
 ### Added

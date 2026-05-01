@@ -68,7 +68,9 @@ let body = sigil_quote!(TypeScript {
 ```
 
 The macro uses `$T`/`$S`/`$N`/`$L`/`$C`/`$W` interpolation markers that expand to
-the equivalent `%T`/`%S`/`%N`/`%L` format specifiers at compile time.
+the equivalent `%T`/`%S`/`%N`/`%L` format specifiers at compile time. It also
+supports `$C_each` for splicing iterables of code blocks, `$if`/`$else_if`/`$else`
+for meta-conditionals, and `$join` for separator-joined lists.
 
 ## Format Specifiers
 
@@ -142,7 +144,7 @@ The [sigil-stitch book](docs/src/SUMMARY.md) covers everything in depth:
 - [Building Functions & Fields](docs/src/functions_and_fields.md) -- ParameterSpec, FieldSpec, FunSpec
 - [Building Types & Enums](docs/src/types_and_enums.md) -- TypeSpec, PropertySpec, AnnotationSpec, EnumVariantSpec
 - [Files & Projects](docs/src/files_and_projects.md) -- ImportSpec, FileSpec, ProjectSpec
-- [sigil_quote! Macro](docs/src/sigil_quote.md) -- inline code with `$T`/`$S`/`$N`/`$L` interpolation
+- [sigil_quote! Macro](docs/src/sigil_quote.md) -- inline code with `$T`/`$S`/`$N`/`$L`/`$C_each`/`$if`/`$join` interpolation
 - [Code Templates](docs/src/code_templates.md) -- reusable `#{name:K}` templates
 - [Language Cookbook](docs/src/language_cookbook.md) -- idiomatic recipes per language
 

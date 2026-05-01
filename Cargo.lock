@@ -100,7 +100,7 @@ dependencies = [
 
 [[package]]
 name = "sigil-stitch"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "pretty",
  "serde",
@@ -111,7 +111,7 @@ dependencies = [
 
 [[package]]
 name = "sigil-stitch-macros"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "proc-macro2",
  "quote",

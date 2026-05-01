@@ -42,6 +42,9 @@ It returns `Result<CodeBlock, SigilStitchError>`.
 | `$>` | `%>` | (none) | Increase indent level |
 | `$<` | `%<` | (none) | Decrease indent level |
 | `$$` | `$` | (none) | Literal dollar sign |
+| `$C_each(expr)` | — | `impl IntoIterator<Item: Into<CodeBlock>>` | Splice each code block from iterable |
+| `$if(cond) { ... }` | — | Rust expression | Meta-conditional (runtime codegen control) |
+| `$join(sep, iter)` | `%L` | separator + `impl IntoIterator<Item: ToString>` | Separator-joined list |
 
 ### Types (`$T`)
 
@@ -310,6 +313,114 @@ sigil_quote!(TypeScript {
 
 These map to the `%>` and `%<` format specifiers in `CodeBlockBuilder`.
 
+## Splicing Code Block Iterables (`$C_each`)
+
+`$C_each(expr)` iterates over a collection of `CodeBlock` values and splices each
+one into the builder sequentially. It must appear at the start of a line.
+
+```rust,ignore
+let blocks: Vec<CodeBlock> = fields
+    .iter()
+    .map(|f| CodeBlock::of(&format!("this.{f} = null"), ()).unwrap())
+    .collect();
+
+sigil_quote!(TypeScript {
+    $C_each(blocks);
+})
+// Output:
+// this.name = null;
+// this.age = null;
+```
+
+Each item in the iterable is converted via `Into<CodeBlock>`, so you can pass any
+type that implements the conversion. An optional trailing `;` after `$C_each(expr)`
+is consumed silently.
+
+## Meta-Conditionals (`$if` / `$else_if` / `$else`)
+
+Meta-conditionals control which builder calls are emitted **at Rust runtime**, as
+opposed to target-language `if`/`else` which emits control flow in the generated
+code. Use them when the structure of the output depends on a Rust-side condition.
+
+```rust,ignore
+let include_debug = true;
+
+sigil_quote!(TypeScript {
+    const x = 1;
+    $if(include_debug) {
+        console.log($S("debug: x ="), x);
+    }
+})
+// When include_debug is true, output includes the console.log line.
+// When false, it's omitted entirely.
+```
+
+### `$else_if` and `$else`
+
+```rust,ignore
+let mode = "production";
+
+sigil_quote!(TypeScript {
+    $if(mode == "debug") {
+        console.log($S("debug mode"));
+    } $else_if(mode == "test") {
+        console.log($S("test mode"));
+    } $else {
+        console.log($S("production mode"));
+    }
+})
+```
+
+The conditions are arbitrary Rust expressions evaluated at runtime. The braces
+delimit which `sigil_quote!` statements are conditionally included — they do **not**
+produce target-language block syntax.
+
+### Nesting with Target-Language Control Flow
+
+Meta-conditionals can wrap target-language control flow and vice versa:
+
+```rust,ignore
+let use_guard = true;
+
+sigil_quote!(TypeScript {
+    $if(use_guard) {
+        if (!user) {
+            throw new Error($S("unauthorized"));
+        }
+    }
+})
+```
+
+## Separator-Joined Lists (`$join`)
+
+`$join(sep, iter)` joins the string representations of an iterable's items with
+a separator. It expands to a `%L` specifier internally.
+
+```rust,ignore
+let items = vec!["a", "b", "c"];
+
+sigil_quote!(TypeScript {
+    const values = [$join(", ", items)];
+})
+// Output: const values = [a, b, c];
+```
+
+The separator is any Rust expression that evaluates to something accepted by
+`Vec<String>::join()` (typically a `&str`). Each item is converted via `ToString`.
+
+```rust,ignore
+let fields = vec!["name", "age", "email"];
+let assignments: Vec<String> = fields.iter().map(|f| format!("this.{f} = {f}")).collect();
+
+sigil_quote!(TypeScript {
+    $join(";\n", assignments)
+})
+// Output:
+// this.name = name;
+// this.age = age;
+// this.email = email
+```
+
 ## Multi-Language Support
 
 The same syntax works with any language type:
@@ -355,9 +466,11 @@ as Rust tokens, not as the target language's tokens. This creates some edge case
    - `x := 42` may render as `x:= 42` (`:` suppresses leading space)
    - `std::mem::size_of` works but `<u32>` may get extra spaces around `<` and `>`
 
-3. **No space before `(` after identifiers.** The macro can't distinguish keywords
-   from function calls, so `if(x)` and `fn(x)` are treated the same. Both are valid
-   in all supported languages.
+3. **Keyword spacing before `(`.** Control-flow keywords (`if`, `for`, `while`,
+   `else`, `match`, `return`, `try`, `catch`, etc.) automatically get a space
+   before `(`. Regular identifiers do not, so `myFunc(x)` stays tight while
+   `if (x)` gets the expected space. This covers the common case but isn't
+   configurable per-language.
 
 4. **Negative number literals.** `-1` tokenizes as `-` then `1`, so it renders as
    `- 1` with a space. Functionally identical in all target languages.
