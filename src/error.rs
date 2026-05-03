@@ -103,4 +103,14 @@ pub enum SigilStitchError {
         /// The reason the declaration is invalid.
         reason: String,
     },
+
+    /// FileSpec has no language set (e.g. after deserialization).
+    #[snafu(display(
+        "FileSpec {filename:?} has no language — call .with_lang() after deserialization \
+         or use FileSpec::builder_with() to set one"
+    ))]
+    MissingLang {
+        /// The filename of the FileSpec.
+        filename: String,
+    },
 }
