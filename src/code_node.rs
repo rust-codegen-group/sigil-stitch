@@ -5,7 +5,7 @@
 //! stored inline rather than in a separate argument vector. This enables natural
 //! tree traversal for import collection, structural transformation, and rendering.
 
-use crate::code_block::{Arg, CodeBlock, FormatPart};
+use crate::code_block::{Arg, CodeBlock, FormatPart, Specifier};
 use crate::type_name::TypeName;
 
 /// A single node in the code generation tree.
@@ -68,36 +68,15 @@ pub(crate) fn parts_args_to_nodes(parts: &[FormatPart], args: &[Arg]) -> Vec<Cod
     for part in parts {
         let node = match part {
             FormatPart::Literal(text) => CodeNode::Literal(text.clone()),
-            FormatPart::Type => {
+            FormatPart::Arg(spec) => {
                 let arg = &args[arg_index];
                 arg_index += 1;
-                match arg {
-                    Arg::TypeName(tn) => CodeNode::TypeRef(tn.clone()),
-                    _ => CodeNode::Literal(String::new()),
-                }
-            }
-            FormatPart::Name => {
-                let arg = &args[arg_index];
-                arg_index += 1;
-                match arg {
-                    Arg::Name(n) => CodeNode::NameRef(n.clone()),
-                    _ => CodeNode::Literal(String::new()),
-                }
-            }
-            FormatPart::StringLit => {
-                let arg = &args[arg_index];
-                arg_index += 1;
-                match arg {
-                    Arg::StringLit(s) => CodeNode::StringLit(s.clone()),
-                    _ => CodeNode::Literal(String::new()),
-                }
-            }
-            FormatPart::Literal_ => {
-                let arg = &args[arg_index];
-                arg_index += 1;
-                match arg {
-                    Arg::Literal(s) => CodeNode::InlineLiteral(s.clone()),
-                    Arg::Code(block) => CodeNode::Nested(block.clone()),
+                match (spec, arg) {
+                    (Specifier::Type, Arg::TypeName(tn)) => CodeNode::TypeRef(tn.clone()),
+                    (Specifier::Name, Arg::Name(n)) => CodeNode::NameRef(n.clone()),
+                    (Specifier::StringLit, Arg::StringLit(s)) => CodeNode::StringLit(s.clone()),
+                    (Specifier::Literal, Arg::Literal(s)) => CodeNode::InlineLiteral(s.clone()),
+                    (Specifier::Literal, Arg::Code(block)) => CodeNode::Nested(block.clone()),
                     _ => CodeNode::Literal(String::new()),
                 }
             }
@@ -136,7 +115,10 @@ mod tests {
     #[test]
     fn test_type_ref_conversion() {
         let tn = TypeName::primitive("string");
-        let parts = vec![FormatPart::Literal("x: ".to_string()), FormatPart::Type];
+        let parts = vec![
+            FormatPart::Literal("x: ".to_string()),
+            FormatPart::Arg(Specifier::Type),
+        ];
         let args = vec![Arg::TypeName(tn)];
         let nodes = parts_args_to_nodes(&parts, &args);
         assert_eq!(nodes.len(), 2);
@@ -147,7 +129,7 @@ mod tests {
     #[test]
     fn test_nested_block_conversion() {
         let inner = CodeBlock::of("inner()", ()).unwrap();
-        let parts = vec![FormatPart::Literal_];
+        let parts = vec![FormatPart::Arg(Specifier::Literal)];
         let args = vec![Arg::Code(inner)];
         let nodes = parts_args_to_nodes(&parts, &args);
         assert_eq!(nodes.len(), 1);
@@ -206,11 +188,11 @@ mod tests {
         let tn = TypeName::primitive("number");
         let parts = vec![
             FormatPart::Literal("let ".to_string()),
-            FormatPart::Name,
+            FormatPart::Arg(Specifier::Name),
             FormatPart::Literal(": ".to_string()),
-            FormatPart::Type,
+            FormatPart::Arg(Specifier::Type),
             FormatPart::Literal(" = ".to_string()),
-            FormatPart::StringLit,
+            FormatPart::Arg(Specifier::StringLit),
         ];
         let args = vec![
             Arg::Name("x".to_string()),

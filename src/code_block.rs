@@ -3,19 +3,67 @@ use crate::import::ImportRef;
 use crate::lang::CodeLang;
 use crate::type_name::TypeName;
 
+/// Argument-consuming format specifier kinds.
+///
+/// This is the single source of truth for what interpolation specifiers exist.
+/// Both the library's `parse_format()` and the `sigil_quote!` macro's codegen
+/// map to these same logical kinds. The macro crate cannot import this type
+/// (proc-macro dependency cycle), but the format characters are shared: the
+/// macro emits `%T`/`%N`/`%S`/`%L` strings that `parse_format` then parses
+/// via [`Specifier::from_format_char`].
+///
+/// Adding a variant here without handling it in `parse_format` and
+/// `parts_args_to_nodes` will cause exhaustiveness errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum Specifier {
+    /// `%T` / `$T` — type reference (consumes `Arg::TypeName`).
+    Type,
+    /// `%N` / `$N` — name identifier (consumes `Arg::Name`).
+    Name,
+    /// `%S` / `$S` — string literal (consumes `Arg::StringLit`).
+    StringLit,
+    /// `%L` / `$L` / `$C` — literal value or nested code block (consumes `Arg::Literal` or `Arg::Code`).
+    Literal,
+}
+
+impl Specifier {
+    /// Map a format-string character to a specifier.
+    ///
+    /// Returns `None` for characters that are not argument-consuming specifiers
+    /// (e.g. `W`, `>`, `<`, `[`, `]`, `%`).
+    pub fn from_format_char(ch: char) -> Option<Self> {
+        match ch {
+            'T' => Some(Self::Type),
+            'N' => Some(Self::Name),
+            'S' => Some(Self::StringLit),
+            'L' => Some(Self::Literal),
+            _ => None,
+        }
+    }
+
+    /// The format-string character for this specifier.
+    pub fn format_char(self) -> char {
+        match self {
+            Self::Type => 'T',
+            Self::Name => 'N',
+            Self::StringLit => 'S',
+            Self::Literal => 'L',
+        }
+    }
+
+    /// All defined specifier variants.
+    pub fn all() -> &'static [Self] {
+        &[Self::Type, Self::Name, Self::StringLit, Self::Literal]
+    }
+}
+
 /// A parsed format specifier from a format string.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum FormatPart {
     /// Literal text (no interpolation).
     Literal(String),
-    /// `%T` - type reference (consumes an Arg::TypeName).
-    Type,
-    /// `%N` - name reference (consumes an Arg::Name).
-    Name,
-    /// `%S` - string literal (consumes an Arg::StringLit).
-    StringLit,
-    /// `%L` - literal/nested code block (consumes an Arg::Literal or Arg::Code).
-    Literal_,
+    /// An argument-consuming specifier (`%T`, `%N`, `%S`, `%L`).
+    Arg(Specifier),
     /// `%W` - soft line break point (no argument consumed).
     Wrap,
     /// `%>` - increase indent (no argument consumed).
@@ -208,10 +256,7 @@ impl CodeBlockBuilder {
         let consuming_specifiers: Vec<String> = parsed
             .iter()
             .filter_map(|p| match p {
-                FormatPart::Type => Some("%T".to_string()),
-                FormatPart::Name => Some("%N".to_string()),
-                FormatPart::StringLit => Some("%S".to_string()),
-                FormatPart::Literal_ => Some("%L".to_string()),
+                FormatPart::Arg(s) => Some(format!("%{}", s.format_char())),
                 _ => None,
             })
             .collect();
@@ -367,10 +412,6 @@ fn parse_format(format: &str) -> Result<Vec<FormatPart>, crate::error::SigilStit
             if let Some(&(_, spec)) = chars.peek() {
                 chars.next();
                 let part = match spec {
-                    'T' => Some(FormatPart::Type),
-                    'N' => Some(FormatPart::Name),
-                    'S' => Some(FormatPart::StringLit),
-                    'L' => Some(FormatPart::Literal_),
                     'W' => Some(FormatPart::Wrap),
                     '>' => Some(FormatPart::Indent),
                     '<' => Some(FormatPart::Dedent),
@@ -380,12 +421,15 @@ fn parse_format(format: &str) -> Result<Vec<FormatPart>, crate::error::SigilStit
                         current_literal.push('%');
                         continue;
                     }
-                    _ => {
-                        return Err(crate::error::SigilStitchError::InvalidFormatSpecifier {
-                            format: format.to_string(),
-                            specifier: spec,
-                        });
-                    }
+                    _ => match Specifier::from_format_char(spec) {
+                        Some(s) => Some(FormatPart::Arg(s)),
+                        None => {
+                            return Err(crate::error::SigilStitchError::InvalidFormatSpecifier {
+                                format: format.to_string(),
+                                specifier: spec,
+                            });
+                        }
+                    },
                 };
                 if let Some(part) = part {
                     if !current_literal.is_empty() {
@@ -580,10 +624,10 @@ mod tests {
     #[test]
     fn test_parse_all_specifiers() {
         let parts = parse_format("hello %T world %N %S %L %W %> %< %[ %]").unwrap();
-        assert!(parts.contains(&FormatPart::Type));
-        assert!(parts.contains(&FormatPart::Name));
-        assert!(parts.contains(&FormatPart::StringLit));
-        assert!(parts.contains(&FormatPart::Literal_));
+        assert!(parts.contains(&FormatPart::Arg(Specifier::Type)));
+        assert!(parts.contains(&FormatPart::Arg(Specifier::Name)));
+        assert!(parts.contains(&FormatPart::Arg(Specifier::StringLit)));
+        assert!(parts.contains(&FormatPart::Arg(Specifier::Literal)));
         assert!(parts.contains(&FormatPart::Wrap));
         assert!(parts.contains(&FormatPart::Indent));
         assert!(parts.contains(&FormatPart::Dedent));
