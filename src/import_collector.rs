@@ -12,7 +12,12 @@ pub fn collect_imports(block: &CodeBlock) -> Vec<ImportRef> {
     refs
 }
 
-fn walk_nodes(nodes: &[CodeNode], refs: &mut Vec<ImportRef>) {
+/// Walk a slice of `CodeNode`s, collecting import references.
+///
+/// Recurses into `Nested(CodeBlock)`, `Sequence`, and `TypeRef(TypeName)`.
+/// This is the single import-collection walker for `CodeNode` trees;
+/// all other import-collection entry points delegate here.
+pub(crate) fn walk_nodes(nodes: &[CodeNode], refs: &mut Vec<ImportRef>) {
     for node in nodes {
         match node {
             CodeNode::TypeRef(tn) => {

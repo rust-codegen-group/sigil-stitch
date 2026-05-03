@@ -174,7 +174,7 @@ impl CodeBlock {
 
     /// Collect all import references from this code block.
     pub fn collect_imports(&self, out: &mut Vec<ImportRef>) {
-        collect_imports_from_nodes(&self.nodes, out);
+        crate::import_collector::walk_nodes(&self.nodes, out);
     }
 
     /// Render this code block to a string without import resolution.
@@ -190,17 +190,6 @@ impl CodeBlock {
         let imports = crate::import::ImportGroup::new();
         let mut renderer = crate::code_renderer::CodeRenderer::new(lang, &imports, width);
         renderer.render(self)
-    }
-}
-
-fn collect_imports_from_nodes(nodes: &[CodeNode], out: &mut Vec<ImportRef>) {
-    for node in nodes {
-        match node {
-            CodeNode::TypeRef(tn) => tn.collect_imports(out),
-            CodeNode::Nested(block) => block.collect_imports(out),
-            CodeNode::Sequence(children) => collect_imports_from_nodes(children, out),
-            _ => {}
-        }
     }
 }
 

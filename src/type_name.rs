@@ -551,7 +551,11 @@ impl TypeName {
     }
 
     /// Collect import references from this type name (recursive).
-    pub fn collect_imports(&self, out: &mut Vec<ImportRef>) {
+    ///
+    /// Callers working with `CodeBlock` or `CodeNode` trees should use
+    /// [`import_collector::collect_imports`](crate::import_collector::collect_imports)
+    /// instead, which handles the full tree walk including nested blocks.
+    pub(crate) fn collect_imports(&self, out: &mut Vec<ImportRef>) {
         crate::type_name_import::collect_imports(self, out)
     }
 
