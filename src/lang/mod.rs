@@ -41,31 +41,136 @@ use crate::import::ImportGroup;
 /// this trait so the same CodeBlock and TypeName structures can generate
 /// output for any supported language via `&dyn CodeLang`.
 ///
-/// Language-specific configuration is exposed through six config accessor
-/// methods (`type_presentation`, `generic_syntax`, `block_syntax`,
-/// `function_syntax`, `type_decl_syntax`, `enum_and_annotation`) that
-/// return config structs. Languages override these accessors to customise
-/// rendering. The remaining methods on the trait have real logic, take
-/// parameters, or are not representable as plain data.
+/// # Required — must implement
+///
+/// Only three methods have no default and must be provided by every language:
+///
+/// - [`file_extension`](CodeLang::file_extension) — e.g. `"ts"`, `"go"`, `"rs"`
+/// - [`render_string_literal`](CodeLang::render_string_literal) — quoting and escaping
+/// - [`line_comment_prefix`](CodeLang::line_comment_prefix) — e.g. `"//"`, `"#"`
+///
+/// # Recommended — have defaults but most real languages will customize
+///
+/// These methods have safe defaults (empty string, empty list, etc.) so a
+/// minimal language compiles immediately, but most production languages
+/// should override them:
+///
+/// - [`reserved_words`](CodeLang::reserved_words) — default `&[]`
+/// - [`render_imports`](CodeLang::render_imports) — default `""`
+/// - [`render_doc_comment`](CodeLang::render_doc_comment) — default uses `line_comment_prefix()`
+/// - [`render_visibility`](CodeLang::render_visibility) — default `""`
+/// - [`function_keyword`](CodeLang::function_keyword) — default `""`
+/// - [`type_keyword`](CodeLang::type_keyword) — default `""`
+/// - [`methods_inside_type_body`](CodeLang::methods_inside_type_body) — default `true`
+/// - [`escape_reserved`](CodeLang::escape_reserved) — default appends `_`
+/// - [`module_separator`](CodeLang::module_separator) — default `None`
+/// - [`optional_field_style`](CodeLang::optional_field_style) — default `Ignored`
+///
+/// # Config struct accessors — data-driven rendering
+///
+/// Six methods return config structs that drive rendering in `spec/*.rs` and
+/// `type_name.rs`. All have defaults (TS/JS-like). Override the accessors
+/// that differ for your language:
+///
+/// - [`type_presentation`](CodeLang::type_presentation)
+/// - [`generic_syntax`](CodeLang::generic_syntax)
+/// - [`block_syntax`](CodeLang::block_syntax)
+/// - [`function_syntax`](CodeLang::function_syntax)
+/// - [`type_decl_syntax`](CodeLang::type_decl_syntax)
+/// - [`enum_and_annotation`](CodeLang::enum_and_annotation)
+///
+/// # Optional — override only for unusual languages
+///
+/// These have sensible defaults and are only overridden by one or two
+/// languages with exotic syntax (Haskell record syntax, OCaml block
+/// comments, Scala HKTs, etc.):
+///
+/// `line_comment_suffix`, `qualify_import_name`, `type_kind_suffix`,
+/// `render_newtype_line`, `fun_block_open`, `type_header_block_open`,
+/// `doc_comment_inside_body`, `doc_before_annotations`, `property_style`,
+/// `property_getter_keyword`, `render_type_context`, `type_body_prefix`,
+/// `type_body_suffix`, `render_type_close_suffix`, `render_type_param_kind`
 pub trait CodeLang: std::fmt::Debug + 'static {
+    // ── Required — must implement ───────────────────────────────────
+
     /// File extension for this language (e.g., "ts", "go", "rs").
     fn file_extension(&self) -> &str;
-
-    /// Reserved words that need escaping.
-    fn reserved_words(&self) -> &[&str];
-
-    /// Render an import group to a string.
-    /// `imports` is deduplicated and grouped by module.
-    fn render_imports(&self, imports: &ImportGroup) -> String;
 
     /// Render a string literal with language-appropriate quoting and escaping.
     fn render_string_literal(&self, s: &str) -> String;
 
-    /// Render a doc comment block.
-    fn render_doc_comment(&self, lines: &[&str]) -> String;
-
     /// Single-line comment prefix (e.g., "//", "#").
     fn line_comment_prefix(&self) -> &str;
+
+    // ── Recommended — have defaults but most languages customize ───
+
+    /// Reserved words that need escaping.
+    ///
+    /// Default: `&[]` (no reserved words).
+    fn reserved_words(&self) -> &[&str] {
+        &[]
+    }
+
+    /// Render an import group to a string.
+    /// `imports` is deduplicated and grouped by module.
+    ///
+    /// Default: `""` (no import system).
+    fn render_imports(&self, _imports: &ImportGroup) -> String {
+        String::new()
+    }
+
+    /// Render a doc comment block.
+    ///
+    /// Default: wraps each line with `line_comment_prefix()` and
+    /// `line_comment_suffix()`.
+    fn render_doc_comment(&self, lines: &[&str]) -> String {
+        let prefix = self.line_comment_prefix();
+        let suffix = self.line_comment_suffix();
+        lines
+            .iter()
+            .map(|line| {
+                if line.is_empty() {
+                    format!("{prefix}{suffix}")
+                } else {
+                    format!("{prefix} {line}{suffix}")
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Render a visibility modifier for the given declaration context.
+    ///
+    /// Default: `""` (no visibility modifiers).
+    fn render_visibility(
+        &self,
+        _vis: crate::spec::modifiers::Visibility,
+        _ctx: crate::spec::modifiers::DeclarationContext,
+    ) -> &str {
+        ""
+    }
+
+    /// The keyword used to declare a function (e.g., "fn", "function").
+    ///
+    /// Default: `""`.
+    fn function_keyword(&self, _ctx: crate::spec::modifiers::DeclarationContext) -> &str {
+        ""
+    }
+
+    /// The keyword for a type declaration (e.g., "struct", "class").
+    ///
+    /// Default: `""`.
+    fn type_keyword(&self, _kind: crate::spec::modifiers::TypeKind) -> &str {
+        ""
+    }
+
+    /// Whether methods are declared inside the type body (true for TS class, Rust trait)
+    /// vs in a separate impl block (Rust struct/enum).
+    ///
+    /// Default: `true`.
+    fn methods_inside_type_body(&self, _kind: crate::spec::modifiers::TypeKind) -> bool {
+        true
+    }
 
     /// Suffix appended after a single-line comment.
     ///
@@ -85,22 +190,7 @@ pub trait CodeLang: std::fmt::Debug + 'static {
         }
     }
 
-    /// Render a visibility modifier for the given declaration context.
-    fn render_visibility(
-        &self,
-        vis: crate::spec::modifiers::Visibility,
-        ctx: crate::spec::modifiers::DeclarationContext,
-    ) -> &str;
-
-    /// The keyword used to declare a function (e.g., "fn", "function").
-    fn function_keyword(&self, ctx: crate::spec::modifiers::DeclarationContext) -> &str;
-
-    /// The keyword for a type declaration (e.g., "struct", "class").
-    fn type_keyword(&self, kind: crate::spec::modifiers::TypeKind) -> &str;
-
-    /// Whether methods are declared inside the type body (true for TS class, Rust trait)
-    /// vs in a separate impl block (Rust struct/enum).
-    fn methods_inside_type_body(&self, kind: crate::spec::modifiers::TypeKind) -> bool;
+    // ── Optional — override only for unusual languages ────────────
 
     /// Qualify an import name for rendering in code.
     ///
@@ -238,7 +328,7 @@ pub trait CodeLang: std::fmt::Debug + 'static {
         String::new()
     }
 
-    // --- Config struct accessors ---
+    // ── Config struct accessors — data-driven rendering ───────────
 
     /// How each compound `TypeName` variant renders.
     fn type_presentation(&self) -> config::TypePresentationConfig<'_> {
