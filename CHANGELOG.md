@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+### Fixed
+
+- `$C_each` trailing blank line when used as `FunSpec` body inside a `TypeSpec` —
+  `ends_with_newline_or_block_close()` now recurses into `Nested` nodes, fixing
+  the unwanted blank line before the closing `}` in generated constructors/methods.
+
 ## 0.4.0
 
 ### Added

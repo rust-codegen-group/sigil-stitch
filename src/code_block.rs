@@ -117,6 +117,7 @@ impl CodeBlock {
             match nodes.last() {
                 Some(CodeNode::Newline | CodeNode::BlockClose) => true,
                 Some(CodeNode::Sequence(children)) => check_last(children),
+                Some(CodeNode::Nested(inner)) => check_last(&inner.nodes),
                 _ => false,
             }
         }

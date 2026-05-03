@@ -337,3 +337,45 @@ fn test_c_each_in_control_flow_no_blank_lines() {
     assert!(output.contains("this.x = x;"), "got: {output}");
     assert!(output.contains("this.y = y;"), "got: {output}");
 }
+
+#[test]
+fn test_c_each_no_trailing_blank_line_in_fun_spec_body() {
+    use sigil_stitch::lang::java_lang::JavaLang;
+
+    let fields = ["statusCode", "raw", "status200"];
+    let assignments: Vec<CodeBlock> = fields
+        .iter()
+        .map(|f| {
+            sigil_quote!(JavaLang {
+                this.$L(*f) = $L(*f);
+            })
+            .unwrap()
+        })
+        .collect();
+
+    let ctor_body = sigil_quote!(JavaLang {
+        $C_each(assignments);
+    })
+    .unwrap();
+
+    let mut cls = TypeSpec::builder("TestClass", TypeKind::Struct).visibility(Visibility::Public);
+    let mut ctor = FunSpec::builder("TestClass");
+    ctor = ctor.visibility(Visibility::Public);
+    ctor = ctor.body(ctor_body);
+    cls = cls.add_method(ctor.build().unwrap());
+
+    let file = FileSpec::builder_with("TestClass.java", JavaLang::new())
+        .add_type(cls.build().unwrap())
+        .build()
+        .unwrap();
+    let output = file.render(100).unwrap();
+
+    assert!(
+        !output.contains("status200;\n\n    }"),
+        "trailing blank line before closing brace. got:\n{output}"
+    );
+    assert!(
+        output.contains("this.statusCode = statusCode;"),
+        "got:\n{output}"
+    );
+}
