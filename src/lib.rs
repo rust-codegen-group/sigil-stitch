@@ -101,6 +101,7 @@ pub mod prelude {
     pub use crate::error::SigilStitchError;
     pub use crate::lang::CodeLang;
     pub use crate::spec::annotation_spec::AnnotationSpec;
+    pub use crate::spec::emittable::Emittable;
     pub use crate::spec::enum_variant_spec::EnumVariantSpec;
     pub use crate::spec::field_spec::FieldSpec;
     pub use crate::spec::file_spec::{FileMember, FileSpec};

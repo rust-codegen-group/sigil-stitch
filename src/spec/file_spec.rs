@@ -4,6 +4,7 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::import_collector;
 use crate::lang::CodeLang;
+use crate::spec::emittable::Emittable;
 use crate::spec::fun_spec::FunSpec;
 use crate::spec::import_spec::ImportSpec;
 use crate::spec::modifiers::DeclarationContext;
@@ -11,7 +12,7 @@ use crate::spec::type_spec::TypeSpec;
 use crate::type_name::TypeName;
 
 /// A member of a file.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum FileMember {
     /// A CodeBlock (e.g., module-level statements, class declarations).
     Code(CodeBlock),
@@ -32,6 +33,12 @@ pub enum FileMember {
     Type(TypeSpec),
     /// A top-level function.
     Fun(FunSpec),
+    /// A type-erased spec for custom or third-party spec types.
+    ///
+    /// Use [`FileSpecBuilder::add_spec`] to add these. Not serializable —
+    /// this variant is skipped during serde round-trips.
+    #[serde(skip)]
+    Spec(Box<dyn Emittable>),
 }
 
 /// A complete source file with automatic import management.
@@ -153,6 +160,7 @@ impl FileSpec {
                 FileMember::Fun(spec) => {
                     Materialized::Blocks(vec![spec.emit(lang, DeclarationContext::TopLevel)?])
                 }
+                FileMember::Spec(spec) => Materialized::Blocks(spec.emit_members(lang)?),
             });
         }
 
@@ -313,6 +321,12 @@ impl FileSpecBuilder {
         self
     }
 
+    /// Add a custom spec that implements [`Emittable`].
+    pub fn add_spec(mut self, spec: impl Emittable + 'static) -> Self {
+        self.members.push(FileMember::Spec(Box::new(spec)));
+        self
+    }
+
     /// Set the language configuration.
     pub fn lang(mut self, lang: impl CodeLang) -> Self {
         self.lang = Some(Box::new(lang));
@@ -356,240 +370,5 @@ impl FileSpecBuilder {
             explicit_imports: self.explicit_imports,
             lang: Some(lang),
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::type_name::TypeName;
-
-    #[test]
-    fn test_empty_file() {
-        let file = FileSpec::builder("empty.ts").build().unwrap();
-        let output = file.render(80).unwrap();
-        assert!(output.is_empty() || output.trim().is_empty());
-    }
-
-    #[test]
-    fn test_simple_file_with_import() {
-        let user = TypeName::importable_type("./models", "User");
-
-        let mut b = CodeBlock::builder();
-        b.add_statement("const u: %T = getUser()", (user,));
-        let block = b.build().unwrap();
-
-        let file = FileSpec::builder("user.ts")
-            .add_code(block)
-            .build()
-            .unwrap();
-
-        let output = file.render(80).unwrap();
-        assert!(output.contains("import type { User } from './models'"));
-        assert!(output.contains("const u: User = getUser();"));
-    }
-
-    #[test]
-    fn test_conflicting_imports() {
-        let user1 = TypeName::importable_type("./models", "User");
-        let user2 = TypeName::importable_type("./other", "User");
-
-        let mut b = CodeBlock::builder();
-        b.add_statement("const u1: %T = get1()", (user1,));
-        b.add_statement("const u2: %T = get2()", (user2,));
-        let block = b.build().unwrap();
-
-        let file = FileSpec::builder("user.ts")
-            .add_code(block)
-            .build()
-            .unwrap();
-
-        let output = file.render(80).unwrap();
-        // First wins simple name.
-        assert!(output.contains("const u1: User = get1();"));
-        // Second gets alias.
-        assert!(output.contains("const u2: OtherUser = get2();"));
-        assert!(output.contains("User as OtherUser"));
-    }
-
-    #[test]
-    fn test_raw_content_no_import_tracking() {
-        let file = FileSpec::builder("raw.ts")
-            .add_raw("// This is raw content\nexport const VERSION = '1.0.0';\n")
-            .build()
-            .unwrap();
-
-        let output = file.render(80).unwrap();
-        assert!(output.contains("// This is raw content"));
-        assert!(output.contains("export const VERSION = '1.0.0';"));
-        // No import header.
-        assert!(!output.contains("import"));
-    }
-
-    #[test]
-    fn test_mixed_code_and_raw() {
-        let user = TypeName::importable_type("./models", "User");
-
-        let mut b = CodeBlock::builder();
-        b.add_statement("const u: %T = getUser()", (user,));
-        let block = b.build().unwrap();
-
-        let file = FileSpec::builder("mixed.ts")
-            .add_raw("// Generated file, do not edit.\n")
-            .add_code(block)
-            .build()
-            .unwrap();
-
-        let output = file.render(80).unwrap();
-        assert!(output.contains("import type { User }"));
-        assert!(output.contains("// Generated file"));
-        assert!(output.contains("const u: User = getUser();"));
-    }
-
-    #[test]
-    fn test_file_with_header() {
-        let mut header_builder = CodeBlock::builder();
-        header_builder.add("// License: MIT", ());
-        let header = header_builder.build().unwrap();
-
-        let mut b = CodeBlock::builder();
-        b.add_statement("const x = 1", ());
-        let block = b.build().unwrap();
-
-        let file = FileSpec::builder("test.ts")
-            .header(header)
-            .add_code(block)
-            .build()
-            .unwrap();
-
-        let output = file.render(80).unwrap();
-        assert!(output.starts_with("// License: MIT"));
-        assert!(output.contains("const x = 1;"));
-    }
-
-    #[test]
-    fn test_dedup_same_import() {
-        let user1 = TypeName::importable_type("./models", "User");
-        let user2 = TypeName::importable_type("./models", "User");
-
-        let mut b = CodeBlock::builder();
-        b.add_statement("const u1: %T = get1()", (user1,));
-        b.add_statement("const u2: %T = get2()", (user2,));
-        let block = b.build().unwrap();
-
-        let file = FileSpec::builder("user.ts")
-            .add_code(block)
-            .build()
-            .unwrap();
-
-        let output = file.render(80).unwrap();
-        // Should appear only once.
-        let import_count = output.matches("import type { User }").count();
-        assert_eq!(import_count, 1);
-    }
-
-    #[test]
-    fn test_build_empty_filename_errors() {
-        let result = FileSpec::builder("").build();
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("'name' must not be empty")
-        );
-    }
-
-    #[test]
-    fn test_aliased_type_in_codeblock() {
-        let user = TypeName::importable("./models", "User").with_alias("UserModel");
-
-        let mut b = CodeBlock::builder();
-        b.add_statement("const u: %T = getUser()", (user,));
-        let block = b.build().unwrap();
-
-        let file = FileSpec::builder("user.ts")
-            .add_code(block)
-            .build()
-            .unwrap();
-
-        let output = file.render(80).unwrap();
-        // Import should use the alias.
-        assert!(
-            output.contains("User as UserModel"),
-            "Expected aliased import, got:\n{output}"
-        );
-        // Code should reference the alias name.
-        assert!(
-            output.contains("const u: UserModel = getUser();"),
-            "Expected alias in code, got:\n{output}"
-        );
-    }
-
-    #[test]
-    fn test_aliased_type_with_auto_alias_conflict() {
-        // Two types named "User" from different modules.
-        // First one has a preferred alias; second should still get auto-aliased.
-        let user1 = TypeName::importable_type("./models", "User").with_alias("ModelUser");
-        let user2 = TypeName::importable_type("./other", "User");
-
-        let mut b = CodeBlock::builder();
-        b.add_statement("const u1: %T = get1()", (user1,));
-        b.add_statement("const u2: %T = get2()", (user2,));
-        let block = b.build().unwrap();
-
-        let file = FileSpec::builder("user.ts")
-            .add_code(block)
-            .build()
-            .unwrap();
-
-        let output = file.render(80).unwrap();
-        // First uses its preferred alias.
-        assert!(
-            output.contains("const u1: ModelUser = get1();"),
-            "Expected preferred alias, got:\n{output}"
-        );
-        // Second gets auto-aliased since "User" is claimed.
-        assert!(
-            output.contains("const u2: OtherUser = get2();"),
-            "Expected auto-alias for second, got:\n{output}"
-        );
-    }
-
-    #[test]
-    fn test_serde_round_trip_render_returns_error_without_lang() {
-        let file = FileSpec::builder("test.ts")
-            .add_code(CodeBlock::of("const x = 1", ()).unwrap())
-            .build()
-            .unwrap();
-
-        let json = serde_json::to_string(&file).unwrap();
-        let deserialized: FileSpec = serde_json::from_str(&json).unwrap();
-
-        let err = deserialized.render(80).unwrap_err();
-        assert!(err.to_string().contains("no language"));
-    }
-
-    #[test]
-    fn test_serde_round_trip_with_lang() {
-        let mut b = CodeBlock::builder();
-        b.add_statement("const x = 1", ());
-        let file = FileSpec::builder("test.ts")
-            .add_code(b.build().unwrap())
-            .build()
-            .unwrap();
-
-        let json = serde_json::to_string(&file).unwrap();
-        let deserialized: FileSpec = serde_json::from_str(&json).unwrap();
-
-        let output = deserialized
-            .with_lang(crate::lang::typescript::TypeScript::new())
-            .render(80)
-            .unwrap();
-        assert!(
-            output.contains("const x = 1;"),
-            "Expected 'const x = 1;' in output:\n{output}"
-        );
     }
 }

@@ -1,5 +1,7 @@
 /// Annotation specifications (e.g., `@Override`, `#[derive(...)]`).
 pub mod annotation_spec;
+/// Trait for spec types that can emit themselves as top-level file members.
+pub mod emittable;
 /// Enum variant specifications.
 pub mod enum_variant_spec;
 /// Struct field and class property specifications.
