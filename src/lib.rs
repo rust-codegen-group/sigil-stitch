@@ -91,6 +91,8 @@ pub mod name_allocator;
 pub mod spec;
 /// Type references with recursive import tracking and pretty-printing.
 pub mod type_name;
+pub(crate) mod type_name_import;
+pub(crate) mod type_name_render;
 
 /// Common re-exports for convenient usage.
 pub mod prelude {
