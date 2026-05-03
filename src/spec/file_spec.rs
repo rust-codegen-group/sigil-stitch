@@ -108,14 +108,25 @@ impl FileSpec {
         &self.filename
     }
 
+    /// Set the language for this FileSpec.
+    ///
+    /// Required after deserialization, since the `lang` field is not serialized.
+    /// Returns `self` for chaining.
+    pub fn with_lang(mut self, lang: impl CodeLang) -> Self {
+        self.lang = Some(Box::new(lang));
+        self
+    }
+
     /// Render the file to a string using the three-pass algorithm.
     ///
     /// `width` controls the target line width for pretty-printing.
     pub fn render(&self, width: usize) -> Result<String, SigilStitchError> {
-        let lang: &dyn CodeLang = self
-            .lang
-            .as_deref()
-            .expect("FileSpec requires a language — use builder_with() to set one");
+        let lang: &dyn CodeLang =
+            self.lang
+                .as_deref()
+                .ok_or_else(|| SigilStitchError::MissingLang {
+                    filename: self.filename.clone(),
+                })?;
 
         // Phase 0: Materialize specs into CodeBlocks.
         enum Materialized {
@@ -543,6 +554,42 @@ mod tests {
         assert!(
             output.contains("const u2: OtherUser = get2();"),
             "Expected auto-alias for second, got:\n{output}"
+        );
+    }
+
+    #[test]
+    fn test_serde_round_trip_render_returns_error_without_lang() {
+        let file = FileSpec::builder("test.ts")
+            .add_code(CodeBlock::of("const x = 1", ()).unwrap())
+            .build()
+            .unwrap();
+
+        let json = serde_json::to_string(&file).unwrap();
+        let deserialized: FileSpec = serde_json::from_str(&json).unwrap();
+
+        let err = deserialized.render(80).unwrap_err();
+        assert!(err.to_string().contains("no language"));
+    }
+
+    #[test]
+    fn test_serde_round_trip_with_lang() {
+        let mut b = CodeBlock::builder();
+        b.add_statement("const x = 1", ());
+        let file = FileSpec::builder("test.ts")
+            .add_code(b.build().unwrap())
+            .build()
+            .unwrap();
+
+        let json = serde_json::to_string(&file).unwrap();
+        let deserialized: FileSpec = serde_json::from_str(&json).unwrap();
+
+        let output = deserialized
+            .with_lang(crate::lang::typescript::TypeScript::new())
+            .render(80)
+            .unwrap();
+        assert!(
+            output.contains("const x = 1;"),
+            "Expected 'const x = 1;' in output:\n{output}"
         );
     }
 }
