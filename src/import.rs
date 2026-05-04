@@ -31,8 +31,13 @@ impl ImportEntry {
 /// A collection of resolved import entries, ready for rendering.
 #[derive(Debug, Clone, Default)]
 pub struct ImportGroup {
-    /// The resolved import entries.
-    pub entries: Vec<ImportEntry>,
+    pub(crate) entries: Vec<ImportEntry>,
+}
+
+impl From<Vec<ImportEntry>> for ImportGroup {
+    fn from(entries: Vec<ImportEntry>) -> Self {
+        Self { entries }
+    }
 }
 
 /// Raw import reference collected from a CodeBlock tree walk (Pass 1).
@@ -55,60 +60,23 @@ impl ImportGroup {
         Self::default()
     }
 
+    /// Read-only access to the resolved import entries.
+    pub fn entries(&self) -> &[ImportEntry] {
+        &self.entries
+    }
+
     /// Resolve a list of raw import references into a deduplicated ImportGroup.
     /// First-encountered wins the simple name; later duplicates get aliases.
     /// Preferred aliases from `TypeName::with_alias()` take precedence.
     pub fn resolve(refs: &[ImportRef]) -> Self {
         let mut entries = Vec::new();
-        // Track which simple names are claimed and by which module.
         let mut claimed: std::collections::HashMap<String, String> =
             std::collections::HashMap::new();
-        // Track (module, name) pairs we've already added.
         let mut seen: std::collections::HashSet<(String, String)> =
             std::collections::HashSet::new();
 
         for import_ref in refs {
-            let key = (import_ref.module.clone(), import_ref.name.clone());
-            if seen.contains(&key) {
-                continue;
-            }
-            seen.insert(key);
-
-            let alias = if let Some(preferred) = &import_ref.alias {
-                // User explicitly requested this alias via with_alias().
-                // Claim the alias name so other imports don't collide with it.
-                claimed.insert(preferred.clone(), import_ref.module.clone());
-                // Also claim the original name if nobody else has.
-                claimed
-                    .entry(import_ref.name.clone())
-                    .or_insert_with(|| import_ref.module.clone());
-                Some(preferred.clone())
-            } else if let Some(existing_module) = claimed.get(&import_ref.name) {
-                if *existing_module == import_ref.module {
-                    // Same module, same name, already claimed. No alias needed.
-                    None
-                } else {
-                    // Conflict: another module already claimed this simple name.
-                    // Generate alias from module path + name.
-                    let module_prefix = module_to_prefix(&import_ref.module);
-                    let auto_alias = format!("{}{}", module_prefix, import_ref.name);
-                    claimed.insert(auto_alias.clone(), import_ref.module.clone());
-                    Some(auto_alias)
-                }
-            } else {
-                // First to claim this simple name.
-                claimed.insert(import_ref.name.clone(), import_ref.module.clone());
-                None
-            };
-
-            entries.push(ImportEntry {
-                module: import_ref.module.clone(),
-                name: import_ref.name.clone(),
-                alias,
-                is_type_only: import_ref.is_type_only,
-                is_side_effect: false,
-                is_wildcard: false,
-            });
+            resolve_ref(import_ref, &mut claimed, &mut seen, &mut entries);
         }
 
         Self { entries }
@@ -148,41 +116,7 @@ impl ImportGroup {
 
         // Then process auto-collected refs.
         for import_ref in refs {
-            let key = (import_ref.module.clone(), import_ref.name.clone());
-            if seen.contains(&key) {
-                continue;
-            }
-            seen.insert(key);
-
-            let alias = if let Some(preferred) = &import_ref.alias {
-                // User explicitly requested this alias via with_alias().
-                claimed.insert(preferred.clone(), import_ref.module.clone());
-                claimed
-                    .entry(import_ref.name.clone())
-                    .or_insert_with(|| import_ref.module.clone());
-                Some(preferred.clone())
-            } else if let Some(existing_module) = claimed.get(&import_ref.name) {
-                if *existing_module == import_ref.module {
-                    None
-                } else {
-                    let module_prefix = module_to_prefix(&import_ref.module);
-                    let auto_alias = format!("{}{}", module_prefix, import_ref.name);
-                    claimed.insert(auto_alias.clone(), import_ref.module.clone());
-                    Some(auto_alias)
-                }
-            } else {
-                claimed.insert(import_ref.name.clone(), import_ref.module.clone());
-                None
-            };
-
-            entries.push(ImportEntry {
-                module: import_ref.module.clone(),
-                name: import_ref.name.clone(),
-                alias,
-                is_type_only: import_ref.is_type_only,
-                is_side_effect: false,
-                is_wildcard: false,
-            });
+            resolve_ref(import_ref, &mut claimed, &mut seen, &mut entries);
         }
 
         Self { entries }
@@ -195,6 +129,53 @@ impl ImportGroup {
             .find(|e| e.module == module && e.name == name)
             .map(|e| e.resolved_name())
     }
+}
+
+/// Process a single import reference: dedup, detect conflicts, assign aliases.
+fn resolve_ref(
+    import_ref: &ImportRef,
+    claimed: &mut std::collections::HashMap<String, String>,
+    seen: &mut std::collections::HashSet<(String, String)>,
+    entries: &mut Vec<ImportEntry>,
+) {
+    let key = (import_ref.module.clone(), import_ref.name.clone());
+    if seen.contains(&key) {
+        return;
+    }
+    seen.insert(key);
+
+    let alias = if let Some(preferred) = &import_ref.alias {
+        // User explicitly requested this alias via with_alias().
+        claimed.insert(preferred.clone(), import_ref.module.clone());
+        claimed
+            .entry(import_ref.name.clone())
+            .or_insert_with(|| import_ref.module.clone());
+        Some(preferred.clone())
+    } else if let Some(existing_module) = claimed.get(&import_ref.name) {
+        if *existing_module == import_ref.module {
+            // Same module, same name, already claimed. No alias needed.
+            None
+        } else {
+            // Conflict: another module already claimed this simple name.
+            let module_prefix = module_to_prefix(&import_ref.module);
+            let auto_alias = format!("{}{}", module_prefix, import_ref.name);
+            claimed.insert(auto_alias.clone(), import_ref.module.clone());
+            Some(auto_alias)
+        }
+    } else {
+        // First to claim this simple name.
+        claimed.insert(import_ref.name.clone(), import_ref.module.clone());
+        None
+    };
+
+    entries.push(ImportEntry {
+        module: import_ref.module.clone(),
+        name: import_ref.name.clone(),
+        alias,
+        is_type_only: import_ref.is_type_only,
+        is_side_effect: false,
+        is_wildcard: false,
+    });
 }
 
 /// Convert a module path to a CamelCase prefix for aliasing.
@@ -258,9 +239,9 @@ mod tests {
             },
         ];
         let group = ImportGroup::resolve(&refs);
-        assert_eq!(group.entries.len(), 1);
-        assert_eq!(group.entries[0].name, "User");
-        assert!(group.entries[0].alias.is_none());
+        assert_eq!(group.entries().len(), 1);
+        assert_eq!(group.entries()[0].name, "User");
+        assert!(group.entries()[0].alias.is_none());
     }
 
     #[test]
@@ -280,12 +261,12 @@ mod tests {
             },
         ];
         let group = ImportGroup::resolve(&refs);
-        assert_eq!(group.entries.len(), 2);
+        assert_eq!(group.entries().len(), 2);
         // First wins simple name.
-        assert!(group.entries[0].alias.is_none());
-        assert_eq!(group.entries[0].name, "User");
+        assert!(group.entries()[0].alias.is_none());
+        assert_eq!(group.entries()[0].name, "User");
         // Second gets alias.
-        assert_eq!(group.entries[1].alias.as_deref(), Some("OtherUser"));
+        assert_eq!(group.entries()[1].alias.as_deref(), Some("OtherUser"));
     }
 
     #[test]
@@ -335,8 +316,8 @@ mod tests {
             alias: Some("MyUser".into()),
         }];
         let group = ImportGroup::resolve(&refs);
-        assert_eq!(group.entries.len(), 1);
-        assert_eq!(group.entries[0].alias.as_deref(), Some("MyUser"));
+        assert_eq!(group.entries().len(), 1);
+        assert_eq!(group.entries()[0].alias.as_deref(), Some("MyUser"));
         assert_eq!(group.resolved_name("./models", "User"), Some("MyUser"));
     }
 
@@ -359,11 +340,11 @@ mod tests {
             },
         ];
         let group = ImportGroup::resolve(&refs);
-        assert_eq!(group.entries.len(), 2);
+        assert_eq!(group.entries().len(), 2);
         // First gets its preferred alias.
-        assert_eq!(group.entries[0].alias.as_deref(), Some("ModelUser"));
+        assert_eq!(group.entries()[0].alias.as_deref(), Some("ModelUser"));
         // Second: "User" name is claimed by ./models, so it gets auto-aliased.
-        assert!(group.entries[1].alias.is_some());
+        assert!(group.entries()[1].alias.is_some());
     }
 
     #[test]
@@ -375,8 +356,8 @@ mod tests {
             alias: Some("MyUser".into()),
         }];
         let group = ImportGroup::resolve_with_explicit(&refs, vec![]);
-        assert_eq!(group.entries.len(), 1);
-        assert_eq!(group.entries[0].alias.as_deref(), Some("MyUser"));
+        assert_eq!(group.entries().len(), 1);
+        assert_eq!(group.entries()[0].alias.as_deref(), Some("MyUser"));
         assert_eq!(group.resolved_name("./models", "User"), Some("MyUser"));
     }
 }

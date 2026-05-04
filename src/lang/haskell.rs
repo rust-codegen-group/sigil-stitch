@@ -126,14 +126,14 @@ impl CodeLang for Haskell {
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries.is_empty() {
+        if imports.entries().is_empty() {
             return String::new();
         }
 
         // Group names by module.
         let mut by_module: std::collections::BTreeMap<&str, Vec<&ImportEntry>> =
             std::collections::BTreeMap::new();
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             if entry.is_side_effect {
                 continue;
             }

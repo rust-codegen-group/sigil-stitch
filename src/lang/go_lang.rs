@@ -116,7 +116,7 @@ impl CodeLang for GoLang {
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries.is_empty() {
+        if imports.entries().is_empty() {
             return String::new();
         }
 
@@ -125,7 +125,7 @@ impl CodeLang for GoLang {
         let mut std_packages: Vec<&ImportEntry> = Vec::new();
         let mut ext_packages: Vec<&ImportEntry> = Vec::new();
 
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             if seen.contains(&entry.module) {
                 continue;
             }

@@ -139,14 +139,14 @@ impl CodeLang for Bash {
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries.is_empty() {
+        if imports.entries().is_empty() {
             return String::new();
         }
 
         // Deduplicate to unique source paths.
         let mut paths: Vec<&str> = Vec::new();
         let mut seen = std::collections::HashSet::new();
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             if seen.insert(entry.module.as_str()) {
                 paths.push(&entry.module);
             }
@@ -315,7 +315,7 @@ mod tests {
     #[test]
     fn test_render_imports_empty() {
         let bash = Bash::new();
-        let imports = ImportGroup { entries: vec![] };
+        let imports = ImportGroup::from(vec![]);
         assert_eq!(bash.render_imports(&imports), "");
     }
 
