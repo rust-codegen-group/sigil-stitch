@@ -144,14 +144,14 @@ impl CodeLang for OCaml {
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries.is_empty() {
+        if imports.entries().is_empty() {
             return String::new();
         }
 
         let mut seen = std::collections::BTreeSet::new();
         let mut lines: Vec<String> = Vec::new();
 
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             if entry.is_side_effect {
                 continue;
             }

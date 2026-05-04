@@ -85,8 +85,6 @@ pub mod import;
 pub mod import_collector;
 /// Language abstraction trait and per-language implementations.
 pub mod lang;
-/// Collision-free name allocation for generated identifiers.
-pub mod name_allocator;
 /// Structural builders (TypeSpec, FunSpec, FileSpec, etc.) that emit `CodeBlock`s.
 pub mod spec;
 /// Type references with recursive import tracking and pretty-printing.

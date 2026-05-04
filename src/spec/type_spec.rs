@@ -444,139 +444,14 @@ impl TypeSpec {
         lang: &dyn CodeLang,
         has_trailing_members: bool,
     ) -> Result<(), crate::error::SigilStitchError> {
-        let ea = lang.enum_and_annotation();
-        let sep = ea.variant_separator;
-        let trailing = ea.variant_trailing_separator;
         let count = self.variants.len();
-        let field_term = lang.block_syntax().field_terminator;
-
         for (i, variant) in self.variants.iter().enumerate() {
-            // Emit variant parts directly here rather than calling variant.emit(),
-            // because we need to append the separator before the trailing newline.
-            let emit_variant_doc = || -> Option<String> {
-                if variant.doc.is_empty() || lang.doc_comment_inside_body() {
-                    return None;
-                }
-                let doc_lines: Vec<&str> = variant.doc.iter().map(|s| s.as_str()).collect();
-                Some(lang.render_doc_comment(&doc_lines))
+            let ctx = crate::spec::enum_variant_spec::VariantContext {
+                is_first: i == 0,
+                is_last: i == count - 1,
+                has_trailing_members,
             };
-
-            if lang.doc_before_annotations()
-                && let Some(doc_str) = emit_variant_doc()
-            {
-                cb.add("%L", doc_str);
-                cb.add_line();
-            }
-
-            for spec in &variant.annotation_specs {
-                cb.add_code(spec.emit(lang)?);
-                cb.add_line();
-            }
-            for ann in &variant.annotations {
-                cb.add_code(ann.clone());
-                cb.add_line();
-            }
-
-            if !lang.doc_before_annotations()
-                && let Some(doc_str) = emit_variant_doc()
-            {
-                cb.add("%L", doc_str);
-                cb.add_line();
-            }
-
-            let prefix = if i == 0 {
-                ea.variant_prefix_first.unwrap_or(ea.variant_prefix)
-            } else {
-                ea.variant_prefix
-            };
-            let mut fmt = String::new();
-            let mut args: Vec<Arg> = Vec::new();
-            fmt.push_str(prefix);
-            fmt.push_str(&variant.name);
-
-            // Tuple/associated types: Name(Type1, Type2)
-            if !variant.associated_types.is_empty() {
-                fmt.push('(');
-                for (j, ty) in variant.associated_types.iter().enumerate() {
-                    if j > 0 {
-                        fmt.push_str(", ");
-                    }
-                    fmt.push_str("%T");
-                    args.push(Arg::TypeName(ty.clone()));
-                }
-                fmt.push(')');
-            }
-
-            // Struct fields: Name { field: Type, ... }
-            if !variant.fields.is_empty() {
-                let is_last = i == count - 1;
-
-                fmt.push_str(" {");
-                cb.add(&fmt, args);
-                cb.add_line();
-                cb.add("%>", ());
-                for field in &variant.fields {
-                    let vis = lang.render_visibility(
-                        field.modifiers.visibility,
-                        crate::spec::modifiers::DeclarationContext::Member,
-                    );
-                    let mut f_fmt = String::new();
-                    let mut f_args: Vec<Arg> = Vec::new();
-                    f_fmt.push_str(vis);
-                    let tds = lang.type_decl_syntax();
-                    if tds.type_before_name {
-                        if !field.field_type.is_empty() {
-                            f_fmt.push_str("%T");
-                            f_args.push(Arg::TypeName(field.field_type.clone()));
-                            f_fmt.push(' ');
-                        }
-                        f_fmt.push_str(&field.name);
-                    } else {
-                        f_fmt.push_str(&field.name);
-                        if !field.field_type.is_empty() {
-                            let type_sep = tds.type_annotation_separator;
-                            f_fmt.push_str(type_sep);
-                            f_fmt.push_str("%T");
-                            f_args.push(Arg::TypeName(field.field_type.clone()));
-                        }
-                    }
-                    f_fmt.push_str(field_term);
-                    cb.add(&f_fmt, f_args);
-                    cb.add_line();
-                }
-                cb.add("%<", ());
-                if is_last && has_trailing_members && !ea.variant_section_terminator.is_empty() {
-                    cb.add(&format!("}}{}", ea.variant_section_terminator), ());
-                } else if !sep.is_empty() && (!is_last || trailing) {
-                    cb.add(&format!("}}{sep}"), ());
-                } else {
-                    cb.add("}", ());
-                }
-                cb.add_line();
-                continue;
-            }
-
-            if let Some(val) = &variant.value {
-                match ea.variant_value_format {
-                    crate::lang::config::VariantValueFormat::Assignment => {
-                        fmt.push_str(" = %L");
-                    }
-                    crate::lang::config::VariantValueFormat::ConstructorArg => {
-                        fmt.push_str("(%L)");
-                    }
-                }
-                args.push(Arg::Code(val.clone()));
-            }
-
-            let is_last = i == count - 1;
-            if is_last && has_trailing_members && !ea.variant_section_terminator.is_empty() {
-                fmt.push_str(ea.variant_section_terminator);
-            } else if !sep.is_empty() && (!is_last || trailing) {
-                fmt.push_str(sep);
-            }
-
-            cb.add(&fmt, args);
-            cb.add_line();
+            variant.emit_into(cb, lang, ctx)?;
         }
         Ok(())
     }

@@ -1,9 +1,23 @@
 //! Enum variant specification for type-safe enum generation.
 
-use crate::code_block::CodeBlock;
+use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
+use crate::error::SigilStitchError;
+use crate::lang::CodeLang;
 use crate::spec::annotation_spec::AnnotationSpec;
 use crate::spec::field_spec::FieldSpec;
+use crate::spec::modifiers::DeclarationContext;
 use crate::type_name::TypeName;
+
+/// Positional context passed to [`EnumVariantSpec::emit()`].
+#[derive(Debug, Clone, Copy)]
+pub struct VariantContext {
+    /// Whether this is the first variant in the enum.
+    pub is_first: bool,
+    /// Whether this is the last variant in the enum.
+    pub is_last: bool,
+    /// Whether the enum has members (fields, properties, methods) after the variants.
+    pub has_trailing_members: bool,
+}
 
 /// A single enum variant (e.g., `Red`, `Up = 'UP'`, `case red`).
 ///
@@ -59,7 +73,7 @@ impl EnumVariantSpec {
     ///
     /// # Errors
     ///
-    /// Returns [`SigilStitchError::EmptyName`](crate::error::SigilStitchError::EmptyName) if `name` is empty.
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
     pub fn new(name: &str) -> Result<Self, crate::error::SigilStitchError> {
         snafu::ensure!(
             !name.is_empty(),
@@ -89,6 +103,128 @@ impl EnumVariantSpec {
             associated_types: Vec::new(),
             fields: Vec::new(),
         }
+    }
+
+    /// Emit this variant as a CodeBlock fragment, including prefix, value,
+    /// struct fields, separator, and terminator.
+    pub fn emit(
+        &self,
+        lang: &dyn CodeLang,
+        ctx: VariantContext,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let mut cb = CodeBlock::builder();
+        self.emit_into(&mut cb, lang, ctx)?;
+        cb.build()
+    }
+
+    /// Emit this variant directly into an existing builder.
+    pub fn emit_into(
+        &self,
+        cb: &mut CodeBlockBuilder,
+        lang: &dyn CodeLang,
+        ctx: VariantContext,
+    ) -> Result<(), SigilStitchError> {
+        let ea = lang.enum_and_annotation();
+        let sep = ea.variant_separator;
+        let trailing = ea.variant_trailing_separator;
+
+        let emit_doc = || -> Option<String> {
+            if self.doc.is_empty() || lang.doc_comment_inside_body() {
+                return None;
+            }
+            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
+            Some(lang.render_doc_comment(&doc_lines))
+        };
+
+        if lang.doc_before_annotations()
+            && let Some(doc_str) = emit_doc()
+        {
+            cb.add("%L", doc_str);
+            cb.add_line();
+        }
+
+        for spec in &self.annotation_specs {
+            cb.add_code(spec.emit(lang)?);
+            cb.add_line();
+        }
+        for ann in &self.annotations {
+            cb.add_code(ann.clone());
+            cb.add_line();
+        }
+
+        if !lang.doc_before_annotations()
+            && let Some(doc_str) = emit_doc()
+        {
+            cb.add("%L", doc_str);
+            cb.add_line();
+        }
+
+        let prefix = if ctx.is_first {
+            ea.variant_prefix_first.unwrap_or(ea.variant_prefix)
+        } else {
+            ea.variant_prefix
+        };
+        let mut fmt = String::new();
+        let mut args: Vec<Arg> = Vec::new();
+        fmt.push_str(prefix);
+        fmt.push_str(&self.name);
+
+        // Tuple/associated types: Name(Type1, Type2)
+        if !self.associated_types.is_empty() {
+            fmt.push('(');
+            for (j, ty) in self.associated_types.iter().enumerate() {
+                if j > 0 {
+                    fmt.push_str(", ");
+                }
+                fmt.push_str("%T");
+                args.push(Arg::TypeName(ty.clone()));
+            }
+            fmt.push(')');
+        }
+
+        // Struct fields: Name { field: Type, ... }
+        if !self.fields.is_empty() {
+            fmt.push_str(" {");
+            cb.add(&fmt, args);
+            cb.add_line();
+            cb.add("%>", ());
+            for field in &self.fields {
+                cb.add_code(field.emit(lang, DeclarationContext::Member)?);
+            }
+            cb.add("%<", ());
+            if ctx.is_last && ctx.has_trailing_members && !ea.variant_section_terminator.is_empty()
+            {
+                cb.add(&format!("}}{}", ea.variant_section_terminator), ());
+            } else if !sep.is_empty() && (!ctx.is_last || trailing) {
+                cb.add(&format!("}}{sep}"), ());
+            } else {
+                cb.add("}", ());
+            }
+            cb.add_line();
+            return Ok(());
+        }
+
+        if let Some(val) = &self.value {
+            match ea.variant_value_format {
+                crate::lang::config::VariantValueFormat::Assignment => {
+                    fmt.push_str(" = %L");
+                }
+                crate::lang::config::VariantValueFormat::ConstructorArg => {
+                    fmt.push_str("(%L)");
+                }
+            }
+            args.push(Arg::Code(val.clone()));
+        }
+
+        if ctx.is_last && ctx.has_trailing_members && !ea.variant_section_terminator.is_empty() {
+            fmt.push_str(ea.variant_section_terminator);
+        } else if !sep.is_empty() && (!ctx.is_last || trailing) {
+            fmt.push_str(sep);
+        }
+
+        cb.add(&fmt, args);
+        cb.add_line();
+        Ok(())
     }
 }
 
@@ -150,7 +286,7 @@ impl EnumVariantSpecBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`SigilStitchError::EmptyName`](crate::error::SigilStitchError::EmptyName) if `name` is empty.
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
     pub fn build(self) -> Result<EnumVariantSpec, crate::error::SigilStitchError> {
         snafu::ensure!(
             !self.name.is_empty(),

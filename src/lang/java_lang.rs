@@ -110,7 +110,7 @@ impl CodeLang for JavaLang {
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries.is_empty() {
+        if imports.entries().is_empty() {
             return String::new();
         }
 
@@ -120,7 +120,7 @@ impl CodeLang for JavaLang {
         let mut other_imports: Vec<String> = Vec::new();
 
         let mut seen = std::collections::BTreeSet::new();
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             let line = if entry.is_wildcard {
                 let fqn = format!("{}.*", entry.module);
                 if !seen.insert(fqn.clone()) {

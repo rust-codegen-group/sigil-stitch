@@ -191,14 +191,14 @@ impl CodeLang for Python {
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries.is_empty() {
+        if imports.entries().is_empty() {
             return String::new();
         }
 
         let mut lines: Vec<String> = Vec::new();
 
         // Handle side-effect and wildcard imports first.
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             if entry.is_side_effect {
                 lines.push(format!("import {}", entry.module));
             } else if entry.is_wildcard {
@@ -212,7 +212,7 @@ impl CodeLang for Python {
         let mut thirdparty: std::collections::BTreeMap<&str, Vec<&ImportEntry>> =
             std::collections::BTreeMap::new();
 
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             if entry.is_side_effect || entry.is_wildcard {
                 continue;
             }

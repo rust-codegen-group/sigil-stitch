@@ -66,14 +66,14 @@ impl CodeLang for RustLang {
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries.is_empty() {
+        if imports.entries().is_empty() {
             return String::new();
         }
 
         let mut lines = Vec::new();
 
         // Handle side-effect and wildcard imports first.
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             if entry.is_wildcard {
                 lines.push(format!("use {}::*;", entry.module));
             } else if entry.is_side_effect {
@@ -86,7 +86,7 @@ impl CodeLang for RustLang {
         let mut external_imports: Vec<&ImportEntry> = Vec::new();
         let mut crate_imports: Vec<&ImportEntry> = Vec::new();
 
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             if entry.is_side_effect || entry.is_wildcard {
                 continue;
             }

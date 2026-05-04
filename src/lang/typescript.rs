@@ -176,7 +176,7 @@ impl CodeLang for TypeScript {
         // Group entries by module path.
         let mut by_module: std::collections::BTreeMap<&str, Vec<&ImportEntry>> =
             std::collections::BTreeMap::new();
-        for entry in &imports.entries {
+        for entry in imports.entries() {
             if entry.is_side_effect {
                 lines.push(format!("import {quote}{}{quote}{term}", entry.module));
                 continue;
