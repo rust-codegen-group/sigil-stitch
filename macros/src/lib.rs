@@ -47,6 +47,22 @@ use proc_macro::TokenStream;
 /// - `$comment("text")` becomes `add_comment("text")`
 /// - `$>` / `$<` increase / decrease indent level
 ///
+/// ## Meta-Conditionals and Meta-Loops
+///
+/// Use `$if`/`$else_if`/`$else` to conditionally emit builder calls at runtime,
+/// and `$for` to loop over a collection and emit per-item statements:
+///
+/// ```ignore
+/// sigil_quote!(TypeScript {
+///     $if(use_strict) {
+///         "use strict";
+///     }
+///     $for((name, ty) in &fields) {
+///         let $N(*name): $L(*ty);
+///     }
+/// })
+/// ```
+///
 /// ## Control Flow
 ///
 /// The macro detects `if`/`else`/`else if` chains, `for`, `while`, `try`/`catch`,

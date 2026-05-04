@@ -32,6 +32,12 @@ pub(crate) enum Statement {
     SpliceEach { expr: TokenStream },
     /// `$if(cond) { ... } $else_if(cond) { ... } $else { ... }` — meta-conditional.
     MetaIf { branches: Vec<MetaBranch> },
+    /// `$for(pat in expr) { ... }` — meta-loop that emits body once per iteration.
+    MetaFor {
+        pat: TokenStream,
+        iter_expr: TokenStream,
+        body: Vec<Statement>,
+    },
 }
 
 /// A single branch in a control flow chain.

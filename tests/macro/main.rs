@@ -16,6 +16,7 @@ mod interpolation;
 mod join;
 mod keyword_spacing;
 mod line_splitting;
+mod meta_for;
 mod meta_if;
 mod multi_language;
 mod non_brace_langs;

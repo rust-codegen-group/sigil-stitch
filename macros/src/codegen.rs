@@ -104,6 +104,18 @@ fn generate_statements(statements: &[Statement]) -> Vec<TokenStream> {
                 let meta_if = generate_meta_if(branches);
                 calls.push(meta_if);
             }
+            Statement::MetaFor {
+                pat,
+                iter_expr,
+                body,
+            } => {
+                let body_calls = generate_statements(body);
+                calls.push(quote! {
+                    for #pat in #iter_expr {
+                        #(#body_calls)*
+                    }
+                });
+            }
         }
     }
     calls

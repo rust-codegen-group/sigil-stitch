@@ -160,11 +160,15 @@ fn tokens_to_format_inner(
                 ));
             }
 
-            // `$if`/`$else_if`/`$else` should have been caught earlier (statement-level).
-            if is_ident(next, "if") || is_ident(next, "else_if") || is_ident(next, "else") {
+            // `$if`/`$else_if`/`$else`/`$for` should have been caught earlier (statement-level).
+            if is_ident(next, "if")
+                || is_ident(next, "else_if")
+                || is_ident(next, "else")
+                || is_ident(next, "for")
+            {
                 return Err(CompileError::new(
                     next.span(),
-                    "$if/$else_if/$else must appear at the start of a line",
+                    "$if/$else_if/$else/$for must appear at the start of a line",
                 ));
             }
 
@@ -276,7 +280,7 @@ fn tokens_to_format_inner(
 
             return Err(CompileError::new(
                 next.span(),
-                "expected interpolation kind after `$`: $T, $N, $S, $L, $C, $W, $join, $C_each, or $$",
+                "expected interpolation kind after `$`: $T, $N, $S, $L, $C, $W, $join, $C_each, $for, or $$",
             ));
         }
 
