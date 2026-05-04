@@ -36,6 +36,11 @@ pub(super) fn parse_one_statement(
         return Ok((stmt, next));
     }
 
+    // Check for $let(binding);
+    if let Some((stmt, next)) = try_parse_meta_let(tokens, start)? {
+        return Ok((stmt, next));
+    }
+
     // Collect tokens for this statement, looking for `;` or a brace group.
     let mut pos = start;
     let mut collected: Vec<TokenTree> = Vec::new();
@@ -512,6 +517,57 @@ fn try_parse_meta_for(
         },
         start + 4,
     )))
+}
+
+/// Try to parse `$let(binding);` at position `start`.
+///
+/// Emits a Rust-level `let` binding in the generated code, allowing
+/// intermediate variable bindings (including fallible `?`) inside
+/// `$for` and `$if` bodies.
+fn try_parse_meta_let(
+    tokens: &[TokenTree],
+    start: usize,
+) -> Result<Option<(Statement, usize)>, CompileError> {
+    // Need at least 4 tokens: `$`, `let`, `(binding)`, `;`
+    if start + 3 >= tokens.len() {
+        return Ok(None);
+    }
+
+    let is_dollar = matches!(&tokens[start], TokenTree::Punct(p) if p.as_char() == '$');
+    if !is_dollar {
+        return Ok(None);
+    }
+
+    if !is_ident(&tokens[start + 1], "let") {
+        return Ok(None);
+    }
+
+    let paren_group = match &tokens[start + 2] {
+        TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g.clone(),
+        _ => {
+            return Err(CompileError::new(
+                tokens[start + 2].span(),
+                "$let requires a parenthesized binding: $let(var = expr);",
+            ));
+        }
+    };
+
+    let binding = paren_group.stream();
+    if binding.is_empty() {
+        return Err(CompileError::new(
+            paren_group.span(),
+            "$let binding cannot be empty: $let(var = expr);",
+        ));
+    }
+
+    if !is_semicolon(&tokens[start + 3]) {
+        return Err(CompileError::new(
+            tokens[start + 3].span(),
+            "$let must be followed by `;`: $let(var = expr);",
+        ));
+    }
+
+    Ok(Some((Statement::MetaLet { binding }, start + 4)))
 }
 
 /// Strip a trailing `$+` continuation marker from collected tokens.

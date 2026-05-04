@@ -38,6 +38,8 @@ pub(crate) enum Statement {
         iter_expr: TokenStream,
         body: Vec<Statement>,
     },
+    /// `$let(binding);` — Rust-level `let` binding inside macro body.
+    MetaLet { binding: TokenStream },
 }
 
 /// A single branch in a control flow chain.

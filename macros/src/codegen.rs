@@ -116,6 +116,11 @@ fn generate_statements(statements: &[Statement]) -> Vec<TokenStream> {
                     }
                 });
             }
+            Statement::MetaLet { binding } => {
+                calls.push(quote! {
+                    let #binding;
+                });
+            }
         }
     }
     calls

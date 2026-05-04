@@ -160,15 +160,16 @@ fn tokens_to_format_inner(
                 ));
             }
 
-            // `$if`/`$else_if`/`$else`/`$for` should have been caught earlier (statement-level).
+            // `$if`/`$else_if`/`$else`/`$for`/`$let` should have been caught earlier (statement-level).
             if is_ident(next, "if")
                 || is_ident(next, "else_if")
                 || is_ident(next, "else")
                 || is_ident(next, "for")
+                || is_ident(next, "let")
             {
                 return Err(CompileError::new(
                     next.span(),
-                    "$if/$else_if/$else/$for must appear at the start of a line",
+                    "$if/$else_if/$else/$for/$let must appear at the start of a line",
                 ));
             }
 

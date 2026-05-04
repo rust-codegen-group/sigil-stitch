@@ -45,6 +45,7 @@ It returns `Result<CodeBlock, SigilStitchError>`.
 | `$C_each(expr)` | — | `impl IntoIterator<Item: Into<CodeBlock>>` | Splice each code block from iterable |
 | `$if(cond) { ... }` | — | Rust expression | Meta-conditional (runtime codegen control) |
 | `$for(pat in expr) { ... }` | — | Rust pattern + iterable | Meta-loop (emit body per iteration) |
+| `$let(binding);` | — | Rust `let` binding | Rust-level variable binding inside macro body |
 | `$join(sep, iter)` | `%L` | separator + `impl IntoIterator<Item: ToString>` | Separator-joined list |
 | `$+` | — | (none) | Line continuation (suppress line-break split) |
 
@@ -464,6 +465,71 @@ sigil_quote!(TypeScript {
         import type { $T(t.clone()) };
     }
 })
+```
+
+## Meta-Bindings (`$let`)
+
+`$let` introduces a Rust-level `let` binding inside the macro body. It emits a
+real `let` statement in the generated Rust code, making it possible to compute
+intermediate values — including fallible expressions with `?` — inside `$for` and
+`$if` bodies.
+
+```rust,ignore
+let fields = vec![("name", "String"), ("age", "u32")];
+
+sigil_quote!(TypeScript {
+    $for((name, ty) in &fields) {
+        $let(upper = name.to_uppercase());
+        const $N(upper): $L(*ty);
+    }
+})
+// Output:
+// const NAME: String;
+// const AGE: u32;
+```
+
+### Syntax
+
+The content between the parentheses is emitted verbatim as `let <content>;`.
+All Rust `let` forms work:
+
+```rust,ignore
+$let(x = expr);                // simple binding
+$let(x: Type = expr);          // with type annotation
+$let((a, b) = pair);           // destructuring
+$let(mut x = 0);               // mutable binding
+```
+
+### Fallible Expressions (`?`)
+
+The primary motivation for `$let` is supporting the `?` operator inside `$for`
+bodies. Since `sigil_quote!` expands to a plain block (not a closure), `?`
+propagates to the enclosing function:
+
+```rust,ignore
+fn emit_enum(en: &Enum) -> Option<FileSpec> {
+    let block = sigil_quote!(RustLang {
+        $for(v in &en.values) {
+            $let(s = v.value.as_str()?);
+            $let(variant = s.to_pascal_case());
+            $if(&variant != s) {
+                #[serde(rename = $S(s))]
+            }
+            $L(format!("{variant},"))
+        }
+    }).ok()?;
+    // ...
+}
+```
+
+Note that `?` also works directly inside interpolation expressions without
+`$let` — use `$let` only when you need to bind the result for reuse:
+
+```rust,ignore
+// Simple case: ? inside $L() works without $let
+$for(v in &values) {
+    $L(format!("{},", v.as_str()?.to_pascal_case()))
+}
 ```
 
 ## Separator-Joined Lists (`$join`)
