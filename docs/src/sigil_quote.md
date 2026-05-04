@@ -44,6 +44,7 @@ It returns `Result<CodeBlock, SigilStitchError>`.
 | `$$` | `$` | (none) | Literal dollar sign |
 | `$C_each(expr)` | — | `impl IntoIterator<Item: Into<CodeBlock>>` | Splice each code block from iterable |
 | `$if(cond) { ... }` | — | Rust expression | Meta-conditional (runtime codegen control) |
+| `$for(pat in expr) { ... }` | — | Rust pattern + iterable | Meta-loop (emit body per iteration) |
 | `$join(sep, iter)` | `%L` | separator + `impl IntoIterator<Item: ToString>` | Separator-joined list |
 | `$+` | — | (none) | Line continuation (suppress line-break split) |
 
@@ -393,6 +394,74 @@ sigil_quote!(TypeScript {
         if (!user) {
             throw new Error($S("unauthorized"));
         }
+    }
+})
+```
+
+## Meta-Loops (`$for`)
+
+`$for` iterates over a Rust collection at compile time, emitting the body statements
+once per iteration. Like `$if`, it controls **which builder calls are made** — it
+does not produce target-language loop syntax.
+
+```rust,ignore
+let fields = vec!["name", "age", "email"];
+
+sigil_quote!(TypeScript {
+    $for(f in &fields) {
+        this.$N(*f) = null;
+    }
+})
+// Output:
+// this.name = null;
+// this.age = null;
+// this.email = null;
+```
+
+### Destructuring Patterns
+
+Any Rust `for` pattern works:
+
+```rust,ignore
+let entries = vec![("x", "number"), ("y", "string")];
+
+sigil_quote!(TypeScript {
+    $for((name, ty) in &entries) {
+        let $N(*name): $L(*ty);
+    }
+})
+// Output:
+// let x: number;
+// let y: string;
+```
+
+### Nesting
+
+`$for` can nest inside `$if` and vice versa, and can contain target-language
+control flow:
+
+```rust,ignore
+let variants = vec!["A", "B", "C"];
+
+sigil_quote!(TypeScript {
+    $for(v in &variants) {
+        case $S(*v):
+            return $S(*v);
+    }
+})
+```
+
+### Combining with Interpolation Markers
+
+All interpolation markers (`$T`, `$N`, `$S`, `$L`, `$C`, `$W`, `$join`) work
+inside `$for` bodies, and the loop variable is in scope:
+
+```rust,ignore
+let types: Vec<TypeName> = get_types();
+
+sigil_quote!(TypeScript {
+    $for(t in &types) {
+        import type { $T(t.clone()) };
     }
 })
 ```

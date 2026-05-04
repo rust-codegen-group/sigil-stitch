@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.2
+
+### Added
+
+- `$for(pat in expr) { body }` meta-loop in `sigil_quote!` — compile-time
+  iteration with full nesting, destructuring patterns, and all interpolation
+  markers.
+- `Emittable` trait and `FileMember::Spec` variant for third-party spec types
+  to participate in `FileSpec` rendering and import collection.
+- `ProjectSpec::build()` rejects duplicate filenames (returns
+  `SigilStitchError::DuplicateFileName`).
+
+### Fixed
+
+- `FileSpec` serde round-trip no longer panics on render (deserialized files
+  now retain their language).
+
+### Changed (internal, non-breaking)
+
+- `CodeLang` required methods reduced from 10 to 3 (config accessors +
+  format specifiers consolidated).
+- TypeName rendering and import collection extracted into separate modules.
+- Import collection consolidated into a single walker.
+- Format specifier definitions unified into `Specifier` enum.
+- Architecture deepened: import resolution deduplication, `ImportGroup.entries`
+  privatized, `EnumVariantSpec` self-contained emit.
+
 ## 0.4.1
 
 ### Fixed
