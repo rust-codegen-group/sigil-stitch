@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.4
+
+### Fixed
+
+- Eliminate spurious spaces around punctuation in `sigil_quote!` — a pre-scan
+  annotation pass now classifies tokens structurally before formatting. Fixes
+  path separators (`std::fmt::Display`), macro bangs (`println!(...)`), prefix
+  operators (`&self`, `*ptr`), and generic angle brackets (`Vec<T>`,
+  `HashMap<K, V>`) across all supported languages.
+
+### Added
+
+- Cross-language spacing test suite covering generics-vs-operators disambiguation
+  for C++, Java, Kotlin, TypeScript, Swift, Rust, Scala, Dart, Go, and Python.
+
 ## 0.4.3
 
 ### Added
