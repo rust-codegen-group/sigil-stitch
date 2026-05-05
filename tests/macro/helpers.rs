@@ -1,9 +1,13 @@
 pub use sigil_stitch::code_block::{CodeBlock, NameArg, StringLitArg};
 pub use sigil_stitch::import_collector;
+pub use sigil_stitch::lang::cpp_lang::CppLang;
+pub use sigil_stitch::lang::dart::DartLang;
 pub use sigil_stitch::lang::haskell::Haskell;
 pub use sigil_stitch::lang::java_lang::JavaLang;
 pub use sigil_stitch::lang::kotlin::Kotlin;
 pub use sigil_stitch::lang::ocaml::OCaml;
+pub use sigil_stitch::lang::scala::Scala;
+pub use sigil_stitch::lang::swift::Swift;
 pub use sigil_stitch::prelude::*;
 pub use sigil_stitch::spec::file_spec::FileSpec;
 pub use sigil_stitch::type_name::TypeName;
@@ -66,6 +70,38 @@ pub fn render_java(block: &CodeBlock) -> String {
 
 pub fn render_kt(block: &CodeBlock) -> String {
     let file = FileSpec::builder_with("test.kt", Kotlin::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
+pub fn render_cpp(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.cpp", CppLang::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
+pub fn render_swift(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.swift", Swift::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
+pub fn render_dart(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.dart", DartLang::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
+pub fn render_scala(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.scala", Scala::new())
         .add_code(block.clone())
         .build()
         .unwrap();

@@ -649,16 +649,18 @@ as Rust tokens, not as the target language's tokens. This creates some edge case
 
    The context is set automatically: `?` (standalone) enters ternary mode,
    `:` and `;` reset to type-annotation mode, `{` enters map-entry mode,
-   and `:=` / `::` are detected via one-token lookahead. The `::` pair is
-   always glued (`std::mem`), but because proc_macro2 tokenizes the second
-   `:` as standalone, a space appears before the following identifier
-   (`std:: mem`). This is a tokenization artifact common to all multi-char
-   punctuation.
+   and `:=` / `::` are detected via one-token lookahead. Path separators
+   (`std::mem::size_of`) render tightly with no extra spaces.
 
 3. **Other multi-character operators.** Operators like `===`, `!==`, `->`
    are tokenized as separate punctuation characters. The macro reconstructs
-   them via proc_macro2's `Spacing::Joint` flag, but spacing may differ
-   slightly — `<u32>` may get extra spaces around `<` and `>`.
+   them via proc_macro2's `Spacing::Joint` flag. A pre-scan annotation pass
+   classifies generic angle brackets (`Vec<T>`, `HashMap<K, V>`), path
+   separators (`std::mem`), macro bangs (`println!(...)`), and prefix
+   operators (`&self`, `*ptr`) — these render tightly without extra spaces.
+   The generic `<`/`>` heuristic relies on the preceding identifier starting
+   with uppercase, so `fn foo<T>` may keep a space before `<` (use `FunSpec`
+   for generic function declarations).
 
 4. **Keyword spacing before `(`.** Control-flow keywords (`if`, `for`, `while`,
    `else`, `match`, `return`, `try`, `catch`, etc.) automatically get a space

@@ -57,10 +57,9 @@ fn test_rust_path_separator() {
     .unwrap();
 
     let output = render_rs(&block);
-    assert!(output.contains("std::"), "got: {output}");
-    assert!(output.contains("mem::"), "got: {output}");
-    assert!(output.contains("size_of"), "got: {output}");
-    assert!(output.contains("u32"), "got: {output}");
+    assert!(output.contains("std::mem::size_of"), "got: {output}");
+    assert!(!output.contains(":: "), "no space after ::, got: {output}");
+    assert!(!output.contains(" ::"), "no space before ::, got: {output}");
 }
 
 #[test]

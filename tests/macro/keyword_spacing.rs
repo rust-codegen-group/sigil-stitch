@@ -128,7 +128,7 @@ fn test_method_named_new_no_space() {
     .unwrap();
 
     let output = render_ts(&block);
-    assert!(output.contains("Vec:: new()"), "got: {output}");
+    assert!(output.contains("Vec::new()"), "got: {output}");
     assert!(!output.contains("new ()"), "no extra space: {output}");
 }
 
