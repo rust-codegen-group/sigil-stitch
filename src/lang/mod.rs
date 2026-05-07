@@ -20,6 +20,8 @@ pub mod java_lang;
 pub mod javascript;
 /// Kotlin language support.
 pub mod kotlin;
+/// Lua language support.
+pub mod lua;
 /// OCaml language support.
 pub mod ocaml;
 /// Python language support.
@@ -403,6 +405,7 @@ pub fn lang_from_extension(ext: &str) -> Option<Box<dyn CodeLang>> {
         "c" | "h" => Some(Box::new(c_lang::CLang::default())),
         "cpp" | "cxx" | "cc" | "hpp" | "hxx" => Some(Box::new(cpp_lang::CppLang::default())),
         "cs" => Some(Box::new(csharp::CSharp::default())),
+        "lua" => Some(Box::new(lua::Lua::default())),
         "sh" | "bash" => Some(Box::new(bash::Bash::default())),
         "zsh" => Some(Box::new(zsh::Zsh::default())),
         _ => None,

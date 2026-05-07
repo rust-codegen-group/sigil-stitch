@@ -780,3 +780,87 @@ fn test_csharp_bitwise_operators() {
     assert!(output.contains("| c"), "bitwise OR spaced, got: {output}");
     assert!(output.contains("^ d"), "bitwise XOR spaced, got: {output}");
 }
+
+// =============================================================================
+// Lua — string concatenation, relational operators
+// =============================================================================
+
+#[test]
+fn test_lua_concat() {
+    let block = sigil_quote!(Lua {
+        local s = "Hello, "..name
+    })
+    .unwrap();
+
+    let output = render_lua(&block);
+    assert!(
+        output.contains("\"Hello, \"..name"),
+        "concat tight, got: {output}"
+    );
+}
+
+#[test]
+fn test_lua_not_equal() {
+    let block = sigil_quote!(Lua {
+        if x ~= 0 then
+            print(x)
+        end
+    })
+    .unwrap();
+
+    let output = render_lua(&block);
+    assert!(output.contains("x ~= 0"), "not-equal tight, got: {output}");
+}
+
+#[test]
+fn test_lua_length_operator() {
+    let block = sigil_quote!(Lua {
+        local n = #t
+    })
+    .unwrap();
+
+    let output = render_lua(&block);
+    assert!(
+        output.contains("#t"),
+        "length operator tight, got: {output}"
+    );
+}
+
+#[test]
+fn test_lua_exponent() {
+    let block = sigil_quote!(Lua {
+        local y = x ^ 2
+    })
+    .unwrap();
+
+    let output = render_lua(&block);
+    assert!(output.contains("x ^ 2"), "exponent spaced, got: {output}");
+}
+
+// =============================================================================
+// Python elif — verify the parser recognizes `elif` as control-flow continuation
+// =============================================================================
+
+#[test]
+fn test_python_elif() {
+    let block = sigil_quote!(Python {
+        if x > 0 {
+            return $S("positive")
+        } elif x < 0 {
+            return $S("negative")
+        } else {
+            return $S("zero")
+        }
+    })
+    .unwrap();
+
+    let output = render_py(&block);
+    assert!(
+        output.contains("elif x < 0"),
+        "elif recognized, got: {output}"
+    );
+    assert!(
+        !output.contains("elseif"),
+        "no elseif in Python, got: {output}"
+    );
+}

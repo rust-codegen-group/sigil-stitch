@@ -76,6 +76,18 @@ pub(super) fn parse_one_statement(
             // Check for $open("...") at end of collected tokens.
             let (condition_tokens, block_open_override) = try_extract_open_override(&collected)?;
 
+            // Distinguish control-flow `{` from literal `{` (e.g., Lua tables).
+            // Brace languages always use `{` for blocks, but end-delimited
+            // languages (Lua, Ruby, Elixir) use `{` for table/hash literals
+            // and can only detect control flow from surrounding keywords.
+            if !looks_like_control_flow_header(&condition_tokens) {
+                // Treat as a literal brace group — not control flow.
+                collected.push(tt.clone());
+                prev_end_line = Some(tt.span().end().line);
+                pos += 1;
+                continue;
+            }
+
             // Control flow detected.
             return parse_control_flow(tokens, &condition_tokens, g, pos, block_open_override);
         }
@@ -181,6 +193,84 @@ fn try_extract_open_override(
     Ok((condition_tokens, Some(text)))
 }
 
+/// Check whether the tokens before a `{` brace group look like a control-flow
+/// header (e.g. `if ... {`, `for ... {`, `function ... {`) rather than a
+/// literal brace expression (e.g. Lua table constructor `local t = { ... }`).
+///
+/// Returns `false` (→ literal) only for clear literal patterns: tokens ending
+/// with `=`, `,`, `return`, or a single identifier before `()` (function call
+/// with table argument, e.g. `foo(...) {`). Everything else defaults to
+/// `true` (→ control flow), which is correct for all brace languages.
+fn looks_like_control_flow_header(tokens: &[TokenTree]) -> bool {
+    if tokens.is_empty() {
+        return false;
+    }
+
+    let n = tokens.len();
+    let last = &tokens[n - 1];
+
+    // Control-flow keywords that always precede `{`
+    if is_ident(last, "then") || is_ident(last, "do") || is_ident(last, "else") {
+        return true;
+    }
+
+    // `=` → assignment of a table/object literal
+    if matches!(last, TokenTree::Punct(p) if p.as_char() == '=') {
+        return false;
+    }
+    // `,` → table entry separator (unlikely at statement level, but safe)
+    if matches!(last, TokenTree::Punct(p) if p.as_char() == ',') {
+        return false;
+    }
+    // `return` → returning a table
+    if is_ident(last, "return") {
+        return false;
+    }
+
+    // `(...)` group — check if it's a function call with table argument.
+    if matches!(last, TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis) {
+        // Only one token before `()` and it's an ident → function call
+        // (e.g. `foo(...) {` with table arg). This is a literal.
+        if n == 2 && matches!(&tokens[0], TokenTree::Ident(_)) {
+            let s = tokens[0].to_string();
+            // Known control-flow keywords that appear as a single ident
+            // before `()` are NOT function calls.
+            if matches!(
+                s.as_str(),
+                "if" | "for"
+                    | "while"
+                    | "catch"
+                    | "switch"
+                    | "foreach"
+                    | "for_each"
+                    | "unless"
+                    | "until"
+                    | "match"
+                    | "try"
+                    | "synchronized"
+                    | "when"
+                    | "guard"
+                    | "function"
+            ) {
+                return true;
+            }
+            // Single ident (not a keyword) → function call → literal
+            return false;
+        }
+        // Multiple tokens before `()` or starts with keyword → control flow
+        return true;
+    }
+
+    // `repeat` starts a control-flow block
+    if is_ident(&tokens[0], "repeat") {
+        return true;
+    }
+
+    // Default: assume control flow — backward compatible with brace languages
+    // where `{` at statement level always denotes a block.
+    true
+}
+
 /// Parse a control flow chain starting from tokens that lead into a brace group.
 fn parse_control_flow(
     tokens: &[TokenTree],
@@ -204,11 +294,20 @@ fn parse_control_flow(
 
     // Check for else chain.
     while pos < tokens.len() {
-        if is_ident(&tokens[pos], "else") {
-            let else_span = tokens[pos].span();
-            pos += 1; // consume `else`
+        let is_else = is_ident(&tokens[pos], "else");
+        let is_elseif = is_ident(&tokens[pos], "elseif");
+        let is_elif = is_ident(&tokens[pos], "elif");
 
-            // Collect tokens until we find a brace group (handles `else if (...) {`).
+        if is_else || is_elseif || is_elif {
+            let kw_span = tokens[pos].span();
+            let keyword: String = tokens[pos].to_string();
+            pos += 1; // consume keyword
+
+            // For bare `else` with no condition tokens, use keyword as-is.
+            // For `elseif`/`elif`, collect tokens until `{` as condition.
+            let is_bare_else = is_else;
+
+            // Collect tokens until we find a brace group.
             let mut else_condition_tokens: Vec<TokenTree> = Vec::new();
             let mut found_brace = false;
 
@@ -219,12 +318,18 @@ fn parse_control_flow(
                     let body_toks: Vec<TokenTree> = g.stream().into_iter().collect();
                     let body = parse_body(&body_toks)?;
 
-                    let (cond_format, cond_args) = if else_condition_tokens.is_empty() {
-                        ("else".to_string(), Vec::new())
-                    } else {
-                        let (fmt, args) = tokens_to_format(&else_condition_tokens)?;
-                        (format!("else {fmt}"), args)
-                    };
+                    let (cond_format, cond_args) =
+                        if is_bare_else && else_condition_tokens.is_empty() {
+                            ("else".to_string(), Vec::new())
+                        } else if is_bare_else {
+                            let (fmt, args) = tokens_to_format(&else_condition_tokens)?;
+                            (format!("else {fmt}"), args)
+                        } else if else_condition_tokens.is_empty() {
+                            (keyword.clone(), Vec::new())
+                        } else {
+                            let (fmt, args) = tokens_to_format(&else_condition_tokens)?;
+                            (format!("{keyword} {fmt}"), args)
+                        };
 
                     branches.push(Branch {
                         condition_format: cond_format,
@@ -241,7 +346,10 @@ fn parse_control_flow(
             }
 
             if !found_brace {
-                return Err(CompileError::new(else_span, "expected `{` after `else`"));
+                return Err(CompileError::new(
+                    kw_span,
+                    "expected `{` after `else`/`elseif`/`elif`",
+                ));
             }
         } else {
             break;

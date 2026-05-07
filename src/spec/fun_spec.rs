@@ -398,12 +398,16 @@ impl FunSpec {
         }
 
         // Return type as suffix (TS/Rust/Go-style: `fn add(...) -> int`).
+        // Skip when separator is empty (e.g. Lua) — nothing to separate.
         if !lang.type_decl_syntax().return_type_is_prefix
             && let Some(ret) = &self.return_type
         {
-            sig.push_str(lang.function_syntax().return_type_separator);
-            sig.push_str("%T");
-            sig_args.push(Arg::TypeName(ret.clone()));
+            let sep = lang.function_syntax().return_type_separator;
+            if !sep.is_empty() {
+                sig.push_str(sep);
+                sig.push_str("%T");
+                sig_args.push(Arg::TypeName(ret.clone()));
+            }
         }
 
         // Constructor delegation — signature style (Kotlin: `constructor(x: Int) : this(x, 0)`).

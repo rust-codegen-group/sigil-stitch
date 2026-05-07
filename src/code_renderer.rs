@@ -154,10 +154,10 @@ impl<'a> CodeRenderer<'a> {
                     }
                 }
                 CodeNode::BlockCloseTransition => {
-                    let close = self.lang.block_syntax().block_close;
-                    if !close.is_empty() {
+                    let cfg = self.lang.block_syntax();
+                    if !cfg.block_close.is_empty() && cfg.close_on_transition {
                         self.ensure_indent();
-                        self.emit(close);
+                        self.emit(cfg.block_close);
                         self.emit(" ");
                     }
                 }
@@ -235,11 +235,11 @@ impl<'a> CodeRenderer<'a> {
                     }
                 }
                 CodeNode::BlockCloseTransition => {
-                    let close = self.lang.block_syntax().block_close;
-                    if close.is_empty() {
+                    let cfg = self.lang.block_syntax();
+                    if cfg.block_close.is_empty() || !cfg.close_on_transition {
                         BoxDoc::nil()
                     } else {
-                        BoxDoc::text(format!("{} ", close))
+                        BoxDoc::text(format!("{} ", cfg.block_close))
                     }
                 }
                 CodeNode::Sequence(children) => self.nodes_to_doc(children),

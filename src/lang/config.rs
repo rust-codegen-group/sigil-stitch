@@ -220,6 +220,10 @@ pub struct BlockSyntaxConfig<'a> {
     pub type_close_terminator: &'a str,
     /// Closing delimiter for base class / implements list (e.g. `")"` for Python).
     pub bases_close: &'a str,
+    /// Whether to emit `block_close` during control-flow transitions (e.g. `} else`).
+    /// Set to `false` for `end`-delimited languages (Lua, Ruby, Elixir) where
+    /// `else`/`elseif` should NOT be preceded by the closing delimiter.
+    pub close_on_transition: bool,
 }
 
 impl Default for BlockSyntaxConfig<'_> {
@@ -232,6 +236,7 @@ impl Default for BlockSyntaxConfig<'_> {
             field_terminator: ",",
             type_close_terminator: "",
             bases_close: "",
+            close_on_transition: true,
         }
     }
 }

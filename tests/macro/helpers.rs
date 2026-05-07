@@ -6,6 +6,7 @@ pub use sigil_stitch::lang::dart::DartLang;
 pub use sigil_stitch::lang::haskell::Haskell;
 pub use sigil_stitch::lang::java_lang::JavaLang;
 pub use sigil_stitch::lang::kotlin::Kotlin;
+pub use sigil_stitch::lang::lua::Lua;
 pub use sigil_stitch::lang::ocaml::OCaml;
 pub use sigil_stitch::lang::scala::Scala;
 pub use sigil_stitch::lang::swift::Swift;
@@ -87,6 +88,14 @@ pub fn render_cpp(block: &CodeBlock) -> String {
 
 pub fn render_cs(block: &CodeBlock) -> String {
     let file = FileSpec::builder_with("Test.cs", CSharp::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
+pub fn render_lua(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.lua", Lua::new())
         .add_code(block.clone())
         .build()
         .unwrap();
