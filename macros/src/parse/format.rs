@@ -112,10 +112,27 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                 continue;
             }
             // $join(expr) or $T(expr) etc — skip ident + group
-            if let TokenTree::Ident(_) = next {
+            if let TokenTree::Ident(id) = next {
+                let is_type_interp = *id == "T";
                 i += 1;
                 if i < tokens.len() && matches!(&tokens[i], TokenTree::Group(_)) {
                     i += 1;
+                }
+                // $T(...) always produces a type — mark following `<` as generic
+                // but NOT if it's `<<` (shift operator)
+                if is_type_interp
+                    && i < tokens.len()
+                    && let TokenTree::Punct(p) = &tokens[i]
+                    && p.as_char() == '<'
+                {
+                    // Check if this is `<<` (shift) by looking at spacing
+                    let is_shift = p.spacing() == Spacing::Joint
+                        && i + 1 < tokens.len()
+                        && matches!(&tokens[i + 1], TokenTree::Punct(np) if np.as_char() == '<');
+                    if !is_shift {
+                        annotations[i] = TokenAnnotation::GenericOpen;
+                        generic_stack.push(i);
+                    }
                 }
                 continue;
             }
@@ -142,14 +159,20 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                     {
                         annotations[i] = TokenAnnotation::MacroBang;
                     }
-                    '&' | '*' => {
-                        // PrefixOp: NOT preceded by ident, literal, `)`, or `]`
+                    '&' | '*' | '-' => {
+                        // PrefixOp: NOT preceded by non-keyword ident, literal, `)`, or `]`
+                        // After keywords like `return`, `-` is prefix (unary minus)
                         let is_prefix = if i == 0 {
                             true
                         } else {
                             let prev = &tokens[i - 1];
                             match prev {
-                                TokenTree::Ident(_) | TokenTree::Literal(_) => false,
+                                TokenTree::Ident(id) => {
+                                    // After keyword → prefix; after variable → binary
+                                    let s = id.to_string();
+                                    CONTROL_FLOW_KEYWORDS.contains(&s.as_str())
+                                }
+                                TokenTree::Literal(_) => false,
                                 TokenTree::Group(g) => !matches!(
                                     g.delimiter(),
                                     Delimiter::Parenthesis | Delimiter::Bracket
