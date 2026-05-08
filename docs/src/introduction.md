@@ -43,7 +43,7 @@ and the same code blocks produce different layouts for different widths.
 languages: string delimiters, statement terminators, import syntax, visibility keywords,
 type formatting, annotation style, and more. sigil-stitch ships with implementations
 for TypeScript, JavaScript, Rust, Go, Python, Java, Kotlin, Swift, Dart, Scala,
-Haskell, OCaml, C, C++, Bash, and Zsh.
+Haskell, OCaml, C, C++, C#, Lua, Bash, and Zsh.
 The same `CodeBlock`, `TypeName`, and `Spec` types work across all of them -- only the
 language passed to `render()` changes.
 

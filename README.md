@@ -130,6 +130,8 @@ See [Building Functions & Fields](docs/src/functions_and_fields.md), [Building T
 | OCaml      | `.ml`     | no         | `open` module      |
 | C          | `.c`      | yes        | `#include`         |
 | C++        | `.cpp`    | yes        | `#include`/`using` |
+| C#         | `.cs`     | yes        | `using` namespace  |
+| Lua        | `.lua`    | no         | `require()`        |
 | Bash       | `.bash`   | no         | `source`           |
 | Zsh        | `.zsh`    | no         | `source`           |
 

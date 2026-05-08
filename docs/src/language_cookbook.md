@@ -13,6 +13,8 @@ This chapter collects practical, copy-paste-ready recipes for each supported lan
 - [Swift](cookbook_swift.md) -- struct with protocol conformance, enum, enum with associated values, protocol
 - [C++](cookbook_cpp.md) -- class with template, using alias, enum class, virtual method, namespace wrapping
 - [C](cookbook_c.md) -- typedef, struct with fields, function declaration, enum
+- [C#](cookbook_csharp.md) -- class with XML doc, interface, enum, record with imports
+- [Lua](cookbook_lua.md) -- function, module with require, control flow, table constructor
 - [Scala](cookbook_scala.md) -- case class, trait with type parameter, enum, bounded type parameter, newtype
 - [Haskell](cookbook_haskell.md) -- data record with deriving, type class, function with split signature, newtype, type alias
 - [OCaml](cookbook_ocaml.md) -- record type, function with curried params, module block, type alias, pattern match
@@ -27,6 +29,8 @@ The same logical concept -- a simple data type with two fields -- rendered acros
 | Rust       | `pub struct Point { pub x: f64, pub y: f64, }` + separate `impl` block |
 | Go         | `type Point struct { X float64; Y float64 }` |
 | Python     | `class Point: x: float; y: float` |
+| C#         | `public class Point { public double X; public double Y; }` |
+| Lua        | (no type system -- use `CodeBlock` directly for table constructors) |
 | Scala      | `case class Point(x: Double, y: Double)` |
 | Haskell    | `data Point = Point { pointX :: Double, pointY :: Double }` |
 | OCaml      | `type point = { x : float; y : float }` |

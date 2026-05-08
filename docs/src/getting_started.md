@@ -154,6 +154,8 @@ let ts = TypeScript::new()
 | `Kotlin`     | n/a | yes | n/a | yes (e.g. `kts`) |
 | `Swift`      | n/a | yes | n/a | yes |
 | `DartLang`   | n/a | yes | n/a | yes |
+| `CSharp`     | n/a | yes | n/a | yes |
+| `Lua`        | n/a | yes | n/a | yes |
 | `CLang`      | n/a | yes | n/a | yes (e.g. `h`) |
 | `CppLang`    | n/a | yes | n/a | yes (e.g. `hpp`, `cxx`) |
 | `Bash`       | n/a | yes | n/a | yes (e.g. `sh`) |
