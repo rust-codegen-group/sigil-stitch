@@ -168,6 +168,10 @@ impl CodeLang for TypeScript {
         TS_RESERVED
     }
 
+    fn escape_field_name(&self, name: &str) -> String {
+        name.to_string()
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         let mut lines = Vec::new();
         let quote = self.quote_style.char();

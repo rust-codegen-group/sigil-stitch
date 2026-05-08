@@ -194,6 +194,12 @@ pub trait CodeLang: std::fmt::Debug + 'static {
         }
     }
 
+    /// Escape a field/property name. Languages where property names never
+    /// conflict with reserved words (e.g. TypeScript) can return the name as-is.
+    fn escape_field_name(&self, name: &str) -> String {
+        self.escape_reserved(name)
+    }
+
     // ── Optional — override only for unusual languages ────────────
 
     /// Qualify an import name for rendering in code.

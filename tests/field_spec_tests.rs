@@ -184,3 +184,23 @@ fn test_javascript_optional_field_is_ignored() {
         "JS output must not contain '?': {out:?}"
     );
 }
+
+#[test]
+fn test_ts_reserved_word_field_not_escaped() {
+    let field = FieldSpec::builder("type", TypeName::primitive("string"))
+        .is_readonly()
+        .build()
+        .unwrap();
+    let out = emit_field_ts(&field, DeclarationContext::Member);
+    assert_eq!(out.trim(), "readonly type: string;");
+}
+
+#[test]
+fn test_go_reserved_word_field_is_escaped() {
+    use sigil_stitch::lang::go_lang::GoLang;
+    let field = FieldSpec::builder("type", TypeName::primitive("string"))
+        .build()
+        .unwrap();
+    let out = emit_for(&GoLang::new(), &field, DeclarationContext::Member);
+    assert_eq!(out.trim(), "type_ string");
+}

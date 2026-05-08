@@ -210,7 +210,7 @@ impl PropertySpec {
             sig.push_str(lang.enum_and_annotation().readonly_keyword);
         }
 
-        sig.push_str(&lang.escape_reserved(&self.name));
+        sig.push_str(&lang.escape_field_name(&self.name));
 
         if !self.property_type.is_empty() {
             sig.push_str(lang.type_decl_syntax().type_annotation_separator);
