@@ -13,10 +13,18 @@ pub(crate) fn render_presentation(
 ) -> BoxDoc<'static, ()> {
     match pres {
         TypePresentation::GenericWrap { name } => {
+            // When generic delimiters are empty (e.g., Haskell prefix juxtaposition),
+            // insert a space between the wrapper name and the parameters so that
+            // `Maybe String` renders correctly instead of `MaybeString`.
+            let open = if gs.open.is_empty() && !name.is_empty() {
+                " ".to_string()
+            } else {
+                gs.open.to_string()
+            };
             let sep = BoxDoc::text(",").append(BoxDoc::softline());
             let params = BoxDoc::intersperse(inner_docs, sep);
             BoxDoc::text(name.to_string())
-                .append(BoxDoc::text(gs.open.to_string()))
+                .append(BoxDoc::text(open))
                 .append(params.nest(2).group())
                 .append(BoxDoc::text(gs.close.to_string()))
         }
