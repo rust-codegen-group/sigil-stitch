@@ -77,7 +77,7 @@ impl CodeLang for Lua {
     }
 
     fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
-        "function "
+        "function"
     }
 
     fn type_keyword(&self, _kind: TypeKind) -> &str {
@@ -298,7 +298,7 @@ mod tests {
         let lua = Lua::new();
         assert_eq!(
             lua.function_keyword(DeclarationContext::TopLevel),
-            "function "
+            "function"
         );
     }
 }
