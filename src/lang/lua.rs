@@ -40,6 +40,37 @@ impl Lua {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Rewrite `: ` to `:` for method calls (Lua `obj:method()` syntax).
+    #[allow(clippy::ptr_arg)]
+    fn rewrite_method_colon(nodes: &mut Vec<crate::code_node::CodeNode>) {
+        use crate::code_node::CodeNode;
+        for node in nodes.iter_mut() {
+            if let CodeNode::Literal(s) | CodeNode::InlineLiteral(s) = node {
+                let mut result = String::with_capacity(s.len());
+                let chars: Vec<char> = s.chars().collect();
+                let mut i = 0;
+                while i < chars.len() {
+                    if chars[i] == ':'
+                        && i > 0
+                        && i + 1 < chars.len()
+                        && chars[i - 1].is_alphanumeric()
+                        && chars[i + 1] == ' '
+                        && i + 2 < chars.len()
+                        && (chars[i + 2].is_alphanumeric() || chars[i + 2] == '_')
+                    {
+                        // Skip the space after ':'
+                        result.push(':');
+                        i += 2; // skip ':' and ' '
+                    } else {
+                        result.push(chars[i]);
+                        i += 1;
+                    }
+                }
+                *s = result;
+            }
+        }
+    }
 }
 
 /// Lua keywords (Lua 5.x).
@@ -201,6 +232,10 @@ impl CodeLang for Lua {
             optional_absent_literal: "nil",
             ..Default::default()
         }
+    }
+
+    fn rewrite_nodes(&self, nodes: &mut Vec<crate::code_node::CodeNode>) {
+        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_method_colon);
     }
 }
 

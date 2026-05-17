@@ -1,3 +1,3 @@
-NAME ="Alice"
-AGE = 30
+NAME="Alice"
+AGE=30
 echo $NAME $AGE

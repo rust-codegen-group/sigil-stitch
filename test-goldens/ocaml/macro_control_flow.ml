@@ -1,4 +1,4 @@
-if x > 0 =
+if x > 0 then
   return true
-else =
+else
   return false

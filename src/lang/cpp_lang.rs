@@ -105,6 +105,29 @@ impl CppLang {
         self.extension = s.to_string();
         self
     }
+
+    /// Rewrite lambda blocks: insert `;` after `}` when the block condition
+    /// contains `[` (lambda capture list).
+    fn rewrite_lambda_semicolon(nodes: &mut Vec<crate::code_node::CodeNode>) {
+        use crate::code_node::CodeNode;
+        let mut i = 0;
+        while i < nodes.len() {
+            let is_lambda_close =
+                matches!(&nodes[i], CodeNode::BlockClose(cond) if cond.contains('['));
+            if is_lambda_close {
+                // Insert a Literal(";") after the BlockClose, before Newline
+                // The renderer will emit "}" then we want ";" immediately after
+                // Actually, we need to replace BlockClose with Literal("};\n")
+                // because BlockClose already emits "}" + newline.
+                // Instead: replace BlockClose with Literal("};") + Newline
+                let replacement = vec![CodeNode::Literal("};".to_string()), CodeNode::Newline];
+                nodes.splice(i..i + 1, replacement);
+                i += 2;
+                continue;
+            }
+            i += 1;
+        }
+    }
 }
 
 #[rustfmt::skip]
@@ -340,6 +363,10 @@ impl CodeLang for CppLang {
             annotation_suffix: "]]",
             ..Default::default()
         }
+    }
+
+    fn rewrite_nodes(&self, nodes: &mut Vec<crate::code_node::CodeNode>) {
+        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_lambda_semicolon);
     }
 }
 
