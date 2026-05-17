@@ -33,3 +33,51 @@ fn test_elvis() {
     .unwrap();
     golden::assert_golden("kotlin/quote_elvis.kt", &render(&block));
 }
+
+#[test]
+fn test_when_expression() {
+    let block = sigil_quote!(Kotlin {
+        val result = when (x) {
+            0 -> $S("zero")
+            1 -> $S("one")
+            else -> $S("many")
+        };
+    })
+    .unwrap();
+    golden::assert_golden("kotlin/quote_when.kt", &render(&block));
+}
+
+#[test]
+fn test_lambda_with_receiver() {
+    let block = sigil_quote!(Kotlin {
+        val config = Config().apply {
+            host = $S("localhost");
+            port = 8080;
+        };
+    })
+    .unwrap();
+    golden::assert_golden("kotlin/quote_lambda_receiver.kt", &render(&block));
+}
+
+#[test]
+fn test_sealed_class() {
+    let block = sigil_quote!(Kotlin {
+        sealed class Result<out T> {
+            data class Success<T>(val value: T) : Result<T>();
+            data class Error(val message: String) : Result<Nothing>();
+        }
+    })
+    .unwrap();
+    golden::assert_golden("kotlin/quote_sealed_class.kt", &render(&block));
+}
+
+#[test]
+fn test_extension_function() {
+    let block = sigil_quote!(Kotlin {
+        fun String.addExclamation(): String {
+            return this + $S("!");
+        }
+    })
+    .unwrap();
+    golden::assert_golden("kotlin/quote_extension_fun.kt", &render(&block));
+}
