@@ -1,5 +1,8 @@
 mod helpers;
 
+#[path = "../golden.rs"]
+mod golden;
+
 mod args_tuple;
 mod basic;
 mod blank_lines;

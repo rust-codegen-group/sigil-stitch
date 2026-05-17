@@ -344,3 +344,39 @@ fn test_embedded_in_ts_interface() {
     let output = file.render(80).unwrap();
     golden::assert_golden("typescript/embedded_interface.ts", &output);
 }
+
+// ── %W wrap point produces single space, not double ───────────────
+
+#[test]
+fn test_wrap_point_single_space() {
+    let mut b = CodeBlock::builder();
+    b.add("createUser(%WfirstName: string,%WlastName: string)", ());
+    b.add_line();
+    let block = b.build().unwrap();
+
+    let file = FileSpec::builder("test.ts")
+        .add_code(block)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("typescript/builder_wrap_point.ts", &output);
+}
+
+// ── Consecutive %L specifiers join without spaces ───────────────
+
+#[test]
+fn test_consecutive_specifiers_no_space() {
+    let mut b = CodeBlock::builder();
+    b.add("const x = %L%L%L;", ("pre", "mid", "post"));
+    b.add_line();
+    let block = b.build().unwrap();
+
+    let file = FileSpec::builder("test.ts")
+        .add_code(block)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("typescript/builder_consecutive_specifiers.ts", &output);
+}

@@ -1,3 +1,4 @@
+use super::golden;
 use super::helpers::*;
 
 #[test]
@@ -105,4 +106,19 @@ fn test_mixed_arg_types_in_one_statement() {
     assert!(output.contains("User"), "got: {output}");
     assert!(output.contains("'hello'"), "got: {output}");
     assert!(output.contains("42"), "got: {output}");
+}
+
+#[test]
+fn test_consecutive_specifiers_no_space() {
+    let block = sigil_quote!(TypeScript {
+        const x = $L("pre")$L("mid")$L("post");
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(
+        output.contains("premidpost"),
+        "consecutive $L should have no space between them, got: {output}"
+    );
+    golden::assert_golden("macro/quote_consecutive_specifiers.txt", &output);
 }

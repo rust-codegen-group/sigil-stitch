@@ -24,3 +24,14 @@ fn test_basic() {
     .unwrap();
     golden::assert_golden("c/macro_basic.c", &render(&block));
 }
+
+#[test]
+fn test_function_pointer_usage() {
+    let block = sigil_quote!(CLang {
+        typedef void (*Callback)(int, const char*);
+        Callback cb = NULL;
+        cb(42, $S("hello"));
+    })
+    .unwrap();
+    golden::assert_golden("c/quote_function_pointer.c", &render(&block));
+}

@@ -23,3 +23,13 @@ fn test_basic() {
     .unwrap();
     golden::assert_golden("haskell/macro_basic.hs", &render(&block));
 }
+
+#[test]
+fn test_newtype_declaration() {
+    let block = sigil_quote!(Haskell {
+        newtype UserId = UserId Int;
+        newtype Email = Email String;
+    })
+    .unwrap();
+    golden::assert_golden("haskell/quote_newtype.hs", &render(&block));
+}

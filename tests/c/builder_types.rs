@@ -60,3 +60,41 @@ fn test_enum() {
 
     golden::assert_golden("c/enum.c", &output);
 }
+
+#[test]
+fn test_typedef_function_pointer() {
+    let callback = TypeSpec::builder("Callback", TypeKind::TypeAlias)
+        .extends(TypeName::function(
+            vec![
+                TypeName::primitive("int"),
+                TypeName::primitive("const char*"),
+            ],
+            TypeName::primitive("void"),
+        ))
+        .build()
+        .unwrap();
+
+    let file = FileSpec::builder_with("callback.h", CLang::header())
+        .add_type(callback)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("c/builder_typedef_function_pointer.c", &output);
+}
+
+#[test]
+fn test_typedef_non_function() {
+    let size = TypeSpec::builder("Size", TypeKind::TypeAlias)
+        .extends(TypeName::primitive("unsigned long"))
+        .build()
+        .unwrap();
+
+    let file = FileSpec::builder_with("types.h", CLang::header())
+        .add_type(size)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("c/builder_typedef_non_function.c", &output);
+}

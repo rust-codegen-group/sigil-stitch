@@ -37,6 +37,8 @@ pub(super) enum PrevTokenKind {
     Literal,
     GroupOpen,
     Specifier,
+    /// `%W` soft-break — already provides a space, so suppress `maybe_space`.
+    SoftBreak,
 }
 
 /// Context for how `:` should be spaced.
@@ -58,6 +60,9 @@ pub(super) enum ColonContext {
 pub(super) struct SpacingState {
     pub prev: PrevTokenKind,
     pub colon_ctx: ColonContext,
+    /// End position (line, column) of the last specifier's closing group,
+    /// used to detect adjacent specifiers like `$L("a")$L("b")`.
+    pub prev_specifier_end: Option<(usize, usize)>,
 }
 
 impl SpacingState {
@@ -65,6 +70,7 @@ impl SpacingState {
         Self {
             prev: PrevTokenKind::None,
             colon_ctx: ColonContext::TypeAnnotation,
+            prev_specifier_end: None,
         }
     }
 }
@@ -295,6 +301,14 @@ fn tokens_to_format_inner(
         if let TokenTree::Punct(p) = tt
             && p.as_char() == '$'
         {
+            // Check if this `$` is immediately adjacent to the previous
+            // specifier's closing group (e.g. `$L("a")$L("b")` with no
+            // whitespace). Used to suppress unwanted space insertion.
+            let dollar_start = p.span().start();
+            let adjacent_to_prev_specifier = state
+                .prev_specifier_end
+                .is_some_and(|(line, col)| dollar_start.line == line && dollar_start.column == col);
+
             pos += 1;
             if pos >= tokens.len() {
                 return Err(CompileError::new(
@@ -309,14 +323,17 @@ fn tokens_to_format_inner(
             if let TokenTree::Punct(p2) = next
                 && p2.as_char() == '$'
             {
-                maybe_space(
-                    format,
-                    state,
-                    PrevTokenKind::Literal,
-                    TokenAnnotation::Normal,
-                );
+                if !adjacent_to_prev_specifier {
+                    maybe_space(
+                        format,
+                        state,
+                        PrevTokenKind::Literal,
+                        TokenAnnotation::Normal,
+                    );
+                }
                 format.push('$');
                 state.prev = PrevTokenKind::Literal;
+                state.prev_specifier_end = None;
                 pos += 1;
                 continue;
             }
@@ -327,6 +344,7 @@ fn tokens_to_format_inner(
             {
                 format.push_str("%>");
                 state.prev = PrevTokenKind::Specifier;
+                state.prev_specifier_end = None;
                 pos += 1;
                 continue;
             }
@@ -337,6 +355,7 @@ fn tokens_to_format_inner(
             {
                 format.push_str("%<");
                 state.prev = PrevTokenKind::Specifier;
+                state.prev_specifier_end = None;
                 pos += 1;
                 continue;
             }
@@ -345,6 +364,7 @@ fn tokens_to_format_inner(
             if let TokenTree::Punct(p2) = next
                 && p2.as_char() == '+'
             {
+                state.prev_specifier_end = None;
                 pos += 1;
                 continue;
             }
@@ -352,7 +372,8 @@ fn tokens_to_format_inner(
             // `$W` -> `%W` (no arg, no parens)
             if is_ident(next, "W") {
                 format.push_str("%W");
-                state.prev = PrevTokenKind::Specifier;
+                state.prev = PrevTokenKind::SoftBreak;
+                state.prev_specifier_end = None;
                 pos += 1;
                 continue;
             }
@@ -407,14 +428,18 @@ fn tokens_to_format_inner(
 
                 let (sep_expr, iter_expr) = split_join_args(group)?;
 
-                maybe_space(
-                    format,
-                    state,
-                    PrevTokenKind::Specifier,
-                    TokenAnnotation::Normal,
-                );
+                if !adjacent_to_prev_specifier {
+                    maybe_space(
+                        format,
+                        state,
+                        PrevTokenKind::Specifier,
+                        TokenAnnotation::Normal,
+                    );
+                }
                 format.push_str("%L");
                 state.prev = PrevTokenKind::Specifier;
+                let group_end = group.span().end();
+                state.prev_specifier_end = Some((group_end.line, group_end.column));
 
                 let join_expr: TokenStream = quote::quote! {
                     {
@@ -484,14 +509,18 @@ fn tokens_to_format_inner(
                     InterpolationKind::Literal | InterpolationKind::Code => "%L",
                 };
 
-                maybe_space(
-                    format,
-                    state,
-                    PrevTokenKind::Specifier,
-                    TokenAnnotation::Normal,
-                );
+                if !adjacent_to_prev_specifier {
+                    maybe_space(
+                        format,
+                        state,
+                        PrevTokenKind::Specifier,
+                        TokenAnnotation::Normal,
+                    );
+                }
                 format.push_str(specifier);
                 state.prev = PrevTokenKind::Specifier;
+                let group_end = group.span().end();
+                state.prev_specifier_end = Some((group_end.line, group_end.column));
 
                 args.push(TypedArg {
                     kind,
@@ -509,6 +538,9 @@ fn tokens_to_format_inner(
         }
 
         let annotation = annotations[pos];
+
+        // Regular (non-interpolation) token — clear specifier adjacency tracking.
+        state.prev_specifier_end = None;
 
         // Regular tokens.
         match tt {
@@ -657,6 +689,11 @@ pub(super) fn maybe_space(
     let prev = state.prev;
 
     if prev == PrevTokenKind::None || prev == PrevTokenKind::GroupOpen {
+        return;
+    }
+
+    // %W already provides a space (or newline), so don't add another.
+    if prev == PrevTokenKind::SoftBreak {
         return;
     }
 

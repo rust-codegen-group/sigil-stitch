@@ -161,3 +161,22 @@ fn test_data_with_deriving_record() {
 
     golden::assert_golden("haskell/data_deriving_record.hs", &output);
 }
+
+#[test]
+fn test_newtype_deriving() {
+    let ts = TypeSpec::builder("UserId", TypeKind::Newtype)
+        .extends(TypeName::primitive("Int"))
+        .implements(TypeName::primitive("Show"))
+        .implements(TypeName::primitive("Eq"))
+        .implements(TypeName::primitive("Ord"))
+        .build()
+        .unwrap();
+
+    let file = FileSpec::builder_with("UserId.hs", Haskell::new())
+        .add_type(ts)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("haskell/builder_newtype_deriving.hs", &output);
+}
