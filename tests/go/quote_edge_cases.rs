@@ -43,6 +43,7 @@ fn test_name_escape_in_macro() {
         output.contains("var type_ string"),
         "Expected 'var type_ string', got: {output}"
     );
+    golden::assert_golden("go/quote_keyword_escape.go", &output);
 }
 
 #[test]
@@ -57,6 +58,7 @@ fn test_name_escape_multiple_keywords_in_macro() {
     let output = render(&block);
     assert!(output.contains("package_"), "Expected 'package_': {output}");
     assert!(output.contains("return_"), "Expected 'return_': {output}");
+    golden::assert_golden("go/quote_keyword_escape_multi.go", &output);
 }
 
 #[test]
@@ -72,4 +74,48 @@ fn test_name_no_escape_in_macro() {
         output.contains("func myHandler()"),
         "Expected 'func myHandler()', got: {output}"
     );
+    golden::assert_golden("go/quote_no_escape.go", &output);
+}
+
+#[test]
+fn test_goroutine() {
+    let block = sigil_quote!(GoLang {
+        go func() {
+            fmt.Println($S("hello from goroutine"));
+        }();
+    })
+    .unwrap();
+    golden::assert_golden("go/quote_goroutine.go", &render(&block));
+}
+
+#[test]
+fn test_channel() {
+    let block = sigil_quote!(GoLang {
+        ch := make(chan int, 10);
+        ch <- 42;
+        val := <-ch;
+    })
+    .unwrap();
+    golden::assert_golden("go/quote_channel.go", &render(&block));
+}
+
+#[test]
+fn test_interface() {
+    let block = sigil_quote!(GoLang {
+        type Reader interface {
+            Read(p []byte) (int, error);
+        }
+    })
+    .unwrap();
+    golden::assert_golden("go/quote_interface.go", &render(&block));
+}
+
+#[test]
+fn test_defer() {
+    let block = sigil_quote!(GoLang {
+        f, err := os.Open(path);
+        defer f.Close();
+    })
+    .unwrap();
+    golden::assert_golden("go/quote_defer.go", &render(&block));
 }
