@@ -32,6 +32,8 @@ pub struct ParameterSpec {
     pub(crate) param_type: TypeName,
     pub(crate) default_value: Option<crate::code_block::CodeBlock>,
     pub(crate) is_variadic: bool,
+    pub(crate) is_property: bool,
+    pub(crate) is_mutable_property: bool,
 }
 
 impl ParameterSpec {
@@ -42,6 +44,8 @@ impl ParameterSpec {
             param_type,
             default_value: None,
             is_variadic: false,
+            is_property: false,
+            is_mutable_property: false,
         }
     }
 
@@ -81,11 +85,27 @@ impl ParameterSpec {
                 args.push(Arg::TypeName(self.param_type.clone()));
                 fmt.push(' ');
             }
+            if self.is_property {
+                fmt.push_str(lang.enum_and_annotation().readonly_keyword);
+            } else if self.is_mutable_property {
+                let mk = lang.enum_and_annotation().mutable_field_keyword;
+                if !mk.is_empty() {
+                    fmt.push_str(mk);
+                }
+            }
             fmt.push_str(&lang.escape_reserved(&self.name));
         } else {
             // TS/Rust/Go/Python-style: name sep type
             if self.is_variadic {
                 fmt.push_str("...");
+            }
+            if self.is_property {
+                fmt.push_str(lang.enum_and_annotation().readonly_keyword);
+            } else if self.is_mutable_property {
+                let mk = lang.enum_and_annotation().mutable_field_keyword;
+                if !mk.is_empty() {
+                    fmt.push_str(mk);
+                }
             }
             fmt.push_str(&lang.escape_reserved(&self.name));
 
@@ -114,6 +134,8 @@ pub struct ParameterSpecBuilder {
     param_type: TypeName,
     default_value: Option<crate::code_block::CodeBlock>,
     is_variadic: bool,
+    is_property: bool,
+    is_mutable_property: bool,
 }
 
 impl ParameterSpecBuilder {
@@ -126,6 +148,24 @@ impl ParameterSpecBuilder {
     /// Mark this parameter as variadic.
     pub fn variadic(mut self) -> Self {
         self.is_variadic = true;
+        self
+    }
+
+    /// Mark this parameter as a readonly property declaration.
+    ///
+    /// When emitting, prepends the language's readonly keyword (e.g., `val` in Kotlin).
+    /// Used for primary constructor parameters that declare properties.
+    pub fn is_property(mut self) -> Self {
+        self.is_property = true;
+        self
+    }
+
+    /// Mark this parameter as a mutable property declaration.
+    ///
+    /// When emitting, prepends the language's mutable field keyword (e.g., `var` in Kotlin).
+    /// Used for primary constructor parameters that declare mutable properties.
+    pub fn is_mutable_property(mut self) -> Self {
+        self.is_mutable_property = true;
         self
     }
 
@@ -146,6 +186,8 @@ impl ParameterSpecBuilder {
             param_type: self.param_type,
             default_value: self.default_value,
             is_variadic: self.is_variadic,
+            is_property: self.is_property,
+            is_mutable_property: self.is_mutable_property,
         })
     }
 }
@@ -206,5 +248,37 @@ mod tests {
                 .to_string()
                 .contains("'name' must not be empty")
         );
+    }
+
+    #[test]
+    fn test_property_param_kotlin() {
+        let kt = crate::lang::kotlin::Kotlin::new();
+        let param = ParameterSpec::builder("name", TypeName::primitive("String"))
+            .is_property()
+            .build()
+            .unwrap();
+        let mut cb = CodeBlock::builder();
+        param.emit_into(&mut cb, &kt);
+        let block = cb.build().unwrap();
+        let imports = crate::import::ImportGroup::new();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&kt, &imports, 80);
+        let output = renderer.render(&block).unwrap();
+        assert_eq!(output, "val name: String");
+    }
+
+    #[test]
+    fn test_mutable_property_param_kotlin() {
+        let kt = crate::lang::kotlin::Kotlin::new();
+        let param = ParameterSpec::builder("name", TypeName::primitive("String"))
+            .is_mutable_property()
+            .build()
+            .unwrap();
+        let mut cb = CodeBlock::builder();
+        param.emit_into(&mut cb, &kt);
+        let block = cb.build().unwrap();
+        let imports = crate::import::ImportGroup::new();
+        let mut renderer = crate::code_renderer::CodeRenderer::new(&kt, &imports, 80);
+        let output = renderer.render(&block).unwrap();
+        assert_eq!(output, "var name: String");
     }
 }

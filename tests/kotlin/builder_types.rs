@@ -57,13 +57,22 @@ fn test_data_class() {
         .visibility(Visibility::Public)
         .doc("A user data class.")
         .add_primary_constructor_param(
-            ParameterSpec::new("val name", TypeName::primitive("String")).unwrap(),
+            ParameterSpec::builder("name", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
         )
         .add_primary_constructor_param(
-            ParameterSpec::new("val age", TypeName::primitive("Int")).unwrap(),
+            ParameterSpec::builder("age", TypeName::primitive("Int"))
+                .is_property()
+                .build()
+                .unwrap(),
         )
         .add_primary_constructor_param(
-            ParameterSpec::new("val email", TypeName::primitive("String")).unwrap(),
+            ParameterSpec::builder("email", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
         )
         .build()
         .unwrap();
@@ -202,7 +211,10 @@ fn test_enum_class() {
 fn test_enum_with_values() {
     let ts = TypeSpec::builder("Status", TypeKind::Enum)
         .add_primary_constructor_param(
-            ParameterSpec::new("val value", TypeName::primitive("String")).unwrap(),
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("ACTIVE")

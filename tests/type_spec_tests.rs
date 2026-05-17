@@ -615,3 +615,67 @@ fn test_embedded_import_tracking() {
         "should import io package: {output}"
     );
 }
+
+#[test]
+fn test_enum_constructor_with_valueless_variant_errors() {
+    use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
+
+    let result = TypeSpec::builder("Status", TypeKind::Enum)
+        .add_primary_constructor_param(
+            ParameterSpec::builder(
+                "value",
+                sigil_stitch::type_name::TypeName::primitive("String"),
+            )
+            .is_property()
+            .build()
+            .unwrap(),
+        )
+        .add_variant(EnumVariantSpec::new("ACTIVE").unwrap())
+        .build();
+
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("some variants lack values"),
+        "should error when enum has constructor but variants lack values"
+    );
+}
+
+#[test]
+fn test_enum_no_values_no_constructor_ok() {
+    use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
+
+    let result = TypeSpec::builder("Color", TypeKind::Enum)
+        .add_variant(EnumVariantSpec::new("RED").unwrap())
+        .add_variant(EnumVariantSpec::new("GREEN").unwrap())
+        .build();
+
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_enum_valued_variants_without_constructor_ok() {
+    use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
+
+    let result = TypeSpec::builder("Direction", TypeKind::Enum)
+        .add_variant(
+            EnumVariantSpec::builder("UP")
+                .value(CodeBlock::of("'UP'", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_variant(
+            EnumVariantSpec::builder("DOWN")
+                .value(CodeBlock::of("'DOWN'", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build();
+
+    assert!(
+        result.is_ok(),
+        "assignment-style valued enums should not require a constructor"
+    );
+}

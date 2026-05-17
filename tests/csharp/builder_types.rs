@@ -127,11 +127,15 @@ fn test_class_extends_implements() {
 
 #[test]
 fn test_generic_class() {
-    let tp = TypeParamSpec::new("T").with_bound(TypeName::primitive("IComparable"));
+    let tp = TypeParamSpec::new("T");
 
     let ts = TypeSpec::builder("SortedList", TypeKind::Class)
         .visibility(Visibility::Public)
         .add_type_param(tp)
+        .add_where_constraint(
+            TypeName::primitive("T"),
+            vec![TypeName::primitive("IComparable")],
+        )
         .add_field(
             FieldSpec::builder("items", TypeName::primitive("List<T>"))
                 .visibility(Visibility::Private)
@@ -249,4 +253,42 @@ fn test_annotation_bracket_syntax() {
         !output.contains("@Serializable"),
         "should NOT use @-prefix annotation style, got:\n{output}"
     );
+}
+
+#[test]
+fn test_where_clause_multiple() {
+    let ts = TypeSpec::builder("Mapper", TypeKind::Class)
+        .visibility(Visibility::Public)
+        .add_type_param(TypeParamSpec::new("TIn"))
+        .add_type_param(TypeParamSpec::new("TOut"))
+        .add_where_constraint(
+            TypeName::primitive("TIn"),
+            vec![TypeName::primitive("IConvertible")],
+        )
+        .add_where_constraint(
+            TypeName::primitive("TOut"),
+            vec![
+                TypeName::primitive("IConvertible"),
+                TypeName::primitive("new()"),
+            ],
+        )
+        .add_method(
+            FunSpec::builder("Map")
+                .visibility(Visibility::Public)
+                .returns(TypeName::primitive("TOut"))
+                .add_param(ParameterSpec::new("input", TypeName::primitive("TIn")).unwrap())
+                .body(CodeBlock::of("throw new NotImplementedException();", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let file = FileSpec::builder_with("Mapper.cs", CSharp::new())
+        .add_type(ts)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("csharp/where_clause_multiple.cs", &output);
 }

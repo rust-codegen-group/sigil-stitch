@@ -7,7 +7,8 @@ use crate::spec::annotation_spec::AnnotationSpec;
 use crate::spec::enum_variant_spec::EnumVariantSpec;
 use crate::spec::field_spec::FieldSpec;
 use crate::spec::fun_spec::{
-    FunSpec, TypeParamSpec, WhereClauseStyle, WhereConstraint, emit_where_block, render_type_params,
+    FunSpec, TypeParamSpec, WhereClauseStyle, WhereConstraint, emit_separate_where_block,
+    emit_where_block, render_type_params,
 };
 use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
@@ -343,11 +344,31 @@ impl TypeSpec {
                 impl_fmt.push_str(gen_syn.close);
             }
             // Where clause on impl block.
-            if !self.where_constraints.is_empty()
-                && lang.function_syntax().where_clause_style == WhereClauseStyle::WhereBlock
-            {
-                emit_where_block(&mut impl_fmt, &mut impl_args, &self.where_constraints, lang);
-                impl_fmt.push_str("\n{");
+            if !self.where_constraints.is_empty() {
+                let style = lang.function_syntax().where_clause_style;
+                match style {
+                    WhereClauseStyle::WhereBlock => {
+                        emit_where_block(
+                            &mut impl_fmt,
+                            &mut impl_args,
+                            &self.where_constraints,
+                            lang,
+                        );
+                        impl_fmt.push_str("\n{");
+                    }
+                    WhereClauseStyle::SeparateWhere => {
+                        emit_separate_where_block(
+                            &mut impl_fmt,
+                            &mut impl_args,
+                            &self.where_constraints,
+                            lang,
+                        );
+                        impl_fmt.push_str("\n{");
+                    }
+                    WhereClauseStyle::Inline => {
+                        impl_fmt.push_str(lang.block_syntax().block_open);
+                    }
+                }
             } else {
                 impl_fmt.push_str(lang.block_syntax().block_open);
             }
@@ -643,12 +664,22 @@ impl TypeSpec {
             }
         }
 
-        // Where clause (Rust-style).
-        if !self.where_constraints.is_empty()
-            && lang.function_syntax().where_clause_style == WhereClauseStyle::WhereBlock
-        {
-            emit_where_block(&mut fmt, &mut args, &self.where_constraints, lang);
-            fmt.push_str("\n{");
+        // Where clause (Rust/C#-style).
+        if !self.where_constraints.is_empty() {
+            let style = lang.function_syntax().where_clause_style;
+            match style {
+                WhereClauseStyle::WhereBlock => {
+                    emit_where_block(&mut fmt, &mut args, &self.where_constraints, lang);
+                    fmt.push_str("\n{");
+                }
+                WhereClauseStyle::SeparateWhere => {
+                    emit_separate_where_block(&mut fmt, &mut args, &self.where_constraints, lang);
+                    fmt.push_str("\n{");
+                }
+                WhereClauseStyle::Inline => {
+                    fmt.push_str(lang.type_header_block_open(self.kind));
+                }
+            }
         } else {
             fmt.push_str(lang.type_header_block_open(self.kind));
         }
@@ -858,6 +889,18 @@ impl TypeSpecBuilder {
                     kind: kind_str,
                     type_name: self.name.clone(),
                     reason: "must not have fields, methods, variants, or properties".to_string(),
+                });
+            }
+        }
+
+        // Validate Enum consistency between primary constructor and variant values.
+        if self.kind == TypeKind::Enum && !self.primary_constructor.is_empty() {
+            let has_valueless_variants = self.variants.iter().any(|v| !v.has_value());
+            if has_valueless_variants {
+                return Err(crate::error::SigilStitchError::InvalidEnum {
+                    type_name: self.name.clone(),
+                    reason: "enum has primary constructor parameters but some variants lack values"
+                        .to_string(),
                 });
             }
         }

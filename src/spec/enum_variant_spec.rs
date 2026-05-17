@@ -92,6 +92,11 @@ impl EnumVariantSpec {
         })
     }
 
+    /// Whether this variant has an explicit value.
+    pub fn has_value(&self) -> bool {
+        self.value.is_some()
+    }
+
     /// Create a variant builder for more complex variants.
     pub fn builder(name: &str) -> EnumVariantSpecBuilder {
         EnumVariantSpecBuilder {

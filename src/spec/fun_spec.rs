@@ -25,6 +25,14 @@ pub enum WhereClauseStyle {
     Inline,
     /// Rust-style `where` block after the signature.
     WhereBlock,
+    /// C#-style per-constraint `where` clauses after the signature.
+    ///
+    /// Each constraint gets its own `where` keyword on an indented line:
+    /// ```text
+    ///     where T : IComparable
+    ///     where U : ISerializable
+    /// ```
+    SeparateWhere,
 }
 
 /// How function parameter lists are formatted.
@@ -571,11 +579,18 @@ impl FunSpec {
     }
 
     fn emit_where_and_open(&self, sig: &mut String, sig_args: &mut Vec<Arg>, lang: &dyn CodeLang) {
-        let has_where = !self.where_constraints.is_empty()
-            && lang.function_syntax().where_clause_style == WhereClauseStyle::WhereBlock;
+        let style = lang.function_syntax().where_clause_style;
+        let has_where = !self.where_constraints.is_empty() && style != WhereClauseStyle::Inline;
         if has_where {
-            emit_where_block(sig, sig_args, &self.where_constraints, lang);
-            // After a where clause, put the block-open brace on its own line.
+            match style {
+                WhereClauseStyle::WhereBlock => {
+                    emit_where_block(sig, sig_args, &self.where_constraints, lang);
+                }
+                WhereClauseStyle::SeparateWhere => {
+                    emit_separate_where_block(sig, sig_args, &self.where_constraints, lang);
+                }
+                WhereClauseStyle::Inline => unreachable!(),
+            }
             sig.push_str("\n{");
         } else {
             sig.push_str(lang.fun_block_open());
@@ -694,6 +709,36 @@ pub(crate) fn emit_where_block(
             args.push(Arg::TypeName(bound.clone()));
         }
         fmt.push(',');
+    }
+}
+
+/// Append C#-style per-constraint where clauses to a format string.
+///
+/// Renders:
+/// ```text
+/// \n    where T : IComparable\n    where U : ISerializable
+/// ```
+pub(crate) fn emit_separate_where_block(
+    fmt: &mut String,
+    args: &mut Vec<Arg>,
+    constraints: &[WhereConstraint],
+    lang: &dyn CodeLang,
+) {
+    let generic = lang.generic_syntax();
+    let indent = lang.block_syntax().indent_unit;
+    for wc in constraints {
+        fmt.push('\n');
+        fmt.push_str(indent);
+        fmt.push_str("where %T");
+        args.push(Arg::TypeName(wc.subject.clone()));
+        fmt.push_str(generic.constraint_keyword);
+        for (j, bound) in wc.bounds.iter().enumerate() {
+            if j > 0 {
+                fmt.push_str(generic.constraint_separator);
+            }
+            fmt.push_str("%T");
+            args.push(Arg::TypeName(bound.clone()));
+        }
     }
 }
 

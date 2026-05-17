@@ -288,6 +288,7 @@ impl CodeLang for CSharp {
             return_type_separator: " ",
             async_keyword: "async ",
             suppress_async_in_interface: true,
+            where_clause_style: crate::spec::fun_spec::WhereClauseStyle::SeparateWhere,
             ..Default::default()
         }
     }

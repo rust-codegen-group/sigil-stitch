@@ -122,4 +122,13 @@ pub enum SigilStitchError {
         /// The filename of the FileSpec.
         filename: String,
     },
+
+    /// Invalid enum declaration.
+    #[snafu(display("invalid enum {type_name:?}: {reason}"))]
+    InvalidEnum {
+        /// The type name.
+        type_name: String,
+        /// The reason the declaration is invalid.
+        reason: String,
+    },
 }

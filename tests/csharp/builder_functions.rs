@@ -67,7 +67,7 @@ fn test_async_method() {
 
 #[test]
 fn test_generic_method() {
-    let tp = TypeParamSpec::new("T").with_bound(TypeName::primitive("IComparable<T>"));
+    let tp = TypeParamSpec::new("T");
 
     let body = CodeBlock::of("return a.CompareTo(b) > 0 ? a : b;", ()).unwrap();
 
@@ -78,6 +78,10 @@ fn test_generic_method() {
                 .visibility(Visibility::Public)
                 .is_static()
                 .add_type_param(tp)
+                .add_where_constraint(
+                    TypeName::primitive("T"),
+                    vec![TypeName::primitive("IComparable<T>")],
+                )
                 .returns(TypeName::primitive("T"))
                 .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())
                 .add_param(ParameterSpec::new("b", TypeName::primitive("T")).unwrap())

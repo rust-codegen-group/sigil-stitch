@@ -1,4 +1,6 @@
-public class SortedList<T : IComparable> {
+public class SortedList<T>
+    where T : IComparable
+{
     private List<T> items;
 
     public void Add(T item) {
