@@ -413,9 +413,24 @@ impl TypeSpec {
         };
 
         let fmt = if lang.type_decl_syntax().type_alias_target_first {
-            // C typedef: `typedef target name;`
-            args.push(Arg::TypeName(target));
-            format!("{kw} %T {}{tp_str}{semi}", self.name)
+            // C function pointer typedef: `typedef void (*Name)(int, char*);`
+            if let TypeName::Function {
+                params,
+                return_type,
+            } = &target
+            {
+                args.push(Arg::TypeName((**return_type).clone()));
+                for p in params {
+                    args.push(Arg::TypeName(p.clone()));
+                }
+                let param_placeholders: Vec<&str> = params.iter().map(|_| "%T").collect();
+                let params_str = param_placeholders.join(", ");
+                format!("{kw} %T (*{}{tp_str})({params_str}){semi}", self.name)
+            } else {
+                // Normal C typedef: `typedef target name;`
+                args.push(Arg::TypeName(target));
+                format!("{kw} %T {}{tp_str}{semi}", self.name)
+            }
         } else {
             // Normal: `{vis}type name<params> = target;`
             args.push(Arg::TypeName(target));
@@ -460,6 +475,15 @@ impl TypeSpec {
             cb.add(&line, tp_args);
         }
         cb.add_line();
+
+        let suffix = self.render_impl_type_suffix(lang);
+        if !suffix.is_empty() {
+            cb.add("%>", ());
+            cb.add("%L", suffix);
+            cb.add_line();
+            cb.add("%<", ());
+        }
+
         cb.build()
     }
 
