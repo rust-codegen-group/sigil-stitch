@@ -1,1 +1,4 @@
-val config = Config().apply{host = "localhost"; port = 8080;}
+val config = Config().apply {
+    host = "localhost"
+    port = 8080
+}

@@ -96,6 +96,15 @@ pub(super) const CONTROL_FLOW_KEYWORDS: &[&str] = &[
     "in", "as", "is",
 ];
 
+#[rustfmt::skip]
+const DECLARATION_KEYWORDS: &[&str] = &[
+    "const", "let", "var", "val", "type", "fun", "def",
+    "pub", "private", "protected", "internal", "static", "final",
+    "abstract", "async", "export", "import", "mut", "ref", "override",
+    "virtual", "sealed", "lazy", "unsafe", "inline",
+    "suspend", "defer", "go",
+];
+
 /// Pre-scan a token slice to classify each token for spacing decisions.
 ///
 /// Skips `$`-prefixed interpolation markers (their contents are Rust
@@ -688,7 +697,9 @@ fn tokens_to_format_inner(
         match tt {
             TokenTree::Ident(id) => {
                 let s = id.to_string();
-                let kind = if CONTROL_FLOW_KEYWORDS.contains(&s.as_str()) {
+                let kind = if CONTROL_FLOW_KEYWORDS.contains(&s.as_str())
+                    || DECLARATION_KEYWORDS.contains(&s.as_str())
+                {
                     PrevTokenKind::Keyword
                 } else if s.starts_with(|c: char| c.is_uppercase()) {
                     PrevTokenKind::TypeIdent

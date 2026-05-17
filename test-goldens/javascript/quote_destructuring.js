@@ -1,5 +1,2 @@
-const {
-  name, age
-}
-= user;
-const[first,...rest] = items;
+const {name, age} = user;
+const [first,...rest] = items;

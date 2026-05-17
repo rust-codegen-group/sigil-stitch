@@ -1,4 +1,4 @@
-use proc_macro2::{Delimiter, TokenTree};
+use proc_macro2::{Delimiter, Spacing, TokenTree};
 
 use super::format::tokens_to_format;
 use super::parse_body;
@@ -76,10 +76,28 @@ pub(super) fn parse_one_statement(
             && g.delimiter() == Delimiter::Brace
         {
             // Look ahead: if next token is `;`, this is NOT control flow
-            // (it's an object literal or struct init in a statement).
+            // (it's an object literal or struct init in a statement),
+            // UNLESS the preceding tokens indicate control flow AND the
+            // body looks like a multi-statement block.
             let next = pos + 1;
-            if next < tokens.len() && is_semicolon(&tokens[next]) {
+            if next < tokens.len()
+                && is_semicolon(&tokens[next])
+                && (!looks_like_control_flow_header(&collected) || !should_be_block_or_multiline(g))
+            {
                 // Part of a statement: `const x = { ... };`
+                collected.push(tt.clone());
+                prev_end_line = Some(tt.span().end().line);
+                pos += 1;
+                continue;
+            }
+
+            // Look ahead: if next token is `=` (alone), this is a destructuring
+            // pattern, not control flow (e.g. `const { name, age } = person;`).
+            if next < tokens.len()
+                && let TokenTree::Punct(eq_p) = &tokens[next]
+                && eq_p.as_char() == '='
+                && eq_p.spacing() == Spacing::Alone
+            {
                 collected.push(tt.clone());
                 prev_end_line = Some(tt.span().end().line);
                 pos += 1;
@@ -93,15 +111,32 @@ pub(super) fn parse_one_statement(
             // languages (Lua, Ruby, Elixir) use `{` for table/hash literals
             // and can only detect control flow from surrounding keywords.
             if !looks_like_control_flow_header(&collected) {
-                // Treat as a literal brace group — not control flow.
-                collected.push(tt.clone());
-                prev_end_line = Some(tt.span().end().line);
-                pos += 1;
-                continue;
+                // Exception: `= { multi-statement }` after a function signature
+                // is a function body, not a literal. Treat as control flow if
+                // the body has statements AND there's a paren group in the prefix
+                // (indicating a function declaration).
+                let last_is_eq = collected
+                    .last()
+                    .is_some_and(|t| matches!(t, TokenTree::Punct(p) if p.as_char() == '='));
+                let has_paren_group = collected.iter().any(
+                    |t| matches!(t, TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis),
+                );
+                if !last_is_eq || !has_paren_group || !should_be_block(g) {
+                    // Treat as a literal brace group — not control flow.
+                    collected.push(tt.clone());
+                    prev_end_line = Some(tt.span().end().line);
+                    pos += 1;
+                    continue;
+                }
             }
 
             // Control flow detected.
-            return parse_control_flow(tokens, &collected, g, pos);
+            let (stmt, mut next_pos) = parse_control_flow(tokens, &collected, g, pos)?;
+            // Consume optional trailing `;` after the control flow block.
+            if next_pos < tokens.len() && is_semicolon(&tokens[next_pos]) {
+                next_pos += 1;
+            }
+            return Ok((stmt, next_pos));
         }
 
         // Line-break detection: split statement when tokens span multiple lines.
@@ -117,8 +152,12 @@ pub(super) fn parse_one_statement(
                 collected.pop();
                 collected.pop();
             } else {
-                let (format, args) = tokens_to_format(&collected)?;
-                return Ok((Statement::Line { format, args }, pos));
+                // Don't split if next line starts with `.` (method chaining)
+                let starts_with_dot = matches!(tt, TokenTree::Punct(p) if p.as_char() == '.');
+                if !starts_with_dot {
+                    let (format, args) = tokens_to_format(&collected)?;
+                    return Ok((Statement::Line { format, args }, pos));
+                }
             }
         }
 
@@ -215,6 +254,36 @@ fn looks_like_control_flow_header(tokens: &[TokenTree]) -> bool {
     // Default: assume control flow — backward compatible with brace languages
     // where `{` at statement level always denotes a block.
     true
+}
+
+/// Determine if a brace group contains multiple statements (semicolons)
+/// and thus should be treated as a block rather than inlined.
+fn should_be_block(g: &proc_macro2::Group) -> bool {
+    let stream: Vec<TokenTree> = g.stream().into_iter().collect();
+    for tt in &stream {
+        if is_semicolon(tt) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Like `should_be_block`, but also returns true for multi-line bodies.
+/// Used for `{...};` with control-flow headers where semicolons may be
+/// absent (e.g. Kotlin `when`, Haskell `do`).
+fn should_be_block_or_multiline(g: &proc_macro2::Group) -> bool {
+    let stream: Vec<TokenTree> = g.stream().into_iter().collect();
+    if stream.is_empty() {
+        return false;
+    }
+    for tt in &stream {
+        if is_semicolon(tt) {
+            return true;
+        }
+    }
+    let first_line = stream.first().unwrap().span().start().line;
+    let last_line = stream.last().unwrap().span().end().line;
+    first_line != last_line
 }
 
 /// Parse a control flow chain starting from tokens that lead into a brace group.
