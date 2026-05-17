@@ -1,2 +1,2 @@
-read - r line <<< "hello world"
+read -r line <<< "hello world"
 echo $line

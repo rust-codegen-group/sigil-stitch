@@ -170,6 +170,28 @@ impl GoLang {
             i += 1;
         }
     }
+
+    /// Rewrite `<- ` to `<-` when used as prefix receive operator.
+    /// In Go, `<-ch` receives from channel. The tokenizer produces `<- ch` because
+    /// `<` and `-` are separate puncts.
+    #[allow(clippy::ptr_arg)]
+    fn rewrite_receive_op(nodes: &mut Vec<CodeNode>) {
+        for node in nodes.iter_mut() {
+            if let CodeNode::Literal(s) | CodeNode::InlineLiteral(s) = node {
+                let replacements: &[(&str, &str)] = &[
+                    (":= <- ", ":= <-"),
+                    ("= <- ", "= <-"),
+                    ("return <- ", "return <-"),
+                ];
+                for &(pat, fixed) in replacements {
+                    *s = s.replace(pat, fixed);
+                }
+                if s.starts_with("<- ") {
+                    *s = format!("<-{}", &s[3..]);
+                }
+            }
+        }
+    }
 }
 
 impl CodeLang for GoLang {
@@ -411,6 +433,7 @@ impl CodeLang for GoLang {
 
     fn rewrite_nodes(&self, nodes: &mut Vec<CodeNode>) {
         crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_iife);
+        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_receive_op);
     }
 }
 

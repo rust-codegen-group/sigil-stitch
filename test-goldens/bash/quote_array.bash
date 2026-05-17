@@ -1,4 +1,4 @@
-declare - a ITEMS
-ITEMS = (one two three)
+declare -a ITEMS
+ITEMS=(one two three)
 echo ${ITEMS[@]}
 echo ${#ITEMS[@]}

@@ -320,6 +320,14 @@ impl CodeLang for Python {
         ":"
     }
 
+    fn block_open_for(&self, condition: &str) -> Option<&str> {
+        if condition.trim_end().ends_with(':') {
+            Some("")
+        } else {
+            None
+        }
+    }
+
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::UnionWithNone(" | ")
     }

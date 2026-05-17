@@ -1,3 +1,3 @@
-DEFAULT =${NAME:-guest}
-UPPER =${NAME^^}
-SUBSTR =${NAME:0:3}
+DEFAULT=${NAME:-guest}
+UPPER=${NAME^^}
+SUBSTR=${NAME:0:3}

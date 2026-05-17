@@ -34,6 +34,10 @@ pub(super) enum TokenAnnotation {
     /// Group open (paren/bracket) that is span-adjacent to preceding token —
     /// suppress space (function call, array index).
     CallOpen,
+    /// `=` span-adjacent to preceding token (shell-style `NAME=val`) — suppress space.
+    AssignAdjacent,
+    /// `:` span-adjacent to both neighbors (Lua method call `obj:method()`).
+    MethodCallColon,
 }
 
 /// What kind of token was just emitted (for spacing decisions).
@@ -102,10 +106,11 @@ pub(super) const CONTROL_FLOW_KEYWORDS: &[&str] = &[
 #[rustfmt::skip]
 const DECLARATION_KEYWORDS: &[&str] = &[
     "const", "let", "var", "val", "type", "fun", "def",
-    "pub", "private", "protected", "internal", "static", "final",
+    "pub", "public", "private", "protected", "internal", "static", "final",
     "abstract", "async", "export", "import", "mut", "ref", "override",
     "virtual", "sealed", "lazy", "unsafe", "inline",
     "suspend", "defer", "go",
+    "declare", "typeset", "local", "read", "readonly", "unset",
 ];
 
 /// Pre-scan a token slice to classify each token for spacing decisions.
@@ -193,6 +198,21 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                                 annotations[i + 1] = TokenAnnotation::PathSepComplete;
                             } else {
                                 annotations[i] = TokenAnnotation::DoubleColonOp;
+                            }
+                        }
+                        // MethodCallColon: single `:` span-adjacent to both neighbors
+                        // (Lua `obj:method()`)
+                        else if p.spacing() == Spacing::Alone && i > 0 && i + 1 < tokens.len() {
+                            let prev_end = tokens[i - 1].span().end();
+                            let colon_start = p.span().start();
+                            let colon_end = p.span().end();
+                            let next_start = tokens[i + 1].span().start();
+                            if prev_end.line == colon_start.line
+                                && prev_end.column == colon_start.column
+                                && colon_end.line == next_start.line
+                                && colon_end.column == next_start.column
+                            {
+                                annotations[i] = TokenAnnotation::MethodCallColon;
                             }
                         }
                     }
@@ -292,6 +312,20 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                             }
                         }
 
+                        // PostfixAmpersand: `&` span-adjacent to preceding ident/keyword
+                        // (reference type like `auto&`, `int&`).
+                        if ch == '&' && i > 0 && matches!(&tokens[i - 1], TokenTree::Ident(_)) {
+                            let prev_end = tokens[i - 1].span().end();
+                            let amp_start = p.span().start();
+                            if prev_end.line == amp_start.line
+                                && prev_end.column == amp_start.column
+                            {
+                                annotations[i] = TokenAnnotation::PostfixStar;
+                                i += 1;
+                                continue;
+                            }
+                        }
+
                         // PrefixOp: NOT preceded by non-keyword ident, literal, `)`, or `]`
                         // After keywords like `return`, `-` is prefix (unary minus)
                         let is_prefix = if i == 0 {
@@ -303,6 +337,7 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                                     // After keyword → prefix; after variable → binary
                                     let s = id.to_string();
                                     CONTROL_FLOW_KEYWORDS.contains(&s.as_str())
+                                        || DECLARATION_KEYWORDS.contains(&s.as_str())
                                 }
                                 TokenTree::Literal(_) => false,
                                 TokenTree::Group(g) => !matches!(
@@ -369,10 +404,12 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                                 TokenTree::Ident(id) => {
                                     let s = id.to_string();
                                     // Uppercase ident (type name heuristic), OR
+                                    // declaration keyword (e.g. `public <T>`), OR
                                     // any ident preceded by PathSepComplete
                                     // (e.g., `std::map<` — lowercase but qualified), OR
                                     // span-adjacent lowercase ident (`identity<T>`)
                                     s.starts_with(|c: char| c.is_uppercase())
+                                        || DECLARATION_KEYWORDS.contains(&s.as_str())
                                         || (i >= 2
                                             && annotations[i - 2]
                                                 == TokenAnnotation::PathSepComplete)
@@ -404,6 +441,27 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                     ';' => {
                         // Reset generic stack at statement boundaries
                         generic_stack.clear();
+                    }
+                    '=' if i > 0 => {
+                        let prev_is_assignable = matches!(
+                            &tokens[i - 1],
+                            TokenTree::Ident(_) | TokenTree::Literal(_) | TokenTree::Group(_)
+                        );
+                        if prev_is_assignable {
+                            let prev_end = tokens[i - 1].span().end();
+                            let eq_start = p.span().start();
+                            if prev_end.line == eq_start.line && prev_end.column == eq_start.column
+                            {
+                                // Don't mark as AssignAdjacent if this is part of
+                                // ==, =>, <=, >= (Joint followed by = or >)
+                                let is_compound = p.spacing() == Spacing::Joint
+                                    && i + 1 < tokens.len()
+                                    && matches!(&tokens[i + 1], TokenTree::Punct(np) if np.as_char() == '=' || np.as_char() == '>');
+                                if !is_compound {
+                                    annotations[i] = TokenAnnotation::AssignAdjacent;
+                                }
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -769,7 +827,9 @@ fn tokens_to_format_inner(
                     TokenAnnotation::PathSepComplete => PrevTokenKind::PathSep,
                     TokenAnnotation::GenericOpen => PrevTokenKind::GenericOpen,
                     TokenAnnotation::PrefixOp => PrevTokenKind::PrefixOp(ch),
-                    TokenAnnotation::ArrowOp => PrevTokenKind::PathSep,
+                    TokenAnnotation::ArrowOp
+                    | TokenAnnotation::AssignAdjacent
+                    | TokenAnnotation::MethodCallColon => PrevTokenKind::PathSep,
                     _ => new_kind,
                 };
             }
@@ -892,13 +952,15 @@ pub(super) fn maybe_space(
     // Annotation-based suppression (replaces old suppress_space flag).
     match annotation {
         TokenAnnotation::MacroBang
-        | TokenAnnotation::GenericOpen
         | TokenAnnotation::GenericClose
         | TokenAnnotation::SafeCallQ
         | TokenAnnotation::PostfixIncDec
         | TokenAnnotation::PostfixStar
         | TokenAnnotation::PostfixQuestion
-        | TokenAnnotation::ArrowOp => return,
+        | TokenAnnotation::ArrowOp
+        | TokenAnnotation::AssignAdjacent
+        | TokenAnnotation::MethodCallColon => return,
+        TokenAnnotation::GenericOpen if prev != PrevTokenKind::Keyword => return,
         _ => {}
     }
 

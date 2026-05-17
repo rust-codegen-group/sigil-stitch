@@ -1,2 +1,2 @@
-PROMPT ="%%F{green}%%n@%%m%%f"
+PROMPT="%%F{green}%%n@%%m%%f"
 echo $PROMPT

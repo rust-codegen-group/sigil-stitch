@@ -305,8 +305,23 @@ impl CodeLang for OCaml {
             Some(" = sig")
         } else if t.starts_with("module ") {
             Some(" = struct")
-        } else if t.starts_with("match ") {
+        } else if t.starts_with("match ") || t.starts_with("try ") {
             Some("")
+        } else if t.starts_with("if ") || t.starts_with("else if ") {
+            Some(" then")
+        } else if t == "else" {
+            Some("")
+        } else if t.starts_with("for ") || t.starts_with("while ") {
+            Some(" do")
+        } else {
+            None
+        }
+    }
+
+    fn block_close_for(&self, condition: &str) -> Option<&str> {
+        let t = condition.trim();
+        if t.starts_with("for ") || t.starts_with("while ") {
+            Some("done")
         } else {
             None
         }
