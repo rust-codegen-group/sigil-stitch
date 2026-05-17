@@ -431,6 +431,14 @@ impl FunSpec {
             sig.push_str(s);
         }
 
+        // Async suffix before return type (Swift: `func f() async -> T`).
+        if self.modifiers.is_async
+            && !suppress_async
+            && lang.function_syntax().async_suffix_before_return
+        {
+            sig.push_str(lang.function_syntax().async_suffix);
+        }
+
         // Return type as suffix (TS/Rust/Go-style: `fn add(...) -> int`).
         // Skip when separator is empty (e.g. Lua) — nothing to separate.
         if !lang.type_decl_syntax().return_type_is_prefix
@@ -459,8 +467,11 @@ impl FunSpec {
             false
         };
 
-        // Async suffix (Dart: `Future<T> foo() async { ... }`).
-        if self.modifiers.is_async && !suppress_async {
+        // Async suffix after return type (Dart: `Future<T> foo() async { ... }`).
+        if self.modifiers.is_async
+            && !suppress_async
+            && !lang.function_syntax().async_suffix_before_return
+        {
             sig.push_str(lang.function_syntax().async_suffix);
         }
 

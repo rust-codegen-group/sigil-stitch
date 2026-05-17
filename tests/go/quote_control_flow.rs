@@ -53,6 +53,7 @@ fn test_for_init_semicolon() {
 fn test_switch_init_semicolon() {
     let block = sigil_quote!(GoLang {
         switch v := getValue(); v {
+        case "hello":
             fmt.Println(v);
         }
     })

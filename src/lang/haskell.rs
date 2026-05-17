@@ -383,6 +383,12 @@ impl CodeLang for Haskell {
             Some(" where")
         } else if t == "do" || t.ends_with(" do") {
             Some("")
+        } else if t.starts_with("if ") || t.starts_with("else if ") {
+            Some(" then")
+        } else if t == "else" {
+            Some("")
+        } else if t.starts_with("case ") {
+            Some(" of")
         } else {
             None
         }
@@ -679,5 +685,17 @@ mod tests {
     fn test_module_separator() {
         let hs = Haskell::new();
         assert_eq!(hs.module_separator(), Some("."));
+    }
+
+    #[test]
+    fn test_block_open_for_if_else_case() {
+        let hs = Haskell::new();
+        assert_eq!(hs.block_open_for("if x > 0"), Some(" then"));
+        assert_eq!(hs.block_open_for("else if x < 0"), Some(" then"));
+        assert_eq!(hs.block_open_for("else"), Some(""));
+        assert_eq!(hs.block_open_for("case x"), Some(" of"));
+        assert_eq!(hs.block_open_for("class Eq a"), Some(" where"));
+        assert_eq!(hs.block_open_for("do"), Some(""));
+        assert_eq!(hs.block_open_for("let x = 5"), None);
     }
 }

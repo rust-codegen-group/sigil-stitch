@@ -1,8 +1,6 @@
-internal enum class Status {
+internal enum class Status(val value: String) {
     ACTIVE("active"),
     INACTIVE("inactive");
-
-    internal val value: String
 
     internal fun getValue(): String {
         return value

@@ -1,5 +1,5 @@
 #include <string>
 #include <vector>
 
-vector items;
-string name = "Alice";
+std::vector<int> items;
+std::string name = "Alice";

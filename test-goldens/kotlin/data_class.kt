@@ -1,5 +1,5 @@
 /**
  * A user data class.
  */
-data class User(name: String, age: Int, email: String) {
+data class User(val name: String, val age: Int, val email: String) {
 }

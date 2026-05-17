@@ -339,6 +339,9 @@ impl CodeLang for Swift {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " -> ",
             abstract_keyword: "",
+            async_keyword: "",
+            async_suffix: " async",
+            async_suffix_before_return: true,
             ..Default::default()
         }
     }
@@ -585,5 +588,13 @@ mod tests {
     fn test_module_separator() {
         let sw = Swift::new();
         assert_eq!(sw.module_separator(), Some("."));
+    }
+
+    #[test]
+    fn test_async_suffix_position() {
+        let sw = Swift::new();
+        let fs = sw.function_syntax();
+        assert_eq!(fs.async_keyword, "");
+        assert_eq!(fs.async_suffix, " async");
     }
 }

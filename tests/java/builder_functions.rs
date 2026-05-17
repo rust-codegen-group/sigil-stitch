@@ -35,7 +35,7 @@ fn test_generic_type_params_before_return_type() {
     use sigil_stitch::spec::fun_spec::TypeParamSpec;
 
     let tp = TypeParamSpec::new("T").with_bound(TypeName::primitive("Comparable"));
-    let body = CodeBlock::of("return Collections.sort(list);", ()).unwrap();
+    let body = CodeBlock::of("Collections.sort(list);\nreturn list;", ()).unwrap();
     let fun = FunSpec::builder("sortList")
         .visibility(Visibility::Public)
         .is_static()
@@ -92,7 +92,7 @@ fn test_override_annotation() {
 #[test]
 fn test_generic_params_before_return_golden() {
     let tp = TypeParamSpec::new("T").with_bound(TypeName::primitive("Comparable"));
-    let body = CodeBlock::of("return Collections.sort(list);", ()).unwrap();
+    let body = CodeBlock::of("Collections.sort(list);\nreturn list;", ()).unwrap();
 
     let ts = TypeSpec::builder("Utils", TypeKind::Class)
         .visibility(Visibility::Public)

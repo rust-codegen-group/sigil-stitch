@@ -73,6 +73,8 @@ pub(super) enum ColonContext {
     PathSeparator,
     /// `x := 42` — space before `:`.
     WalrusAssign,
+    /// `for (item : collection)` — space before `:`.
+    ForRange,
 }
 
 /// Accumulated state threaded through the format-string builder.
@@ -476,8 +478,15 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                 let prev_is_callable = match &tokens[i - 1] {
                     TokenTree::Ident(id) => {
                         let s = id.to_string();
-                        !CONTROL_FLOW_KEYWORDS.contains(&s.as_str())
-                            && !DECLARATION_KEYWORDS.contains(&s.as_str())
+                        let is_keyword = CONTROL_FLOW_KEYWORDS.contains(&s.as_str())
+                            || DECLARATION_KEYWORDS.contains(&s.as_str());
+                        if !is_keyword {
+                            true
+                        } else if i >= 2 {
+                            matches!(&tokens[i - 2], TokenTree::Punct(p) if p.as_char() == '.')
+                        } else {
+                            false
+                        }
                     }
                     TokenTree::Literal(_) | TokenTree::Group(_) => true,
                     TokenTree::Punct(p) => p.as_char() == '>',
@@ -853,6 +862,12 @@ fn tokens_to_format_inner(
                 let saved_ctx = state.colon_ctx;
                 if g.delimiter() == Delimiter::Brace {
                     state.colon_ctx = ColonContext::MapEntry;
+                } else if g.delimiter() == Delimiter::Parenthesis
+                    && pos > 0
+                    && let TokenTree::Ident(id) = &tokens[pos - 1]
+                    && *id == "for"
+                {
+                    state.colon_ctx = ColonContext::ForRange;
                 }
                 state.prev = PrevTokenKind::GroupOpen;
 
@@ -980,7 +995,7 @@ pub(super) fn maybe_space(
         match ch {
             ',' | ';' | ')' | ']' | '.' => return,
             ':' if annotation != TokenAnnotation::DoubleColonOp => match state.colon_ctx {
-                ColonContext::Ternary | ColonContext::WalrusAssign => {}
+                ColonContext::Ternary | ColonContext::WalrusAssign | ColonContext::ForRange => {}
                 ColonContext::TypeAnnotation
                 | ColonContext::MapEntry
                 | ColonContext::PathSeparator => return,

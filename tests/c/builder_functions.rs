@@ -33,7 +33,7 @@ fn test_void_function() {
     let printf_type = TypeName::importable("stdio.h", "printf");
     let body = CodeBlock::of(
         "%T(%S, name);",
-        (printf_type, StringLitArg("Hello, %s!\\n".to_string())),
+        (printf_type, StringLitArg("Hello, %s!\n".to_string())),
     )
     .unwrap();
     let fun = FunSpec::builder("greet")

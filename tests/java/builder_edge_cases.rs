@@ -80,6 +80,7 @@ fn test_annotated_method() {
 #[test]
 fn test_full_module() {
     let list = TypeName::importable("java.util", "List");
+    let list_user = TypeName::generic(list, vec![TypeName::primitive("User")]);
     let array_list = TypeName::importable("java.util", "ArrayList");
     let nullable = TypeName::importable("javax.annotation", "Nullable");
 
@@ -96,7 +97,7 @@ fn test_full_module() {
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(TypeName::primitive("List<User>"))
+                .returns(list_user.clone())
                 .build()
                 .unwrap(),
         )
@@ -104,20 +105,20 @@ fn test_full_module() {
         .unwrap();
 
     // Implementation class.
-    let ctor_body = CodeBlock::of("this.users = new %T<>();", (array_list,)).unwrap();
+    let ctor_body = CodeBlock::of("this.users = new %T<>();", (array_list.clone(),)).unwrap();
     let find_body = CodeBlock::of(
         "return this.users.stream()\n    .filter(u -> u.getId().equals(id))\n    .findFirst()\n    .orElse(null);",
         (),
     )
     .unwrap();
-    let find_all_body = CodeBlock::of("return new %T<>(this.users);", (list.clone(),)).unwrap();
+    let find_all_body = CodeBlock::of("return new %T<>(this.users);", (array_list,)).unwrap();
 
     let cls_spec = TypeSpec::builder("InMemoryUserRepository", TypeKind::Class)
         .visibility(Visibility::Public)
         .implements(TypeName::primitive("UserRepository"))
         .doc("In-memory implementation of UserRepository.")
         .add_field(
-            FieldSpec::builder("users", TypeName::primitive("List<User>"))
+            FieldSpec::builder("users", list_user.clone())
                 .visibility(Visibility::Private)
                 .is_readonly()
                 .build()
@@ -144,7 +145,7 @@ fn test_full_module() {
         .add_method(
             FunSpec::builder("findAll")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("List<User>"))
+                .returns(list_user)
                 .annotation(CodeBlock::of("@Override", ()).unwrap())
                 .body(find_all_body)
                 .build()

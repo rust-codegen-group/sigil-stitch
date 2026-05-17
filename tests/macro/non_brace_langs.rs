@@ -22,7 +22,7 @@ fn test_haskell_control_flow() {
     .unwrap();
 
     let output = render_hs(&block);
-    assert!(output.contains("if x > 0 ="), "got: {output}");
+    assert!(output.contains("if x > 0 then"), "got: {output}");
     assert!(output.contains("return True"), "got: {output}");
 }
 

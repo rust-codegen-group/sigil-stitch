@@ -1,5 +1,5 @@
 import MyModule
 
-async func fetchUser(id: String) -> User {
+func fetchUser(id: String) async -> User {
     return try await api.fetchUser(id: id)
 }

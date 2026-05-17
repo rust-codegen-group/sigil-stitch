@@ -57,13 +57,13 @@ fn test_data_class() {
         .visibility(Visibility::Public)
         .doc("A user data class.")
         .add_primary_constructor_param(
-            ParameterSpec::new("name", TypeName::primitive("String")).unwrap(),
+            ParameterSpec::new("val name", TypeName::primitive("String")).unwrap(),
         )
         .add_primary_constructor_param(
-            ParameterSpec::new("age", TypeName::primitive("Int")).unwrap(),
+            ParameterSpec::new("val age", TypeName::primitive("Int")).unwrap(),
         )
         .add_primary_constructor_param(
-            ParameterSpec::new("email", TypeName::primitive("String")).unwrap(),
+            ParameterSpec::new("val email", TypeName::primitive("String")).unwrap(),
         )
         .build()
         .unwrap();
@@ -201,6 +201,9 @@ fn test_enum_class() {
 #[test]
 fn test_enum_with_values() {
     let ts = TypeSpec::builder("Status", TypeKind::Enum)
+        .add_primary_constructor_param(
+            ParameterSpec::new("val value", TypeName::primitive("String")).unwrap(),
+        )
         .add_variant(
             EnumVariantSpec::builder("ACTIVE")
                 .value(CodeBlock::of("\"active\"", ()).unwrap())
@@ -210,12 +213,6 @@ fn test_enum_with_values() {
         .add_variant(
             EnumVariantSpec::builder("INACTIVE")
                 .value(CodeBlock::of("\"inactive\"", ()).unwrap())
-                .build()
-                .unwrap(),
-        )
-        .add_field(
-            FieldSpec::builder("value", TypeName::primitive("String"))
-                .is_readonly()
                 .build()
                 .unwrap(),
         )

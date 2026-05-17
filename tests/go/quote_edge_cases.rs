@@ -17,12 +17,12 @@ fn render(block: &CodeBlock) -> String {
 #[test]
 fn test_indent() {
     let block = sigil_quote!(GoLang {
-        namespace Foo {
+        func printDirections() {
         $>
-        North = iota;
-        East;
-        South;
-        West;
+        fmt.Println("North");
+        fmt.Println("East");
+        fmt.Println("South");
+        fmt.Println("West");
         $<
         }
     })

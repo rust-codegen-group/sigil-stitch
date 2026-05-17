@@ -1,4 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 
-let map: HashMap = HashMap::new();
-let deque: VecDeque = VecDeque::new();
+fn demo() {
+    let map: HashMap<String, i32> = HashMap::new();
+    let deque: VecDeque<String> = VecDeque::new();
+}

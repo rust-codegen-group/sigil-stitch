@@ -16,7 +16,8 @@ fn test_function_with_imports() {
     b.add("%>", ());
     b.add_statement("let mut map = HashMap::new()", ());
     b.add_statement("map.insert(\"key\".to_string(), \"value\".to_string())", ());
-    b.add_statement("map", ());
+    b.add("map", ());
+    b.add_line();
     b.add("%<", ());
     b.add("}", ());
     b.add_line();
@@ -28,7 +29,8 @@ fn test_function_with_imports() {
     b2.add("pub struct Config {", ());
     b2.add_line();
     b2.add("%>", ());
-    b2.add_statement("pub name: String", ());
+    b2.add("pub name: String,", ());
+    b2.add_line();
     b2.add("%<", ());
     b2.add("}", ());
     b2.add_line();
@@ -54,6 +56,9 @@ fn test_import_grouping() {
     let user = TypeName::importable("crate::models", "User");
 
     let mut b = CodeBlock::builder();
+    b.add("fn demo() {", ());
+    b.add_line();
+    b.add("%>", ());
     b.add_statement(
         "let _h: %T<String, String> = Default::default()",
         (hashmap,),
@@ -63,9 +68,12 @@ fn test_import_grouping() {
         (btreemap,),
     );
     b.add_statement("let _a: %T<String> = Arc::new(\"x\".into())", (arc,));
-    b.add_statement("let _s: %T = todo!()", (serialize,));
-    b.add_statement("let _d: %T = todo!()", (deserialize,));
+    b.add_statement("let _s = %T::default()", (serialize,));
+    b.add_statement("let _d = %T::default()", (deserialize,));
     b.add_statement("let _u: %T = todo!()", (user,));
+    b.add("%<", ());
+    b.add("}", ());
+    b.add_line();
     let block = b.build().unwrap();
 
     let file = FileSpec::builder_with("main.rs", RustLang::new())

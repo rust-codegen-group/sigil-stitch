@@ -15,8 +15,8 @@ fn test_function_with_includes() {
     b.add_line();
     b.add("%>", ());
     b.add_statement(
-        "%T(%S, config.name)",
-        (printf_type, StringLitArg("Hello, %s\\n".to_string())),
+        "%T(%S, cfg.name)",
+        (printf_type, StringLitArg("Hello, %s\n".to_string())),
     );
     b.add_statement("%T cfg", (config_type,));
     b.add_line();

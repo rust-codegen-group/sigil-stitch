@@ -17,8 +17,11 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_imports() {
-    let vector = TypeName::importable("vector", "vector");
-    let string = TypeName::importable("string", "string");
+    let vector = TypeName::generic(
+        TypeName::importable("vector", "std::vector"),
+        vec![TypeName::primitive("int")],
+    );
+    let string = TypeName::importable("string", "std::string");
     let block = sigil_quote!(CppLang {
         $T(vector) items;
         $T(string) name = $S("Alice");

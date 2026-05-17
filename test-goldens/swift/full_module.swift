@@ -1,7 +1,7 @@
 import Foundation
 
 protocol DataFetcher {
-    async func fetchData(from: URL) -> Data
+    func fetchData(from: URL) async -> Data
 }
 
 /// API response model.
@@ -14,7 +14,7 @@ struct Response {
 class NetworkFetcher: DataFetcher {
     private let session: URLSession
 
-    async func fetchData(from: URL) -> Data {
+    func fetchData(from: URL) async -> Data {
         let (data, _) = try await session.data(from: from)
         return data
     }

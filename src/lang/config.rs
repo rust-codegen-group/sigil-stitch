@@ -252,6 +252,10 @@ pub struct FunctionSyntaxConfig<'a> {
     /// (e.g. Dart: `" async"`). Emitted when `is_async` is set, placed
     /// after the closing `)` and before the block-open brace.
     pub async_suffix: &'a str,
+    /// When true, `async_suffix` is emitted between the closing `)` and the
+    /// return type arrow (Swift: `func f() async -> T`). When false (default),
+    /// it is emitted after the return type (Dart: `Future<T> f() async {`).
+    pub async_suffix_before_return: bool,
     /// Keyword for abstract methods (e.g. `"abstract "`, `"virtual "`).
     pub abstract_keyword: &'a str,
     /// Keyword for override methods as an inline modifier (e.g. `"override "`).
@@ -301,6 +305,7 @@ impl Default for FunctionSyntaxConfig<'_> {
             return_type_separator: ": ",
             async_keyword: "async ",
             async_suffix: "",
+            async_suffix_before_return: false,
             abstract_keyword: "abstract ",
             override_keyword: "override ",
             override_annotation: "",

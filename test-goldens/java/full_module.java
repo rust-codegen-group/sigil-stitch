@@ -31,6 +31,6 @@ public class InMemoryUserRepository implements UserRepository {
 
     @Override
     public List<User> findAll() {
-        return new List<>(this.users);
+        return new ArrayList<>(this.users);
     }
 }

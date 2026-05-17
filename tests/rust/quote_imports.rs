@@ -17,11 +17,19 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_imports() {
-    let hashmap = TypeName::importable("std::collections", "HashMap");
-    let vec_deque = TypeName::importable("std::collections", "VecDeque");
+    let hashmap = TypeName::generic(
+        TypeName::importable("std::collections", "HashMap"),
+        vec![TypeName::primitive("String"), TypeName::primitive("i32")],
+    );
+    let vec_deque = TypeName::generic(
+        TypeName::importable("std::collections", "VecDeque"),
+        vec![TypeName::primitive("String")],
+    );
     let block = sigil_quote!(RustLang {
-        let map: $T(hashmap.clone()) = $T(hashmap)::new();
-        let deque: $T(vec_deque.clone()) = $T(vec_deque)::new();
+        fn demo() {
+            let map: $T(hashmap) = HashMap::new();
+            let deque: $T(vec_deque) = VecDeque::new();
+        }
     })
     .unwrap();
     golden::assert_golden("rust/macro_imports.rs", &render(&block));

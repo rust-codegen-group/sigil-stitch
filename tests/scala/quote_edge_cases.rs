@@ -18,8 +18,8 @@ fn render(block: &CodeBlock) -> String {
 fn test_pattern_match() {
     let block = sigil_quote!(Scala {
         val result = x match {
-            case(1) => "one"
-            case(_) => "other"
+            case 1 => "one"
+            case _ => "other"
         }
     })
     .unwrap();

@@ -5,9 +5,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::User;
 
-let _h: HashMap<String, String> = Default::default();
-let _b: BTreeMap<String, String> = Default::default();
-let _a: Arc<String> = Arc::new("x".into());
-let _s: Serialize = todo!();
-let _d: Deserialize = todo!();
-let _u: User = todo!();
+fn demo() {
+    let _h: HashMap<String, String> = Default::default();
+    let _b: BTreeMap<String, String> = Default::default();
+    let _a: Arc<String> = Arc::new("x".into());
+    let _s = Serialize::default();
+    let _d = Deserialize::default();
+    let _u: User = todo!();
+}
