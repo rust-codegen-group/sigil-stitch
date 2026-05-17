@@ -24,3 +24,37 @@ fn test_cascade() {
     .unwrap();
     golden::assert_golden("dart/quote_cascade.dart", &render(&block));
 }
+
+#[test]
+fn test_named_params() {
+    let block = sigil_quote!(DartLang {
+        void configure({required String host, int port = 8080}) {
+            print(host);
+        }
+    })
+    .unwrap();
+    golden::assert_golden("dart/quote_named_params.dart", &render(&block));
+}
+
+#[test]
+fn test_null_aware() {
+    let block = sigil_quote!(DartLang {
+        String name = user?.name ?? $S("anonymous");
+        list ??= [];
+        final length = items?.length ?? 0;
+    })
+    .unwrap();
+    golden::assert_golden("dart/quote_null_aware.dart", &render(&block));
+}
+
+#[test]
+fn test_async_await() {
+    let block = sigil_quote!(DartLang {
+        Future<String> fetchData(String url) async {
+            final response = await http.get(Uri.parse(url));
+            return response.body;
+        }
+    })
+    .unwrap();
+    golden::assert_golden("dart/quote_async_await.dart", &render(&block));
+}
