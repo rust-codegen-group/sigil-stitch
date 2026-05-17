@@ -35,3 +35,53 @@ fn test_local_function() {
     .unwrap();
     golden::assert_golden("lua/quote_local_function.lua", &render(&block));
 }
+
+#[test]
+fn test_method_call() {
+    let block = sigil_quote!(Lua {
+        local obj = {}
+        obj:init("config")
+        local result = obj:getValue()
+    })
+    .unwrap();
+    golden::assert_golden("lua/quote_method_call.lua", &render(&block));
+}
+
+#[test]
+fn test_vararg() {
+    let block = sigil_quote!(Lua {
+        local function printf(fmt, ...) {
+            local args = {...}
+            print(string.format(fmt, ...))
+        }
+    })
+    .unwrap();
+    golden::assert_golden("lua/quote_vararg.lua", &render(&block));
+}
+
+#[test]
+fn test_multiline_table() {
+    let block = sigil_quote!(Lua {
+        local config = {
+            host = "localhost",
+            port = 8080,
+            debug = true,
+        }
+    })
+    .unwrap();
+    golden::assert_golden("lua/quote_multiline_table.lua", &render(&block));
+}
+
+#[test]
+fn test_for_loop() {
+    let block = sigil_quote!(Lua {
+        for i = 1, 10 do {
+            print(i)
+        }
+        for k, v in pairs(t) do {
+            print(k, v)
+        }
+    })
+    .unwrap();
+    golden::assert_golden("lua/quote_for_loop.lua", &render(&block));
+}
