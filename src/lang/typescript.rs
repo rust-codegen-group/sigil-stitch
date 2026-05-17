@@ -275,7 +275,7 @@ impl CodeLang for TypeScript {
                 Visibility::Public => "export ",
                 _ => "",
             },
-            DeclarationContext::Member => match vis {
+            DeclarationContext::Member | DeclarationContext::InterfaceMember => match vis {
                 Visibility::Public => "public ",
                 Visibility::Private => "private ",
                 Visibility::Protected => "protected ",
@@ -287,7 +287,7 @@ impl CodeLang for TypeScript {
     fn function_keyword(&self, ctx: DeclarationContext) -> &str {
         match ctx {
             DeclarationContext::TopLevel => "function",
-            DeclarationContext::Member => "",
+            DeclarationContext::Member | DeclarationContext::InterfaceMember => "",
         }
     }
 

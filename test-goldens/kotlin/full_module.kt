@@ -3,9 +3,9 @@ import kotlin.collections.List
 import kotlin.collections.MutableList
 
 internal interface UserRepository {
-    internal fun findById(id: String): User?
+    fun findById(id: String): User?
 
-    internal fun findAll(): List<User>
+    fun findAll(): List<User>
 }
 
 /**

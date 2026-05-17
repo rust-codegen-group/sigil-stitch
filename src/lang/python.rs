@@ -385,6 +385,7 @@ impl CodeLang for Python {
             return_type_separator: " -> ",
             constructor_keyword: "def",
             empty_body: "...",
+            static_keyword: "",
             ..Default::default()
         }
     }

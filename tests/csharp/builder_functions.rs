@@ -155,3 +155,35 @@ fn test_function_with_doc() {
 
     golden::assert_golden("csharp/function_with_doc.cs", &output);
 }
+
+#[test]
+fn test_async_suppressed_in_interface() {
+    let ts = TypeSpec::builder("IUserService", TypeKind::Interface)
+        .visibility(Visibility::Public)
+        .add_method(
+            FunSpec::builder("GetUserAsync")
+                .is_async()
+                .returns(TypeName::primitive("Task<User>"))
+                .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_method(
+            FunSpec::builder("SaveUserAsync")
+                .is_async()
+                .returns(TypeName::primitive("Task"))
+                .add_param(ParameterSpec::new("user", TypeName::primitive("User")).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let file = FileSpec::builder_with("IUserService.cs", CSharp::new())
+        .add_type(ts)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("csharp/async_interface.cs", &output);
+}

@@ -254,6 +254,17 @@ pub struct FunctionSyntaxConfig<'a> {
     pub async_suffix: &'a str,
     /// Keyword for abstract methods (e.g. `"abstract "`, `"virtual "`).
     pub abstract_keyword: &'a str,
+    /// Keyword for override methods as an inline modifier (e.g. `"override "`).
+    ///
+    /// Set to `""` for languages that use an annotation instead (e.g. Java `@Override`).
+    pub override_keyword: &'a str,
+    /// Annotation emitted on its own line when `is_override` is set and the
+    /// language uses an annotation instead of an inline keyword.
+    ///
+    /// For example, Java sets this to `"@Override"`. When non-empty, it is
+    /// emitted as a line before the function signature. Languages that use an
+    /// inline keyword (Kotlin, Swift, C#) leave this empty.
+    pub override_annotation: &'a str,
     /// How parameter lists are formatted (tupled vs curried).
     pub param_list_style: ParamListStyle,
     /// How signatures are rendered (merged vs split type signature).
@@ -273,6 +284,15 @@ pub struct FunctionSyntaxConfig<'a> {
     /// Most other languages place them after the function name:
     /// `fun <T> sortList(...)` or `fn sort_list<T>(...)`.
     pub type_params_before_return_type: bool,
+    /// Whether to suppress the `async` keyword for interface/trait member declarations.
+    ///
+    /// C# sets this to `true` because interface methods declare the contract
+    /// (return type `Task<T>`) without the `async` implementation detail.
+    /// Swift sets this to `false` because protocols include `async` in signatures.
+    pub suppress_async_in_interface: bool,
+    /// Keyword emitted for static methods/fields. Default `"static "`.
+    /// Python sets to `""` since static is expressed via decorators.
+    pub static_keyword: &'a str,
 }
 
 impl Default for FunctionSyntaxConfig<'_> {
@@ -282,6 +302,8 @@ impl Default for FunctionSyntaxConfig<'_> {
             async_keyword: "async ",
             async_suffix: "",
             abstract_keyword: "abstract ",
+            override_keyword: "override ",
+            override_annotation: "",
             param_list_style: ParamListStyle::Tupled,
             function_signature_style: FunctionSignatureStyle::Merged,
             constructor_keyword: "",
@@ -289,6 +311,8 @@ impl Default for FunctionSyntaxConfig<'_> {
             where_clause_style: WhereClauseStyle::Inline,
             empty_body: "",
             type_params_before_return_type: false,
+            suppress_async_in_interface: false,
+            static_keyword: "static ",
         }
     }
 }

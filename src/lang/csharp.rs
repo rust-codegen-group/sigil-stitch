@@ -214,12 +214,16 @@ impl CodeLang for CSharp {
         "//"
     }
 
-    fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
-        match vis {
-            Visibility::Public => "public ",
-            Visibility::Private => "private ",
-            Visibility::Protected => "protected ",
-            _ => "internal ",
+    fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
+        match ctx {
+            // Interface members are implicitly public in C#; no visibility keyword.
+            DeclarationContext::InterfaceMember => "",
+            _ => match vis {
+                Visibility::Public => "public ",
+                Visibility::Private => "private ",
+                Visibility::Protected => "protected ",
+                _ => "internal ",
+            },
         }
     }
 
@@ -283,6 +287,7 @@ impl CodeLang for CSharp {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " ",
             async_keyword: "async ",
+            suppress_async_in_interface: true,
             ..Default::default()
         }
     }

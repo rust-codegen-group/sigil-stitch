@@ -210,6 +210,8 @@ impl CodeLang for JavaLang {
                 Visibility::Protected => "protected ",
                 _ => "", // package-private
             },
+            // Interface members are implicitly public abstract in Java.
+            DeclarationContext::InterfaceMember => "",
         }
     }
 
@@ -276,6 +278,8 @@ impl CodeLang for JavaLang {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " ",
             async_keyword: "",
+            override_keyword: "",
+            override_annotation: "@Override",
             type_params_before_return_type: true,
             ..Default::default()
         }

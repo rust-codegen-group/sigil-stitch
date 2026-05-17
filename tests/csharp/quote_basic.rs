@@ -46,3 +46,14 @@ fn test_method_calls() {
     .unwrap();
     golden::assert_golden("csharp/macro_method_calls.cs", &render(&block));
 }
+
+#[test]
+fn test_interface_method_signatures() {
+    let block = sigil_quote!(CSharp {
+        Task<User> GetUserAsync(string id);
+        Task SaveUserAsync(User user);
+        void Delete(string id);
+    })
+    .unwrap();
+    golden::assert_golden("csharp/macro_interface_methods.cs", &render(&block));
+}

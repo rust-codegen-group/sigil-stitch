@@ -2,9 +2,9 @@
  * Generic data repository.
  */
 internal interface Repository<T> {
-    internal fun findById(id: String): T?
+    fun findById(id: String): T?
 
-    internal fun save(entity: T)
+    fun save(entity: T)
 
-    internal fun delete(id: String)
+    fun delete(id: String)
 }

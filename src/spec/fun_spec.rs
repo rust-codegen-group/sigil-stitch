@@ -310,6 +310,16 @@ impl FunSpec {
             cb.add_line();
         }
 
+        // Override annotation (e.g., Java `@Override`) -- emitted as an annotation line
+        // rather than an inline keyword when the language uses annotation style.
+        if self.modifiers.is_override {
+            let override_ann = lang.function_syntax().override_annotation;
+            if !override_ann.is_empty() {
+                cb.add("%L", override_ann.to_string());
+                cb.add_line();
+            }
+        }
+
         if !lang.doc_before_annotations()
             && let Some(doc_str) = emit_doc()
         {
@@ -333,15 +343,28 @@ impl FunSpec {
 
         sig.push_str(vis);
         if self.modifiers.is_abstract {
-            sig.push_str(lang.function_syntax().abstract_keyword);
+            let kw = lang.function_syntax().abstract_keyword;
+            if !kw.is_empty() {
+                sig.push_str(kw);
+            }
         }
         if self.modifiers.is_static {
-            sig.push_str("static ");
+            let kw = lang.function_syntax().static_keyword;
+            if !kw.is_empty() {
+                sig.push_str(kw);
+            }
         }
         if self.modifiers.is_override {
-            sig.push_str("override ");
+            let kw = lang.function_syntax().override_keyword;
+            if !kw.is_empty() {
+                sig.push_str(kw);
+            }
         }
-        if self.modifiers.is_async {
+        // Some languages (C#) suppress `async` for interface members because
+        // interfaces declare the contract (return type), not the implementation.
+        let suppress_async = ctx == DeclarationContext::InterfaceMember
+            && lang.function_syntax().suppress_async_in_interface;
+        if self.modifiers.is_async && !suppress_async {
             sig.push_str(lang.function_syntax().async_keyword);
         }
 
@@ -437,7 +460,7 @@ impl FunSpec {
         };
 
         // Async suffix (Dart: `Future<T> foo() async { ... }`).
-        if self.modifiers.is_async {
+        if self.modifiers.is_async && !suppress_async {
             sig.push_str(lang.function_syntax().async_suffix);
         }
 

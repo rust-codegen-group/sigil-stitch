@@ -110,7 +110,7 @@ impl PropertySpec {
 
             sig.push_str(vis);
             if self.modifiers.is_static {
-                sig.push_str("static ");
+                sig.push_str(lang.function_syntax().static_keyword);
             }
             sig.push_str("get ");
             sig.push_str(&self.name);
@@ -148,7 +148,7 @@ impl PropertySpec {
 
             sig.push_str(vis);
             if self.modifiers.is_static {
-                sig.push_str("static ");
+                sig.push_str(lang.function_syntax().static_keyword);
             }
             sig.push_str("set ");
             sig.push_str(&self.name);
@@ -201,7 +201,7 @@ impl PropertySpec {
 
         sig.push_str(vis);
         if self.modifiers.is_static {
-            sig.push_str("static ");
+            sig.push_str(lang.function_syntax().static_keyword);
         }
 
         if has_setter {

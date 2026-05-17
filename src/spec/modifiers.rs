@@ -7,6 +7,13 @@ pub enum DeclarationContext {
     TopLevel,
     /// Inside a type body: e.g., `private name: string` (TS), `pub name: String` (Rust).
     Member,
+    /// Inside an interface or trait body.
+    ///
+    /// Some languages suppress modifiers for interface members:
+    /// - Kotlin: no visibility (implicitly public).
+    /// - Java: interface methods are implicitly `public abstract`.
+    /// - C#: no visibility (implicitly public), no `async` keyword.
+    InterfaceMember,
 }
 
 /// Visibility level for declarations.

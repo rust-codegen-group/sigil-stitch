@@ -23,3 +23,15 @@ fn test_basic() {
     .unwrap();
     golden::assert_golden("python/macro_basic.py", &render(&block));
 }
+
+#[test]
+fn test_classmethod_decorator() {
+    let block = sigil_quote!(Python {
+        @classmethod
+        def from_dict(cls, data: dict) -> "User": {
+            return cls(data["name"], data["age"])
+        }
+    })
+    .unwrap();
+    golden::assert_golden("python/macro_classmethod.py", &render(&block));
+}

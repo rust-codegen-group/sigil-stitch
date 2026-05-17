@@ -2,7 +2,9 @@ use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::lang::python::Python;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
+use sigil_stitch::spec::modifiers::TypeKind;
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
+use sigil_stitch::spec::type_spec::TypeSpec;
 use sigil_stitch::type_name::TypeName;
 
 use super::golden;
@@ -46,4 +48,33 @@ fn test_function_with_doc() {
     let output = file.render(80).unwrap();
 
     golden::assert_golden("python/function_with_doc.py", &output);
+}
+
+#[test]
+fn test_static_method_no_keyword() {
+    let body = CodeBlock::of("return cls(name, age)", ()).unwrap();
+
+    let ts = TypeSpec::builder("User", TypeKind::Class)
+        .add_method(
+            FunSpec::builder("from_dict")
+                .is_static()
+                .annotation(CodeBlock::of("@classmethod", ()).unwrap())
+                .add_param(ParameterSpec::new("cls", TypeName::primitive("")).unwrap())
+                .add_param(ParameterSpec::new("name", TypeName::primitive("str")).unwrap())
+                .add_param(ParameterSpec::new("age", TypeName::primitive("int")).unwrap())
+                .returns(TypeName::primitive("User"))
+                .body(body)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let file = FileSpec::builder_with("user.py", Python::new())
+        .add_type(ts)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("python/static_method.py", &output);
 }

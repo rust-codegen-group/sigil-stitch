@@ -131,6 +131,13 @@ impl TypeSpec {
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
         let mut cb = CodeBlock::builder();
 
+        // Use InterfaceMember context for interface/trait bodies so that
+        // languages can suppress visibility modifiers and async keywords.
+        let member_ctx = match self.kind {
+            TypeKind::Interface | TypeKind::Trait => DeclarationContext::InterfaceMember,
+            _ => DeclarationContext::Member,
+        };
+
         self.emit_preamble(&mut cb, lang)?;
         self.emit_header(&mut cb, lang)?;
 
@@ -171,7 +178,7 @@ impl TypeSpec {
                 if i == 0 && !self.variants.is_empty() {
                     cb.add_line();
                 }
-                cb.add_code(field.emit(lang, DeclarationContext::Member)?);
+                cb.add_code(field.emit(lang, member_ctx)?);
             }
         } else {
             // Fields first, then variants (default).
@@ -179,7 +186,7 @@ impl TypeSpec {
                 if i > 0 {
                     // No extra blank line between fields.
                 }
-                cb.add_code(field.emit(lang, DeclarationContext::Member)?);
+                cb.add_code(field.emit(lang, member_ctx)?);
             }
             if !self.variants.is_empty() {
                 if !self.fields.is_empty() {
@@ -199,7 +206,7 @@ impl TypeSpec {
                 if i > 0 {
                     cb.add_line();
                 }
-                for block in prop.emit(lang, DeclarationContext::Member)? {
+                for block in prop.emit(lang, member_ctx)? {
                     cb.add_code(block);
                 }
             }
@@ -212,7 +219,7 @@ impl TypeSpec {
             if i > 0 {
                 cb.add_line();
             }
-            cb.add_code(method.emit(lang, DeclarationContext::Member)?);
+            cb.add_code(method.emit(lang, member_ctx)?);
         }
         for extra in &self.extra_members {
             cb.add_code(extra.clone());

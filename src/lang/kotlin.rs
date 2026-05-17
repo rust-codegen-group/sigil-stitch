@@ -272,6 +272,8 @@ impl CodeLang for Kotlin {
                 Visibility::Protected => "protected ",
                 _ => "internal ",
             },
+            // Interface members are implicitly public in Kotlin — no visibility modifier.
+            DeclarationContext::InterfaceMember => "",
         }
     }
 

@@ -221,7 +221,7 @@ impl CodeLang for GoLang {
             // Top-level functions and receiver methods use `func`.
             DeclarationContext::TopLevel => "func",
             // Interface method signatures omit `func`.
-            DeclarationContext::Member => "",
+            DeclarationContext::Member | DeclarationContext::InterfaceMember => "",
         }
     }
 

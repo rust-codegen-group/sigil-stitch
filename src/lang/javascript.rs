@@ -226,14 +226,14 @@ impl CodeLang for JavaScript {
             },
             // JavaScript has no member visibility keywords.
             // Use #name convention for private fields.
-            DeclarationContext::Member => "",
+            DeclarationContext::Member | DeclarationContext::InterfaceMember => "",
         }
     }
 
     fn function_keyword(&self, ctx: DeclarationContext) -> &str {
         match ctx {
             DeclarationContext::TopLevel => "function",
-            DeclarationContext::Member => "",
+            DeclarationContext::Member | DeclarationContext::InterfaceMember => "",
         }
     }
 

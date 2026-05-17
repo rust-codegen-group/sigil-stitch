@@ -135,7 +135,7 @@ impl FieldSpec {
 
         fmt.push_str(vis);
         if self.modifiers.is_static {
-            fmt.push_str("static ");
+            fmt.push_str(lang.function_syntax().static_keyword);
         }
 
         // Resolve the optional-field style (only applied when `is_optional` is set).
