@@ -24,3 +24,14 @@ fn test_basic() {
     .unwrap();
     golden::assert_golden("javascript/macro_basic.js", &render(&block));
 }
+
+#[test]
+fn test_postfix_increment() {
+    let block = sigil_quote!(JavaScript {
+        for (let i = 0; i < 10; i++) {
+            count++;
+        }
+    })
+    .unwrap();
+    golden::assert_golden("javascript/quote_postfix_increment.js", &render(&block));
+}

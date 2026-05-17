@@ -26,3 +26,36 @@ fn test_control_flow() {
     .unwrap();
     golden::assert_golden("go/macro_control_flow.go", &render(&block));
 }
+
+#[test]
+fn test_if_init_semicolon() {
+    let block = sigil_quote!(GoLang {
+        if err := doStuff(); err != nil {
+            return err;
+        }
+    })
+    .unwrap();
+    golden::assert_golden("go/quote_if_init.go", &render(&block));
+}
+
+#[test]
+fn test_for_init_semicolon() {
+    let block = sigil_quote!(GoLang {
+        for i := 0; i < 10; i++ {
+            fmt.Println(i);
+        }
+    })
+    .unwrap();
+    golden::assert_golden("go/quote_for_init.go", &render(&block));
+}
+
+#[test]
+fn test_switch_init_semicolon() {
+    let block = sigil_quote!(GoLang {
+        switch v := getValue(); v {
+            fmt.Println(v);
+        }
+    })
+    .unwrap();
+    golden::assert_golden("go/quote_switch_init.go", &render(&block));
+}

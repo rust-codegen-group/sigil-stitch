@@ -35,3 +35,14 @@ fn test_function_pointer_usage() {
     .unwrap();
     golden::assert_golden("c/quote_function_pointer.c", &render(&block));
 }
+
+#[test]
+fn test_arrow_and_pointer_spacing() {
+    let block = sigil_quote!(CLang {
+        struct Config* cfg = create_config();
+        cfg->host = $S("localhost");
+        cfg->port = 8080;
+    })
+    .unwrap();
+    golden::assert_golden("c/quote_arrow_pointer.c", &render(&block));
+}

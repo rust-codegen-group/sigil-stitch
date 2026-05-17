@@ -2,4 +2,4 @@
 #include <stdlib.h>
 
 printf("hello");
-void * p = malloc(sizeof(int));
+void* p = malloc(sizeof(int));

@@ -21,6 +21,14 @@ pub(super) enum TokenAnnotation {
     MacroBang,
     /// `?` in `?.` safe-call — suppress space before it.
     SafeCallQ,
+    /// First `+` of `++` or first `-` of `--` used as postfix — suppress space before.
+    PostfixIncDec,
+    /// `*` used as postfix pointer marker (e.g. `Config*`) — suppress space before.
+    PostfixStar,
+    /// `-` starting `->` when adjacent to preceding token (member access, not type arrow).
+    ArrowOp,
+    /// First `:` of `::` used as operator (not path separator) — space before it.
+    DoubleColonOp,
 }
 
 /// What kind of token was just emitted (for spacing decisions).
@@ -39,6 +47,8 @@ pub(super) enum PrevTokenKind {
     Specifier,
     /// `%W` soft-break — already provides a space, so suppress `maybe_space`.
     SoftBreak,
+    /// `$$` literal dollar — suppress space after it so `$$1` renders as `$1`.
+    DollarLiteral,
 }
 
 /// Context for how `:` should be spaced.
@@ -150,13 +160,26 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                 let ch = p.as_char();
                 match ch {
                     ':' => {
-                        // PathSepComplete: first `:` is Joint and next is `:`
+                        // PathSepComplete: first `:` is Joint, next is `:`, and
+                        // the `::` is span-adjacent to the preceding token
+                        // (no whitespace before `::` → path separator like `std::fmt`).
+                        // When user writes `fmap :: Type` with space, it's an operator.
                         if p.spacing() == Spacing::Joint
                             && i + 1 < tokens.len()
                             && let TokenTree::Punct(next_p) = &tokens[i + 1]
                             && next_p.as_char() == ':'
                         {
-                            annotations[i + 1] = TokenAnnotation::PathSepComplete;
+                            let is_path_sep = i > 0 && {
+                                let prev_end = tokens[i - 1].span().end();
+                                let colon_start = p.span().start();
+                                prev_end.line == colon_start.line
+                                    && prev_end.column == colon_start.column
+                            };
+                            if is_path_sep {
+                                annotations[i + 1] = TokenAnnotation::PathSepComplete;
+                            } else {
+                                annotations[i] = TokenAnnotation::DoubleColonOp;
+                            }
                         }
                     }
                     '!' if p.spacing() == Spacing::Alone
@@ -165,7 +188,66 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                     {
                         annotations[i] = TokenAnnotation::MacroBang;
                     }
+                    '+' | '-'
+                        if p.spacing() == Spacing::Joint
+                            && i + 1 < tokens.len()
+                            && matches!(&tokens[i + 1], TokenTree::Punct(np) if np.as_char() == ch) =>
+                    {
+                        // ++ or -- : check if postfix (preceded by ident, literal, or group close)
+                        let is_postfix = if i == 0 {
+                            false
+                        } else {
+                            match &tokens[i - 1] {
+                                TokenTree::Ident(id) => {
+                                    let s = id.to_string();
+                                    !CONTROL_FLOW_KEYWORDS.contains(&s.as_str())
+                                }
+                                TokenTree::Literal(_) => true,
+                                TokenTree::Group(g) => matches!(
+                                    g.delimiter(),
+                                    Delimiter::Parenthesis | Delimiter::Bracket
+                                ),
+                                _ => false,
+                            }
+                        };
+                        if is_postfix {
+                            annotations[i] = TokenAnnotation::PostfixIncDec;
+                        }
+                    }
                     '&' | '*' | '-' => {
+                        // ArrowOp: `-` that forms `->` and is span-adjacent to
+                        // preceding token (member access like `cfg->host`).
+                        if ch == '-'
+                            && p.spacing() == Spacing::Joint
+                            && i + 1 < tokens.len()
+                            && matches!(&tokens[i + 1], TokenTree::Punct(np) if np.as_char() == '>')
+                            && i > 0
+                        {
+                            let prev_end = tokens[i - 1].span().end();
+                            let cur_start = p.span().start();
+                            if prev_end.line == cur_start.line
+                                && prev_end.column == cur_start.column
+                            {
+                                annotations[i] = TokenAnnotation::ArrowOp;
+                                annotations[i + 1] = TokenAnnotation::ArrowOp;
+                                i += 2;
+                                continue;
+                            }
+                        }
+
+                        // PostfixStar: `*` span-adjacent to preceding ident (pointer type like `Config*`).
+                        if ch == '*' && i > 0 && matches!(&tokens[i - 1], TokenTree::Ident(_)) {
+                            let prev_end = tokens[i - 1].span().end();
+                            let star_start = p.span().start();
+                            if prev_end.line == star_start.line
+                                && prev_end.column == star_start.column
+                            {
+                                annotations[i] = TokenAnnotation::PostfixStar;
+                                i += 1;
+                                continue;
+                            }
+                        }
+
                         // PrefixOp: NOT preceded by non-keyword ident, literal, `)`, or `]`
                         // After keywords like `return`, `-` is prefix (unary minus)
                         let is_prefix = if i == 0 {
@@ -327,12 +409,12 @@ fn tokens_to_format_inner(
                     maybe_space(
                         format,
                         state,
-                        PrevTokenKind::Literal,
+                        PrevTokenKind::DollarLiteral,
                         TokenAnnotation::Normal,
                     );
                 }
                 format.push('$');
-                state.prev = PrevTokenKind::Literal;
+                state.prev = PrevTokenKind::DollarLiteral;
                 state.prev_specifier_end = None;
                 pos += 1;
                 continue;
@@ -570,7 +652,9 @@ fn tokens_to_format_inner(
                 {
                     match next_p.as_char() {
                         '=' => state.colon_ctx = ColonContext::WalrusAssign,
-                        ':' => state.colon_ctx = ColonContext::PathSeparator,
+                        ':' if annotations[pos + 1] == TokenAnnotation::PathSepComplete => {
+                            state.colon_ctx = ColonContext::PathSeparator;
+                        }
                         _ => {}
                     }
                 }
@@ -593,6 +677,7 @@ fn tokens_to_format_inner(
                     TokenAnnotation::PathSepComplete => PrevTokenKind::PathSep,
                     TokenAnnotation::GenericOpen => PrevTokenKind::GenericOpen,
                     TokenAnnotation::PrefixOp => PrevTokenKind::PrefixOp(ch),
+                    TokenAnnotation::ArrowOp => PrevTokenKind::PathSep,
                     _ => new_kind,
                 };
             }
@@ -702,14 +787,20 @@ pub(super) fn maybe_space(
         TokenAnnotation::MacroBang
         | TokenAnnotation::GenericOpen
         | TokenAnnotation::GenericClose
-        | TokenAnnotation::SafeCallQ => return,
+        | TokenAnnotation::SafeCallQ
+        | TokenAnnotation::PostfixIncDec
+        | TokenAnnotation::PostfixStar
+        | TokenAnnotation::ArrowOp => return,
         _ => {}
     }
 
     // No space after prefix operators, path separators, or generic openers.
     if matches!(
         prev,
-        PrevTokenKind::PrefixOp(_) | PrevTokenKind::PathSep | PrevTokenKind::GenericOpen
+        PrevTokenKind::PrefixOp(_)
+            | PrevTokenKind::PathSep
+            | PrevTokenKind::GenericOpen
+            | PrevTokenKind::DollarLiteral
     ) {
         return;
     }
@@ -718,7 +809,7 @@ pub(super) fn maybe_space(
     if let PrevTokenKind::Punct(ch, _) = current {
         match ch {
             ',' | ';' | ')' | ']' | '.' => return,
-            ':' => match state.colon_ctx {
+            ':' if annotation != TokenAnnotation::DoubleColonOp => match state.colon_ctx {
                 ColonContext::Ternary | ColonContext::WalrusAssign => {}
                 ColonContext::TypeAnnotation
                 | ColonContext::MapEntry

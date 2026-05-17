@@ -46,12 +46,27 @@ pub(super) fn parse_one_statement(
     let mut collected: Vec<TokenTree> = Vec::new();
     let mut prev_end_line: Option<usize> = None;
 
+    // Track whether we're inside a control-flow header that allows embedded
+    // semicolons (Go: `if init; cond {`, `for init; cond; post {`,
+    // `switch init; expr {`). Semicolons before the opening `{` are part of
+    // the header, not statement terminators.
+    let mut in_cf_header = false;
+
     while pos < tokens.len() {
         let tt = &tokens[pos];
 
-        // Check for `;` — statement terminator.
+        if collected.is_empty()
+            && let TokenTree::Ident(id) = tt
+        {
+            let s = id.to_string();
+            if matches!(s.as_str(), "if" | "for" | "switch") {
+                in_cf_header = true;
+            }
+        }
+
+        // Check for `;` — statement terminator, unless inside a CF header.
         // (Any trailing `$+` in collected is handled by tokens_to_format_inner.)
-        if is_semicolon(tt) {
+        if is_semicolon(tt) && !in_cf_header {
             let (format, args) = tokens_to_format(&collected)?;
             return Ok((Statement::Statement { format, args }, pos + 1));
         }

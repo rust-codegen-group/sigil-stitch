@@ -23,3 +23,14 @@ fn test_basic() {
     .unwrap();
     golden::assert_golden("bash/macro_basic.bash", &render(&block));
 }
+
+#[test]
+fn test_dollar_escape_no_space() {
+    // `$$` followed by an identifier or number should NOT insert a space.
+    let block = sigil_quote!(Bash {
+        local level=$$1;
+        echo $$level;
+    })
+    .unwrap();
+    golden::assert_golden("bash/quote_dollar_escape.bash", &render(&block));
+}

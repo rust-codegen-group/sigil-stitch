@@ -24,3 +24,13 @@ fn test_open_where() {
     .unwrap();
     golden::assert_golden("haskell/macro_open_where.hs", &render(&block));
 }
+
+#[test]
+fn test_type_annotation() {
+    let block = sigil_quote!(Haskell {
+        map :: (a -> b) -> f a -> f b;
+        id :: a -> a;
+    })
+    .unwrap();
+    golden::assert_golden("haskell/quote_type_annotation.hs", &render(&block));
+}

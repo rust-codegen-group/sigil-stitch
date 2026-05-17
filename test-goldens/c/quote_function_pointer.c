@@ -1,3 +1,3 @@
-typedef void(*Callback)(int, const char *);
+typedef void(*Callback)(int, const char*);
 Callback cb = NULL;
 cb(42, "hello");

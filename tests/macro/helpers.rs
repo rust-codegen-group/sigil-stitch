@@ -1,5 +1,6 @@
 pub use sigil_stitch::code_block::{CodeBlock, NameArg, StringLitArg};
 pub use sigil_stitch::import_collector;
+pub use sigil_stitch::lang::c_lang::CLang;
 pub use sigil_stitch::lang::cpp_lang::CppLang;
 pub use sigil_stitch::lang::csharp::CSharp;
 pub use sigil_stitch::lang::dart::DartLang;
@@ -14,8 +15,25 @@ pub use sigil_stitch::prelude::*;
 pub use sigil_stitch::spec::file_spec::FileSpec;
 pub use sigil_stitch::type_name::TypeName;
 
+pub fn render_js(block: &CodeBlock) -> String {
+    use sigil_stitch::lang::javascript::JavaScript;
+    let file = FileSpec::builder_with("test.js", JavaScript::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
 pub fn render_ts(block: &CodeBlock) -> String {
     let file = FileSpec::builder("test.ts")
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
+pub fn render_c(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.c", CLang::new())
         .add_code(block.clone())
         .build()
         .unwrap();

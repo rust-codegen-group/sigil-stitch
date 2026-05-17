@@ -12,6 +12,23 @@ use sigil_stitch::type_name::TypeName;
 use super::golden;
 
 #[test]
+fn test_arrow_and_pointer_spacing() {
+    let mut b = CodeBlock::builder();
+    b.add_statement("struct Config* cfg = create_config()", ());
+    b.add_statement("cfg->host = %S", (StringLitArg("localhost".to_string()),));
+    b.add_statement("cfg->port = 8080", ());
+    let block = b.build().unwrap();
+
+    let file = FileSpec::builder_with("test.c", CLang::new())
+        .add_code(block)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("c/builder_arrow_pointer.c", &output);
+}
+
+#[test]
 fn test_struct_basic() {
     let mut b = CodeBlock::builder();
     b.add("struct Point", ());

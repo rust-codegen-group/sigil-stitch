@@ -31,3 +31,20 @@ fn test_control_flow() {
     let output = file.render(80).unwrap();
     golden::assert_golden("go/control_flow.go", &output);
 }
+
+#[test]
+fn test_if_init_semicolon() {
+    let mut b = CodeBlock::builder();
+    b.begin_control_flow("if err := doStuff(); err != nil", ());
+    b.add_statement("return err", ());
+    b.end_control_flow();
+    let block = b.build().unwrap();
+
+    let file = FileSpec::builder_with("test.go", GoLang::new())
+        .add_code(block)
+        .build()
+        .unwrap();
+
+    let output = file.render(80).unwrap();
+    golden::assert_golden("go/builder_if_init.go", &output);
+}

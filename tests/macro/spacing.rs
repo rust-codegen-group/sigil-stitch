@@ -602,3 +602,119 @@ fn test_elvis_no_space_before_question() {
     let output = render_kt(&block);
     assert!(output.contains("x ?: \"default\""), "got: {output}");
 }
+
+// --- Postfix pointer (`*`) spacing (Issue #44) ---
+
+#[test]
+fn test_postfix_star_pointer_type() {
+    let block = sigil_quote!(CppLang {
+        Config* cfg = get_config();
+    })
+    .unwrap();
+
+    let output = render_cpp(&block);
+    assert!(
+        output.contains("Config*"),
+        "no space before * in pointer type. got: {output}"
+    );
+}
+
+#[test]
+fn test_postfix_star_const_pointer() {
+    let block = sigil_quote!(CppLang {
+        const char* host = get_host();
+    })
+    .unwrap();
+
+    let output = render_cpp(&block);
+    assert!(
+        output.contains("char*"),
+        "no space before * after type name. got: {output}"
+    );
+}
+
+#[test]
+fn test_multiplication_still_spaced() {
+    // After a group close, `*` should still be multiplication
+    let block = sigil_quote!(TypeScript {
+        const x = (a + b) * c;
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(
+        output.contains("(a + b) * c"),
+        "multiplication should keep spaces. got: {output}"
+    );
+}
+
+// --- Postfix `++` and `--` spacing ---
+
+#[test]
+fn test_postfix_increment() {
+    let block = sigil_quote!(JavaScript {
+        for (let i = 0; i < 10; i++) {
+            count++;
+        }
+    })
+    .unwrap();
+
+    let output = render_js(&block);
+    assert!(output.contains("i++"), "got: {output}");
+    assert!(output.contains("count++"), "got: {output}");
+}
+
+#[test]
+fn test_postfix_decrement() {
+    let block = sigil_quote!(JavaScript {
+        while (n > 0) {
+            n--;
+        }
+    })
+    .unwrap();
+
+    let output = render_js(&block);
+    assert!(output.contains("n--"), "got: {output}");
+}
+
+#[test]
+fn test_binary_plus_still_spaced() {
+    let block = sigil_quote!(JavaScript {
+        const x = a + b;
+    })
+    .unwrap();
+
+    let output = render_js(&block);
+    assert!(
+        output.contains("a + b"),
+        "binary + should keep spaces. got: {output}"
+    );
+}
+
+#[test]
+fn test_binary_minus_still_spaced() {
+    let block = sigil_quote!(JavaScript {
+        const x = a - b;
+    })
+    .unwrap();
+
+    let output = render_js(&block);
+    assert!(
+        output.contains("a - b"),
+        "binary - should keep spaces. got: {output}"
+    );
+}
+
+#[test]
+fn test_binary_star_still_spaced() {
+    let block = sigil_quote!(CLang {
+        int x = a * b;
+    })
+    .unwrap();
+
+    let output = render_c(&block);
+    assert!(
+        output.contains("a * b"),
+        "binary * should keep spaces. got: {output}"
+    );
+}

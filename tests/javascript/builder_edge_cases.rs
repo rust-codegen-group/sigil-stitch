@@ -78,3 +78,20 @@ fn test_full_module() {
 
     golden::assert_golden("javascript/full_module.js", &output);
 }
+
+#[test]
+fn test_postfix_increment() {
+    let mut b = CodeBlock::builder();
+    b.begin_control_flow("for (let i = 0; i < 10; i++)", ());
+    b.add_statement("count++", ());
+    b.end_control_flow();
+    let block = b.build().unwrap();
+
+    let file = FileSpec::builder_with("test.js", JavaScript::new())
+        .add_code(block)
+        .build()
+        .unwrap();
+    let output = file.render(80).unwrap();
+
+    golden::assert_golden("javascript/builder_postfix_increment.js", &output);
+}

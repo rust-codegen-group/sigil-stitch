@@ -58,3 +58,19 @@ fn test_string_escaping() {
     let output = file.render(80).unwrap();
     golden::assert_golden("bash/string_escaping.bash", &output);
 }
+
+#[test]
+fn test_dollar_escape_no_space() {
+    let mut b = CodeBlock::builder();
+    b.add_statement("local level=$1", ());
+    b.add_statement("echo $level", ());
+    let block = b.build().unwrap();
+
+    let file = FileSpec::builder("test.bash")
+        .add_code(block)
+        .build()
+        .unwrap();
+
+    let output = file.render(80).unwrap();
+    golden::assert_golden("bash/builder_dollar_escape.bash", &output);
+}
