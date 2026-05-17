@@ -1,0 +1,3 @@
+DEFAULT =${NAME:-guest}
+LENGTH =${#ITEMS[@]}
+echo $DEFAULT $LENGTH
