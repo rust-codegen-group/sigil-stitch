@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.3
+
+### Fixed
+
+- `sigil_quote!` tokenizer: single-dash flags (`-q`, `-f`, `-avz`) and path
+  separators (`linux/amd64`) no longer get unwanted spaces inserted around `-`
+  and `/` (#93). Uses span-adjacency detection to distinguish flags/paths from
+  binary operators (`a - b`, `a / b`).
+- Shell test operators like `-gt` now render tight (previously `- gt`).
+
+### Tests
+
+- Migrated `$L` → `$N` for identifier interpolation across all test modules and
+  examples (semantic correctness — `$N` escapes reserved words, `$L` does not).
+- Added `$N` keyword-escape tests for all 18 languages.
+- Added 4 new spacing tests for dash-flag and slash-path edge cases.
+
 ## 0.5.2
 
 ### Added
