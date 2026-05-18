@@ -21,6 +21,7 @@ fn parse_macro_lang(ts: &TokenStream) -> MacroLang {
             "Bash" => MacroLang::Bash,
             "Zsh" => MacroLang::Zsh,
             "GoLang" => MacroLang::GoLang,
+            "Haskell" => MacroLang::Haskell,
             _ => MacroLang::Unaware,
         }
     } else {

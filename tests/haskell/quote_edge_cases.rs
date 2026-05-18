@@ -103,3 +103,48 @@ fn test_name_keyword_escape_in_macro() {
     let output = render(&block);
     assert!(output.contains("data' = 1"), "got: {output}");
 }
+
+// ── Dollar operator: tokenizer-level spacing fix ────────
+
+#[test]
+fn test_dollar_op_has_space_after() {
+    let block = sigil_quote!(Haskell {
+        main = putStrLn $$ show 42;
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("$ show"),
+        "dollar should have space after, got: {output}"
+    );
+    assert!(
+        !output.contains("$show"),
+        "dollar must not glue to next word, got: {output}"
+    );
+}
+
+#[test]
+fn test_dollar_op_in_expression() {
+    let block = sigil_quote!(Haskell {
+        result = f $$ g $$ h x;
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("f $ g $ h"),
+        "chained dollar ops need spaces, got: {output}"
+    );
+}
+
+#[test]
+fn test_bind_arrow_has_spaces() {
+    let block = sigil_quote!(Haskell {
+        x <- getLine;
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("x <- getLine"),
+        "bind arrow needs spaces on both sides, got: {output}"
+    );
+}

@@ -10,6 +10,7 @@ pub(crate) enum MacroLang {
     Bash,
     Zsh,
     GoLang,
+    Haskell,
 }
 
 impl MacroLang {

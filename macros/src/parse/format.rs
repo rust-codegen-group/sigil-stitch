@@ -308,6 +308,18 @@ fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<TokenAnnotation
                             && prev_p.spacing() == Spacing::Joint
                             && annotations[i - 1] != TokenAnnotation::GenericOpen
                         {
+                            // Go: `<-ch` is prefix receive — suppress space after
+                            // if span-adjacent to next token. `ch <- 42` (send) has
+                            // whitespace after `-`, so it keeps the space.
+                            if lang == MacroLang::GoLang && i + 1 < tokens.len() {
+                                let dash_end = p.span().end();
+                                let next_start = tokens[i + 1].span().start();
+                                if dash_end.line == next_start.line
+                                    && dash_end.column == next_start.column
+                                {
+                                    annotations[i] = TokenAnnotation::PrefixOp;
+                                }
+                            }
                             i += 1;
                             continue;
                         }
@@ -726,7 +738,13 @@ fn tokens_to_format_inner(
                     );
                 }
                 format.push('$');
-                state.prev = PrevTokenKind::DollarLiteral;
+                // Haskell: `$` is an infix operator that needs space after it.
+                // Other languages (shell): `$` glues to the next token (`$VAR`).
+                state.prev = if lang == MacroLang::Haskell {
+                    PrevTokenKind::Punct('$', Spacing::Alone)
+                } else {
+                    PrevTokenKind::DollarLiteral
+                };
                 state.prev_specifier_end = None;
                 pos += 1;
                 continue;

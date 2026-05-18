@@ -119,3 +119,39 @@ fn test_defer() {
     .unwrap();
     golden::assert_golden("go/quote_defer.go", &render(&block));
 }
+
+// ── Channel receive: tokenizer-level <- fix ─────────────
+
+#[test]
+fn test_channel_receive_tight() {
+    let block = sigil_quote!(GoLang { val := <-ch; }).unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("<-ch"),
+        "receive should be tight, got: {output}"
+    );
+    assert!(
+        !output.contains("<- ch"),
+        "no space after <- in receive, got: {output}"
+    );
+}
+
+#[test]
+fn test_channel_send_has_space() {
+    let block = sigil_quote!(GoLang { ch <- 42; }).unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("<- 42") || output.contains("ch <- 42"),
+        "send should keep space, got: {output}"
+    );
+}
+
+#[test]
+fn test_channel_receive_standalone() {
+    let block = sigil_quote!(GoLang { <-done; }).unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("<-done"),
+        "standalone receive should be tight, got: {output}"
+    );
+}
