@@ -777,3 +777,17 @@ fn test_slash_division_with_space() {
         "division should keep spaces, got: {output}"
     );
 }
+
+#[test]
+fn test_hyphenated_flag_intact() {
+    let block = sigil_quote!(TypeScript {
+        console.log(--from-oci-layout);
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(
+        output.contains("--from-oci-layout"),
+        "hyphenated flag should stay intact, got: {output}"
+    );
+}

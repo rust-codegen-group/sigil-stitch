@@ -1,6 +1,6 @@
 use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
 
-use super::types::{CompileError, InterpolationKind, TypedArg};
+use super::types::{CompileError, InterpolationKind, MacroLang, TypedArg};
 use super::util::is_ident;
 
 /// Annotations computed by pre-scanning the token stream.
@@ -38,10 +38,17 @@ pub(super) enum TokenAnnotation {
     AssignAdjacent,
     /// `:` span-adjacent to both neighbors (Lua method call `obj:method()`).
     MethodCallColon,
-    /// `-` span-adjacent to following ident/literal (shell flag like `-q`, `-f`).
+    /// `-` that acts as flag prefix (like `-q`, `-f`). Does NOT suppress space
+    /// before (so `declare -q` keeps the space). Only suppresses space after via
+    /// `PrevTokenKind::PrefixOp`.
     DashFlag,
+    /// `-` span-adjacent to both neighbors where prev is ident/literal
+    /// (hyphenated word like `from-oci-layout`).
+    DashSep,
     /// `/` span-adjacent to both neighbors (path separator like `linux/amd64`).
     SlashSep,
+    /// `.` used as standalone argument in shell (e.g. `find .`), not member access.
+    DotArg,
 }
 
 /// What kind of token was just emitted (for spacing decisions).
@@ -123,7 +130,7 @@ const DECLARATION_KEYWORDS: &[&str] = &[
 ///
 /// Skips `$`-prefixed interpolation markers (their contents are Rust
 /// expressions, not target-language tokens).
-fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
+fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<TokenAnnotation> {
     let mut annotations = vec![TokenAnnotation::Normal; tokens.len()];
     let mut generic_stack: Vec<usize> = Vec::new();
     let mut i = 0;
@@ -305,19 +312,27 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                             continue;
                         }
 
-                        // DashFlag: standalone `-` span-adjacent to following ident/literal
-                        // (shell flag like `-q`, `-f`, `-avz`).
+                        // DashSep: `-` between two ident/literals with no whitespace
+                        // on either side (hyphenated word like `from-oci-layout`).
+                        // Requires prev to be Ident/Literal to avoid false positives
+                        // (e.g. `-- file` where prev `-` is Punct).
                         if ch == '-'
                             && p.spacing() == Spacing::Alone
+                            && i > 0
                             && i + 1 < tokens.len()
+                            && matches!(&tokens[i - 1], TokenTree::Ident(_) | TokenTree::Literal(_))
                             && matches!(&tokens[i + 1], TokenTree::Ident(_) | TokenTree::Literal(_))
                         {
+                            let prev_end = tokens[i - 1].span().end();
+                            let dash_start = p.span().start();
                             let dash_end = p.span().end();
                             let next_start = tokens[i + 1].span().start();
-                            if dash_end.line == next_start.line
+                            if prev_end.line == dash_start.line
+                                && prev_end.column == dash_start.column
+                                && dash_end.line == next_start.line
                                 && dash_end.column == next_start.column
                             {
-                                annotations[i] = TokenAnnotation::DashFlag;
+                                annotations[i] = TokenAnnotation::DashSep;
                                 i += 1;
                                 continue;
                             }
@@ -368,32 +383,127 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
                                     g.delimiter(),
                                     Delimiter::Parenthesis | Delimiter::Bracket
                                 ),
-                                TokenTree::Punct(pp) => {
-                                    // After `)` or `]` from previous group close
-                                    // tokens won't be Punct ')'/']' because those
-                                    // are inside groups. After other punct → prefix.
-                                    // But also: after `>` could be binary (rare),
-                                    // let's be conservative and treat it as prefix.
-                                    !matches!(pp.as_char(), ')' | ']')
-                                }
+                                TokenTree::Punct(pp) => !matches!(pp.as_char(), ')' | ']'),
                             }
                         };
                         if is_prefix {
                             annotations[i] = TokenAnnotation::PrefixOp;
                         }
+
+                        // Shell: `-- file` separator. The second `-` of `--` gets
+                        // PrefixOp above (prev is Punct '-'). In shell mode, if
+                        // NOT span-adjacent to next ident, downgrade to Normal so
+                        // the space is preserved (separator, not flag prefix).
+                        if lang.is_shell()
+                            && ch == '-'
+                            && annotations[i] == TokenAnnotation::PrefixOp
+                            && i > 0
+                            && matches!(&tokens[i - 1], TokenTree::Punct(pp) if pp.as_char() == '-')
+                            && i + 1 < tokens.len()
+                            && matches!(&tokens[i + 1], TokenTree::Ident(_) | TokenTree::Literal(_))
+                        {
+                            let dash_end = p.span().end();
+                            let next_start = tokens[i + 1].span().start();
+                            if !(dash_end.line == next_start.line
+                                && dash_end.column == next_start.column)
+                            {
+                                annotations[i] = TokenAnnotation::Normal;
+                            }
+                        }
+
+                        // DashFlag: standalone `-` span-adjacent to following ident/literal.
+                        // Overrides PrefixOp or Normal with DashFlag to suppress space after.
+                        // Guards: must not be preceded by another `-` (avoids `-- file`
+                        // false positive where proc_macro2 spans are unreliable).
+                        if ch == '-'
+                            && p.spacing() == Spacing::Alone
+                            && i + 1 < tokens.len()
+                            && matches!(&tokens[i + 1], TokenTree::Ident(_) | TokenTree::Literal(_))
+                            && !(i > 0
+                                && matches!(
+                                    &tokens[i - 1],
+                                    TokenTree::Punct(pp) if pp.as_char() == '-'
+                                ))
+                        {
+                            let dash_end = p.span().end();
+                            let next_start = tokens[i + 1].span().start();
+                            if dash_end.line == next_start.line
+                                && dash_end.column == next_start.column
+                            {
+                                annotations[i] = TokenAnnotation::DashFlag;
+                                i += 1;
+                                continue;
+                            }
+                        }
                     }
-                    '/' if p.spacing() == Spacing::Alone && i > 0 && i + 1 < tokens.len() => {
-                        // SlashSep: `/` span-adjacent to both neighbors (path like `linux/amd64`).
-                        let prev_end = tokens[i - 1].span().end();
-                        let slash_start = p.span().start();
+                    '/' if p.spacing() == Spacing::Alone && i + 1 < tokens.len() => {
                         let slash_end = p.span().end();
                         let next_start = tokens[i + 1].span().start();
-                        if prev_end.line == slash_start.line
-                            && prev_end.column == slash_start.column
-                            && slash_end.line == next_start.line
-                            && slash_end.column == next_start.column
+                        let next_adj = slash_end.line == next_start.line
+                            && slash_end.column == next_start.column;
+
+                        if i > 0 {
+                            // SlashSep: `/` span-adjacent to both neighbors (path like `linux/amd64`).
+                            let prev_end = tokens[i - 1].span().end();
+                            let slash_start = p.span().start();
+                            if prev_end.line == slash_start.line
+                                && prev_end.column == slash_start.column
+                                && next_adj
+                            {
+                                annotations[i] = TokenAnnotation::SlashSep;
+                            }
+                        }
+                        // Shell: leading `/` or non-adjacent prev — treat as path prefix
+                        if lang.is_shell()
+                            && annotations[i] != TokenAnnotation::SlashSep
+                            && next_adj
                         {
                             annotations[i] = TokenAnnotation::SlashSep;
+                        }
+                    }
+                    '.' if lang.is_shell() => {
+                        // Shell: `.` not span-adjacent to prev is a standalone argument
+                        // (e.g. `find .`, `cd ..`), not member access. Handles both
+                        // Alone (single `.`) and Joint (first `.` of `..`).
+                        // Guard: if the dot IS span-adjacent to the next non-dot token,
+                        // it's a dotfile prefix (`.gitignore`) — keep as Normal.
+                        let not_adj_to_prev = if i > 0 {
+                            let prev_end = tokens[i - 1].span().end();
+                            let dot_start = p.span().start();
+                            !(prev_end.line == dot_start.line
+                                && prev_end.column == dot_start.column)
+                        } else {
+                            true
+                        };
+
+                        if not_adj_to_prev {
+                            // Check if this dot (or `..` sequence) is adjacent to
+                            // the following non-dot token — if so, it's a dotfile.
+                            let seq_end = if p.spacing() == Spacing::Joint
+                                && i + 1 < tokens.len()
+                                && matches!(&tokens[i + 1], TokenTree::Punct(p2) if p2.as_char() == '.')
+                            {
+                                i + 2 // `..` — check token after second dot
+                            } else {
+                                i + 1 // single `.` — check next token
+                            };
+
+                            let adj_to_next = if seq_end < tokens.len() {
+                                let dot_seq_end = tokens[seq_end - 1].span().end();
+                                let next_start = tokens[seq_end].span().start();
+                                dot_seq_end.line == next_start.line
+                                    && dot_seq_end.column == next_start.column
+                            } else {
+                                false
+                            };
+
+                            if !adj_to_next {
+                                annotations[i] = TokenAnnotation::DotArg;
+                                // If Joint (first of `..`), also mark the second dot
+                                if seq_end == i + 2 {
+                                    annotations[i + 1] = TokenAnnotation::DotArg;
+                                }
+                            }
                         }
                     }
                     '?' => {
@@ -549,13 +659,21 @@ fn annotate_tokens(tokens: &[TokenTree]) -> Vec<TokenAnnotation> {
 /// escapes `%` to `%%` in literal text. Recursively handles groups.
 pub(crate) fn tokens_to_format(
     tokens: &[TokenTree],
+    lang: MacroLang,
 ) -> Result<(String, Vec<TypedArg>), CompileError> {
     let mut format = String::new();
     let mut args: Vec<TypedArg> = Vec::new();
     let mut state = SpacingState::new();
-    let annotations = annotate_tokens(tokens);
+    let annotations = annotate_tokens(tokens, lang);
 
-    tokens_to_format_inner(tokens, &annotations, &mut format, &mut args, &mut state)?;
+    tokens_to_format_inner(
+        tokens,
+        &annotations,
+        &mut format,
+        &mut args,
+        &mut state,
+        lang,
+    )?;
 
     Ok((format, args))
 }
@@ -566,6 +684,7 @@ fn tokens_to_format_inner(
     format: &mut String,
     args: &mut Vec<TypedArg>,
     state: &mut SpacingState,
+    lang: MacroLang,
 ) -> Result<(), CompileError> {
     let mut pos = 0;
 
@@ -872,11 +991,19 @@ fn tokens_to_format_inner(
                     TokenAnnotation::PathSepComplete => PrevTokenKind::PathSep,
                     TokenAnnotation::GenericOpen => PrevTokenKind::GenericOpen,
                     TokenAnnotation::PrefixOp => PrevTokenKind::PrefixOp(ch),
+                    TokenAnnotation::DashFlag => PrevTokenKind::PrefixOp(ch),
                     TokenAnnotation::ArrowOp
                     | TokenAnnotation::AssignAdjacent
                     | TokenAnnotation::MethodCallColon
+                    | TokenAnnotation::DashSep
                     | TokenAnnotation::SlashSep => PrevTokenKind::PathSep,
-                    TokenAnnotation::DashFlag => PrevTokenKind::PrefixOp(ch),
+                    TokenAnnotation::DotArg => {
+                        if p.spacing() == Spacing::Joint {
+                            new_kind // Punct('.', Joint) — keeps `..` glued
+                        } else {
+                            PrevTokenKind::Literal // standalone `.` — allow space after
+                        }
+                    }
                     _ => new_kind,
                 };
             }
@@ -910,8 +1037,8 @@ fn tokens_to_format_inner(
                 state.prev = PrevTokenKind::GroupOpen;
 
                 let inner: Vec<TokenTree> = g.stream().into_iter().collect();
-                let inner_annotations = annotate_tokens(&inner);
-                tokens_to_format_inner(&inner, &inner_annotations, format, args, state)?;
+                let inner_annotations = annotate_tokens(&inner, lang);
+                tokens_to_format_inner(&inner, &inner_annotations, format, args, state, lang)?;
 
                 state.colon_ctx = saved_ctx;
                 format.push_str(close);
@@ -1013,6 +1140,7 @@ pub(super) fn maybe_space(
         | TokenAnnotation::ArrowOp
         | TokenAnnotation::AssignAdjacent
         | TokenAnnotation::MethodCallColon
+        | TokenAnnotation::DashSep
         | TokenAnnotation::SlashSep => return,
         TokenAnnotation::GenericOpen if prev != PrevTokenKind::Keyword => return,
         _ => {}
@@ -1032,7 +1160,8 @@ pub(super) fn maybe_space(
     // No space before certain punctuation.
     if let PrevTokenKind::Punct(ch, _) = current {
         match ch {
-            ',' | ';' | ')' | ']' | '.' => return,
+            ',' | ';' | ')' | ']' => return,
+            '.' if annotation != TokenAnnotation::DotArg => return,
             ':' if annotation != TokenAnnotation::DoubleColonOp => match state.colon_ctx {
                 ColonContext::Ternary | ColonContext::WalrusAssign | ColonContext::ForRange => {}
                 ColonContext::TypeAnnotation

@@ -2,7 +2,7 @@ use proc_macro2::{Delimiter, Spacing, TokenTree};
 
 use super::format::tokens_to_format;
 use super::parse_body;
-use super::types::{Branch, CompileError, MetaBranch, Statement};
+use super::types::{Branch, CompileError, MacroLang, MetaBranch, Statement};
 use super::util::{is_ident, is_semicolon, unescape_string};
 
 /// Parse a single statement starting at `pos`.
@@ -10,6 +10,7 @@ use super::util::{is_ident, is_semicolon, unescape_string};
 pub(super) fn parse_one_statement(
     tokens: &[TokenTree],
     start: usize,
+    lang: MacroLang,
 ) -> Result<(Statement, usize), CompileError> {
     // Check for $comment(...) at current position.
     if let Some((comment_text, next)) = try_parse_comment(tokens, start)? {
@@ -27,12 +28,12 @@ pub(super) fn parse_one_statement(
     }
 
     // Check for $if(cond) { ... } [$else_if(cond) { ... }] [$else { ... }]
-    if let Some((stmt, next)) = try_parse_meta_if(tokens, start)? {
+    if let Some((stmt, next)) = try_parse_meta_if(tokens, start, lang)? {
         return Ok((stmt, next));
     }
 
     // Check for $for(pat in expr) { ... }
-    if let Some((stmt, next)) = try_parse_meta_for(tokens, start)? {
+    if let Some((stmt, next)) = try_parse_meta_for(tokens, start, lang)? {
         return Ok((stmt, next));
     }
 
@@ -67,7 +68,7 @@ pub(super) fn parse_one_statement(
         // Check for `;` — statement terminator, unless inside a CF header.
         // (Any trailing `$+` in collected is handled by tokens_to_format_inner.)
         if is_semicolon(tt) && !in_cf_header {
-            let (format, args) = tokens_to_format(&collected)?;
+            let (format, args) = tokens_to_format(&collected, lang)?;
             return Ok((Statement::Statement { format, args }, pos + 1));
         }
 
@@ -131,7 +132,7 @@ pub(super) fn parse_one_statement(
             }
 
             // Control flow detected.
-            let (stmt, mut next_pos) = parse_control_flow(tokens, &collected, g, pos)?;
+            let (stmt, mut next_pos) = parse_control_flow(tokens, &collected, g, pos, lang)?;
             // Consume optional trailing `;` after the control flow block.
             if next_pos < tokens.len() && is_semicolon(&tokens[next_pos]) {
                 next_pos += 1;
@@ -155,7 +156,7 @@ pub(super) fn parse_one_statement(
                 // Don't split if next line starts with `.` (method chaining)
                 let starts_with_dot = matches!(tt, TokenTree::Punct(p) if p.as_char() == '.');
                 if !starts_with_dot {
-                    let (format, args) = tokens_to_format(&collected)?;
+                    let (format, args) = tokens_to_format(&collected, lang)?;
                     return Ok((Statement::Line { format, args }, pos));
                 }
             }
@@ -173,7 +174,7 @@ pub(super) fn parse_one_statement(
     if collected.is_empty() {
         Ok((Statement::BlankLine, pos))
     } else {
-        let (format, args) = tokens_to_format(&collected)?;
+        let (format, args) = tokens_to_format(&collected, lang)?;
         Ok((Statement::Line { format, args }, pos))
     }
 }
@@ -292,10 +293,11 @@ fn parse_control_flow(
     condition_tokens: &[TokenTree],
     first_brace: &proc_macro2::Group,
     brace_pos: usize,
+    lang: MacroLang,
 ) -> Result<(Statement, usize), CompileError> {
-    let (cond_format, cond_args) = tokens_to_format(condition_tokens)?;
+    let (cond_format, cond_args) = tokens_to_format(condition_tokens, lang)?;
     let body_tokens: Vec<TokenTree> = first_brace.stream().into_iter().collect();
-    let body = parse_body(&body_tokens)?;
+    let body = parse_body(&body_tokens, lang)?;
 
     let mut branches = vec![Branch {
         condition_format: cond_format,
@@ -329,18 +331,18 @@ fn parse_control_flow(
                     && g.delimiter() == Delimiter::Brace
                 {
                     let body_toks: Vec<TokenTree> = g.stream().into_iter().collect();
-                    let body = parse_body(&body_toks)?;
+                    let body = parse_body(&body_toks, lang)?;
 
                     let (cond_format, cond_args) =
                         if is_bare_else && else_condition_tokens.is_empty() {
                             ("else".to_string(), Vec::new())
                         } else if is_bare_else {
-                            let (fmt, args) = tokens_to_format(&else_condition_tokens)?;
+                            let (fmt, args) = tokens_to_format(&else_condition_tokens, lang)?;
                             (format!("else {fmt}"), args)
                         } else if else_condition_tokens.is_empty() {
                             (keyword.clone(), Vec::new())
                         } else {
-                            let (fmt, args) = tokens_to_format(&else_condition_tokens)?;
+                            let (fmt, args) = tokens_to_format(&else_condition_tokens, lang)?;
                             (format!("{keyword} {fmt}"), args)
                         };
 
@@ -421,6 +423,7 @@ fn try_parse_splice_each(
 fn try_parse_meta_if(
     tokens: &[TokenTree],
     start: usize,
+    lang: MacroLang,
 ) -> Result<Option<(Statement, usize)>, CompileError> {
     // Need at least 4 tokens: `$`, `if`, `(cond)`, `{ body }`
     if start + 3 >= tokens.len() {
@@ -463,7 +466,7 @@ fn try_parse_meta_if(
     pos += 1;
 
     let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-    let body = parse_body(&body_tokens)?;
+    let body = parse_body(&body_tokens, lang)?;
     branches.push(MetaBranch {
         condition: Some(cond_group.stream()),
         body,
@@ -517,7 +520,7 @@ fn try_parse_meta_if(
             pos += 1;
 
             let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-            let body = parse_body(&body_tokens)?;
+            let body = parse_body(&body_tokens, lang)?;
             branches.push(MetaBranch {
                 condition: Some(cond_group.stream()),
                 body,
@@ -543,7 +546,7 @@ fn try_parse_meta_if(
             pos += 1;
 
             let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-            let body = parse_body(&body_tokens)?;
+            let body = parse_body(&body_tokens, lang)?;
             branches.push(MetaBranch {
                 condition: None,
                 body,
@@ -562,6 +565,7 @@ fn try_parse_meta_if(
 fn try_parse_meta_for(
     tokens: &[TokenTree],
     start: usize,
+    lang: MacroLang,
 ) -> Result<Option<(Statement, usize)>, CompileError> {
     // Need at least 4 tokens: `$`, `for`, `(pat in expr)`, `{ body }`
     if start + 3 >= tokens.len() {
@@ -627,7 +631,7 @@ fn try_parse_meta_for(
     let iter_expr: proc_macro2::TokenStream = paren_tokens[in_pos + 1..].iter().cloned().collect();
 
     let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-    let body = parse_body(&body_tokens)?;
+    let body = parse_body(&body_tokens, lang)?;
 
     Ok(Some((
         Statement::MetaFor {

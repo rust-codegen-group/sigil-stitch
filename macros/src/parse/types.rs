@@ -1,10 +1,31 @@
 use proc_macro2::{Span, TokenStream};
 
+/// Language identity for macro-level tokenizer decisions.
+///
+/// Allows `annotate_tokens` to apply language-specific spacing heuristics
+/// (e.g., shell `.` as argument vs. member access).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MacroLang {
+    Unaware,
+    Bash,
+    Zsh,
+    GoLang,
+}
+
+impl MacroLang {
+    pub fn is_shell(self) -> bool {
+        matches!(self, Self::Bash | Self::Zsh)
+    }
+}
+
 /// A parsed `sigil_quote!` invocation.
 pub(crate) struct ParsedInput {
-    /// The language type tokens (e.g., `TypeScript`). Parsed for backwards
-    /// compatibility but no longer used in code generation since types are
-    /// no longer parameterized by language.
+    /// The resolved language for macro-level tokenizer decisions.
+    /// Used during parsing (threaded to annotate_tokens); not read by codegen.
+    #[allow(dead_code)]
+    pub lang: MacroLang,
+    /// The language type tokens (e.g., `TypeScript`). Kept for codegen
+    /// (the generated code references this type).
     #[allow(dead_code)]
     pub lang_type: TokenStream,
     /// The parsed body statements.

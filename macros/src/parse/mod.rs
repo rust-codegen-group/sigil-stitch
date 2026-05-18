@@ -14,6 +14,20 @@ use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
 
 use statements::parse_one_statement;
 
+fn parse_macro_lang(ts: &TokenStream) -> MacroLang {
+    let first = ts.clone().into_iter().next();
+    if let Some(TokenTree::Ident(id)) = first {
+        match id.to_string().as_str() {
+            "Bash" => MacroLang::Bash,
+            "Zsh" => MacroLang::Zsh,
+            "GoLang" => MacroLang::GoLang,
+            _ => MacroLang::Unaware,
+        }
+    } else {
+        MacroLang::Unaware
+    }
+}
+
 /// Parse the full `sigil_quote!` input.
 ///
 /// Expected form: `LangType { body }`
@@ -48,16 +62,21 @@ pub(crate) fn parse_input(input: TokenStream) -> Result<ParsedInput, CompileErro
     }
 
     let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-    let statements = parse_body(&body_tokens)?;
+    let lang = parse_macro_lang(&lang_tokens);
+    let statements = parse_body(&body_tokens, lang)?;
 
     Ok(ParsedInput {
+        lang,
         lang_type: lang_tokens,
         statements,
     })
 }
 
 /// Parse the body tokens into a list of statements.
-pub(super) fn parse_body(tokens: &[TokenTree]) -> Result<Vec<Statement>, CompileError> {
+pub(super) fn parse_body(
+    tokens: &[TokenTree],
+    lang: MacroLang,
+) -> Result<Vec<Statement>, CompileError> {
     let mut statements = Vec::new();
     let mut pos = 0;
 
@@ -73,7 +92,7 @@ pub(super) fn parse_body(tokens: &[TokenTree]) -> Result<Vec<Statement>, Compile
             }
         }
 
-        let (stmt, next_pos) = parse_one_statement(tokens, pos)?;
+        let (stmt, next_pos) = parse_one_statement(tokens, pos, lang)?;
         // Track the line of the last token consumed.
         if next_pos > pos {
             prev_line = Some(tokens[next_pos - 1].span().end().line);
