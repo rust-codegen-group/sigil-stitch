@@ -3,7 +3,9 @@
 //! Parses the macro input into a structured `ParsedInput` containing the
 //! language type and a list of statements.
 
+mod annotate;
 mod format;
+mod spacing;
 mod statements;
 mod stmt_rewrite;
 mod types;
