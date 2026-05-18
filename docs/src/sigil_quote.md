@@ -801,6 +801,16 @@ sigil_quote!(RustLang {
 
 ## Known Limitations and Quirks
 
+### Language-Aware Tokenization
+
+`sigil_quote!` recognizes certain language identifiers and applies language-specific spacing
+rules at compile time. For example, shell languages (Bash, Zsh) get correct handling of flags
+(`-q`, `--amend`), paths (`/usr/local/bin`), and standalone dots (`find .`). Go gets tight
+`<-ch` channel receive, and Haskell gets correct `$ operator` spacing.
+
+Languages without dedicated support use universal heuristics that handle most cases correctly.
+See [Language-Aware Tokenizer (MacroLang)](macrolang.md) for the full design.
+
 ### Tokenization
 
 `sigil_quote!` uses Rust's proc_macro2 tokenizer, which means the input is tokenized

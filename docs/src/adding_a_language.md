@@ -13,6 +13,10 @@ Adding a language takes four steps:
 3. Write integration tests in `tests/`
 4. Run `just bless` to generate golden files
 
+If your language has tokenizer conflicts in `sigil_quote!` that the universal heuristics
+can't handle (e.g., shell flags, Go channel operators), you may also need to add a
+`MacroLang` variant. See [Language-Aware Tokenizer](macrolang.md) for details.
+
 ## The CodeLang Trait
 
 The trait methods fall into natural groups.
@@ -274,29 +278,39 @@ pub mod your_lang;
 
 ### 3. Write tests
 
-Create two test files following the existing pattern:
+Create a test directory `tests/your_lang/` with a `main.rs` entry point and submodules:
 
-**`tests/your_lang_tests.rs`** -- basic CodeBlock rendering:
+**`tests/your_lang/main.rs`**:
 ```rust,ignore
 mod golden;
 
+mod quote_basic;
+mod builder_basic;
+```
+
+**`tests/your_lang/quote_basic.rs`** -- `sigil_quote!` macro tests:
+```rust,ignore
+use sigil_stitch::prelude::*;
+
+fn render(block: &CodeBlock) -> String {
+    FileSpec::builder("test.yl")
+        .add_code(block.clone())
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap()
+}
 
 #[test]
 fn test_basic_statement() {
-    let mut cb = CodeBlock::builder();
-    cb.add_statement("const x = 1", ());
-    let block = cb.build().unwrap();
-
-    let lang = YourLang::new();
-    let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&lang, &imports, 80);
-    let output = renderer.render(&block).unwrap();
-
-    golden::assert_golden("your_lang", "basic_statement", "yl", &output);
+    let block = sigil_quote!(YourLang {
+        const x = 1;
+    });
+    golden::assert_golden("your_lang/basic_statement.yl", &render(&block));
 }
 ```
 
-**`tests/phase2_your_lang_tests.rs`** -- spec-layer rendering (TypeSpec, FunSpec, FileSpec).
+**`tests/your_lang/builder_basic.rs`** -- builder API tests (CodeBlock, TypeSpec, FunSpec, FileSpec).
 
 ### 4. Generate golden files
 
@@ -304,7 +318,7 @@ fn test_basic_statement() {
 just bless
 ```
 
-This runs all tests with `BLESS=1`, which creates `tests/golden/your_lang/*.yl` files from the actual output. Review them manually, then commit.
+This runs all tests with `BLESS=1`, which creates `test-goldens/your_lang/*.yl` files from the actual output. Review them manually, then commit.
 
 ### 5. Override defaults
 

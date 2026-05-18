@@ -23,10 +23,11 @@ sigil-stitch/
 │   ├── lang/               # CodeLang trait + 6 config struct accessors + language implementations
 │   │   ├── mod.rs          # CodeLang trait (33 methods)
 │   │   ├── config.rs       # Config structs (BlockSyntaxConfig, FunctionSyntaxConfig, etc.)
+│   │   ├── rewrite.rs      # Runtime node rewrite walker
 │   │   ├── typescript.rs   # One file per language: typescript, javascript,
 │   │   └── ...             # rust_lang, go_lang, python, java_lang, kotlin,
 │   │                       # swift, dart, scala, haskell, ocaml, c_lang,
-│   │                       # cpp_lang, bash, zsh
+│   │                       # cpp_lang, bash, zsh, lua, csharp
 │   └── spec/               # Structural builders (emit CodeBlocks)
 │       ├── type_spec.rs    # Class, struct, interface, trait, enum, type alias, newtype
 │       ├── fun_spec.rs     # Functions and methods
@@ -35,9 +36,11 @@ sigil-stitch/
 │       ├── project_spec.rs # Multi-file generation
 │       └── ...             # ParameterSpec, PropertySpec, AnnotationSpec, etc.
 ├── macros/                 # sigil_quote! proc macro crate
-├── tests/                  # Integration tests (one file per language)
-│   ├── golden/             # Golden test output files
+│   └── src/parse/          # Tokenizer: format.rs (annotations), statements.rs, types.rs (MacroLang)
+├── tests/                  # Integration tests (one directory per language)
+│   ├── <lang>/             # main.rs + quote_*.rs + builder_*.rs submodules
 │   └── golden.rs           # Golden test assertion helper
+├── test-goldens/           # Golden test output files (one directory per language)
 └── docs/                   # mdbook documentation
 ```
 
@@ -85,20 +88,21 @@ CI runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo do
 
 **Unit tests** live alongside source code in `#[cfg(test)]` modules.
 
-**Integration tests** are in `tests/`, organized by language:
-- `tests/<lang>_tests.rs` — CodeBlock-level rendering
-- `tests/phase2_<lang>_tests.rs` — spec-layer rendering (TypeSpec, FunSpec, FileSpec)
+**Integration tests** are in `tests/`, organized by language directory:
+- `tests/<lang>/main.rs` — test harness entry point with submodules
+- `tests/<lang>/quote_*.rs` — `sigil_quote!` macro tests
+- `tests/<lang>/builder_*.rs` — builder API tests
 
-**Golden tests** compare rendered output against files in `tests/golden/<lang>/`. The workflow:
+**Golden tests** compare rendered output against files in `test-goldens/<lang>/`. The workflow:
 
-1. Tests call `golden::assert_golden("lang", "test_name", "ext", &output)`
+1. Tests call `golden::assert_golden("lang/test_name.ext", &output)`
 2. On normal runs, the assertion compares output against the golden file and fails on mismatch
 3. `BLESS=1 cargo test` (or `just bless`) writes actual output to the golden files
-4. Review the diffs in `tests/golden/` manually, then commit
+4. Review the diffs in `test-goldens/` manually, then commit
 
 When your change affects rendered output:
 1. Run `just bless` to update golden files
-2. `git diff tests/golden/` to review what changed
+2. `git diff test-goldens/` to review what changed
 3. Commit the updated golden files together with your code change
 
 **Adding a language:** See [Adding a Language](docs/src/adding_a_language.md) for the full walkthrough — implement `CodeLang`, add tests, run `just bless`, review golden files.
@@ -120,6 +124,7 @@ The [sigil-stitch book](docs/src/SUMMARY.md) covers the internals:
 
 - [Architecture](docs/src/architecture.md) — four layers, three-pass pipeline, import resolution
 - [Type Presentation](docs/src/type_presentation.md) — data-driven cross-language type rendering
+- [Language-Aware Tokenizer](docs/src/macrolang.md) — `MacroLang` enum, annotation heuristics, runtime rewrite passes
 - [Adding a Language](docs/src/adding_a_language.md) — implementing the CodeLang trait step by step
 
 Build the book locally:

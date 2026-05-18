@@ -20,7 +20,9 @@ The library is organized in four layers, each building on the one below:
 
 ### Layer 1: CodeLang
 
-`src/lang/mod.rs` defines the `CodeLang` trait with 36 methods, including 6 config struct accessors (`type_presentation()`, `generic_syntax()`, `block_syntax()`, `function_syntax()`, `type_decl_syntax()`, `enum_and_annotation()`) that return data structs with sensible defaults. Each supported language implements this trait in its own module (`src/lang/typescript.rs`, etc.). Languages can also implement `rewrite_nodes()` to transform the CodeNode tree after macro expansion for language-specific fixups (e.g., `=` assignment spacing in Bash, `do`/`end` block rewrites in Lua).
+`src/lang/mod.rs` defines the `CodeLang` trait with 36 methods, including 6 config struct accessors (`type_presentation()`, `generic_syntax()`, `block_syntax()`, `function_syntax()`, `type_decl_syntax()`, `enum_and_annotation()`) that return data structs with sensible defaults. Each supported language implements this trait in its own module (`src/lang/typescript.rs`, etc.). Languages can also implement `rewrite_nodes()` to transform the CodeNode tree after macro expansion for language-specific fixups (e.g., Go IIFE `}()` fusion, C++ lambda `};` semicolons).
+
+At the macro level, the `MacroLang` enum (`macros/src/parse/types.rs`) provides compile-time language-aware tokenizer annotations. Languages like Bash, Zsh, Go, and Haskell get specialized spacing rules in `sigil_quote!` without runtime overhead. See [Language-Aware Tokenizer](macrolang.md).
 
 Public types are language-agnostic — no generic parameter. The language enters as `&dyn CodeLang` at render time. `FileSpec` stores a `Box<dyn CodeLang>` internally; all other types (`CodeBlock`, `TypeName`, specs) are language-independent.
 
