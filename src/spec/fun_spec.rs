@@ -488,54 +488,21 @@ impl FunSpec {
             self.emit_where_and_open(&mut sig, &mut sig_args, lang);
             cb.add(&sig, sig_args);
             cb.add_line();
-            cb.add("%>", ());
-            // Docstring inside body (Python).
-            if !self.doc.is_empty() && lang.doc_comment_inside_body() {
-                let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-                let doc_str = lang.render_doc_comment(&doc_lines);
-                cb.add("%L", doc_str);
-                cb.add_line();
-            }
-            // Constructor delegation — body style (TS/Java/Dart/Swift).
-            if delegation_in_body && let Some(deleg) = &self.delegation {
-                cb.add_statement("%L", deleg.clone());
-            }
-            cb.add_code(body.clone());
-            if !body.ends_with_newline_or_block_close() {
-                cb.add_line();
-            }
-            cb.add("%<", ());
-            let close = lang.block_syntax().block_close;
-            if !close.is_empty() {
-                cb.add(close, ());
-                cb.add_line();
-            }
+            self.emit_body_interior(&mut cb, lang, delegation_in_body, |cb| {
+                cb.add_code(body.clone());
+                if !body.ends_with_newline_or_block_close() {
+                    cb.add_line();
+                }
+            });
         } else {
             let empty = lang.function_syntax().empty_body;
             if !empty.is_empty() {
-                // Language requires a body placeholder (e.g., Python `...`).
                 self.emit_where_and_open(&mut sig, &mut sig_args, lang);
                 cb.add(&sig, sig_args);
                 cb.add_line();
-                cb.add("%>", ());
-                // Docstring inside body (Python).
-                if !self.doc.is_empty() && lang.doc_comment_inside_body() {
-                    let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-                    let doc_str = lang.render_doc_comment(&doc_lines);
-                    cb.add("%L", doc_str);
-                    cb.add_line();
-                }
-                // Constructor delegation — body style.
-                if delegation_in_body && let Some(deleg) = &self.delegation {
-                    cb.add_statement("%L", deleg.clone());
-                }
-                cb.add_statement(empty, ());
-                cb.add("%<", ());
-                let close = lang.block_syntax().block_close;
-                if !close.is_empty() {
-                    cb.add(close, ());
-                    cb.add_line();
-                }
+                self.emit_body_interior(&mut cb, lang, delegation_in_body, |cb| {
+                    cb.add_statement(empty, ());
+                });
             } else {
                 if lang.block_syntax().uses_semicolons {
                     sig.push(';');
@@ -594,6 +561,32 @@ impl FunSpec {
             sig.push_str("\n{");
         } else {
             sig.push_str(lang.fun_block_open());
+        }
+    }
+
+    fn emit_body_interior(
+        &self,
+        cb: &mut crate::code_block::CodeBlockBuilder,
+        lang: &dyn CodeLang,
+        delegation_in_body: bool,
+        emit_content: impl FnOnce(&mut crate::code_block::CodeBlockBuilder),
+    ) {
+        cb.add("%>", ());
+        if !self.doc.is_empty() && lang.doc_comment_inside_body() {
+            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
+            let doc_str = lang.render_doc_comment(&doc_lines);
+            cb.add("%L", doc_str);
+            cb.add_line();
+        }
+        if delegation_in_body && let Some(deleg) = &self.delegation {
+            cb.add_statement("%L", deleg.clone());
+        }
+        emit_content(cb);
+        cb.add("%<", ());
+        let close = lang.block_syntax().block_close;
+        if !close.is_empty() {
+            cb.add(close, ());
+            cb.add_line();
         }
     }
 
