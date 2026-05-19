@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.6.0
+
+### Added
+
+- `$V` / `%V` verbatim string literal — preserves interpolation sigils (`$`, `` ` ``)
+  with minimal escaping, unlike `$S` which escapes everything.
+  - Per-language rendering: Bash/Zsh `"..."`, JS/TS `` `...` ``, Python `f"..."`,
+    Kotlin/Swift `"..."`, Dart `'...'`, C# `$"..."`, Scala `s"..."`.
+  - `VerbatimStrArg` wrapper for the builder API.
+- `MacroLang`-aware tokenizer with per-language annotation rules (Go `<-`,
+  Haskell `$$`, shell dash-flags and slash-paths).
+- Language-aware statement rewriting for Haskell guards and OCaml blocks.
+- Shell cookbook (`cookbook_shell.md`) with comprehensive Bash/Zsh recipes.
+
+### Changed
+
+- `CodeLang` split into `RendererLang` (renderer-only methods) + `CodeLang`
+  (spec-layer). Existing `impl CodeLang` still works; only affects custom trait
+  implementations.
+- Macro crate internals: `format.rs` split into `annotate.rs`, `spacing.rs`,
+  and `format.rs` modules.
+
+### Fixed
+
+- Zsh block delimiters: `begin_control_flow("if ...")` now emits `then`/`fi`
+  and `do`/`done` instead of `{`/`}`.
+- Shell bracket spacing: `[ $x ]` and `[[ $x ]]` render with correct inner
+  spaces in `sigil_quote!`.
+
+### Internal
+
+- Shared `shell_syntax.rs` for Bash/Zsh control-flow logic.
+- `code_renderer.rs` block/comment resolution unified.
+- `fun_spec.rs` body-emission deduplication.
+- Unit tests for annotation and format parsing in macro crate.
+
 ## 0.5.3
 
 ### Fixed
