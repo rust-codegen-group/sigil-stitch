@@ -1,5 +1,5 @@
 //! Tests for bracket spacing in shell `sigil_quote!` expressions.
-//! The `[` test command requires spaces: `[ $x -gt 0 ]`, not `[$x -gt 0]`.
+//! `[ ... ]` requires inner spaces; `[[ ... ]]` also needs inner spaces.
 
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::prelude::*;
@@ -15,9 +15,9 @@ fn render(block: &CodeBlock) -> String {
 }
 
 #[test]
-fn bracket_test_has_inner_spaces() {
+fn single_bracket_quoted_has_inner_spaces() {
     let block = sigil_quote!(Zsh {
-        if [ $$x -gt 0 ] {
+        if [ "$$x" -gt 0 ] {
             echo $S("positive");
         } else {
             echo $S("negative");
@@ -27,15 +27,33 @@ fn bracket_test_has_inner_spaces() {
     let output = render(&block);
 
     assert!(
-        output.contains("[ $x"),
+        output.contains("[ \"$x\""),
         "Shell test bracket needs space after '[', got:\n{output}"
     );
     assert!(
         output.contains("0 ]"),
         "Shell test bracket needs space before ']', got:\n{output}"
     );
+}
+
+#[test]
+fn double_bracket_has_inner_spaces() {
+    let block = sigil_quote!(Zsh {
+        if [[ $$x -gt 0 ]] {
+            echo $S("positive");
+        } else {
+            echo $S("negative");
+        }
+    })
+    .unwrap();
+    let output = render(&block);
+
     assert!(
-        !output.contains("[$x"),
-        "Missing space after '[' is a syntax error, got:\n{output}"
+        output.contains("[[ $x"),
+        "Shell [[ ]] needs space after '[[', got:\n{output}"
+    );
+    assert!(
+        output.contains("0 ]]"),
+        "Shell [[ ]] needs space before ']]', got:\n{output}"
     );
 }
