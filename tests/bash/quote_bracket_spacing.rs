@@ -1,11 +1,11 @@
-//! Tests that expose bugs in Bash control-flow rendering:
-//! - Bracket groups `[ ... ]` need inner spaces in shell languages
+//! Tests for bracket spacing in shell `sigil_quote!` expressions.
+//! The `[` test command requires spaces: `[ $x -gt 0 ]`, not `[$x -gt 0]`.
 
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
-fn render_block(block: &CodeBlock) -> String {
+fn render(block: &CodeBlock) -> String {
     FileSpec::builder("test.bash")
         .add_code(block.clone())
         .build()
@@ -14,10 +14,8 @@ fn render_block(block: &CodeBlock) -> String {
         .unwrap()
 }
 
-/// The `sigil_quote!` macro with bracket groups `[ ... ]` should produce
-/// spaces inside the brackets for shell test expressions.
 #[test]
-fn bash_sigil_quote_bracket_spacing() {
+fn bracket_test_has_inner_spaces() {
     let block = sigil_quote!(Bash {
         if [ $L("$x") -gt 0 ] {
             echo $S("positive");
@@ -26,9 +24,8 @@ fn bash_sigil_quote_bracket_spacing() {
         }
     })
     .unwrap();
-    let output = render_block(&block);
+    let output = render(&block);
 
-    // The `[` test command requires a space after it and before `]`
     assert!(
         output.contains("[ $x"),
         "Shell test bracket needs space after '[', got:\n{output}"
@@ -39,6 +36,6 @@ fn bash_sigil_quote_bracket_spacing() {
     );
     assert!(
         !output.contains("[$x"),
-        "Missing space after '[' is a bug, got:\n{output}"
+        "Missing space after '[' is a syntax error, got:\n{output}"
     );
 }
