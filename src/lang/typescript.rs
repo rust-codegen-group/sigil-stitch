@@ -1,9 +1,9 @@
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::CodeLang;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
 };
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::type_name::{
     AssociatedTypeStyle, BoundsPresentation, TypePresentation, WildcardPresentation,
@@ -159,7 +159,7 @@ const TS_RESERVED: &[&str] = &[
     "defer",
 ];
 
-impl CodeLang for TypeScript {
+impl RendererLang for TypeScript {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -168,6 +168,67 @@ impl CodeLang for TypeScript {
         TS_RESERVED
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        match self.quote_style {
+            QuoteStyle::Single => {
+                format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
+            }
+            QuoteStyle::Double => {
+                format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+            }
+        }
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    // --- Config struct accessors ---
+
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            map: TypePresentation::GenericWrap { name: "Record" },
+            tuple: TypePresentation::Delimited {
+                open: "[",
+                sep: ", ",
+                close: "]",
+            },
+            associated_type: AssociatedTypeStyle::IndexAccess {
+                open: "[\"",
+                close: "\"]",
+            },
+            impl_trait: BoundsPresentation {
+                keyword: "",
+                separator: " & ",
+            },
+            wildcard: WildcardPresentation {
+                unbounded: "unknown",
+                upper_keyword: "unknown ",
+                lower_keyword: "unknown ",
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            constraint_keyword: " extends ",
+            constraint_separator: " & ",
+            ..Default::default()
+        }
+    }
+
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: self.uses_semicolons,
+            field_terminator: ";",
+            ..Default::default()
+        }
+    }
+}
+
+impl CodeLang for TypeScript {
     fn escape_field_name(&self, name: &str) -> String {
         name.to_string()
     }
@@ -238,17 +299,6 @@ impl CodeLang for TypeScript {
         lines.join("\n")
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        match self.quote_style {
-            QuoteStyle::Single => {
-                format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
-            }
-            QuoteStyle::Double => {
-                format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
-            }
-        }
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         if lines.is_empty() {
             return String::new();
@@ -263,10 +313,6 @@ impl CodeLang for TypeScript {
         }
         out.push_str(" */");
         out
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "//"
     }
 
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
@@ -306,50 +352,6 @@ impl CodeLang for TypeScript {
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::NameSuffix("?")
-    }
-
-    // --- Config struct accessors ---
-
-    fn type_presentation(&self) -> TypePresentationConfig<'_> {
-        TypePresentationConfig {
-            map: TypePresentation::GenericWrap { name: "Record" },
-            tuple: TypePresentation::Delimited {
-                open: "[",
-                sep: ", ",
-                close: "]",
-            },
-            associated_type: AssociatedTypeStyle::IndexAccess {
-                open: "[\"",
-                close: "\"]",
-            },
-            impl_trait: BoundsPresentation {
-                keyword: "",
-                separator: " & ",
-            },
-            wildcard: WildcardPresentation {
-                unbounded: "unknown",
-                upper_keyword: "unknown ",
-                lower_keyword: "unknown ",
-            },
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
-        GenericSyntaxConfig {
-            constraint_keyword: " extends ",
-            constraint_separator: " & ",
-            ..Default::default()
-        }
-    }
-
-    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
-        BlockSyntaxConfig {
-            indent_unit: &self.indent,
-            uses_semicolons: self.uses_semicolons,
-            field_terminator: ";",
-            ..Default::default()
-        }
     }
 
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {

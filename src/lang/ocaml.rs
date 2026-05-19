@@ -1,11 +1,11 @@
 //! OCaml language implementation.
 
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::type_name::{
     AssociatedTypeStyle, FunctionPresentation, GenericApplicationStyle, TypePresentation,
@@ -124,7 +124,7 @@ const OCAML_RESERVED: &[&str] = &[
     "virtual", "when", "while", "with",
 ];
 
-impl CodeLang for OCaml {
+impl RendererLang for OCaml {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -141,29 +141,6 @@ impl CodeLang for OCaml {
         }
     }
 
-    fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries().is_empty() {
-            return String::new();
-        }
-
-        let mut seen = std::collections::BTreeSet::new();
-        let mut lines: Vec<String> = Vec::new();
-
-        for entry in imports.entries() {
-            if entry.is_side_effect {
-                continue;
-            }
-            let module = &entry.module;
-            if !seen.insert(module.clone()) {
-                continue;
-            }
-            lines.push(format!("open {module}"));
-        }
-
-        lines.sort();
-        lines.join("\n")
-    }
-
     fn render_string_literal(&self, s: &str) -> String {
         format!(
             "\"{}\"",
@@ -175,26 +152,6 @@ impl CodeLang for OCaml {
         )
     }
 
-    fn render_doc_comment(&self, lines: &[&str]) -> String {
-        if lines.len() == 1 {
-            return format!("(** {} *)", lines[0]);
-        }
-        let mut result = String::from("(**");
-        for (i, line) in lines.iter().enumerate() {
-            result.push('\n');
-            if line.is_empty() {
-                if i < lines.len() - 1 {
-                    result.push_str("    ");
-                }
-            } else {
-                result.push_str("    ");
-                result.push_str(line);
-            }
-        }
-        result.push_str(" *)");
-        result
-    }
-
     fn line_comment_prefix(&self) -> &str {
         "(*"
     }
@@ -203,49 +160,9 @@ impl CodeLang for OCaml {
         " *)"
     }
 
-    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
-        ""
-    }
-
-    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
-        "let"
-    }
-
-    fn type_keyword(&self, _kind: TypeKind) -> &str {
-        "type"
-    }
-
-    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
-        false
-    }
-
-    fn fun_block_open(&self) -> &str {
-        " ="
-    }
-
-    fn type_header_block_open(&self, _kind: TypeKind) -> &str {
-        " ="
-    }
-
-    fn type_body_prefix(&self, _name: &str, kind: crate::spec::modifiers::TypeKind) -> String {
-        match kind {
-            crate::spec::modifiers::TypeKind::Struct => "{".to_string(),
-            _ => String::new(),
-        }
-    }
-
-    fn type_body_suffix(&self, _name: &str, kind: crate::spec::modifiers::TypeKind) -> String {
-        match kind {
-            crate::spec::modifiers::TypeKind::Struct => "}".to_string(),
-            _ => String::new(),
-        }
-    }
-
     fn module_separator(&self) -> Option<&str> {
         Some(".")
     }
-
-    // --- Config struct accessors ---
 
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
@@ -324,6 +241,89 @@ impl CodeLang for OCaml {
             Some("done")
         } else {
             None
+        }
+    }
+}
+
+impl CodeLang for OCaml {
+    fn render_imports(&self, imports: &ImportGroup) -> String {
+        if imports.entries().is_empty() {
+            return String::new();
+        }
+
+        let mut seen = std::collections::BTreeSet::new();
+        let mut lines: Vec<String> = Vec::new();
+
+        for entry in imports.entries() {
+            if entry.is_side_effect {
+                continue;
+            }
+            let module = &entry.module;
+            if !seen.insert(module.clone()) {
+                continue;
+            }
+            lines.push(format!("open {module}"));
+        }
+
+        lines.sort();
+        lines.join("\n")
+    }
+
+    fn render_doc_comment(&self, lines: &[&str]) -> String {
+        if lines.len() == 1 {
+            return format!("(** {} *)", lines[0]);
+        }
+        let mut result = String::from("(**");
+        for (i, line) in lines.iter().enumerate() {
+            result.push('\n');
+            if line.is_empty() {
+                if i < lines.len() - 1 {
+                    result.push_str("    ");
+                }
+            } else {
+                result.push_str("    ");
+                result.push_str(line);
+            }
+        }
+        result.push_str(" *)");
+        result
+    }
+
+    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
+        ""
+    }
+
+    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
+        "let"
+    }
+
+    fn type_keyword(&self, _kind: TypeKind) -> &str {
+        "type"
+    }
+
+    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
+        false
+    }
+
+    fn fun_block_open(&self) -> &str {
+        " ="
+    }
+
+    fn type_header_block_open(&self, _kind: TypeKind) -> &str {
+        " ="
+    }
+
+    fn type_body_prefix(&self, _name: &str, kind: crate::spec::modifiers::TypeKind) -> String {
+        match kind {
+            crate::spec::modifiers::TypeKind::Struct => "{".to_string(),
+            _ => String::new(),
+        }
+    }
+
+    fn type_body_suffix(&self, _name: &str, kind: crate::spec::modifiers::TypeKind) -> String {
+        match kind {
+            crate::spec::modifiers::TypeKind::Struct => "}".to_string(),
+            _ => String::new(),
         }
     }
 

@@ -1,7 +1,7 @@
 //! Swift language implementation.
 
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Swift language implementation.
@@ -162,7 +162,7 @@ fn is_apple_framework(module: &str) -> bool {
     APPLE_FRAMEWORKS.contains(&module)
 }
 
-impl CodeLang for Swift {
+impl RendererLang for Swift {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -179,48 +179,6 @@ impl CodeLang for Swift {
         }
     }
 
-    fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries().is_empty() {
-            return String::new();
-        }
-
-        // Swift imports entire modules — deduplicate at the module level.
-        let mut apple_imports: Vec<String> = Vec::new();
-        let mut other_imports: Vec<String> = Vec::new();
-
-        let mut seen = std::collections::BTreeSet::new();
-        for entry in imports.entries() {
-            if !seen.insert(&entry.module) {
-                continue;
-            }
-
-            let line = format!("import {}", entry.module);
-            if is_apple_framework(&entry.module) {
-                apple_imports.push(line);
-            } else {
-                other_imports.push(line);
-            }
-        }
-
-        apple_imports.sort();
-        other_imports.sort();
-
-        let groups: Vec<&Vec<String>> = [&apple_imports, &other_imports]
-            .into_iter()
-            .filter(|g| !g.is_empty())
-            .collect();
-
-        let mut lines = Vec::new();
-        for (i, group) in groups.iter().enumerate() {
-            if i > 0 {
-                lines.push(String::new());
-            }
-            lines.extend(group.iter().cloned());
-        }
-
-        lines.join("\n")
-    }
-
     fn render_string_literal(&self, s: &str) -> String {
         format!(
             "\"{}\"",
@@ -233,62 +191,8 @@ impl CodeLang for Swift {
         )
     }
 
-    fn render_doc_comment(&self, lines: &[&str]) -> String {
-        // Swift Markup: /// prefix per line.
-        let mut result = String::new();
-        for (i, line) in lines.iter().enumerate() {
-            if i > 0 {
-                result.push('\n');
-            }
-            if line.is_empty() {
-                result.push_str("///");
-            } else {
-                result.push_str("/// ");
-                result.push_str(line);
-            }
-        }
-        result
-    }
-
     fn line_comment_prefix(&self) -> &str {
         "//"
-    }
-
-    fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
-        match vis {
-            Visibility::Public => "public ",
-            Visibility::Private => "private ",
-            Visibility::Protected => "internal ",
-            Visibility::PublicCrate => "internal ",
-            Visibility::PublicSuper => "fileprivate ",
-            Visibility::Inherited => "",
-        }
-    }
-
-    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
-        "func"
-    }
-
-    fn type_keyword(&self, kind: TypeKind) -> &str {
-        match kind {
-            TypeKind::Class => "class",
-            TypeKind::Struct => "struct",
-            TypeKind::Interface | TypeKind::Trait => "protocol",
-            TypeKind::Enum => "enum",
-            TypeKind::TypeAlias | TypeKind::Newtype => "typealias",
-        }
-    }
-
-    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
-        true
-    }
-
-    fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
-        crate::spec::modifiers::PropertyStyle::Field
-    }
-
-    fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
-        crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
     }
 
     fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
@@ -333,6 +237,104 @@ impl CodeLang for Swift {
             field_terminator: "",
             ..Default::default()
         }
+    }
+}
+
+impl CodeLang for Swift {
+    fn render_imports(&self, imports: &ImportGroup) -> String {
+        if imports.entries().is_empty() {
+            return String::new();
+        }
+
+        // Swift imports entire modules — deduplicate at the module level.
+        let mut apple_imports: Vec<String> = Vec::new();
+        let mut other_imports: Vec<String> = Vec::new();
+
+        let mut seen = std::collections::BTreeSet::new();
+        for entry in imports.entries() {
+            if !seen.insert(&entry.module) {
+                continue;
+            }
+
+            let line = format!("import {}", entry.module);
+            if is_apple_framework(&entry.module) {
+                apple_imports.push(line);
+            } else {
+                other_imports.push(line);
+            }
+        }
+
+        apple_imports.sort();
+        other_imports.sort();
+
+        let groups: Vec<&Vec<String>> = [&apple_imports, &other_imports]
+            .into_iter()
+            .filter(|g| !g.is_empty())
+            .collect();
+
+        let mut lines = Vec::new();
+        for (i, group) in groups.iter().enumerate() {
+            if i > 0 {
+                lines.push(String::new());
+            }
+            lines.extend(group.iter().cloned());
+        }
+
+        lines.join("\n")
+    }
+
+    fn render_doc_comment(&self, lines: &[&str]) -> String {
+        // Swift Markup: /// prefix per line.
+        let mut result = String::new();
+        for (i, line) in lines.iter().enumerate() {
+            if i > 0 {
+                result.push('\n');
+            }
+            if line.is_empty() {
+                result.push_str("///");
+            } else {
+                result.push_str("/// ");
+                result.push_str(line);
+            }
+        }
+        result
+    }
+
+    fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
+        match vis {
+            Visibility::Public => "public ",
+            Visibility::Private => "private ",
+            Visibility::Protected => "internal ",
+            Visibility::PublicCrate => "internal ",
+            Visibility::PublicSuper => "fileprivate ",
+            Visibility::Inherited => "",
+        }
+    }
+
+    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
+        "func"
+    }
+
+    fn type_keyword(&self, kind: TypeKind) -> &str {
+        match kind {
+            TypeKind::Class => "class",
+            TypeKind::Struct => "struct",
+            TypeKind::Interface | TypeKind::Trait => "protocol",
+            TypeKind::Enum => "enum",
+            TypeKind::TypeAlias | TypeKind::Newtype => "typealias",
+        }
+    }
+
+    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
+        true
+    }
+
+    fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
+        crate::spec::modifiers::PropertyStyle::Field
+    }
+
+    fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
+        crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
     }
 
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {

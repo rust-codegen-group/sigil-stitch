@@ -4,7 +4,7 @@ use crate::code_block::CodeBlock;
 use crate::code_node::CodeNode;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
+use crate::lang::RendererLang;
 
 /// Pass 2 of the three-pass rendering model.
 ///
@@ -14,7 +14,7 @@ use crate::lang::CodeLang;
 /// - `%W` soft break support via `pretty` crate
 /// - Proper indentation via `%>` / `%<`
 pub struct CodeRenderer<'a> {
-    lang: &'a dyn CodeLang,
+    lang: &'a dyn RendererLang,
     imports: &'a ImportGroup,
     width: usize,
     output: String,
@@ -25,7 +25,7 @@ pub struct CodeRenderer<'a> {
 
 impl<'a> CodeRenderer<'a> {
     /// Create a new renderer with the given language, imports, and target width.
-    pub fn new(lang: &'a dyn CodeLang, imports: &'a ImportGroup, width: usize) -> Self {
+    pub fn new(lang: &'a dyn RendererLang, imports: &'a ImportGroup, width: usize) -> Self {
         Self {
             lang,
             imports,
@@ -66,17 +66,17 @@ impl<'a> CodeRenderer<'a> {
         tn.to_doc_with_lang(&resolve, self.lang)
     }
 
-    fn resolve_block_open<'b>(lang: &'b dyn CodeLang, cond: &str) -> &'b str {
+    fn resolve_block_open<'b>(lang: &'b dyn RendererLang, cond: &str) -> &'b str {
         lang.block_open_for(cond)
             .unwrap_or(lang.block_syntax().block_open)
     }
 
-    fn resolve_block_close<'b>(lang: &'b dyn CodeLang, cond: &str) -> &'b str {
+    fn resolve_block_close<'b>(lang: &'b dyn RendererLang, cond: &str) -> &'b str {
         lang.block_close_for(cond)
             .unwrap_or(lang.block_syntax().block_close)
     }
 
-    fn resolve_comment(lang: &dyn CodeLang, text: &str) -> String {
+    fn resolve_comment(lang: &dyn RendererLang, text: &str) -> String {
         let prefix = lang.line_comment_prefix();
         let suffix = lang.line_comment_suffix();
         format!("{prefix} {text}{suffix}")

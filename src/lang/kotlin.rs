@@ -1,7 +1,7 @@
 //! Kotlin language implementation.
 
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Kotlin language implementation.
@@ -139,7 +139,7 @@ fn import_group_order(module: &str) -> u8 {
     }
 }
 
-impl CodeLang for Kotlin {
+impl RendererLang for Kotlin {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -156,6 +156,73 @@ impl CodeLang for Kotlin {
         }
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        format!(
+            "\"{}\"",
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\t', "\\t")
+                .replace('\r', "\\r")
+                .replace('\0', "\\0")
+                .replace('$', "\\$")
+        )
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::GenericWrap { name: "List" },
+            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap { name: "List" }),
+            optional: crate::type_name::TypePresentation::Postfix { suffix: "?" },
+            function: crate::type_name::FunctionPresentation {
+                keyword: "",
+                params_open: "(",
+                params_sep: ", ",
+                params_close: ")",
+                arrow: " -> ",
+                return_first: false,
+                curried: false,
+                wrapper_open: "",
+                wrapper_close: "",
+            },
+            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
+            wildcard: crate::type_name::WildcardPresentation {
+                unbounded: "*",
+                upper_keyword: "out ",
+                lower_keyword: "in ",
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            constraint_keyword: " : ",
+            constraint_separator: ", ",
+            context_bound_keyword: " : ",
+            ..Default::default()
+        }
+    }
+
+    fn module_separator(&self) -> Option<&str> {
+        Some(".")
+    }
+
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: "",
+            ..Default::default()
+        }
+    }
+}
+
+impl CodeLang for Kotlin {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -224,19 +291,6 @@ impl CodeLang for Kotlin {
         lines.join("\n")
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-                .replace('\0', "\\0")
-                .replace('$', "\\$")
-        )
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         // KDoc uses /** ... */ style (same as Javadoc).
         let mut result = String::from("/**");
@@ -252,10 +306,6 @@ impl CodeLang for Kotlin {
         result.push('\n');
         result.push_str(" */");
         result
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "//"
     }
 
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
@@ -310,54 +360,6 @@ impl CodeLang for Kotlin {
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
-    }
-
-    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
-        crate::lang::config::TypePresentationConfig {
-            array: crate::type_name::TypePresentation::GenericWrap { name: "List" },
-            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap { name: "List" }),
-            optional: crate::type_name::TypePresentation::Postfix { suffix: "?" },
-            function: crate::type_name::FunctionPresentation {
-                keyword: "",
-                params_open: "(",
-                params_sep: ", ",
-                params_close: ")",
-                arrow: " -> ",
-                return_first: false,
-                curried: false,
-                wrapper_open: "",
-                wrapper_close: "",
-            },
-            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
-            wildcard: crate::type_name::WildcardPresentation {
-                unbounded: "*",
-                upper_keyword: "out ",
-                lower_keyword: "in ",
-            },
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
-        crate::lang::config::GenericSyntaxConfig {
-            constraint_keyword: " : ",
-            constraint_separator: ", ",
-            context_bound_keyword: " : ",
-            ..Default::default()
-        }
-    }
-
-    fn module_separator(&self) -> Option<&str> {
-        Some(".")
-    }
-
-    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
-        crate::lang::config::BlockSyntaxConfig {
-            indent_unit: &self.indent,
-            uses_semicolons: false,
-            field_terminator: "",
-            ..Default::default()
-        }
     }
 
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {

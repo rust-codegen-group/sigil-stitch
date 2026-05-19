@@ -1,6 +1,6 @@
 use pretty::BoxDoc;
 
-use crate::lang::CodeLang;
+use crate::lang::RendererLang;
 use crate::lang::config::GenericSyntaxConfig;
 use crate::type_name::{
     AssociatedTypeStyle, FunctionPresentation, GenericApplicationStyle, TypeName, TypePresentation,
@@ -263,7 +263,11 @@ pub fn render(
     })
 }
 
-pub fn to_doc_with_lang<F>(tn: &TypeName, resolve: &F, lang: &dyn CodeLang) -> BoxDoc<'static, ()>
+pub fn to_doc_with_lang<F>(
+    tn: &TypeName,
+    resolve: &F,
+    lang: &dyn RendererLang,
+) -> BoxDoc<'static, ()>
 where
     F: Fn(&str, &str) -> String,
 {

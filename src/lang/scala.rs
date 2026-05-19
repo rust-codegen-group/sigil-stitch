@@ -1,7 +1,7 @@
 //! Scala language implementation.
 
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Scala language implementation.
@@ -114,7 +114,7 @@ fn import_group_order(module: &str) -> u8 {
     }
 }
 
-impl CodeLang for Scala {
+impl RendererLang for Scala {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -131,6 +131,64 @@ impl CodeLang for Scala {
         }
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        format!(
+            "\"{}\"",
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\t', "\\t")
+                .replace('\r', "\\r")
+                .replace('\0', "\\0")
+        )
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::GenericWrap { name: "Array" },
+            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap { name: "List" }),
+            optional: crate::type_name::TypePresentation::GenericWrap { name: "Option" },
+            intersection: crate::type_name::TypePresentation::Infix { sep: " with " },
+            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
+            wildcard: crate::type_name::WildcardPresentation {
+                unbounded: "_",
+                upper_keyword: "_ <: ",
+                lower_keyword: "_ >: ",
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            open: "[",
+            close: "]",
+            constraint_keyword: " <: ",
+            constraint_separator: " with ",
+            context_bound_keyword: " : ",
+            ..Default::default()
+        }
+    }
+
+    fn module_separator(&self) -> Option<&str> {
+        Some(".")
+    }
+
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: "",
+            ..Default::default()
+        }
+    }
+}
+
+impl CodeLang for Scala {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -185,18 +243,6 @@ impl CodeLang for Scala {
         lines.join("\n")
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-                .replace('\0', "\\0")
-        )
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         let mut result = String::from("/**");
         for line in lines {
@@ -211,10 +257,6 @@ impl CodeLang for Scala {
         result.push('\n');
         result.push_str(" */");
         result
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "//"
     }
 
     fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
@@ -267,46 +309,6 @@ impl CodeLang for Scala {
 
     fn fun_block_open(&self) -> &str {
         " = {"
-    }
-
-    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
-        crate::lang::config::TypePresentationConfig {
-            array: crate::type_name::TypePresentation::GenericWrap { name: "Array" },
-            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap { name: "List" }),
-            optional: crate::type_name::TypePresentation::GenericWrap { name: "Option" },
-            intersection: crate::type_name::TypePresentation::Infix { sep: " with " },
-            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
-            wildcard: crate::type_name::WildcardPresentation {
-                unbounded: "_",
-                upper_keyword: "_ <: ",
-                lower_keyword: "_ >: ",
-            },
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
-        crate::lang::config::GenericSyntaxConfig {
-            open: "[",
-            close: "]",
-            constraint_keyword: " <: ",
-            constraint_separator: " with ",
-            context_bound_keyword: " : ",
-            ..Default::default()
-        }
-    }
-
-    fn module_separator(&self) -> Option<&str> {
-        Some(".")
-    }
-
-    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
-        crate::lang::config::BlockSyntaxConfig {
-            indent_unit: &self.indent,
-            uses_semicolons: false,
-            field_terminator: "",
-            ..Default::default()
-        }
     }
 
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {

@@ -1,9 +1,9 @@
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::CodeLang;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::WhereClauseStyle;
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::type_name::{FunctionPresentation, TypePresentation, WildcardPresentation};
@@ -56,7 +56,7 @@ const RUST_RESERVED: &[&str] = &[
     "unsized", "virtual", "yield",
 ];
 
-impl CodeLang for RustLang {
+impl RendererLang for RustLang {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -65,6 +65,76 @@ impl CodeLang for RustLang {
         RUST_RESERVED
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn escape_reserved(&self, name: &str) -> String {
+        if self.reserved_words().contains(&name) {
+            format!("r#{name}")
+        } else {
+            name.to_string()
+        }
+    }
+
+    fn module_separator(&self) -> Option<&str> {
+        Some("::")
+    }
+
+    // --- Config struct accessors ---
+
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            array: TypePresentation::GenericWrap { name: "Vec" },
+            readonly_array: Some(TypePresentation::GenericWrap { name: "Vec" }),
+            optional: TypePresentation::GenericWrap { name: "Option" },
+            map: TypePresentation::GenericWrap { name: "HashMap" },
+            intersection: TypePresentation::Infix { sep: " + " },
+            pointer: TypePresentation::Prefix { prefix: "*const " },
+            slice: TypePresentation::Delimited {
+                open: "&[",
+                sep: "",
+                close: "]",
+            },
+            reference: TypePresentation::Prefix { prefix: "&" },
+            reference_mut: TypePresentation::Prefix { prefix: "&mut " },
+            function: FunctionPresentation {
+                keyword: "fn",
+                params_open: "(",
+                params_sep: ", ",
+                params_close: ")",
+                arrow: " -> ",
+                return_first: false,
+                curried: false,
+                wrapper_open: "",
+                wrapper_close: "",
+            },
+            wildcard: WildcardPresentation {
+                unbounded: "_",
+                upper_keyword: "impl ",
+                lower_keyword: "impl ",
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig::default()
+    }
+
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            ..Default::default()
+        }
+    }
+}
+
+impl CodeLang for RustLang {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -157,10 +227,6 @@ impl CodeLang for RustLang {
         lines.join("\n")
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         lines
             .iter()
@@ -173,18 +239,6 @@ impl CodeLang for RustLang {
             })
             .collect::<Vec<_>>()
             .join("\n")
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "//"
-    }
-
-    fn escape_reserved(&self, name: &str) -> String {
-        if self.reserved_words().contains(&name) {
-            format!("r#{name}")
-        } else {
-            name.to_string()
-        }
     }
 
     fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
@@ -227,58 +281,6 @@ impl CodeLang for RustLang {
         crate::lang::config::OptionalFieldStyle::TypeWrap {
             open: "Option<",
             close: ">",
-        }
-    }
-
-    fn module_separator(&self) -> Option<&str> {
-        Some("::")
-    }
-
-    // --- Config struct accessors ---
-
-    fn type_presentation(&self) -> TypePresentationConfig<'_> {
-        TypePresentationConfig {
-            array: TypePresentation::GenericWrap { name: "Vec" },
-            readonly_array: Some(TypePresentation::GenericWrap { name: "Vec" }),
-            optional: TypePresentation::GenericWrap { name: "Option" },
-            map: TypePresentation::GenericWrap { name: "HashMap" },
-            intersection: TypePresentation::Infix { sep: " + " },
-            pointer: TypePresentation::Prefix { prefix: "*const " },
-            slice: TypePresentation::Delimited {
-                open: "&[",
-                sep: "",
-                close: "]",
-            },
-            reference: TypePresentation::Prefix { prefix: "&" },
-            reference_mut: TypePresentation::Prefix { prefix: "&mut " },
-            function: FunctionPresentation {
-                keyword: "fn",
-                params_open: "(",
-                params_sep: ", ",
-                params_close: ")",
-                arrow: " -> ",
-                return_first: false,
-                curried: false,
-                wrapper_open: "",
-                wrapper_close: "",
-            },
-            wildcard: WildcardPresentation {
-                unbounded: "_",
-                upper_keyword: "impl ",
-                lower_keyword: "impl ",
-            },
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
-        GenericSyntaxConfig::default()
-    }
-
-    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
-        BlockSyntaxConfig {
-            indent_unit: &self.indent,
-            ..Default::default()
         }
     }
 

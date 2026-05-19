@@ -1,7 +1,7 @@
 //! C++ language implementation.
 
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::CodeLang;
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// C++ language implementation.
@@ -163,58 +163,13 @@ fn strip_local_prefix(module: &str) -> &str {
     module.strip_prefix("./").unwrap_or(module)
 }
 
-impl CodeLang for CppLang {
+impl RendererLang for CppLang {
     fn file_extension(&self) -> &str {
         &self.extension
     }
 
     fn reserved_words(&self) -> &[&str] {
         CPP_RESERVED
-    }
-
-    fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries().is_empty() {
-            return String::new();
-        }
-
-        // Deduplicate to header-level: C++ includes entire headers, not symbols.
-        let mut seen = std::collections::BTreeSet::new();
-        let mut system_headers: Vec<&ImportEntry> = Vec::new();
-        let mut local_headers: Vec<&ImportEntry> = Vec::new();
-
-        for entry in imports.entries() {
-            if seen.contains(&entry.module) {
-                continue;
-            }
-            seen.insert(&entry.module);
-            if is_system_header(&entry.module) {
-                system_headers.push(entry);
-            } else {
-                local_headers.push(entry);
-            }
-        }
-
-        system_headers.sort_by_key(|e| &e.module);
-        local_headers.sort_by_key(|e| &e.module);
-
-        let mut lines: Vec<String> = Vec::new();
-
-        for entry in &system_headers {
-            lines.push(format!("#include <{}>", entry.module));
-        }
-
-        if !system_headers.is_empty() && !local_headers.is_empty() {
-            lines.push(String::new());
-        }
-
-        for entry in &local_headers {
-            lines.push(format!(
-                "#include \"{}\"",
-                strip_local_prefix(&entry.module)
-            ));
-        }
-
-        lines.join("\n")
     }
 
     fn render_string_literal(&self, s: &str) -> String {
@@ -229,62 +184,8 @@ impl CodeLang for CppLang {
         )
     }
 
-    fn render_doc_comment(&self, lines: &[&str]) -> String {
-        // Doxygen-style /// comments.
-        let mut result = String::new();
-        for (i, line) in lines.iter().enumerate() {
-            if i > 0 {
-                result.push('\n');
-            }
-            if line.is_empty() {
-                result.push_str("///");
-            } else {
-                result.push_str("/// ");
-                result.push_str(line);
-            }
-        }
-        result
-    }
-
     fn line_comment_prefix(&self) -> &str {
         "//"
-    }
-
-    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
-        // C++ uses section-header access specifiers, not per-member keywords.
-        // Users add `public:` / `private:` / `protected:` via extra_member.
-        ""
-    }
-
-    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
-        // C++ has no function keyword.
-        ""
-    }
-
-    fn type_keyword(&self, kind: TypeKind) -> &str {
-        match kind {
-            TypeKind::Class => "class",
-            TypeKind::Struct => "struct",
-            TypeKind::Enum => "enum class",
-            TypeKind::Interface | TypeKind::Trait => "class",
-            TypeKind::TypeAlias => "using",
-            TypeKind::Newtype => "struct",
-        }
-    }
-
-    fn methods_inside_type_body(&self, kind: TypeKind) -> bool {
-        match kind {
-            TypeKind::Class | TypeKind::Interface | TypeKind::Trait => true,
-            TypeKind::Struct | TypeKind::Enum | TypeKind::TypeAlias | TypeKind::Newtype => false,
-        }
-    }
-
-    fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
-        // Note: callers must `#include <optional>` to use `std::optional<T>`.
-        crate::lang::config::OptionalFieldStyle::TypeWrap {
-            open: "std::optional<",
-            close: ">",
-        }
     }
 
     fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
@@ -339,6 +240,111 @@ impl CodeLang for CppLang {
         }
     }
 
+    fn rewrite_nodes(&self, nodes: &mut Vec<crate::code_node::CodeNode>) {
+        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_lambda_semicolon);
+    }
+}
+
+impl CodeLang for CppLang {
+    fn render_imports(&self, imports: &ImportGroup) -> String {
+        if imports.entries().is_empty() {
+            return String::new();
+        }
+
+        // Deduplicate to header-level: C++ includes entire headers, not symbols.
+        let mut seen = std::collections::BTreeSet::new();
+        let mut system_headers: Vec<&ImportEntry> = Vec::new();
+        let mut local_headers: Vec<&ImportEntry> = Vec::new();
+
+        for entry in imports.entries() {
+            if seen.contains(&entry.module) {
+                continue;
+            }
+            seen.insert(&entry.module);
+            if is_system_header(&entry.module) {
+                system_headers.push(entry);
+            } else {
+                local_headers.push(entry);
+            }
+        }
+
+        system_headers.sort_by_key(|e| &e.module);
+        local_headers.sort_by_key(|e| &e.module);
+
+        let mut lines: Vec<String> = Vec::new();
+
+        for entry in &system_headers {
+            lines.push(format!("#include <{}>", entry.module));
+        }
+
+        if !system_headers.is_empty() && !local_headers.is_empty() {
+            lines.push(String::new());
+        }
+
+        for entry in &local_headers {
+            lines.push(format!(
+                "#include \"{}\"",
+                strip_local_prefix(&entry.module)
+            ));
+        }
+
+        lines.join("\n")
+    }
+
+    fn render_doc_comment(&self, lines: &[&str]) -> String {
+        // Doxygen-style /// comments.
+        let mut result = String::new();
+        for (i, line) in lines.iter().enumerate() {
+            if i > 0 {
+                result.push('\n');
+            }
+            if line.is_empty() {
+                result.push_str("///");
+            } else {
+                result.push_str("/// ");
+                result.push_str(line);
+            }
+        }
+        result
+    }
+
+    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
+        // C++ uses section-header access specifiers, not per-member keywords.
+        // Users add `public:` / `private:` / `protected:` via extra_member.
+        ""
+    }
+
+    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
+        // C++ has no function keyword.
+        ""
+    }
+
+    fn type_keyword(&self, kind: TypeKind) -> &str {
+        match kind {
+            TypeKind::Class => "class",
+            TypeKind::Struct => "struct",
+            TypeKind::Enum => "enum class",
+            TypeKind::Interface | TypeKind::Trait => "class",
+            TypeKind::TypeAlias => "using",
+            TypeKind::Newtype => "struct",
+        }
+    }
+
+    fn methods_inside_type_body(&self, kind: TypeKind) -> bool {
+        match kind {
+            TypeKind::Class | TypeKind::Interface | TypeKind::Trait => true,
+            TypeKind::Struct | TypeKind::Enum | TypeKind::TypeAlias | TypeKind::Newtype => false,
+        }
+    }
+
+    fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
+        // Note: callers must `#include <optional>` to use `std::optional<T>`.
+        crate::lang::config::OptionalFieldStyle::TypeWrap {
+            open: "std::optional<",
+            close: ">",
+        }
+    }
+
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " ",
@@ -363,10 +369,6 @@ impl CodeLang for CppLang {
             annotation_suffix: "]]",
             ..Default::default()
         }
-    }
-
-    fn rewrite_nodes(&self, nodes: &mut Vec<crate::code_node::CodeNode>) {
-        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_lambda_semicolon);
     }
 }
 

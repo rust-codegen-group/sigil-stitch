@@ -1,7 +1,7 @@
 //! C language implementation.
 
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::CodeLang;
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// C language implementation.
@@ -134,7 +134,7 @@ fn strip_local_prefix(module: &str) -> &str {
     module.strip_prefix("./").unwrap_or(module)
 }
 
-impl CodeLang for CLang {
+impl RendererLang for CLang {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -143,6 +143,59 @@ impl CodeLang for CLang {
         C_RESERVED
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        format!(
+            "\"{}\"",
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\t', "\\t")
+                .replace('\r', "\\r")
+                .replace('\0', "\\0")
+        )
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            pointer: crate::type_name::TypePresentation::Postfix { suffix: "*" },
+            reference: crate::type_name::TypePresentation::Surround {
+                prefix: "const ",
+                suffix: "*",
+            },
+            reference_mut: crate::type_name::TypePresentation::Postfix { suffix: "*" },
+            function: crate::type_name::FunctionPresentation {
+                arrow: "",
+                return_first: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            constraint_keyword: "",
+            constraint_separator: "",
+            context_bound_keyword: "",
+            ..Default::default()
+        }
+    }
+
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            field_terminator: ";",
+            type_close_terminator: ";",
+            ..Default::default()
+        }
+    }
+}
+
+impl CodeLang for CLang {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -188,18 +241,6 @@ impl CodeLang for CLang {
         lines.join("\n")
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-                .replace('\0', "\\0")
-        )
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         if lines.len() == 1 {
             format!("/* {} */", lines[0])
@@ -217,10 +258,6 @@ impl CodeLang for CLang {
             result.push_str("\n */");
             result
         }
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "//"
     }
 
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
@@ -253,41 +290,6 @@ impl CodeLang for CLang {
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypePrefix("*")
-    }
-
-    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
-        crate::lang::config::TypePresentationConfig {
-            pointer: crate::type_name::TypePresentation::Postfix { suffix: "*" },
-            reference: crate::type_name::TypePresentation::Surround {
-                prefix: "const ",
-                suffix: "*",
-            },
-            reference_mut: crate::type_name::TypePresentation::Postfix { suffix: "*" },
-            function: crate::type_name::FunctionPresentation {
-                arrow: "",
-                return_first: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
-        crate::lang::config::GenericSyntaxConfig {
-            constraint_keyword: "",
-            constraint_separator: "",
-            context_bound_keyword: "",
-            ..Default::default()
-        }
-    }
-
-    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
-        crate::lang::config::BlockSyntaxConfig {
-            indent_unit: &self.indent,
-            field_terminator: ";",
-            type_close_terminator: ";",
-            ..Default::default()
-        }
     }
 
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {

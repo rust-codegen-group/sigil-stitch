@@ -2,7 +2,7 @@
 
 use crate::code_node::CodeNode;
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::CodeLang;
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Haskell language implementation.
@@ -143,7 +143,7 @@ fn import_group_order(module: &str) -> u8 {
     }
 }
 
-impl CodeLang for Haskell {
+impl RendererLang for Haskell {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -160,6 +160,94 @@ impl CodeLang for Haskell {
         }
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        format!(
+            "\"{}\"",
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\t', "\\t")
+        )
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "--"
+    }
+
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::Delimited {
+                open: "[",
+                sep: "",
+                close: "]",
+            },
+            readonly_array: Some(crate::type_name::TypePresentation::Delimited {
+                open: "[",
+                sep: "",
+                close: "]",
+            }),
+            optional: crate::type_name::TypePresentation::GenericWrap { name: "Maybe" },
+            function: crate::type_name::FunctionPresentation {
+                params_open: "",
+                params_sep: " -> ",
+                params_close: "",
+                arrow: " -> ",
+                curried: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            open: "",
+            close: "",
+            application_style: crate::type_name::GenericApplicationStyle::PrefixJuxtaposition,
+            constraint_keyword: "",
+            constraint_separator: "",
+            context_bound_keyword: "",
+        }
+    }
+
+    fn module_separator(&self) -> Option<&str> {
+        Some(".")
+    }
+
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            block_open: " =",
+            block_close: "",
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: ",",
+            ..Default::default()
+        }
+    }
+
+    fn block_open_for(&self, condition: &str) -> Option<&str> {
+        let t = condition.trim();
+        if t.starts_with("class ") || t.starts_with("instance ") {
+            Some(" where")
+        } else if t == "do" || t.ends_with(" do") {
+            Some("")
+        } else if t.starts_with("if ") || t.starts_with("else if ") {
+            Some(" then")
+        } else if t == "else" {
+            Some("")
+        } else if t.starts_with("case ") {
+            Some(" of")
+        } else {
+            None
+        }
+    }
+
+    fn rewrite_nodes(&self, nodes: &mut Vec<CodeNode>) {
+        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_dollar_spacing);
+    }
+}
+
+impl CodeLang for Haskell {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -213,16 +301,6 @@ impl CodeLang for Haskell {
         lines.join("\n")
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-        )
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         let mut result = Vec::new();
         for (i, line) in lines.iter().enumerate() {
@@ -239,10 +317,6 @@ impl CodeLang for Haskell {
             }
         }
         result.join("\n")
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "--"
     }
 
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
@@ -326,74 +400,6 @@ impl CodeLang for Haskell {
         format!("  deriving ({})", impl_types.join(", "))
     }
 
-    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
-        crate::lang::config::TypePresentationConfig {
-            array: crate::type_name::TypePresentation::Delimited {
-                open: "[",
-                sep: "",
-                close: "]",
-            },
-            readonly_array: Some(crate::type_name::TypePresentation::Delimited {
-                open: "[",
-                sep: "",
-                close: "]",
-            }),
-            optional: crate::type_name::TypePresentation::GenericWrap { name: "Maybe" },
-            function: crate::type_name::FunctionPresentation {
-                params_open: "",
-                params_sep: " -> ",
-                params_close: "",
-                arrow: " -> ",
-                curried: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
-        crate::lang::config::GenericSyntaxConfig {
-            open: "",
-            close: "",
-            application_style: crate::type_name::GenericApplicationStyle::PrefixJuxtaposition,
-            constraint_keyword: "",
-            constraint_separator: "",
-            context_bound_keyword: "",
-        }
-    }
-
-    fn module_separator(&self) -> Option<&str> {
-        Some(".")
-    }
-
-    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
-        crate::lang::config::BlockSyntaxConfig {
-            block_open: " =",
-            block_close: "",
-            indent_unit: &self.indent,
-            uses_semicolons: false,
-            field_terminator: ",",
-            ..Default::default()
-        }
-    }
-
-    fn block_open_for(&self, condition: &str) -> Option<&str> {
-        let t = condition.trim();
-        if t.starts_with("class ") || t.starts_with("instance ") {
-            Some(" where")
-        } else if t == "do" || t.ends_with(" do") {
-            Some("")
-        } else if t.starts_with("if ") || t.starts_with("else if ") {
-            Some(" then")
-        } else if t == "else" {
-            Some("")
-        } else if t.starts_with("case ") {
-            Some(" of")
-        } else {
-            None
-        }
-    }
-
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " -> ",
@@ -416,10 +422,6 @@ impl CodeLang for Haskell {
             variant_separator: "",
             ..Default::default()
         }
-    }
-
-    fn rewrite_nodes(&self, nodes: &mut Vec<CodeNode>) {
-        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_dollar_spacing);
     }
 }
 

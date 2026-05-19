@@ -1,11 +1,11 @@
 //! Zsh shell language implementation.
 
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Zsh shell language implementation.
@@ -74,35 +74,13 @@ const ZSH_RESERVED: &[&str] = &[
     "zle", "zmodload", "zshexit", "zstyle",
 ];
 
-impl CodeLang for Zsh {
+impl RendererLang for Zsh {
     fn file_extension(&self) -> &str {
         &self.extension
     }
 
     fn reserved_words(&self) -> &[&str] {
         ZSH_RESERVED
-    }
-
-    fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries().is_empty() {
-            return String::new();
-        }
-
-        // Deduplicate to unique source paths.
-        let mut paths: Vec<&str> = Vec::new();
-        let mut seen = std::collections::HashSet::new();
-        for entry in imports.entries() {
-            if seen.insert(entry.module.as_str()) {
-                paths.push(&entry.module);
-            }
-        }
-        paths.sort();
-
-        paths
-            .iter()
-            .map(|p| format!("source \"{p}\""))
-            .collect::<Vec<_>>()
-            .join("\n")
     }
 
     fn render_string_literal(&self, s: &str) -> String {
@@ -119,38 +97,8 @@ impl CodeLang for Zsh {
         format!("\"{escaped}\"")
     }
 
-    fn render_doc_comment(&self, lines: &[&str]) -> String {
-        lines
-            .iter()
-            .map(|line| {
-                if line.is_empty() {
-                    "#".to_string()
-                } else {
-                    format!("# {line}")
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
     fn line_comment_prefix(&self) -> &str {
         "#"
-    }
-
-    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
-        ""
-    }
-
-    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
-        "function"
-    }
-
-    fn type_keyword(&self, _kind: TypeKind) -> &str {
-        ""
-    }
-
-    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
-        true
     }
 
     // --- Config struct accessors ---
@@ -174,6 +122,60 @@ impl CodeLang for Zsh {
             field_terminator: "",
             ..Default::default()
         }
+    }
+}
+
+impl CodeLang for Zsh {
+    fn render_imports(&self, imports: &ImportGroup) -> String {
+        if imports.entries().is_empty() {
+            return String::new();
+        }
+
+        // Deduplicate to unique source paths.
+        let mut paths: Vec<&str> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for entry in imports.entries() {
+            if seen.insert(entry.module.as_str()) {
+                paths.push(&entry.module);
+            }
+        }
+        paths.sort();
+
+        paths
+            .iter()
+            .map(|p| format!("source \"{p}\""))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn render_doc_comment(&self, lines: &[&str]) -> String {
+        lines
+            .iter()
+            .map(|line| {
+                if line.is_empty() {
+                    "#".to_string()
+                } else {
+                    format!("# {line}")
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
+        ""
+    }
+
+    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
+        "function"
+    }
+
+    fn type_keyword(&self, _kind: TypeKind) -> &str {
+        ""
+    }
+
+    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
+        true
     }
 
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {

@@ -10,11 +10,11 @@
 //! - 2-space indent by convention
 
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Lua language implementation.
@@ -80,7 +80,7 @@ const LUA_RESERVED: &[&str] = &[
     "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while",
 ];
 
-impl CodeLang for Lua {
+impl RendererLang for Lua {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -103,23 +103,6 @@ impl CodeLang for Lua {
         LUA_RESERVED
     }
 
-    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
-        ""
-    }
-
-    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
-        "function"
-    }
-
-    fn type_keyword(&self, _kind: TypeKind) -> &str {
-        // Lua has no class/struct/enum keywords — tables and metatables fill
-        // that role. TypeSpec should not be used with Lua; use CodeBlock
-        // directly for table constructors and function definitions instead.
-        // If TypeSpec IS used, this returns "" so the name emits as a bare
-        // identifier block (valid Lua, treated as a scope by the interpreter).
-        ""
-    }
-
     fn module_separator(&self) -> Option<&str> {
         Some(".")
     }
@@ -132,32 +115,6 @@ impl CodeLang for Lua {
         } else {
             name.to_string()
         }
-    }
-
-    fn render_imports(&self, imports: &ImportGroup) -> String {
-        let mut lines = Vec::new();
-        for entry in imports.entries() {
-            let module = entry.module.replace('.', "/");
-            if entry.name.is_empty() || entry.is_side_effect {
-                lines.push(format!("require(\"{}\");", module));
-            } else {
-                let name = entry.resolved_name();
-                lines.push(format!("local {} = require(\"{}\");", name, module));
-            }
-        }
-        lines.join("\n")
-    }
-
-    fn render_doc_comment(&self, lines: &[&str]) -> String {
-        let mut out = String::new();
-        for line in lines {
-            if line.is_empty() {
-                out.push_str("---\n");
-            } else {
-                out.push_str(&format!("--- {}\n", line));
-            }
-        }
-        out
     }
 
     // ── Config accessors ──
@@ -187,6 +144,70 @@ impl CodeLang for Lua {
         }
     }
 
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            open: "",
+            close: "",
+            ..Default::default()
+        }
+    }
+
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            optional_absent_literal: "nil",
+            ..Default::default()
+        }
+    }
+
+    fn rewrite_nodes(&self, nodes: &mut Vec<crate::code_node::CodeNode>) {
+        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_method_colon);
+    }
+}
+
+impl CodeLang for Lua {
+    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
+        ""
+    }
+
+    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
+        "function"
+    }
+
+    fn type_keyword(&self, _kind: TypeKind) -> &str {
+        // Lua has no class/struct/enum keywords — tables and metatables fill
+        // that role. TypeSpec should not be used with Lua; use CodeBlock
+        // directly for table constructors and function definitions instead.
+        // If TypeSpec IS used, this returns "" so the name emits as a bare
+        // identifier block (valid Lua, treated as a scope by the interpreter).
+        ""
+    }
+
+    fn render_imports(&self, imports: &ImportGroup) -> String {
+        let mut lines = Vec::new();
+        for entry in imports.entries() {
+            let module = entry.module.replace('.', "/");
+            if entry.name.is_empty() || entry.is_side_effect {
+                lines.push(format!("require(\"{}\");", module));
+            } else {
+                let name = entry.resolved_name();
+                lines.push(format!("local {} = require(\"{}\");", name, module));
+            }
+        }
+        lines.join("\n")
+    }
+
+    fn render_doc_comment(&self, lines: &[&str]) -> String {
+        let mut out = String::new();
+        for line in lines {
+            if line.is_empty() {
+                out.push_str("---\n");
+            } else {
+                out.push_str(&format!("--- {}\n", line));
+            }
+        }
+        out
+    }
+
     fn fun_block_open(&self) -> &str {
         "" // Function bodies start on the next line
     }
@@ -212,30 +233,11 @@ impl CodeLang for Lua {
         }
     }
 
-    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
-        GenericSyntaxConfig {
-            open: "",
-            close: "",
-            ..Default::default()
-        }
-    }
-
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig {
             readonly_keyword: "",
             ..Default::default()
         }
-    }
-
-    fn type_presentation(&self) -> TypePresentationConfig<'_> {
-        TypePresentationConfig {
-            optional_absent_literal: "nil",
-            ..Default::default()
-        }
-    }
-
-    fn rewrite_nodes(&self, nodes: &mut Vec<crate::code_node::CodeNode>) {
-        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_method_colon);
     }
 }
 

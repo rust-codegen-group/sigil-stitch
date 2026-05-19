@@ -97,7 +97,7 @@ pub mod prelude {
     pub use crate::code_block::{CodeBlock, CodeBlockBuilder, NameArg, Specifier, StringLitArg};
     pub use crate::code_template::{CodeTemplate, ParamKind};
     pub use crate::error::SigilStitchError;
-    pub use crate::lang::CodeLang;
+    pub use crate::lang::{CodeLang, RendererLang};
     pub use crate::spec::annotation_spec::AnnotationSpec;
     pub use crate::spec::emittable::Emittable;
     pub use crate::spec::enum_variant_spec::EnumVariantSpec;

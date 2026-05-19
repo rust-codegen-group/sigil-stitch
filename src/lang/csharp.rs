@@ -1,5 +1,5 @@
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// C# language implementation.
@@ -116,7 +116,7 @@ fn import_group_order(module: &str) -> u8 {
     }
 }
 
-impl CodeLang for CSharp {
+impl RendererLang for CSharp {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -133,6 +133,57 @@ impl CodeLang for CSharp {
         }
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        format!(
+            "\"{}\"",
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\t', "\\t")
+                .replace('\r', "\\r")
+                .replace('\0', "\\0")
+        )
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::GenericWrap { name: "List" },
+            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap {
+                name: "IReadOnlyList",
+            }),
+            optional: crate::type_name::TypePresentation::Postfix { suffix: "?" },
+            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            constraint_keyword: " : ",
+            constraint_separator: ", ",
+            context_bound_keyword: " : ",
+            ..Default::default()
+        }
+    }
+
+    fn module_separator(&self) -> Option<&str> {
+        Some(".")
+    }
+
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            field_terminator: ";",
+            ..Default::default()
+        }
+    }
+}
+
+impl CodeLang for CSharp {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -182,18 +233,6 @@ impl CodeLang for CSharp {
         lines.join("\n")
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-                .replace('\0', "\\0")
-        )
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         let mut result = String::new();
         for (i, line) in lines.iter().enumerate() {
@@ -208,10 +247,6 @@ impl CodeLang for CSharp {
             }
         }
         result
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "//"
     }
 
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
@@ -248,39 +283,6 @@ impl CodeLang for CSharp {
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
-    }
-
-    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
-        crate::lang::config::TypePresentationConfig {
-            array: crate::type_name::TypePresentation::GenericWrap { name: "List" },
-            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap {
-                name: "IReadOnlyList",
-            }),
-            optional: crate::type_name::TypePresentation::Postfix { suffix: "?" },
-            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
-        crate::lang::config::GenericSyntaxConfig {
-            constraint_keyword: " : ",
-            constraint_separator: ", ",
-            context_bound_keyword: " : ",
-            ..Default::default()
-        }
-    }
-
-    fn module_separator(&self) -> Option<&str> {
-        Some(".")
-    }
-
-    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
-        crate::lang::config::BlockSyntaxConfig {
-            indent_unit: &self.indent,
-            field_terminator: ";",
-            ..Default::default()
-        }
     }
 
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {

@@ -1,11 +1,11 @@
 //! Python language implementation.
 
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::CodeLang;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
 };
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::type_name::{AssociatedTypeStyle, FunctionPresentation, TypePresentation};
 
@@ -181,69 +181,13 @@ fn is_stdlib(module: &str) -> bool {
     PYTHON_STDLIB.contains(&top)
 }
 
-impl CodeLang for Python {
+impl RendererLang for Python {
     fn file_extension(&self) -> &str {
         &self.extension
     }
 
     fn reserved_words(&self) -> &[&str] {
         PYTHON_RESERVED
-    }
-
-    fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries().is_empty() {
-            return String::new();
-        }
-
-        let mut lines: Vec<String> = Vec::new();
-
-        // Handle side-effect and wildcard imports first.
-        for entry in imports.entries() {
-            if entry.is_side_effect {
-                lines.push(format!("import {}", entry.module));
-            } else if entry.is_wildcard {
-                lines.push(format!("from {} import *", entry.module));
-            }
-        }
-
-        // Group named imports by module, merging names from the same module.
-        let mut stdlib: std::collections::BTreeMap<&str, Vec<&ImportEntry>> =
-            std::collections::BTreeMap::new();
-        let mut thirdparty: std::collections::BTreeMap<&str, Vec<&ImportEntry>> =
-            std::collections::BTreeMap::new();
-
-        for entry in imports.entries() {
-            if entry.is_side_effect || entry.is_wildcard {
-                continue;
-            }
-            let target = if is_stdlib(&entry.module) {
-                &mut stdlib
-            } else {
-                &mut thirdparty
-            };
-            target.entry(entry.module.as_str()).or_default().push(entry);
-        }
-
-        if !lines.is_empty() && (!stdlib.is_empty() || !thirdparty.is_empty()) {
-            lines.push(String::new());
-        }
-
-        // Emit stdlib imports.
-        for (module, entries) in &stdlib {
-            lines.push(render_from_import(module, entries));
-        }
-
-        // Blank line between groups.
-        if !stdlib.is_empty() && !thirdparty.is_empty() {
-            lines.push(String::new());
-        }
-
-        // Emit third-party imports.
-        for (module, entries) in &thirdparty {
-            lines.push(render_from_import(module, entries));
-        }
-
-        lines.join("\n")
     }
 
     fn render_string_literal(&self, s: &str) -> String {
@@ -265,59 +209,8 @@ impl CodeLang for Python {
         }
     }
 
-    fn render_doc_comment(&self, lines: &[&str]) -> String {
-        if lines.len() == 1 {
-            format!("\"\"\"{}\"\"\"", lines[0])
-        } else {
-            let mut result = String::from("\"\"\"");
-            for line in lines {
-                result.push('\n');
-                result.push_str(line);
-            }
-            result.push_str("\n\"\"\"");
-            result
-        }
-    }
-
     fn line_comment_prefix(&self) -> &str {
         "#"
-    }
-
-    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
-        // Python uses naming conventions (_private, __mangled), not keywords.
-        ""
-    }
-
-    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
-        "def"
-    }
-
-    fn type_keyword(&self, kind: TypeKind) -> &str {
-        match kind {
-            TypeKind::TypeAlias => "type",
-            TypeKind::Newtype => "class",
-            _ => "class",
-        }
-    }
-
-    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
-        true
-    }
-
-    fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
-        format!("{name} = NewType(\"{name}\", {inner})")
-    }
-
-    fn doc_comment_inside_body(&self) -> bool {
-        true
-    }
-
-    fn fun_block_open(&self) -> &str {
-        ":"
-    }
-
-    fn type_header_block_open(&self, _kind: crate::spec::modifiers::TypeKind) -> &str {
-        ":"
     }
 
     fn block_open_for(&self, condition: &str) -> Option<&str> {
@@ -326,10 +219,6 @@ impl CodeLang for Python {
         } else {
             None
         }
-    }
-
-    fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
-        crate::lang::config::OptionalFieldStyle::UnionWithNone(" | ")
     }
 
     fn module_separator(&self) -> Option<&str> {
@@ -386,6 +275,119 @@ impl CodeLang for Python {
             bases_close: ")",
             ..Default::default()
         }
+    }
+}
+
+impl CodeLang for Python {
+    fn render_imports(&self, imports: &ImportGroup) -> String {
+        if imports.entries().is_empty() {
+            return String::new();
+        }
+
+        let mut lines: Vec<String> = Vec::new();
+
+        // Handle side-effect and wildcard imports first.
+        for entry in imports.entries() {
+            if entry.is_side_effect {
+                lines.push(format!("import {}", entry.module));
+            } else if entry.is_wildcard {
+                lines.push(format!("from {} import *", entry.module));
+            }
+        }
+
+        // Group named imports by module, merging names from the same module.
+        let mut stdlib: std::collections::BTreeMap<&str, Vec<&ImportEntry>> =
+            std::collections::BTreeMap::new();
+        let mut thirdparty: std::collections::BTreeMap<&str, Vec<&ImportEntry>> =
+            std::collections::BTreeMap::new();
+
+        for entry in imports.entries() {
+            if entry.is_side_effect || entry.is_wildcard {
+                continue;
+            }
+            let target = if is_stdlib(&entry.module) {
+                &mut stdlib
+            } else {
+                &mut thirdparty
+            };
+            target.entry(entry.module.as_str()).or_default().push(entry);
+        }
+
+        if !lines.is_empty() && (!stdlib.is_empty() || !thirdparty.is_empty()) {
+            lines.push(String::new());
+        }
+
+        // Emit stdlib imports.
+        for (module, entries) in &stdlib {
+            lines.push(render_from_import(module, entries));
+        }
+
+        // Blank line between groups.
+        if !stdlib.is_empty() && !thirdparty.is_empty() {
+            lines.push(String::new());
+        }
+
+        // Emit third-party imports.
+        for (module, entries) in &thirdparty {
+            lines.push(render_from_import(module, entries));
+        }
+
+        lines.join("\n")
+    }
+
+    fn render_doc_comment(&self, lines: &[&str]) -> String {
+        if lines.len() == 1 {
+            format!("\"\"\"{}\"\"\"", lines[0])
+        } else {
+            let mut result = String::from("\"\"\"");
+            for line in lines {
+                result.push('\n');
+                result.push_str(line);
+            }
+            result.push_str("\n\"\"\"");
+            result
+        }
+    }
+
+    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
+        // Python uses naming conventions (_private, __mangled), not keywords.
+        ""
+    }
+
+    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
+        "def"
+    }
+
+    fn type_keyword(&self, kind: TypeKind) -> &str {
+        match kind {
+            TypeKind::TypeAlias => "type",
+            TypeKind::Newtype => "class",
+            _ => "class",
+        }
+    }
+
+    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
+        true
+    }
+
+    fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
+        format!("{name} = NewType(\"{name}\", {inner})")
+    }
+
+    fn doc_comment_inside_body(&self) -> bool {
+        true
+    }
+
+    fn fun_block_open(&self) -> &str {
+        ":"
+    }
+
+    fn type_header_block_open(&self, _kind: crate::spec::modifiers::TypeKind) -> &str {
+        ":"
+    }
+
+    fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
+        crate::lang::config::OptionalFieldStyle::UnionWithNone(" | ")
     }
 
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {

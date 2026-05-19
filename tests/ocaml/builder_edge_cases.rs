@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::CodeLang;
+use sigil_stitch::lang::RendererLang;
 use sigil_stitch::lang::ocaml::OCaml;
 use sigil_stitch::spec::file_spec::FileSpec;
 

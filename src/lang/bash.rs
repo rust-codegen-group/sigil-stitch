@@ -1,11 +1,11 @@
 //! Bash shell language implementation.
 
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Bash shell language implementation.
@@ -91,35 +91,13 @@ const BASH_RESERVED: &[&str] = &[
     "select", "shift", "source", "then", "time", "trap", "typeset", "unset", "until", "while",
 ];
 
-impl CodeLang for Bash {
+impl RendererLang for Bash {
     fn file_extension(&self) -> &str {
         &self.extension
     }
 
     fn reserved_words(&self) -> &[&str] {
         BASH_RESERVED
-    }
-
-    fn render_imports(&self, imports: &ImportGroup) -> String {
-        if imports.entries().is_empty() {
-            return String::new();
-        }
-
-        // Deduplicate to unique source paths.
-        let mut paths: Vec<&str> = Vec::new();
-        let mut seen = std::collections::HashSet::new();
-        for entry in imports.entries() {
-            if seen.insert(entry.module.as_str()) {
-                paths.push(&entry.module);
-            }
-        }
-        paths.sort();
-
-        paths
-            .iter()
-            .map(|p| format!("source \"{p}\""))
-            .collect::<Vec<_>>()
-            .join("\n")
     }
 
     fn render_string_literal(&self, s: &str) -> String {
@@ -134,43 +112,8 @@ impl CodeLang for Bash {
         format!("\"{escaped}\"")
     }
 
-    fn render_doc_comment(&self, lines: &[&str]) -> String {
-        // Bash has no doc comment convention; use # comment blocks.
-        lines
-            .iter()
-            .map(|line| {
-                if line.is_empty() {
-                    "#".to_string()
-                } else {
-                    format!("# {line}")
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
     fn line_comment_prefix(&self) -> &str {
         "#"
-    }
-
-    // --- Spec support ---
-    // Shell has no visibility, generics, inheritance, or interfaces.
-    // Return empty/no-op for all structural methods.
-
-    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
-        ""
-    }
-
-    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
-        "function"
-    }
-
-    fn type_keyword(&self, _kind: TypeKind) -> &str {
-        ""
-    }
-
-    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
-        true
     }
 
     // --- Config struct accessors ---
@@ -237,6 +180,65 @@ impl CodeLang for Bash {
         } else {
             None
         }
+    }
+}
+
+impl CodeLang for Bash {
+    fn render_imports(&self, imports: &ImportGroup) -> String {
+        if imports.entries().is_empty() {
+            return String::new();
+        }
+
+        // Deduplicate to unique source paths.
+        let mut paths: Vec<&str> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for entry in imports.entries() {
+            if seen.insert(entry.module.as_str()) {
+                paths.push(&entry.module);
+            }
+        }
+        paths.sort();
+
+        paths
+            .iter()
+            .map(|p| format!("source \"{p}\""))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn render_doc_comment(&self, lines: &[&str]) -> String {
+        // Bash has no doc comment convention; use # comment blocks.
+        lines
+            .iter()
+            .map(|line| {
+                if line.is_empty() {
+                    "#".to_string()
+                } else {
+                    format!("# {line}")
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    // --- Spec support ---
+    // Shell has no visibility, generics, inheritance, or interfaces.
+    // Return empty/no-op for all structural methods.
+
+    fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
+        ""
+    }
+
+    fn function_keyword(&self, _ctx: DeclarationContext) -> &str {
+        "function"
+    }
+
+    fn type_keyword(&self, _kind: TypeKind) -> &str {
+        ""
+    }
+
+    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
+        true
     }
 
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {

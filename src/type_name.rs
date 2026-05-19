@@ -1,7 +1,7 @@
 use pretty::BoxDoc;
 
 use crate::import::ImportRef;
-use crate::lang::CodeLang;
+use crate::lang::RendererLang;
 ///
 /// Each variant describes a structural pattern for assembling already-rendered
 /// inner type docs into the output. The rendering engine in `type_name.rs`
@@ -190,7 +190,7 @@ pub enum TypeName {
         alias: Option<String>,
         /// When true, render as `module{sep}name` inline (e.g., `serde_json::Value`)
         /// and skip import generation. The separator comes from
-        /// [`CodeLang::module_separator()`]. Falls back to unqualified rendering
+        /// [`RendererLang::module_separator()`]. Falls back to unqualified rendering
         /// if the language returns `None`.
         #[serde(default)]
         qualified: bool,
@@ -305,7 +305,7 @@ impl TypeName {
 
     /// Create a qualified type name that renders inline as `module{sep}name`.
     ///
-    /// The separator comes from [`CodeLang::module_separator()`] — `"::"` for
+    /// The separator comes from [`RendererLang::module_separator()`] — `"::"` for
     /// Rust/C++, `"."` for Go/Python/Java/etc.  No import statement is generated.
     ///
     /// If the target language returns `None` from `module_separator()`, the
@@ -584,7 +584,7 @@ impl TypeName {
 
     /// Language-aware variant of [`TypeName::to_doc`] that consults the lang for
     /// syntax differences (e.g., generic delimiters `<>` vs `[]`).
-    pub fn to_doc_with_lang<F>(&self, resolve: &F, lang: &dyn CodeLang) -> BoxDoc<'static, ()>
+    pub fn to_doc_with_lang<F>(&self, resolve: &F, lang: &dyn RendererLang) -> BoxDoc<'static, ()>
     where
         F: Fn(&str, &str) -> String,
     {
@@ -610,23 +610,25 @@ mod tests {
             impl $name {
                 fn new() -> Self { Self(<$base>::new()) }
             }
-            impl crate::lang::CodeLang for $name {
+            impl crate::lang::RendererLang for $name {
                 fn file_extension(&self) -> &str { self.0.file_extension() }
                 fn reserved_words(&self) -> &[&str] { self.0.reserved_words() }
-                fn render_imports(&self, imports: &crate::import::ImportGroup) -> String { self.0.render_imports(imports) }
                 fn render_string_literal(&self, s: &str) -> String { self.0.render_string_literal(s) }
-                fn render_doc_comment(&self, lines: &[&str]) -> String { self.0.render_doc_comment(lines) }
                 fn line_comment_prefix(&self) -> &str { self.0.line_comment_prefix() }
+                fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> { self.0.type_presentation() }
+                fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> { self.0.block_syntax() }
+                $($override)*
+            }
+            impl crate::lang::CodeLang for $name {
+                fn render_imports(&self, imports: &crate::import::ImportGroup) -> String { self.0.render_imports(imports) }
+                fn render_doc_comment(&self, lines: &[&str]) -> String { self.0.render_doc_comment(lines) }
                 fn render_visibility(&self, vis: crate::spec::modifiers::Visibility, ctx: crate::spec::modifiers::DeclarationContext) -> &str { self.0.render_visibility(vis, ctx) }
                 fn function_keyword(&self, ctx: crate::spec::modifiers::DeclarationContext) -> &str { self.0.function_keyword(ctx) }
                 fn type_keyword(&self, kind: crate::spec::modifiers::TypeKind) -> &str { self.0.type_keyword(kind) }
                 fn methods_inside_type_body(&self, kind: crate::spec::modifiers::TypeKind) -> bool { self.0.methods_inside_type_body(kind) }
-                fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> { self.0.type_presentation() }
-                fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> { self.0.block_syntax() }
                 fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> { self.0.function_syntax() }
                 fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> { self.0.type_decl_syntax() }
                 fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> { self.0.enum_and_annotation() }
-                $($override)*
             }
         };
     }

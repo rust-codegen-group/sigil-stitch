@@ -1,11 +1,11 @@
 //! JavaScript language implementation.
 
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::CodeLang;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
 };
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::type_name::TypePresentation;
 
@@ -127,7 +127,7 @@ const JS_RESERVED: &[&str] = &[
     "async", "await",
 ];
 
-impl CodeLang for JavaScript {
+impl RendererLang for JavaScript {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -136,6 +136,54 @@ impl CodeLang for JavaScript {
         JS_RESERVED
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        match self.quote_style {
+            QuoteStyle::Single => {
+                format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
+            }
+            QuoteStyle::Double => {
+                format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+            }
+        }
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    // --- Config struct accessors ---
+
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            tuple: TypePresentation::Delimited {
+                open: "[",
+                sep: ", ",
+                close: "]",
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            constraint_keyword: "",
+            constraint_separator: "",
+            context_bound_keyword: "",
+            ..Default::default()
+        }
+    }
+
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: self.semicolons,
+            field_terminator: ";",
+            ..Default::default()
+        }
+    }
+}
+
+impl CodeLang for JavaScript {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         let mut lines = Vec::new();
         let quote = self.quote_style.char();
@@ -187,17 +235,6 @@ impl CodeLang for JavaScript {
         lines.join("\n")
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        match self.quote_style {
-            QuoteStyle::Single => {
-                format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
-            }
-            QuoteStyle::Double => {
-                format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
-            }
-        }
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         if lines.is_empty() {
             return String::new();
@@ -212,10 +249,6 @@ impl CodeLang for JavaScript {
         }
         out.push_str(" */");
         out
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "//"
     }
 
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
@@ -248,37 +281,6 @@ impl CodeLang for JavaScript {
 
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         true
-    }
-
-    // --- Config struct accessors ---
-
-    fn type_presentation(&self) -> TypePresentationConfig<'_> {
-        TypePresentationConfig {
-            tuple: TypePresentation::Delimited {
-                open: "[",
-                sep: ", ",
-                close: "]",
-            },
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
-        GenericSyntaxConfig {
-            constraint_keyword: "",
-            constraint_separator: "",
-            context_bound_keyword: "",
-            ..Default::default()
-        }
-    }
-
-    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
-        BlockSyntaxConfig {
-            indent_unit: &self.indent,
-            uses_semicolons: self.semicolons,
-            field_terminator: ";",
-            ..Default::default()
-        }
     }
 
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {

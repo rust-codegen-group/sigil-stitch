@@ -1,7 +1,7 @@
 //! Java language implementation.
 
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Java language implementation.
@@ -100,7 +100,7 @@ fn import_group_order(module: &str) -> u8 {
     }
 }
 
-impl CodeLang for JavaLang {
+impl RendererLang for JavaLang {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -109,6 +109,55 @@ impl CodeLang for JavaLang {
         JAVA_RESERVED
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        format!(
+            "\"{}\"",
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\t', "\\t")
+                .replace('\r', "\\r")
+                .replace('\0', "\\0")
+        )
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
+        crate::lang::config::TypePresentationConfig {
+            array: crate::type_name::TypePresentation::GenericWrap { name: "List" },
+            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap { name: "List" }),
+            optional: crate::type_name::TypePresentation::GenericWrap { name: "Optional" },
+            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
+        crate::lang::config::GenericSyntaxConfig {
+            constraint_keyword: " extends ",
+            constraint_separator: " & ",
+            context_bound_keyword: " extends ",
+            ..Default::default()
+        }
+    }
+
+    fn module_separator(&self) -> Option<&str> {
+        Some(".")
+    }
+
+    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
+        crate::lang::config::BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            field_terminator: ";",
+            ..Default::default()
+        }
+    }
+}
+
+impl CodeLang for JavaLang {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -165,18 +214,6 @@ impl CodeLang for JavaLang {
         lines.join("\n")
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-                .replace('\0', "\\0")
-        )
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         // Javadoc /** ... */ style.
         let mut result = String::from("/**");
@@ -192,10 +229,6 @@ impl CodeLang for JavaLang {
         result.push('\n');
         result.push_str(" */");
         result
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "//"
     }
 
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
@@ -240,37 +273,6 @@ impl CodeLang for JavaLang {
         crate::lang::config::OptionalFieldStyle::TypeWrap {
             open: "Optional<",
             close: ">",
-        }
-    }
-
-    fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
-        crate::lang::config::TypePresentationConfig {
-            array: crate::type_name::TypePresentation::GenericWrap { name: "List" },
-            readonly_array: Some(crate::type_name::TypePresentation::GenericWrap { name: "List" }),
-            optional: crate::type_name::TypePresentation::GenericWrap { name: "Optional" },
-            associated_type: crate::type_name::AssociatedTypeStyle::DotAccess,
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
-        crate::lang::config::GenericSyntaxConfig {
-            constraint_keyword: " extends ",
-            constraint_separator: " & ",
-            context_bound_keyword: " extends ",
-            ..Default::default()
-        }
-    }
-
-    fn module_separator(&self) -> Option<&str> {
-        Some(".")
-    }
-
-    fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
-        crate::lang::config::BlockSyntaxConfig {
-            indent_unit: &self.indent,
-            field_terminator: ";",
-            ..Default::default()
         }
     }
 

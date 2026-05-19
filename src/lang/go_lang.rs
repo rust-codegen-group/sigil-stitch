@@ -2,11 +2,11 @@
 
 use crate::code_node::CodeNode;
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::CodeLang;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
+use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::type_name::{FunctionPresentation, TypePresentation, WildcardPresentation};
 
@@ -194,7 +194,7 @@ impl GoLang {
     }
 }
 
-impl CodeLang for GoLang {
+impl RendererLang for GoLang {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -203,6 +203,91 @@ impl CodeLang for GoLang {
         GO_RESERVED
     }
 
+    fn render_string_literal(&self, s: &str) -> String {
+        format!(
+            "\"{}\"",
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\t', "\\t")
+        )
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn qualify_import_name(&self, module: &str, resolved_name: &str) -> String {
+        let pkg = package_name(module);
+        format!("{pkg}.{resolved_name}")
+    }
+
+    fn module_separator(&self) -> Option<&str> {
+        Some(".")
+    }
+
+    // --- Config struct accessors ---
+
+    fn type_presentation(&self) -> TypePresentationConfig<'_> {
+        TypePresentationConfig {
+            array: TypePresentation::Prefix { prefix: "[]" },
+            readonly_array: Some(TypePresentation::Prefix { prefix: "[]" }),
+            optional: TypePresentation::Prefix { prefix: "*" },
+            map: TypePresentation::Delimited {
+                open: "map[",
+                sep: "]",
+                close: "",
+            },
+            pointer: TypePresentation::Prefix { prefix: "*" },
+            slice: TypePresentation::Prefix { prefix: "[]" },
+            reference_mut: TypePresentation::Prefix { prefix: "*" },
+            function: FunctionPresentation {
+                keyword: "func",
+                params_open: "(",
+                params_sep: ", ",
+                params_close: ")",
+                arrow: " ",
+                return_first: false,
+                curried: false,
+                wrapper_open: "",
+                wrapper_close: "",
+            },
+            wildcard: WildcardPresentation {
+                unbounded: "any",
+                upper_keyword: "any ",
+                lower_keyword: "any ",
+            },
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            open: "[",
+            close: "]",
+            constraint_keyword: " ",
+            constraint_separator: " ",
+            context_bound_keyword: " ",
+            ..Default::default()
+        }
+    }
+
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            indent_unit: &self.indent,
+            uses_semicolons: false,
+            field_terminator: "",
+            ..Default::default()
+        }
+    }
+
+    fn rewrite_nodes(&self, nodes: &mut Vec<CodeNode>) {
+        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_iife);
+        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_receive_op);
+    }
+}
+
+impl CodeLang for GoLang {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -271,16 +356,6 @@ impl CodeLang for GoLang {
         }
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-        )
-    }
-
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         lines
             .iter()
@@ -293,10 +368,6 @@ impl CodeLang for GoLang {
             })
             .collect::<Vec<_>>()
             .join("\n")
-    }
-
-    fn line_comment_prefix(&self) -> &str {
-        "//"
     }
 
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
@@ -334,11 +405,6 @@ impl CodeLang for GoLang {
         format!("type {name} {inner}")
     }
 
-    fn qualify_import_name(&self, module: &str, resolved_name: &str) -> String {
-        let pkg = package_name(module);
-        format!("{pkg}.{resolved_name}")
-    }
-
     fn type_kind_suffix(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Struct | TypeKind::Class => "struct",
@@ -349,65 +415,6 @@ impl CodeLang for GoLang {
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypePrefix("*")
-    }
-
-    fn module_separator(&self) -> Option<&str> {
-        Some(".")
-    }
-
-    // --- Config struct accessors ---
-
-    fn type_presentation(&self) -> TypePresentationConfig<'_> {
-        TypePresentationConfig {
-            array: TypePresentation::Prefix { prefix: "[]" },
-            readonly_array: Some(TypePresentation::Prefix { prefix: "[]" }),
-            optional: TypePresentation::Prefix { prefix: "*" },
-            map: TypePresentation::Delimited {
-                open: "map[",
-                sep: "]",
-                close: "",
-            },
-            pointer: TypePresentation::Prefix { prefix: "*" },
-            slice: TypePresentation::Prefix { prefix: "[]" },
-            reference_mut: TypePresentation::Prefix { prefix: "*" },
-            function: FunctionPresentation {
-                keyword: "func",
-                params_open: "(",
-                params_sep: ", ",
-                params_close: ")",
-                arrow: " ",
-                return_first: false,
-                curried: false,
-                wrapper_open: "",
-                wrapper_close: "",
-            },
-            wildcard: WildcardPresentation {
-                unbounded: "any",
-                upper_keyword: "any ",
-                lower_keyword: "any ",
-            },
-            ..Default::default()
-        }
-    }
-
-    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
-        GenericSyntaxConfig {
-            open: "[",
-            close: "]",
-            constraint_keyword: " ",
-            constraint_separator: " ",
-            context_bound_keyword: " ",
-            ..Default::default()
-        }
-    }
-
-    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
-        BlockSyntaxConfig {
-            indent_unit: &self.indent,
-            uses_semicolons: false,
-            field_terminator: "",
-            ..Default::default()
-        }
     }
 
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
@@ -429,11 +436,6 @@ impl CodeLang for GoLang {
             variant_separator: "",
             ..Default::default()
         }
-    }
-
-    fn rewrite_nodes(&self, nodes: &mut Vec<CodeNode>) {
-        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_iife);
-        crate::lang::rewrite::walk_nodes_mut(nodes, &Self::rewrite_receive_op);
     }
 }
 
