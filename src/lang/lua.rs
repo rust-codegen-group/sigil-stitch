@@ -107,16 +107,6 @@ impl RendererLang for Lua {
         Some(".")
     }
 
-    fn escape_reserved(&self, name: &str) -> String {
-        // Lua doesn't support `@` or backtick escaping.
-        // Append `_` suffix (e.g., `function_` for `function`).
-        if LUA_RESERVED.contains(&name) {
-            format!("{}_", name)
-        } else {
-            name.to_string()
-        }
-    }
-
     // ── Config accessors ──
 
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
