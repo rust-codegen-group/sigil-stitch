@@ -158,6 +158,35 @@ function setup() {
 }
 ```
 
+## `@{expr}` interpolation in `$V`
+
+When you need to mix Rust compile-time values with shell runtime variables, use `@{expr}` inside `$V` strings. The `@{...}` parts are evaluated at compile time; everything else passes through verbatim for shell to interpret at runtime:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::bash::Bash;
+# fn main() {
+let registry = "ghcr.io/myorg";
+let app = "api-server";
+let services = ["web", "worker", "scheduler"];
+
+let block = sigil_quote!(Bash {
+    docker push $V("@{registry}/@{app}:${TAG}")
+    echo $V("Deploying @{services.len()} services to ${ENVIRONMENT}")
+    echo $V("Contact: admin@@@{app}.internal")
+}).unwrap();
+# }
+```
+
+```bash
+docker push ghcr.io/myorg/api-server:${TAG}
+echo Deploying 3 services to ${ENVIRONMENT}
+echo Contact: admin@api-server.internal
+```
+
+Use `@@` to emit a literal `@` in the output. Bare `@` not followed by `{` passes through unchanged.
+
 ## Shebang and header
 
 Use `FileSpec::header()` for the shebang and preamble:

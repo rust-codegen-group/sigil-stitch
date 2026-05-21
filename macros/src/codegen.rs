@@ -2,9 +2,10 @@
 //!
 //! Converts parsed statements into a `TokenStream` of `CodeBlockBuilder` method calls.
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Literal, TokenStream, TokenTree};
 use quote::quote;
 
+use crate::parse::verbatim_interpolation::{VerbatimResult, parse_verbatim_interpolation};
 use crate::parse::{InterpolationKind, MetaBranch, ParsedInput, Statement, TypedArg};
 
 /// Generate the output token stream from a parsed `sigil_quote!` input.
@@ -150,7 +151,34 @@ fn build_args_tuple(args: &[TypedArg]) -> TokenStream {
                         quote! { ::sigil_stitch::code_block::StringLitArg((#expr).to_string()) }
                     }
                     InterpolationKind::VerbatimStr => {
-                        quote! { ::sigil_stitch::code_block::VerbatimStrArg((#expr).to_string()) }
+                        match extract_verbatim_interpolation(expr) {
+                            Some(VerbatimResult::Interpolated {
+                                format_string,
+                                expressions,
+                            }) => {
+                                let fmt_lit = Literal::string(&format_string);
+                                let exprs: Vec<TokenStream> = expressions
+                                    .iter()
+                                    .map(|e| e.parse::<TokenStream>().unwrap())
+                                    .collect();
+                                quote! {
+                                    ::sigil_stitch::code_block::VerbatimStrArg(
+                                        ::std::format!(#fmt_lit, #(#exprs),*)
+                                    )
+                                }
+                            }
+                            Some(VerbatimResult::Literal(s)) => {
+                                let lit = Literal::string(&s);
+                                quote! {
+                                    ::sigil_stitch::code_block::VerbatimStrArg(
+                                        ::std::string::String::from(#lit)
+                                    )
+                                }
+                            }
+                            _ => {
+                                quote! { ::sigil_stitch::code_block::VerbatimStrArg((#expr).to_string()) }
+                            }
+                        }
                     }
                 }
             })
@@ -193,4 +221,67 @@ fn generate_meta_if(branches: &[MetaBranch]) -> TokenStream {
     }
 
     result
+}
+
+/// Try to extract a string literal from a token stream and parse `@{expr}` interpolations.
+///
+/// Returns `None` if the expression is not a single string literal (e.g. a variable or
+/// function call), in which case the expression is used as-is.
+fn extract_verbatim_interpolation(expr: &TokenStream) -> Option<VerbatimResult> {
+    let tokens: Vec<TokenTree> = expr.clone().into_iter().collect();
+    if tokens.len() != 1 {
+        return None;
+    }
+    let lit = match &tokens[0] {
+        TokenTree::Literal(lit) => lit,
+        _ => return None,
+    };
+    let repr = lit.to_string();
+    if !repr.starts_with('"') || !repr.ends_with('"') {
+        return None;
+    }
+    let content = unescape_string_literal(&repr[1..repr.len() - 1])?;
+    parse_verbatim_interpolation(&content).ok()
+}
+
+/// Unescape a Rust string literal body (content between the outer quotes).
+fn unescape_string_literal(s: &str) -> Option<String> {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.next()? {
+                'n' => result.push('\n'),
+                'r' => result.push('\r'),
+                't' => result.push('\t'),
+                '\\' => result.push('\\'),
+                '"' => result.push('"'),
+                '\'' => result.push('\''),
+                '0' => result.push('\0'),
+                'x' => {
+                    let hi = chars.next()?.to_digit(16)?;
+                    let lo = chars.next()?.to_digit(16)?;
+                    result.push(char::from(((hi << 4) | lo) as u8));
+                }
+                'u' => {
+                    if chars.next()? != '{' {
+                        return None;
+                    }
+                    let mut val = 0u32;
+                    loop {
+                        let c = chars.next()?;
+                        if c == '}' {
+                            break;
+                        }
+                        val = val * 16 + c.to_digit(16)?;
+                    }
+                    result.push(char::from_u32(val)?);
+                }
+                _ => return None,
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+    Some(result)
 }

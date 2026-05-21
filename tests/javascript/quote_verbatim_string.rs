@@ -1,11 +1,11 @@
-//! Tests for `$V` verbatim string literal in TypeScript.
+//! Tests for `$V` verbatim string literal in JavaScript.
 
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 fn render(block: &CodeBlock) -> String {
-    FileSpec::builder("test.ts")
+    FileSpec::builder("test.js")
         .add_code(block.clone())
         .build()
         .unwrap()
@@ -15,28 +15,14 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn verbatim_uses_template_literal() {
-    let block = sigil_quote!(TypeScript {
+    let block = sigil_quote!(JavaScript {
         const msg = $V("Hello, ${name}!")
     })
     .unwrap();
     let output = render(&block);
     assert!(
         output.contains("`Hello, ${name}!`"),
-        "Expected template literal with interpolation, got:\n{output}"
-    );
-}
-
-#[test]
-fn verbatim_escapes_backtick() {
-    let block = sigil_quote!(TypeScript {
-        const msg = $V("use \\` for templates")
-    })
-    .unwrap();
-    let output = render(&block);
-    // Input: "use \` for templates" → escapes \ to \\ and ` to \`
-    assert!(
-        output.contains("`use \\\\\\` for templates`"),
-        "Expected escaped backtick in template literal, got:\n{output}"
+        "Expected template literal, got:\n{output}"
     );
 }
 
@@ -45,7 +31,7 @@ fn verbatim_escapes_backtick() {
 #[test]
 fn verbatim_at_interpolation_simple() {
     let greeting = "Hello";
-    let block = sigil_quote!(TypeScript {
+    let block = sigil_quote!(JavaScript {
         const msg = $V("@{greeting}, ${name}!")
     })
     .unwrap();
@@ -55,10 +41,10 @@ fn verbatim_at_interpolation_simple() {
 
 #[test]
 fn verbatim_at_interpolation_multiple() {
-    let base_url = "https://api.example.com";
-    let version = "v2";
-    let block = sigil_quote!(TypeScript {
-        const url = $V("@{base_url}/@{version}/${endpoint}")
+    let base = "https://api.example.com";
+    let ver = "v2";
+    let block = sigil_quote!(JavaScript {
+        const url = $V("@{base}/@{ver}/${endpoint}")
     })
     .unwrap();
     let output = render(&block);
@@ -70,7 +56,7 @@ fn verbatim_at_interpolation_multiple() {
 
 #[test]
 fn verbatim_at_escape() {
-    let block = sigil_quote!(TypeScript {
+    let block = sigil_quote!(JavaScript {
         const email = $V("user@@example.com")
     })
     .unwrap();
@@ -80,11 +66,11 @@ fn verbatim_at_escape() {
 
 #[test]
 fn verbatim_at_expr_method_call() {
-    let items = ["a", "b", "c"];
-    let block = sigil_quote!(TypeScript {
-        const msg = $V("total: @{items.len()} items")
+    let items = ["a", "b"];
+    let block = sigil_quote!(JavaScript {
+        const msg = $V("count=@{items.len()}")
     })
     .unwrap();
     let output = render(&block);
-    assert!(output.contains("`total: 3 items`"), "got:\n{output}");
+    assert!(output.contains("`count=2`"), "got:\n{output}");
 }

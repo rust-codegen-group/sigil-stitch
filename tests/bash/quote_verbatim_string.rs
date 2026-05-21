@@ -201,3 +201,106 @@ fn verbatim_with_explicit_quotes() {
         "Expected user-provided quotes for assignment, got:\n{output}"
     );
 }
+
+// ── @{expr} interpolation ────────────────────────────────
+
+#[test]
+fn verbatim_at_interpolation_simple() {
+    let name = "world";
+    let block = sigil_quote!(Bash {
+        echo $V("Hello @{name}")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo Hello world"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_interpolation_multiple() {
+    let registry = "ghcr.io";
+    let tag = "latest";
+    let block = sigil_quote!(Bash {
+        docker push $V("@{registry}/myapp:@{tag}")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("ghcr.io/myapp:latest"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_escape() {
+    let block = sigil_quote!(Bash {
+        echo $V("user@@host")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo user@host"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_with_shell_vars() {
+    let prefix = "/opt";
+    let block = sigil_quote!(Bash {
+        echo $V("@{prefix}/$USER/bin")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo /opt/$USER/bin"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_expr_method_call() {
+    let items = ["a", "b"];
+    let block = sigil_quote!(Bash {
+        echo $V("count=@{items.len()}")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo count=2"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_mixed_with_escape_and_shell() {
+    let user = "admin";
+    let block = sigil_quote!(Bash {
+        echo $V("@{user}@@localhost: $HOME")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("echo admin@localhost: $HOME"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn verbatim_at_no_interpolation_unchanged() {
+    let block = sigil_quote!(Bash {
+        echo $V("$HOME/.config")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo $HOME/.config"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_bare_at_passes_through() {
+    let block = sigil_quote!(Bash {
+        echo $V("user@host.com")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo user@host.com"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_format_expr() {
+    let name = "app";
+    let version = "1.0";
+    let block = sigil_quote!(Bash {
+        echo $V("@{format!(\"{}-{}\", name, version)}")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo app-1.0"), "got:\n{output}");
+}

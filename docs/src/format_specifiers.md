@@ -171,6 +171,54 @@ For Bash/Zsh, `%V` is pure passthrough — the string is emitted as-is with no w
 
 For languages without string interpolation (C, C++, Go, Rust, Java, Haskell, OCaml, Lua), `%V` falls back to `%S` behavior (full escaping).
 
+### `@{expr}` interpolation in `$V`
+
+When using `$V` with a string literal in `sigil_quote!`, you can embed Rust expressions with `@{expr}`. These are evaluated at compile time and spliced into the verbatim output:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let registry = "ghcr.io";
+let tag = "latest";
+let block = sigil_quote!(Bash {
+    docker push $V("@{registry}/myapp:@{tag}")
+}).unwrap();
+// Output: docker push ghcr.io/myapp:latest
+# }
+```
+
+This is syntactic sugar — the macro transforms the string into a `format!()` call. Shell variables like `$HOME` pass through unchanged while `@{expr}` parts are resolved at Rust compile time.
+
+Escape `@@` to emit a literal `@`:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let block = sigil_quote!(Bash {
+    echo $V("admin@@localhost")
+}).unwrap();
+// Output: echo admin@localhost
+# }
+```
+
+Arbitrary Rust expressions work inside `@{...}`, including method calls:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let items = vec!["a", "b", "c"];
+let block = sigil_quote!(Bash {
+    echo $V("count=@{items.len()}")
+}).unwrap();
+// Output: echo count=3
+# }
+```
+
+If `$V` receives a non-literal expression (e.g. `$V(my_var)` or `$V(format!(...))`), `@{...}` processing is skipped and the expression is used as-is.
+
 ## `%L` -- Literal
 
 Emits a raw value with no transformation. This is the default for bare `&str` and `String` arguments, so no wrapper is needed. Also accepts `CodeBlock` for embedding nested blocks.

@@ -126,3 +126,60 @@ fn verbatim_with_explicit_quotes() {
         "Expected user-provided quotes for assignment, got:\n{output}"
     );
 }
+
+// ── @{expr} interpolation ────────────────────────────────
+
+#[test]
+fn verbatim_at_interpolation_simple() {
+    let name = "world";
+    let block = sigil_quote!(Zsh {
+        echo $V("Hello @{name}")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo Hello world"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_interpolation_multiple() {
+    let registry = "ghcr.io";
+    let tag = "latest";
+    let block = sigil_quote!(Zsh {
+        docker push $V("@{registry}/myapp:@{tag}")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("ghcr.io/myapp:latest"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_escape() {
+    let block = sigil_quote!(Zsh {
+        echo $V("user@@host")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo user@host"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_with_shell_vars() {
+    let prefix = "/opt";
+    let block = sigil_quote!(Zsh {
+        echo $V("@{prefix}/$USER/bin")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo /opt/$USER/bin"), "got:\n{output}");
+}
+
+#[test]
+fn verbatim_at_with_zsh_flags() {
+    let var = "USERNAME";
+    let block = sigil_quote!(Zsh {
+        echo $V("${(L)@{var}}")
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("echo ${(L)USERNAME}"), "got:\n{output}");
+}

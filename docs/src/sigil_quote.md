@@ -140,6 +140,25 @@ let block = sigil_quote!(Bash {
 # }
 ```
 
+#### `@{expr}` interpolation
+
+Embed Rust expressions inside `$V` string literals with `@{expr}`. These are resolved at compile time while the rest passes through for the target language's runtime:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let registry = "ghcr.io/myorg";
+let app = "api";
+let block = sigil_quote!(Bash {
+    docker push $V("@{registry}/@{app}:${TAG}")
+}).unwrap();
+// Output: docker push ghcr.io/myorg/api:${TAG}
+# }
+```
+
+Use `@@` to emit a literal `@`. Bare `@` not followed by `{` passes through unchanged. Works with all languages that support `$V`.
+
 ### Literals (`$L`)
 
 ```rust

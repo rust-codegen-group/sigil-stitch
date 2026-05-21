@@ -10,6 +10,7 @@ mod statements;
 mod stmt_rewrite;
 mod types;
 mod util;
+pub(crate) mod verbatim_interpolation;
 
 pub(crate) use types::*;
 
