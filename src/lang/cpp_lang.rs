@@ -172,18 +172,6 @@ impl RendererLang for CppLang {
         CPP_RESERVED
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-                .replace('\0', "\\0")
-        )
-    }
-
     fn line_comment_prefix(&self) -> &str {
         "//"
     }

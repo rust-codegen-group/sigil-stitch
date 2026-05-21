@@ -1,8 +1,9 @@
 //! Where-clause types and rendering for generic declarations.
 //!
 //! Extracted from `fun_spec.rs` to give where-clause rendering its own
-//! module. Consumed by both [`FunSpec`](super::fun_spec::FunSpec) and
-//! [`TypeSpec`](super::type_spec::TypeSpec).
+//! module. Consumed by both
+//! [`FunSpec`](crate::spec::fun_spec::FunSpec) and
+//! [`TypeSpec`](crate::spec::type_spec::TypeSpec).
 
 use crate::code_block::Arg;
 use crate::lang::CodeLang;

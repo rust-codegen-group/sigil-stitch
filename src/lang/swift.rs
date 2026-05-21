@@ -179,18 +179,6 @@ impl RendererLang for Swift {
         }
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-                .replace('\0', "\\0")
-        )
-    }
-
     fn render_verbatim_string(&self, s: &str) -> String {
         let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
         format!("\"{escaped}\"")

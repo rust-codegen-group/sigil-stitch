@@ -133,14 +133,6 @@ impl RendererLang for OCaml {
         OCAML_RESERVED
     }
 
-    fn escape_reserved(&self, name: &str) -> String {
-        if self.reserved_words().contains(&name) {
-            format!("{name}_")
-        } else {
-            name.to_string()
-        }
-    }
-
     fn render_string_literal(&self, s: &str) -> String {
         format!(
             "\"{}\"",
