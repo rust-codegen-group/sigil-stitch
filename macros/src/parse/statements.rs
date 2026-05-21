@@ -1,5 +1,6 @@
 use proc_macro2::{Delimiter, Spacing, TokenTree};
 
+use super::brace_classifier::{self, BraceKind};
 use super::format::tokens_to_format;
 use super::parse_body;
 use super::types::{Branch, CompileError, MacroLang, MetaBranch, Statement};
@@ -83,7 +84,8 @@ pub(super) fn parse_one_statement(
             let next = pos + 1;
             if next < tokens.len()
                 && is_semicolon(&tokens[next])
-                && (!looks_like_control_flow_header(&collected) || !should_be_block_or_multiline(g))
+                && (!brace_classifier::looks_like_control_flow_header(&collected)
+                    || !brace_classifier::should_be_block_or_multiline(g))
             {
                 // Part of a statement: `const x = { ... };`
                 collected.push(tt.clone());
@@ -111,32 +113,15 @@ pub(super) fn parse_one_statement(
             // Brace languages always use `{` for blocks, but end-delimited
             // languages (Lua, Ruby, Elixir) use `{` for table/hash literals
             // and can only detect control flow from surrounding keywords.
-            if !looks_like_control_flow_header(&collected) {
-                // Exception: `= { multi-statement }` after a function signature
-                // is a function body, not a literal. Treat as control flow if
-                // the body has statements AND there's a paren group in the prefix
-                // (indicating a function declaration).
-                let last_is_eq = collected
-                    .last()
-                    .is_some_and(|t| matches!(t, TokenTree::Punct(p) if p.as_char() == '='));
-                let has_paren_group = collected.iter().any(
-                    |t| matches!(t, TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis),
-                );
-                // Another exception: `foo() { $... }` where a paren group precedes
-                // the brace (method shorthand / function declaration) and the body
-                // contains sigil-stitch markers (`$C_each`, `$if`, `$S`, etc.).
-                // Without this, `foo() { $C_each(items); }` is misclassified as a
-                // function call with an object-literal argument.
-                let body_has_meta = has_meta_marker(g);
-                let is_function_body = last_is_eq && has_paren_group && should_be_block(g);
-                let is_method_with_meta = has_paren_group && body_has_meta;
-                if !is_function_body && !is_method_with_meta {
-                    // Treat as a literal brace group — not control flow.
+            // Delegated to `brace_classifier` for the heuristic logic.
+            match brace_classifier::classify(&collected, g) {
+                BraceKind::Literal => {
                     collected.push(tt.clone());
                     prev_end_line = Some(tt.span().end().line);
                     pos += 1;
                     continue;
                 }
+                BraceKind::ControlFlow => {}
             }
 
             // Control flow detected.
@@ -185,130 +170,6 @@ pub(super) fn parse_one_statement(
         let (format, args) = tokens_to_format(&collected, lang)?;
         Ok((Statement::Line { format, args }, pos))
     }
-}
-
-/// Check whether the tokens before a `{` brace group look like a control-flow
-/// header (e.g. `if ... {`, `for ... {`, `function ... {`) rather than a
-/// literal brace expression (e.g. Lua table constructor `local t = { ... }`).
-///
-/// Returns `false` (→ literal) only for clear literal patterns: tokens ending
-/// with `=`, `,`, `return`, or a single identifier before `()` (function call
-/// with table argument, e.g. `foo(...) {`). Everything else defaults to
-/// `true` (→ control flow), which is correct for all brace languages.
-fn looks_like_control_flow_header(tokens: &[TokenTree]) -> bool {
-    if tokens.is_empty() {
-        return false;
-    }
-
-    let n = tokens.len();
-    let last = &tokens[n - 1];
-
-    // Control-flow keywords that always precede `{`
-    if is_ident(last, "then") || is_ident(last, "do") || is_ident(last, "else") {
-        return true;
-    }
-
-    // `=` → assignment of a table/object literal
-    if matches!(last, TokenTree::Punct(p) if p.as_char() == '=') {
-        return false;
-    }
-    // `,` → table entry separator (unlikely at statement level, but safe)
-    if matches!(last, TokenTree::Punct(p) if p.as_char() == ',') {
-        return false;
-    }
-    // `return` → returning a table
-    if is_ident(last, "return") {
-        return false;
-    }
-
-    // `(...)` group — check if it's a function call with table argument.
-    if matches!(last, TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis) {
-        // Only one token before `()` and it's an ident → function call
-        // (e.g. `foo(...) {` with table arg). This is a literal.
-        if n == 2 && matches!(&tokens[0], TokenTree::Ident(_)) {
-            let s = tokens[0].to_string();
-            // Known control-flow keywords that appear as a single ident
-            // before `()` are NOT function calls.
-            if matches!(
-                s.as_str(),
-                "if" | "for"
-                    | "while"
-                    | "catch"
-                    | "switch"
-                    | "foreach"
-                    | "for_each"
-                    | "unless"
-                    | "until"
-                    | "match"
-                    | "try"
-                    | "synchronized"
-                    | "when"
-                    | "guard"
-                    | "function"
-            ) {
-                return true;
-            }
-            // Single ident (not a keyword) → function call → literal
-            return false;
-        }
-        // Multiple tokens before `()` or starts with keyword → control flow
-        return true;
-    }
-
-    // `repeat` starts a control-flow block
-    if is_ident(&tokens[0], "repeat") {
-        return true;
-    }
-
-    // Default: assume control flow — backward compatible with brace languages
-    // where `{` at statement level always denotes a block.
-    true
-}
-
-/// Check if a brace group contains any `$` sigil at the top level,
-/// indicating it's code using sigil-stitch markers (not an object literal).
-/// Used to disambiguate `foo() { $C_each(...) }` (method body) from
-/// `func({ key: value })` (call with object-literal argument).
-fn has_meta_marker(g: &proc_macro2::Group) -> bool {
-    let stream: Vec<TokenTree> = g.stream().into_iter().collect();
-    for tt in &stream {
-        match tt {
-            TokenTree::Punct(p) if p.as_char() == '$' => return true,
-            TokenTree::Group(g) if has_meta_marker(g) => return true,
-            _ => {}
-        }
-    }
-    false
-}
-
-/// Determine if a brace group contains multiple statements (semicolons)
-/// and thus should be treated as a block rather than inlined.
-fn should_be_block(g: &proc_macro2::Group) -> bool {
-    let stream: Vec<TokenTree> = g.stream().into_iter().collect();
-    for tt in &stream {
-        if is_semicolon(tt) {
-            return true;
-        }
-    }
-    false
-}
-
-/// Like `should_be_block`, but also returns true for multi-line bodies.
-/// Used for `{...};` with control-flow headers where semicolons may be
-/// absent (e.g. Kotlin `when`, Haskell `do`).
-fn should_be_block_or_multiline(g: &proc_macro2::Group) -> bool {
-    let stream: Vec<TokenTree> = g.stream().into_iter().collect();
-    if stream.is_empty() {
-        return false;
-    }
-    for tt in &stream {
-        if is_semicolon(tt) {
-            return true;
-        }
-    }
-    let first_line = stream.first().unwrap().span().start().line;
-    let last_line = stream.last().unwrap().span().end().line;
-    first_line != last_line
 }
 
 /// Parse a control flow chain starting from tokens that lead into a brace group.

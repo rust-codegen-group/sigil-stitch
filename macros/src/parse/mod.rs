@@ -4,6 +4,7 @@
 //! language type and a list of statements.
 
 mod annotate;
+mod brace_classifier;
 mod format;
 mod spacing;
 mod statements;
