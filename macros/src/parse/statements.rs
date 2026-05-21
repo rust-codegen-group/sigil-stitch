@@ -122,7 +122,15 @@ pub(super) fn parse_one_statement(
                 let has_paren_group = collected.iter().any(
                     |t| matches!(t, TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis),
                 );
-                if !last_is_eq || !has_paren_group || !should_be_block(g) {
+                // Another exception: `foo() { $... }` where a paren group precedes
+                // the brace (method shorthand / function declaration) and the body
+                // contains sigil-stitch markers (`$C_each`, `$if`, `$S`, etc.).
+                // Without this, `foo() { $C_each(items); }` is misclassified as a
+                // function call with an object-literal argument.
+                let body_has_meta = has_meta_marker(g);
+                let is_function_body = last_is_eq && has_paren_group && should_be_block(g);
+                let is_method_with_meta = has_paren_group && body_has_meta;
+                if !is_function_body && !is_method_with_meta {
                     // Treat as a literal brace group — not control flow.
                     collected.push(tt.clone());
                     prev_end_line = Some(tt.span().end().line);
@@ -255,6 +263,22 @@ fn looks_like_control_flow_header(tokens: &[TokenTree]) -> bool {
     // Default: assume control flow — backward compatible with brace languages
     // where `{` at statement level always denotes a block.
     true
+}
+
+/// Check if a brace group contains any `$` sigil at the top level,
+/// indicating it's code using sigil-stitch markers (not an object literal).
+/// Used to disambiguate `foo() { $C_each(...) }` (method body) from
+/// `func({ key: value })` (call with object-literal argument).
+fn has_meta_marker(g: &proc_macro2::Group) -> bool {
+    let stream: Vec<TokenTree> = g.stream().into_iter().collect();
+    for tt in &stream {
+        match tt {
+            TokenTree::Punct(p) if p.as_char() == '$' => return true,
+            TokenTree::Group(g) if has_meta_marker(g) => return true,
+            _ => {}
+        }
+    }
+    false
 }
 
 /// Determine if a brace group contains multiple statements (semicolons)

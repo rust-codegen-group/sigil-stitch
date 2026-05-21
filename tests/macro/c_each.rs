@@ -398,3 +398,64 @@ fn test_c_each_golden() {
     let output = render_ts(&block);
     golden::assert_golden("macro/quote_c_each.txt", &output);
 }
+
+// ── $C_each inside function bodies ───────────────────────
+
+#[test]
+fn test_c_each_inside_export_function() {
+    let params = vec![
+        CodeBlock::of("name: string", ()).unwrap(),
+        CodeBlock::of("age: number", ()).unwrap(),
+    ];
+
+    let block = sigil_quote!(TypeScript {
+        export function foo() {
+            $C_each(params);
+        }
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(output.contains("export function foo()"), "got:\n{output}");
+    assert!(output.contains("name: string"), "got:\n{output}");
+    assert!(output.contains("age: number"), "got:\n{output}");
+}
+
+#[test]
+fn test_c_each_inside_method_shorthand() {
+    let params = vec![
+        CodeBlock::of("name: string", ()).unwrap(),
+        CodeBlock::of("age: number", ()).unwrap(),
+    ];
+
+    let block = sigil_quote!(TypeScript {
+        class MyClass {
+            foo() {
+                $C_each(params);
+            }
+        }
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(output.contains("class MyClass"), "got:\n{output}");
+    assert!(output.contains("foo()"), "got:\n{output}");
+    assert!(output.contains("name: string"), "got:\n{output}");
+    assert!(output.contains("age: number"), "got:\n{output}");
+}
+
+#[test]
+fn test_c_each_inside_plain_function() {
+    let params = vec![CodeBlock::of("x = 1", ()).unwrap()];
+
+    let block = sigil_quote!(TypeScript {
+        function bar() {
+            $C_each(params);
+        }
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(output.contains("function bar()"), "got:\n{output}");
+    assert!(output.contains("x = 1"), "got:\n{output}");
+}
