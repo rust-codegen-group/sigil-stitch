@@ -6,13 +6,14 @@ use crate::lang::CodeLang;
 use crate::spec::annotation_spec::AnnotationSpec;
 use crate::spec::enum_variant_spec::EnumVariantSpec;
 use crate::spec::field_spec::FieldSpec;
-use crate::spec::fun_spec::{
-    FunSpec, TypeParamSpec, WhereClauseStyle, WhereConstraint, emit_separate_where_block,
-    emit_where_block, render_type_params,
-};
+use crate::spec::fun_spec::FunSpec;
 use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::property_spec::PropertySpec;
+use crate::spec::where_spec::{
+    TypeParamSpec, WhereClauseStyle, WhereConstraint, emit_separate_where_block, emit_where_block,
+    render_type_params,
+};
 use crate::type_name::TypeName;
 
 /// A type declaration (struct, class, interface, trait, enum).

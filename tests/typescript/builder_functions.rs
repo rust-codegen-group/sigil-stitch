@@ -1,8 +1,9 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::spec::file_spec::FileSpec;
-use sigil_stitch::spec::fun_spec::{FunSpec, TypeParamSpec};
+use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::Visibility;
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
+use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
 use super::golden;

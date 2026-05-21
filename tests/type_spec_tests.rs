@@ -5,10 +5,11 @@ use sigil_stitch::lang::rust_lang::RustLang;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::field_spec::FieldSpec;
-use sigil_stitch::spec::fun_spec::{FunSpec, TypeParamSpec};
+use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
 fn render_blocks_ts(blocks: &[CodeBlock]) -> String {

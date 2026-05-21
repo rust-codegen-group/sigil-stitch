@@ -4,8 +4,9 @@
 //! because they represent cross-cutting concepts — quote style, optional-field
 //! semantics, type presentation — that multiple languages express in similar ways.
 
-use crate::spec::fun_spec::{FunctionSignatureStyle, ParamListStyle, WhereClauseStyle};
+use crate::spec::fun_spec::{FunctionSignatureStyle, ParamListStyle};
 use crate::spec::modifiers::ConstructorDelegationStyle;
+use crate::spec::where_spec::WhereClauseStyle;
 use crate::type_name::{
     AssociatedTypeStyle, BoundsPresentation, FunctionPresentation, GenericApplicationStyle,
     TypePresentation, WildcardPresentation,

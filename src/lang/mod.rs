@@ -43,18 +43,38 @@ pub(crate) mod shell_syntax;
 
 use crate::import::ImportGroup;
 
-/// Narrow trait containing only the methods needed by `CodeRenderer` and
-/// `TypeName` rendering. Implement this for basic `CodeBlock` rendering
-/// without needing the full spec-layer surface.
+/// Narrow trait for `CodeRenderer` and `TypeName` rendering.
 ///
-/// All 14 methods here are used directly by `code_renderer.rs` or by
-/// `TypeName::to_doc_with_lang` (which is called during rendering).
+/// Implementors must provide:
+/// - [`file_extension`](Self::file_extension)
+/// - [`line_comment_prefix`](Self::line_comment_prefix)
+/// - [`reserved_words`](Self::reserved_words) (default `&[]` — useless for real languages)
+/// - [`type_presentation`](Self::type_presentation) (rules for compound type rendering)
+/// - [`block_syntax`](Self::block_syntax) (delimiters, indentation, statement terminator)
+///
+/// The remaining methods have defaults suitable for most brace/double-quote
+/// languages. Override only when your language differs.
 pub trait RendererLang: std::fmt::Debug + 'static {
     /// File extension for this language (e.g., "ts", "go", "rs").
     fn file_extension(&self) -> &str;
 
     /// Render a string literal with language-appropriate quoting and escaping.
-    fn render_string_literal(&self, s: &str) -> String;
+    ///
+    /// Default: double-quote with C-style escaping (`\\`, `\"`, `\n`, `\t`,
+    /// `\r`, `\0`). Override for languages with different quoting
+    /// conventions (shell, JS/TS, Python, Kotlin, Dart, Go, Haskell,
+    /// Rust, OCaml, Lua).
+    fn render_string_literal(&self, s: &str) -> String {
+        format!(
+            "\"{}\"",
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\t', "\\t")
+                .replace('\r', "\\r")
+                .replace('\0', "\\0")
+        )
+    }
 
     /// Render a verbatim string literal with minimal escaping.
     ///
@@ -287,7 +307,10 @@ pub trait CodeLang: RendererLang {
     /// Render a type context / constraint prefix for split function signatures.
     ///
     /// Default: `""` (no context).
-    fn render_type_context(&self, _type_params: &[crate::spec::fun_spec::TypeParamSpec]) -> String {
+    fn render_type_context(
+        &self,
+        _type_params: &[crate::spec::where_spec::TypeParamSpec],
+    ) -> String {
         String::new()
     }
 
@@ -319,7 +342,7 @@ pub trait CodeLang: RendererLang {
     /// Render a type parameter's kind annotation (for higher-kinded types).
     ///
     /// Default: empty string.
-    fn render_type_param_kind(&self, _kind: &crate::spec::fun_spec::TypeParamKind) -> String {
+    fn render_type_param_kind(&self, _kind: &crate::spec::where_spec::TypeParamKind) -> String {
         String::new()
     }
 

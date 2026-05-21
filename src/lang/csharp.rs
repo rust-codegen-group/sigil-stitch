@@ -133,18 +133,6 @@ impl RendererLang for CSharp {
         }
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-                .replace('\0', "\\0")
-        )
-    }
-
     fn render_verbatim_string(&self, s: &str) -> String {
         let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
         format!("$\"{escaped}\"")
@@ -295,7 +283,7 @@ impl CodeLang for CSharp {
             return_type_separator: " ",
             async_keyword: "async ",
             suppress_async_in_interface: true,
-            where_clause_style: crate::spec::fun_spec::WhereClauseStyle::SeparateWhere,
+            where_clause_style: crate::spec::where_spec::WhereClauseStyle::SeparateWhere,
             ..Default::default()
         }
     }

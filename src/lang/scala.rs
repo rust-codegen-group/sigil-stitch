@@ -131,18 +131,6 @@ impl RendererLang for Scala {
         }
     }
 
-    fn render_string_literal(&self, s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\t', "\\t")
-                .replace('\r', "\\r")
-                .replace('\0', "\\0")
-        )
-    }
-
     fn render_verbatim_string(&self, s: &str) -> String {
         let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
         format!("s\"{escaped}\"")
@@ -300,11 +288,11 @@ impl CodeLang for Scala {
         }
     }
 
-    fn render_type_param_kind(&self, kind: &crate::spec::fun_spec::TypeParamKind) -> String {
+    fn render_type_param_kind(&self, kind: &crate::spec::where_spec::TypeParamKind) -> String {
         match kind {
-            crate::spec::fun_spec::TypeParamKind::Constructor1 => "[_]".to_string(),
-            crate::spec::fun_spec::TypeParamKind::Constructor2 => "[_, _]".to_string(),
-            crate::spec::fun_spec::TypeParamKind::Raw(s) => s.clone(),
+            crate::spec::where_spec::TypeParamKind::Constructor1 => "[_]".to_string(),
+            crate::spec::where_spec::TypeParamKind::Constructor2 => "[_, _]".to_string(),
+            crate::spec::where_spec::TypeParamKind::Raw(s) => s.clone(),
         }
     }
 
@@ -576,7 +564,7 @@ mod tests {
     #[test]
     fn test_hkt_rendering() {
         let sc = Scala::new();
-        use crate::spec::fun_spec::TypeParamKind;
+        use crate::spec::where_spec::TypeParamKind;
         assert_eq!(
             sc.render_type_param_kind(&TypeParamKind::Constructor1),
             "[_]"

@@ -356,7 +356,10 @@ impl CodeLang for Haskell {
         format!("newtype {name} = {name} {inner}")
     }
 
-    fn render_type_context(&self, type_params: &[crate::spec::fun_spec::TypeParamSpec]) -> String {
+    fn render_type_context(
+        &self,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+    ) -> String {
         let resolve = |_module: &str, name: &str| name.to_string();
         let mut constraints: Vec<String> = Vec::new();
         for tp in type_params {
@@ -605,7 +608,7 @@ mod tests {
     #[test]
     fn test_render_type_context_empty() {
         let hs = Haskell::new();
-        let params: Vec<crate::spec::fun_spec::TypeParamSpec> = vec![];
+        let params: Vec<crate::spec::where_spec::TypeParamSpec> = vec![];
         assert_eq!(hs.render_type_context(&params), "");
     }
 
@@ -613,7 +616,7 @@ mod tests {
     fn test_render_type_context_single() {
         let hs = Haskell::new();
         let params = vec![
-            crate::spec::fun_spec::TypeParamSpec::new("a")
+            crate::spec::where_spec::TypeParamSpec::new("a")
                 .with_bound(crate::type_name::TypeName::primitive("Show")),
         ];
         assert_eq!(hs.render_type_context(&params), "Show a => ");
@@ -623,7 +626,7 @@ mod tests {
     fn test_render_type_context_multiple() {
         let hs = Haskell::new();
         let params = vec![
-            crate::spec::fun_spec::TypeParamSpec::new("a")
+            crate::spec::where_spec::TypeParamSpec::new("a")
                 .with_bound(crate::type_name::TypeName::primitive("Show"))
                 .with_bound(crate::type_name::TypeName::primitive("Eq")),
         ];

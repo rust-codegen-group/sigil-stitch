@@ -105,15 +105,16 @@ pub mod prelude {
     pub use crate::spec::enum_variant_spec::EnumVariantSpec;
     pub use crate::spec::field_spec::FieldSpec;
     pub use crate::spec::file_spec::{FileMember, FileSpec};
-    pub use crate::spec::fun_spec::{
-        FunSpec, TypeParamKind, TypeParamSpec, WhereClauseStyle, WhereConstraint,
-    };
+    pub use crate::spec::fun_spec::FunSpec;
     pub use crate::spec::import_spec::ImportSpec;
     pub use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
     pub use crate::spec::parameter_spec::ParameterSpec;
     pub use crate::spec::project_spec::{ProjectSpec, RenderedFile};
     pub use crate::spec::property_spec::PropertySpec;
     pub use crate::spec::type_spec::TypeSpec;
+    pub use crate::spec::where_spec::{
+        TypeParamKind, TypeParamSpec, WhereClauseStyle, WhereConstraint,
+    };
     pub use crate::type_name::TypeName;
     pub use sigil_stitch_macros::sigil_quote;
 }

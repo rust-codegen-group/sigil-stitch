@@ -22,3 +22,5 @@ pub mod project_spec;
 pub mod property_spec;
 /// Type declaration specifications (struct, class, interface, trait, enum).
 pub mod type_spec;
+/// Where-clause types and rendering for generic declarations.
+pub mod where_spec;

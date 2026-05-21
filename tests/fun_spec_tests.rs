@@ -4,9 +4,10 @@ use sigil_stitch::import::ImportGroup;
 use sigil_stitch::lang::rust_lang::RustLang;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::emittable::Emittable;
-use sigil_stitch::spec::fun_spec::{FunSpec, TypeParamKind, TypeParamSpec};
+use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
+use sigil_stitch::spec::where_spec::{TypeParamKind, TypeParamSpec};
 use sigil_stitch::type_name::TypeName;
 
 fn emit_fun_ts(spec: &FunSpec, ctx: DeclarationContext) -> String {

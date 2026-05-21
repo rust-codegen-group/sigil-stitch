@@ -4,8 +4,8 @@ use crate::lang::config::{
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
 use crate::lang::{CodeLang, RendererLang};
-use crate::spec::fun_spec::WhereClauseStyle;
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::spec::where_spec::WhereClauseStyle;
 use crate::type_name::{FunctionPresentation, TypePresentation, WildcardPresentation};
 
 /// Rust language implementation.

@@ -52,7 +52,7 @@ fn test_function_with_context() {
     let body = CodeBlock::of("show x", ()).unwrap();
     let fun = FunSpec::builder("display")
         .add_type_param(
-            sigil_stitch::spec::fun_spec::TypeParamSpec::new("a")
+            sigil_stitch::spec::where_spec::TypeParamSpec::new("a")
                 .with_bound(TypeName::primitive("Show")),
         )
         .add_param(ParameterSpec::new("x", TypeName::primitive("a")).unwrap())
@@ -113,7 +113,7 @@ fn test_multi_constraint_context() {
     let body = CodeBlock::of("show x", ()).unwrap();
     let fun = FunSpec::builder("display")
         .add_type_param(
-            sigil_stitch::spec::fun_spec::TypeParamSpec::new("a")
+            sigil_stitch::spec::where_spec::TypeParamSpec::new("a")
                 .with_bound(TypeName::primitive("Show"))
                 .with_bound(TypeName::primitive("Eq")),
         )
