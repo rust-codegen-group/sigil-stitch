@@ -139,10 +139,30 @@ fn build_args_tuple(args: &[TypedArg]) -> TokenStream {
             .map(|arg| {
                 let expr = &arg.expr;
                 match arg.kind {
-                    InterpolationKind::Type
-                    | InterpolationKind::Literal
-                    | InterpolationKind::Code => {
+                    InterpolationKind::Type | InterpolationKind::Code => {
                         quote! { #expr }
+                    }
+                    InterpolationKind::Literal => {
+                        match extract_at_interpolation(expr) {
+                            Some(VerbatimResult::Interpolated {
+                                format_string,
+                                expressions,
+                            }) => {
+                                let fmt_lit = Literal::string(&format_string);
+                                let exprs: Vec<TokenStream> = expressions
+                                    .iter()
+                                    .map(|e| e.parse::<TokenStream>().unwrap())
+                                    .collect();
+                                quote! { ::std::format!(#fmt_lit, #(#exprs),*) }
+                            }
+                            Some(VerbatimResult::Literal(s)) => {
+                                let lit = Literal::string(&s);
+                                quote! { ::std::string::String::from(#lit) }
+                            }
+                            _ => {
+                                quote! { #expr }
+                            }
+                        }
                     }
                     InterpolationKind::Name => {
                         quote! { ::sigil_stitch::code_block::NameArg((#expr).to_string()) }
@@ -151,7 +171,7 @@ fn build_args_tuple(args: &[TypedArg]) -> TokenStream {
                         quote! { ::sigil_stitch::code_block::StringLitArg((#expr).to_string()) }
                     }
                     InterpolationKind::VerbatimStr => {
-                        match extract_verbatim_interpolation(expr) {
+                        match extract_at_interpolation(expr) {
                             Some(VerbatimResult::Interpolated {
                                 format_string,
                                 expressions,
@@ -223,11 +243,11 @@ fn generate_meta_if(branches: &[MetaBranch]) -> TokenStream {
     result
 }
 
-/// Try to extract a string literal from a token stream and parse `@{expr}` interpolations.
+/// Try to extract a string literal from a token stream and parse `@{expr}` interpolation.
 ///
-/// Returns `None` if the expression is not a single string literal (e.g. a variable or
-/// function call), in which case the expression is used as-is.
-fn extract_verbatim_interpolation(expr: &TokenStream) -> Option<VerbatimResult> {
+/// Used by both `$V` (verbatim) and `$L` (literal). Returns `None` if the expression
+/// is not a single string literal, in which case the expression is used as-is.
+fn extract_at_interpolation(expr: &TokenStream) -> Option<VerbatimResult> {
     let tokens: Vec<TokenTree> = expr.clone().into_iter().collect();
     if tokens.len() != 1 {
         return None;

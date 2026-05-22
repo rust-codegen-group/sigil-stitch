@@ -459,3 +459,71 @@ fn test_c_each_inside_plain_function() {
     assert!(output.contains("function bar()"), "got:\n{output}");
     assert!(output.contains("x = 1"), "got:\n{output}");
 }
+
+// ── @{expr} in $L and $V ─────────────────────────────────
+
+#[test]
+fn test_literal_at_interpolation_typescript() {
+    let disc = "foo.bar";
+    let block = sigil_quote!(TypeScript {
+        switch ($L("@{disc}")) {
+            $L("case 1:") {
+                break;
+            }
+        }
+    })
+    .unwrap();
+    let output = render_ts(&block);
+    assert!(output.contains("switch (foo.bar)"), "got:\n{output}");
+}
+
+#[test]
+fn test_literal_at_interpolation_multiple() {
+    let prefix = "data";
+    let suffix = "type";
+    let block = sigil_quote!(TypeScript {
+        const name = $L("@{prefix}_@{suffix}");
+    })
+    .unwrap();
+    let output = render_ts(&block);
+    assert!(output.contains("const name = data_type;"), "got:\n{output}");
+}
+
+#[test]
+fn test_literal_at_escape() {
+    let block = sigil_quote!(TypeScript {
+        const user = $L("admin@@local");
+    })
+    .unwrap();
+    let output = render_ts(&block);
+    assert!(
+        output.contains("const user = admin@local;"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_verbatim_at_typescript_no_backticks() {
+    // $V wraps in backticks for TS — but @{expr} resolve first
+    let name = "Alice";
+    let block = sigil_quote!(TypeScript {
+        const greeting = $V("Hello, @{name}");
+    })
+    .unwrap();
+    let output = render_ts(&block);
+    assert!(
+        output.contains("const greeting = `Hello, Alice`;"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_literal_no_at_unchanged() {
+    // No @ present — behaves like normal $L
+    let block = sigil_quote!(TypeScript {
+        const x = $L("42");
+    })
+    .unwrap();
+    let output = render_ts(&block);
+    assert!(output.contains("const x = 42;"), "got:\n{output}");
+}
