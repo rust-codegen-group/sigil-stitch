@@ -39,19 +39,32 @@ pub(super) fn classify(prefix_tokens: &[TokenTree], group: &proc_macro2::Group) 
     let last_is_eq = prefix_tokens
         .last()
         .is_some_and(|t| matches!(t, TokenTree::Punct(p) if p.as_char() == '='));
-    let has_paren_group = prefix_tokens
-        .iter()
-        .any(|t| matches!(t, TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis));
+    let has_paren_group = prefix_tokens.iter().enumerate().any(|(i, t)| {
+        if matches!(t, TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis) {
+            // Exclude paren groups that belong to sigil-stitch interpolation
+            // markers ($N(...), $V(...), $C_each(...), etc.). These are NOT
+            // function-signature parens; they only appear as interpolation args.
+            // Pattern: Punct('$'), Ident(_), Group(Paren)
+            !is_interpolation_paren(prefix_tokens, i)
+        } else {
+            false
+        }
+    });
 
     // Exception: `foo() { $... }` where a paren group precedes the brace
     // (method shorthand / function declaration) and the body contains
     // sigil-stitch markers. Without this, `foo() { $C_each(items); }` is
     // misclassified as a function call with an object-literal argument.
     let body_has_meta = has_meta_marker(group);
+    let body_has_stmt_marker = has_statement_marker(group);
     let is_function_body = last_is_eq && has_paren_group && should_be_block(group);
     let is_method_with_meta = has_paren_group && body_has_meta;
+    // `= { $C_each(...) }` — object literal containing statement-level markers.
+    // Use `has_statement_marker` (not `has_meta_marker`) to avoid triggering on
+    // inline specifiers like `$S("x")` inside Lua table constructors.
+    let is_eq_object_with_stmt = last_is_eq && body_has_stmt_marker;
 
-    if is_function_body || is_method_with_meta {
+    if is_function_body || is_method_with_meta || is_eq_object_with_stmt {
         BraceKind::ControlFlow
     } else {
         BraceKind::Literal
@@ -134,6 +147,42 @@ pub(super) fn looks_like_control_flow_header(tokens: &[TokenTree]) -> bool {
     // Default: assume control flow — backward compatible with brace languages
     // where `{` at statement level always denotes a block.
     true
+}
+
+/// Check whether the paren group at `pos` in `tokens` is part of a
+/// sigil-stitch interpolation marker (pattern: `$Ident(...)`).
+fn is_interpolation_paren(tokens: &[TokenTree], pos: usize) -> bool {
+    if pos < 2 {
+        return false;
+    }
+    matches!(&tokens[pos - 2], TokenTree::Punct(p) if p.as_char() == '$')
+        && matches!(&tokens[pos - 1], TokenTree::Ident(_))
+}
+
+/// Check if a brace group contains a statement-level sigil marker
+/// (`$C_each`, `$for`, `$if`, `$let`) that requires a control-flow context.
+/// Unlike `has_meta_marker`, this skips inline specifiers (`$S`, `$V`, `$L`,
+/// `$N`, `$T`, `$join`) which work fine inside literal brace groups.
+fn has_statement_marker(g: &proc_macro2::Group) -> bool {
+    let stream: Vec<TokenTree> = g.stream().into_iter().collect();
+    let mut i = 0;
+    while i < stream.len() {
+        if i + 1 < stream.len()
+            && let TokenTree::Punct(p) = &stream[i]
+            && p.as_char() == '$'
+            && let TokenTree::Ident(id) = &stream[i + 1]
+        {
+            let s = id.to_string();
+            if matches!(
+                s.as_str(),
+                "C_each" | "for" | "if" | "else_if" | "else" | "let"
+            ) {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
 }
 
 /// Check if a brace group contains any `$` sigil at the top level,
