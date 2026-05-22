@@ -16,13 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_basic() {
-    let block = sigil_quote!(CSharp {
-        string name = $S("Alice");
-        int age = 30;
-        Console.WriteLine(name);
-    })
-    .unwrap();
-    golden::assert_golden("csharp/macro_basic.cs", &render(&block));
+    crate::shared::run_basic_test::<super::quote_suite::CSharpSuite>();
 }
 
 #[test]

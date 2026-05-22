@@ -15,13 +15,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_basic() {
-    let block = sigil_quote!(Bash {
-        NAME=$S("Alice");
-        AGE=30;
-        echo $L("$NAME") $L("$AGE");
-    })
-    .unwrap();
-    golden::assert_golden("bash/macro_basic.bash", &render(&block));
+    crate::shared::run_basic_test::<super::quote_suite::BashSuite>();
 }
 
 #[test]

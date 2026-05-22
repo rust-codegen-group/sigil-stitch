@@ -16,17 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_if_else() {
-    let block = sigil_quote!(CSharp {
-        if (x > 0) {
-            return 1;
-        } else if (x < 0) {
-            return -1;
-        } else {
-            return 0;
-        }
-    })
-    .unwrap();
-    golden::assert_golden("csharp/macro_control_flow.cs", &render(&block));
+    crate::shared::run_control_flow_test::<super::quote_suite::CSharpSuite>();
 }
 
 #[test]

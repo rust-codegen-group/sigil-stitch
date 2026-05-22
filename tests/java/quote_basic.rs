@@ -16,13 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_basic() {
-    let block = sigil_quote!(JavaLang {
-        String name = $S("Alice");
-        int age = 30;
-        System.out.println(name);
-    })
-    .unwrap();
-    golden::assert_golden("java/macro_basic.java", &render(&block));
+    crate::shared::run_basic_test::<super::quote_suite::JavaSuite>();
 }
 
 #[test]

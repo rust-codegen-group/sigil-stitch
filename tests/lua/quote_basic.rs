@@ -16,13 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_basic() {
-    let block = sigil_quote!(Lua {
-        local name = $S("Alice")
-        local age = 30
-        print(name, age)
-    })
-    .unwrap();
-    golden::assert_golden("lua/macro_basic.lua", &render(&block));
+    crate::shared::run_basic_test::<super::quote_suite::LuaSuite>();
 }
 
 #[test]

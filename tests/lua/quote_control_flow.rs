@@ -16,17 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_if_else() {
-    let block = sigil_quote!(Lua {
-        if x > 0 then {
-            return $S("positive")
-        } elseif x < 0 then {
-            return $S("negative")
-        } else {
-            return $S("zero")
-        }
-    })
-    .unwrap();
-    golden::assert_golden("lua/macro_control_flow.lua", &render(&block));
+    crate::shared::run_control_flow_test::<super::quote_suite::LuaSuite>();
 }
 
 #[test]

@@ -16,15 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_control_flow() {
-    let block = sigil_quote!(GoLang {
-        if x > 0 {
-            return $S("positive");
-        } else {
-            return $S("negative");
-        }
-    })
-    .unwrap();
-    golden::assert_golden("go/macro_control_flow.go", &render(&block));
+    crate::shared::run_control_flow_test::<super::quote_suite::GoSuite>();
 }
 
 #[test]

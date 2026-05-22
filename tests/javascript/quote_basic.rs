@@ -16,13 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_basic() {
-    let block = sigil_quote!(JavaScript {
-        const name = $S("Alice");
-        const age = $L("30");
-        console.log(name, age);
-    })
-    .unwrap();
-    golden::assert_golden("javascript/macro_basic.js", &render(&block));
+    crate::shared::run_basic_test::<super::quote_suite::JavaScriptSuite>();
 }
 
 #[test]

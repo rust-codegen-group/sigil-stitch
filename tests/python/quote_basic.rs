@@ -15,13 +15,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_basic() {
-    let block = sigil_quote!(Python {
-        name = $S("Alice");
-        age = 30;
-        print(name, age);
-    })
-    .unwrap();
-    golden::assert_golden("python/macro_basic.py", &render(&block));
+    crate::shared::run_basic_test::<super::quote_suite::PythonSuite>();
 }
 
 #[test]

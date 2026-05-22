@@ -16,13 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_basic() {
-    let block = sigil_quote!(CLang {
-        int x = 42;
-        float y = 3.14;
-        printf($S("x=%d y=%f"), x, y);
-    })
-    .unwrap();
-    golden::assert_golden("c/macro_basic.c", &render(&block));
+    crate::shared::run_basic_test::<super::quote_suite::CSuite>();
 }
 
 #[test]

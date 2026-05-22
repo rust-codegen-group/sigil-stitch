@@ -16,12 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_basic() {
-    let block = sigil_quote!(Haskell {
-        let x = 42;
-        putStrLn $S("hello");
-    })
-    .unwrap();
-    golden::assert_golden("haskell/macro_basic.hs", &render(&block));
+    crate::shared::run_basic_test::<super::quote_suite::HaskellSuite>();
 }
 
 #[test]
