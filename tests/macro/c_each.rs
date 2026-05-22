@@ -527,3 +527,26 @@ fn test_literal_no_at_unchanged() {
     let output = render_ts(&block);
     assert!(output.contains("const x = 42;"), "got:\n{output}");
 }
+
+// ── $C_each inside object literal after $N assignment ─────
+
+#[test]
+fn test_c_each_inside_object_literal_with_name_interp() {
+    let entries = vec![
+        CodeBlock::of("name: \"Alice\",", ()).unwrap(),
+        CodeBlock::of("age: 30,", ()).unwrap(),
+    ];
+    let name = "config";
+
+    let block = sigil_quote!(TypeScript {
+        export const $N(name) = {
+            $C_each(entries);
+        }
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(output.contains("export const config = {"), "got:\n{output}");
+    assert!(output.contains("name: \"Alice\""), "got:\n{output}");
+    assert!(output.contains("age: 30"), "got:\n{output}");
+}
