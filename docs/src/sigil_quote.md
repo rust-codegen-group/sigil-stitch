@@ -142,7 +142,7 @@ let block = sigil_quote!(Bash {
 
 #### `@{expr}` interpolation
 
-Embed Rust expressions inside `$V` string literals with `@{expr}`. These are resolved at compile time while the rest passes through for the target language's runtime:
+Embed Rust expressions inside `$V` or `$L` string literals with `@{expr}`. These are resolved at compile time while the rest passes through for the target language's runtime:
 
 ```rust
 # extern crate sigil_stitch;
@@ -157,7 +157,9 @@ let block = sigil_quote!(Bash {
 # }
 ```
 
-Use `@@` to emit a literal `@`. Bare `@` not followed by `{` passes through unchanged. Works with all languages that support `$V`.
+Use `$V` when the output should be wrapped in the target language's string delimiter; use `$L` when you need plain unwrapped text (e.g., type expressions, switch headers).
+
+Use `@@` to emit a literal `@`. Bare `@` not followed by `{` passes through unchanged. Works with all languages.
 
 ### Literals (`$L`)
 

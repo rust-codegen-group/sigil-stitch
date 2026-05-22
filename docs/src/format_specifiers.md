@@ -171,9 +171,9 @@ For Bash/Zsh, `%V` is pure passthrough — the string is emitted as-is with no w
 
 For languages without string interpolation (C, C++, Go, Rust, Java, Haskell, OCaml, Lua), `%V` falls back to `%S` behavior (full escaping).
 
-### `@{expr}` interpolation in `$V`
+### `@{expr}` interpolation in `$V` and `$L`
 
-When using `$V` with a string literal in `sigil_quote!`, you can embed Rust expressions with `@{expr}`. These are evaluated at compile time and spliced into the verbatim output:
+When using `$V` or `$L` with a string literal in `sigil_quote!`, you can embed Rust expressions with `@{expr}`. These are evaluated at compile time and spliced into the output:
 
 ```rust
 # extern crate sigil_stitch;
@@ -185,6 +185,25 @@ let block = sigil_quote!(Bash {
     docker push $V("@{registry}/myapp:@{tag}")
 }).unwrap();
 // Output: docker push ghcr.io/myapp:latest
+# }
+```
+
+Use `$V` when you want the result wrapped in the target language's string delimiter (backticks for JS/TS, `f"..."` for Python, etc.). Use `$L` when you need plain unwrapped output — type expressions, switch headers, return statements, and other non-string-literal contexts:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let disc = "foo.bar";
+let block = sigil_quote!(TypeScript {
+    switch ($L("@{disc}")) {
+        $L("case 1:") {
+            break;
+        }
+    }
+}).unwrap();
+// Output: switch (foo.bar) {
+// (No backticks — $L emits plain text, $V would wrap in `...`)
 # }
 ```
 
@@ -217,9 +236,11 @@ let block = sigil_quote!(Bash {
 # }
 ```
 
-If `$V` receives a non-literal expression (e.g. `$V(my_var)` or `$V(format!(...))`), `@{...}` processing is skipped and the expression is used as-is.
+If the expression is not a string literal (e.g. `$V(my_var)` or `$L(format!(...))`), `@{...}` processing is skipped and the expression is used as-is.
 
 ## `%L` -- Literal
+
+Emits a raw value with no transformation. This is the default for bare `&str` and `String` arguments, so no wrapper is needed. Also accepts `CodeBlock` for embedding nested blocks. Supports `@{expr}` interpolation inside string literals (see above).
 
 Emits a raw value with no transformation. This is the default for bare `&str` and `String` arguments, so no wrapper is needed. Also accepts `CodeBlock` for embedding nested blocks.
 

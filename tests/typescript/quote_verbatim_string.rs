@@ -88,3 +88,42 @@ fn verbatim_at_expr_method_call() {
     let output = render(&block);
     assert!(output.contains("`total: 3 items`"), "got:\n{output}");
 }
+
+// ── $L with @{expr} (plain text, no backticks) ────────────
+
+#[test]
+fn literal_at_interpolation_plain_text() {
+    let disc = "foo.bar";
+    let block = sigil_quote!(TypeScript {
+        switch ($L("@{disc}")) {
+            $L("case 1:") {
+                break;
+            }
+        }
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("switch (foo.bar)"), "got:\n{output}");
+    assert!(
+        !output.contains("`foo.bar`"),
+        "$L should NOT wrap in backticks, got:\n{output}"
+    );
+}
+
+#[test]
+fn literal_at_vs_verbatim_at_typescript() {
+    let name = "Alice";
+    let block = sigil_quote!(TypeScript {
+        const a = $V("Hello, @{name}");
+        const b = $L("@{name}");
+    })
+    .unwrap();
+    let output = render(&block);
+    // $V wraps in backticks
+    assert!(
+        output.contains("const a = `Hello, Alice`;"),
+        "got:\n{output}"
+    );
+    // $L does NOT wrap
+    assert!(output.contains("const b = Alice;"), "got:\n{output}");
+}

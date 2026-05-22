@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.3
+
+### Added
+
+- `@{expr}` compile-time interpolation inside `$L` string literals. Like
+  `$V`, `$L("@{expr}")` resolves Rust expressions at macro expansion time,
+  but emits the result as-is with no wrapping quotes or template delimiters.
+  Suitable for type expressions, switch headers, return statements, and other
+  contexts where language-specific `$V` wrapping is unwanted.
+
 ## 0.6.2
 
 ### Fixed
