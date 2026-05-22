@@ -74,3 +74,20 @@ fn verbatim_at_expr_method_call() {
     let output = render(&block);
     assert!(output.contains("f\"total=3\""), "got:\n{output}");
 }
+
+// ── $L with @{expr} (plain text, no wrapping) ────────────
+
+#[test]
+fn literal_at_interpolation_python() {
+    let cls = "UserService";
+    let block = sigil_quote!(Python {
+        obj = $L("@{cls}()");
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("obj = UserService()"), "got:\n{output}");
+    assert!(
+        !output.contains("f\""),
+        "$L should NOT produce f-string, got:\n{output}"
+    );
+}

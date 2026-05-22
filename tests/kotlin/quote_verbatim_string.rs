@@ -74,3 +74,23 @@ fn verbatim_at_mixed_with_kotlin_interpolation() {
         "got:\n{output}"
     );
 }
+
+// ── $L with @{expr} (plain text, no quotes) ──────────────
+
+#[test]
+fn literal_at_interpolation_kotlin() {
+    let pkg = "com.example.auth";
+    let block = sigil_quote!(Kotlin {
+        val user = $L("@{pkg}.User()");
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("val user = com.example.auth.User()"),
+        "got:\n{output}"
+    );
+    assert!(
+        !output.contains("\"com.example.auth.User()\""),
+        "$L should NOT wrap in quotes, got:\n{output}"
+    );
+}
