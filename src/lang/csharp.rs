@@ -133,6 +133,10 @@ impl RendererLang for CSharp {
         }
     }
 
+    fn render_attribute(&self, text: &str) -> String {
+        format!("[{text}]")
+    }
+
     fn render_verbatim_string(&self, s: &str) -> String {
         let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
         format!("$\"{escaped}\"")

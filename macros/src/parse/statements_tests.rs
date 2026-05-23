@@ -147,6 +147,7 @@ fn stmt_kind(s: &Statement) -> &'static str {
         Statement::Line { .. } => "Line",
         Statement::BlankLine => "BlankLine",
         Statement::Comment(_) => "Comment",
+        Statement::Attr(_) => "Attr",
         Statement::ControlFlow { .. } => "ControlFlow",
         Statement::Indent => "Indent",
         Statement::Dedent => "Dedent",

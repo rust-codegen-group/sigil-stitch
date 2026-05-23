@@ -91,3 +91,22 @@ fn literal_at_interpolation_python() {
         "$L should NOT produce f-string, got:\n{output}"
     );
 }
+
+// ── $attr() ──────────────────────────────────────────────
+
+#[test]
+fn attr_decorator_python() {
+    let block = sigil_quote!(Python {
+        $attr("classmethod")
+
+        def from_dict(cls, data: dict):
+            pass
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("@classmethod"), "got:\n{output}");
+    assert!(
+        !output.contains("@classmethod\n\n"),
+        "blank line should be suppressed, got:\n{output}"
+    );
+}

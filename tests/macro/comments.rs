@@ -125,3 +125,109 @@ fn test_comment_attaches_to_declaration_after_blank_line() {
         "blank line should be suppressed after comment, got:\n{output}"
     );
 }
+
+// ── $attr() — language-aware attributes ──────────────────
+
+#[test]
+fn test_attr_basic_typescript() {
+    let block = sigil_quote!(TypeScript {
+        $attr("override")
+
+        process(): void {
+            return;
+        }
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(output.contains("@override"), "got:\n{output}");
+    assert!(
+        !output.contains("@override\n\n"),
+        "blank line should be suppressed after attribute, got:\n{output}"
+    );
+}
+
+#[test]
+fn test_attr_basic_rust() {
+    let block = sigil_quote!(RustLang {
+        $attr("derive(Debug, Clone)")
+
+        struct Foo;
+    })
+    .unwrap();
+
+    let output = render_rs(&block);
+    assert!(output.contains("#[derive(Debug, Clone)]"), "got:\n{output}");
+}
+
+#[test]
+fn test_attr_multiple() {
+    let block = sigil_quote!(TypeScript {
+        $attr("injectable()")
+        $attr("singleton()")
+
+        class MyService {}
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(output.contains("@injectable()"), "got:\n{output}");
+    assert!(output.contains("@singleton()"), "got:\n{output}");
+}
+
+#[test]
+fn test_attr_cpp_double_bracket() {
+    let block = sigil_quote!(CppLang {
+        $attr("nodiscard")
+
+        int getValue() {
+            return 42;
+        }
+    })
+    .unwrap();
+
+    let output = render_cpp(&block);
+    assert!(output.contains("[[nodiscard]]"), "got:\n{output}");
+}
+
+#[test]
+fn test_attr_rust_derive() {
+    let block = sigil_quote!(RustLang {
+        $attr("derive(Debug, Clone, Serialize, Deserialize)")
+
+        pub struct $N("User") {
+            name: String,
+        }
+    })
+    .unwrap();
+
+    let output = render_rs(&block);
+    assert!(
+        output.contains("#[derive(Debug, Clone, Serialize, Deserialize)]"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_attr_with_if_conditional() {
+    let needs_serde = true;
+    let block = sigil_quote!(RustLang {
+        $attr("derive(Debug, Clone)")
+
+        $if(needs_serde) {
+            $attr("serde(rename_all = \"camelCase\")")
+        }
+
+        struct $N("Config") {
+            name: String,
+        }
+    })
+    .unwrap();
+
+    let output = render_rs(&block);
+    assert!(output.contains("#[derive(Debug, Clone)]"), "got:\n{output}");
+    assert!(
+        output.contains("#[serde(rename_all = \"camelCase\")]"),
+        "got:\n{output}"
+    );
+}

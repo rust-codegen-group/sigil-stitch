@@ -81,6 +81,10 @@ impl RendererLang for RustLang {
         }
     }
 
+    fn render_attribute(&self, text: &str) -> String {
+        format!("#[{text}]")
+    }
+
     fn module_separator(&self) -> Option<&str> {
         Some("::")
     }

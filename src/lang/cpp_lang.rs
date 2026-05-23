@@ -176,6 +176,10 @@ impl RendererLang for CppLang {
         "//"
     }
 
+    fn render_attribute(&self, text: &str) -> String {
+        format!("[[{text}]]")
+    }
+
     fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
         crate::lang::config::TypePresentationConfig {
             array: crate::type_name::TypePresentation::GenericWrap {

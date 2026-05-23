@@ -41,6 +41,22 @@ fn verbatim_at_interpolation_multiple() {
     assert!(output.contains("\"com.example.Main\""), "got:\n{output}");
 }
 
+// ── $attr() ──────────────────────────────────────────────
+
+#[test]
+fn attr_annotation_java() {
+    let block = sigil_quote!(JavaLang {
+        $attr("Override")
+
+        public String toString() {
+            return $S("hello");
+        }
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("@Override"), "got:\n{output}");
+}
+
 #[test]
 fn verbatim_at_escape() {
     let block = sigil_quote!(Java {

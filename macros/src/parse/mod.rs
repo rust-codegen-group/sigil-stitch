@@ -100,7 +100,10 @@ pub(super) fn parse_body(
                 // attach to the following declaration without a separator.
                 // This mirrors the spec-level behavior where FunSpec/TypeSpec
                 // render doc comments and declarations together.
-                let suppress = matches!(statements.last(), Some(Statement::Comment(_)));
+                let suppress = matches!(
+                    statements.last(),
+                    Some(Statement::Comment(_) | Statement::Attr(_))
+                );
                 if !suppress {
                     for _ in 0..gap {
                         statements.push(Statement::BlankLine);

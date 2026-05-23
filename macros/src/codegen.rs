@@ -46,6 +46,11 @@ fn generate_statements(statements: &[Statement]) -> Vec<TokenStream> {
                     __sigil_builder.add_comment(#text);
                 });
             }
+            Statement::Attr(text) => {
+                calls.push(quote! {
+                    __sigil_builder.add_attribute(#text);
+                });
+            }
             Statement::Statement { format, args } => {
                 let args_tuple = build_args_tuple(args);
                 calls.push(quote! {

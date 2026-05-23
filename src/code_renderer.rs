@@ -142,6 +142,11 @@ impl<'a> CodeRenderer<'a> {
                     let comment = Self::resolve_comment(self.lang, text);
                     self.emit(&comment);
                 }
+                CodeNode::Attribute(text) => {
+                    self.ensure_indent();
+                    let attr = self.lang.render_attribute(text);
+                    self.emit(&attr);
+                }
                 CodeNode::SoftBreak => {
                     self.emit(" ");
                 }
@@ -233,6 +238,7 @@ impl<'a> CodeRenderer<'a> {
                 CodeNode::InlineLiteral(s) => BoxDoc::text(s.clone()),
                 CodeNode::Nested(block) => self.nodes_to_doc(&block.nodes),
                 CodeNode::Comment(text) => BoxDoc::text(Self::resolve_comment(self.lang, text)),
+                CodeNode::Attribute(text) => BoxDoc::text(self.lang.render_attribute(text)),
                 CodeNode::SoftBreak => BoxDoc::softline(),
                 CodeNode::Indent | CodeNode::Dedent => BoxDoc::nil(),
                 CodeNode::StatementBegin => BoxDoc::nil(),

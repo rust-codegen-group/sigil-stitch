@@ -60,3 +60,17 @@ fn verbatim_at_escape() {
     let output = render(&block);
     assert!(output.contains("$\"user@host.com\""), "got:\n{output}");
 }
+
+// ── $attr() ──────────────────────────────────────────────
+
+#[test]
+fn attr_bracket_csharp() {
+    let block = sigil_quote!(CSharp {
+        $attr("Serializable")
+
+        public class Foo {}
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("[Serializable]"), "got:\n{output}");
+}

@@ -98,6 +98,14 @@ pub trait RendererLang: std::fmt::Debug + 'static {
         ""
     }
 
+    /// Render an attribute / annotation with language-specific syntax.
+    ///
+    /// Default: `"@{text}"` (Java/Python/Kotlin/TypeScript decorator style).
+    /// Override for Rust (`#[text]`), C++ (`[[text]]`), C# (`[text]`), etc.
+    fn render_attribute(&self, text: &str) -> String {
+        format!("@{text}")
+    }
+
     /// Reserved words that need escaping.
     fn reserved_words(&self) -> &[&str] {
         &[]

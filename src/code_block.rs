@@ -368,6 +368,16 @@ impl CodeBlockBuilder {
         self
     }
 
+    /// Add a language-aware attribute / annotation.
+    ///
+    /// Rendered with the language's annotation prefix and suffix
+    /// (Rust: `#[text]`, Java/Python: `@text`, C++: `[[text]]`).
+    pub fn add_attribute(&mut self, text: &str) -> &mut Self {
+        self.nodes.push(CodeNode::Attribute(text.to_string()));
+        self.nodes.push(CodeNode::Newline);
+        self
+    }
+
     /// Add a nested CodeBlock inline.
     pub fn add_code(&mut self, block: CodeBlock) -> &mut Self {
         self.nodes.push(CodeNode::Nested(block));

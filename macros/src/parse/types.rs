@@ -45,6 +45,10 @@ pub(crate) enum Statement {
     BlankLine,
     /// `add_comment(text)` — `$comment("text")`.
     Comment(String),
+    /// `add_attribute(text)` — `$attr("text")`. Language-aware attribute/annotation
+    /// that renders with the target language's prefix/suffix (Rust: #[...],
+    /// Java/Python: @..., C++: [[...]]).
+    Attr(String),
     /// Control flow: `begin_control_flow` / `next_control_flow` / `end_control_flow`.
     ControlFlow { branches: Vec<Branch> },
     /// `add("%>", ())` — increase indent.

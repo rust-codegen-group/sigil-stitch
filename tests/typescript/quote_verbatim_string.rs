@@ -127,3 +127,48 @@ fn literal_at_vs_verbatim_at_typescript() {
     // $L does NOT wrap
     assert!(output.contains("const b = Alice;"), "got:\n{output}");
 }
+
+// ── $attr() ──────────────────────────────────────────────
+
+#[test]
+fn attr_basic_decorator() {
+    let block = sigil_quote!(TypeScript {
+        $attr("injectable()")
+
+        class MyService {}
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("@injectable()"), "got:\n{output}");
+}
+
+#[test]
+fn attr_multiple_decorators() {
+    let block = sigil_quote!(TypeScript {
+        $attr("injectable()")
+        $attr("singleton()")
+
+        class MyService {}
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("@injectable()"), "got:\n{output}");
+    assert!(output.contains("@singleton()"), "got:\n{output}");
+}
+
+#[test]
+fn attr_attaches_without_blank_line() {
+    let block = sigil_quote!(TypeScript {
+        $attr("override")
+
+        process(): void {
+            return;
+        }
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(
+        !output.contains("@override\n\n"),
+        "blank line should be suppressed, got:\n{output}"
+    );
+}

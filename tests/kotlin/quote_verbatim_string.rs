@@ -94,3 +94,19 @@ fn literal_at_interpolation_kotlin() {
         "$L should NOT wrap in quotes, got:\n{output}"
     );
 }
+
+// ── $attr() ──────────────────────────────────────────────
+
+#[test]
+fn attr_annotation_kotlin() {
+    let block = sigil_quote!(Kotlin {
+        $attr("Override")
+
+        fun toString(): String {
+            return $S("hello");
+        }
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("@Override"), "got:\n{output}");
+}

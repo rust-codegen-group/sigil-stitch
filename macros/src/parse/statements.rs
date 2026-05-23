@@ -18,6 +18,11 @@ pub(super) fn parse_one_statement(
         return Ok((Statement::Comment(comment_text), next));
     }
 
+    // Check for $attr(...) at current position.
+    if let Some((attr_text, next)) = try_parse_attr(tokens, start)? {
+        return Ok((Statement::Attr(attr_text), next));
+    }
+
     // Check for $> or $< at current position.
     if let Some((stmt, next)) = try_parse_indent_directive(tokens, start) {
         return Ok((stmt, next));
@@ -683,6 +688,67 @@ fn try_parse_comment(
         next += 1;
     }
 
+    Ok(Some((text, next)))
+}
+
+/// Try to parse `$attr("text")` at position `start`.
+fn try_parse_attr(
+    tokens: &[TokenTree],
+    start: usize,
+) -> Result<Option<(String, usize)>, CompileError> {
+    if start + 2 >= tokens.len() {
+        return Ok(None);
+    }
+    let _dollar = match &tokens[start] {
+        TokenTree::Punct(p) if p.as_char() == '$' => p,
+        _ => return Ok(None),
+    };
+    if !is_ident(&tokens[start + 1], "attr") {
+        return Ok(None);
+    }
+    let group = match &tokens[start + 2] {
+        TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g,
+        _ => {
+            return Err(CompileError::new(
+                tokens[start + 2].span(),
+                "$attr requires parenthesized string: $attr(\"text\")",
+            ));
+        }
+    };
+    let inner: Vec<TokenTree> = group.stream().into_iter().collect();
+    if inner.len() != 1 {
+        return Err(CompileError::new(
+            group.span(),
+            "$attr requires a single string literal: $attr(\"text\")",
+        ));
+    }
+    let text = match &inner[0] {
+        TokenTree::Literal(lit) => {
+            let s = lit.to_string();
+            if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
+                let raw = &s[1..s.len() - 1];
+                match unescape_string(raw) {
+                    Ok(text) => text,
+                    Err(msg) => return Err(CompileError::new(lit.span(), &msg)),
+                }
+            } else {
+                return Err(CompileError::new(
+                    lit.span(),
+                    "$attr requires a string literal",
+                ));
+            }
+        }
+        _ => {
+            return Err(CompileError::new(
+                inner[0].span(),
+                "$attr requires a string literal",
+            ));
+        }
+    };
+    let mut next = start + 3;
+    if next < tokens.len() && is_semicolon(&tokens[next]) {
+        next += 1;
+    }
     Ok(Some((text, next)))
 }
 

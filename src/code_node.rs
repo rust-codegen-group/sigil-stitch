@@ -34,6 +34,9 @@ pub enum CodeNode {
     /// A comment line. Rendered as `{prefix} {text}{suffix}` using the
     /// language's comment syntax.
     Comment(String),
+    /// An attribute / annotation line. Rendered with the language's annotation
+    /// prefix and suffix (Rust: `#[text]`, Java/Python: `@text`, C++: `[[text]]`).
+    Attribute(String),
     /// Soft line break point (`%W`). In direct mode emits a space; in pretty
     /// mode becomes `BoxDoc::softline()`.
     SoftBreak,
