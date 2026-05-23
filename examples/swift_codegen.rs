@@ -2,7 +2,7 @@
 //!
 //! Demonstrates: struct, protocol with associated type, enum with associated
 //! values, static methods, optional types (`T?`), array types (`[T]`),
-//! and async functions.
+//! async functions, and `$T_join` for protocol composition.
 //!
 //! Run: `cargo run --example swift_codegen`
 
@@ -143,12 +143,22 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join comparison: manual protocol composition ---
+    let codable = TypeName::importable("Foundation", "Codable");
+    let hashable = TypeName::importable("Foundation", "Hashable");
+    let mut join_body = CodeBlock::builder();
+    join_body.add("typealias Model = ", ());
+    join_body.add("%T", (codable,));
+    join_body.add(" & ", ());
+    join_body.add("%T", (hashable,));
+
     FileSpec::builder_with("Task.swift", Swift::new())
         .add_type(result_enum)
         .add_type(proto)
         .add_type(task)
         .add_function(make_url)
         .add_function(fetch_fn)
+        .add_code(join_body.build().unwrap())
         .build()
         .unwrap()
         .render(80)
@@ -228,12 +238,23 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join: protocol composition with import tracking ---
+    let protocols = vec![
+        TypeName::importable("Foundation", "Codable"),
+        TypeName::importable("Foundation", "Hashable"),
+    ];
+    let join_body = sigil_quote!(Swift {
+        typealias Model = $T_join(" & ", &protocols)
+    })
+    .unwrap();
+
     FileSpec::builder_with("Task.swift", Swift::new())
         .add_type(result_enum)
         .add_type(proto)
         .add_type(task)
         .add_function(make_url)
         .add_function(fetch_fn)
+        .add_code(join_body)
         .build()
         .unwrap()
         .render(80)

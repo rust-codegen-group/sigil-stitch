@@ -52,6 +52,262 @@ fn test_meta_for_with_string_literal() {
     assert!(output.contains("console.log('world')"), "got: {output}");
 }
 
+// ── $T_join — type join with import tracking ─────────────
+
+#[test]
+fn test_t_join_basic() {
+    let types = vec![
+        TypeName::importable_type("./models", "User"),
+        TypeName::importable_type("./models", "Admin"),
+        TypeName::primitive("null"),
+    ];
+
+    let block = sigil_quote!(TypeScript {
+        export type MyType = $T_join(" | ", &types);
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(
+        output.contains("export type MyType = User | Admin | null;"),
+        "got:\n{output}"
+    );
+    // Verify imports are tracked (dedup merges same-module imports)
+    assert!(
+        output.contains("import type { Admin, User } from './models'"),
+        "imports should be tracked, got:\n{output}"
+    );
+}
+
+#[test]
+fn test_t_join_single_item() {
+    let types = vec![TypeName::primitive("string")];
+
+    let block = sigil_quote!(TypeScript {
+        export type MyType = $T_join(" | ", &types);
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(
+        output.contains("export type MyType = string;"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_t_join_empty() {
+    let types: Vec<TypeName> = vec![];
+
+    let block = sigil_quote!(TypeScript {
+        export type MyType = $T_join(" | ", &types);
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(output.contains("export type MyType = ;"), "got:\n{output}");
+}
+
+#[test]
+fn test_t_join_typescript_intersection() {
+    let types = vec![
+        TypeName::importable_type("./types", "Serializable"),
+        TypeName::importable_type("./types", "Comparable"),
+    ];
+
+    let block = sigil_quote!(TypeScript {
+        export type MyType = $T_join(" & ", &types);
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(
+        output.contains("export type MyType = Serializable & Comparable;"),
+        "got:\n{output}"
+    );
+    assert!(
+        output.contains("import type { Comparable, Serializable }"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_t_join_python_union() {
+    let types = vec![
+        TypeName::primitive("str"),
+        TypeName::primitive("int"),
+        TypeName::primitive("None"),
+    ];
+
+    let block = sigil_quote!(Python {
+        MyType = $T_join(" | ", &types)
+    })
+    .unwrap();
+
+    let output = render_py(&block);
+    assert!(
+        output.contains("MyType = str | int | None"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_t_join_swift_protocol() {
+    let types = vec![
+        TypeName::primitive("Codable"),
+        TypeName::primitive("Hashable"),
+    ];
+
+    let block = sigil_quote!(Swift {
+        typealias MyType = $T_join(" & ", &types)
+    })
+    .unwrap();
+
+    let output = render_swift(&block);
+    assert!(
+        output.contains("typealias MyType = Codable & Hashable"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_t_join_scala_mixin() {
+    let types = vec![
+        TypeName::primitive("A"),
+        TypeName::primitive("B"),
+        TypeName::primitive("C"),
+    ];
+
+    let block = sigil_quote!(Scala {
+        trait Foo extends $T_join(" with ", &types)
+    })
+    .unwrap();
+
+    let output = render_scala(&block);
+    assert!(
+        output.contains("trait Foo extends A with B with C"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_t_join_rust_trait_bounds() {
+    let traits = vec![
+        TypeName::importable_type("./traits", "Serializable"),
+        TypeName::importable_type("./traits", "Cloneable"),
+        TypeName::primitive("Send"),
+    ];
+
+    let block = sigil_quote!(Rust {
+        fn process(x: &(dyn $T_join(" + ", &traits))) -> Result<(), Error>;
+    })
+    .unwrap();
+
+    let output = render_rs(&block);
+    assert!(
+        output.contains("fn process(x: &(dyn Serializable + Cloneable + Send))"),
+        "got:\n{output}"
+    );
+    assert!(
+        output.contains("use ./traits::{Cloneable, Serializable};"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_t_join_java_intersection() {
+    let bounds = vec![
+        TypeName::importable_type("./io", "Serializable"),
+        TypeName::importable_type("./util", "Comparable"),
+    ];
+
+    let block = sigil_quote!(Java {
+        class Foo<T extends $T_join(" & ", &bounds)> {}
+    })
+    .unwrap();
+
+    let output = render_java(&block);
+    assert!(
+        output.contains("class Foo<T extends Serializable & Comparable>"),
+        "got:\n{output}"
+    );
+    assert!(
+        output.contains("import ./io.Serializable;"),
+        "got:\n{output}"
+    );
+    assert!(
+        output.contains("import ./util.Comparable;"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_t_join_dart_mixins() {
+    let mixins = vec![
+        TypeName::importable_type("./mixins", "JsonSerializable"),
+        TypeName::importable_type("./mixins", "EquatableMixin"),
+    ];
+
+    let block = sigil_quote!(Dart {
+        class User extends BaseModel with $T_join(", ", &mixins) {}
+    })
+    .unwrap();
+
+    let output = render_dart(&block);
+    assert!(
+        output.contains("class User extends BaseModel with JsonSerializable, EquatableMixin"),
+        "got:\n{output}"
+    );
+    assert!(output.contains("import './mixins'"), "got:\n{output}");
+}
+
+#[test]
+fn test_t_join_kotlin_supertypes() {
+    let interfaces = vec![
+        TypeName::importable_type("./interfaces", "Serializable"),
+        TypeName::importable_type("./interfaces", "Parcelable"),
+    ];
+
+    let block = sigil_quote!(Kotlin {
+        class User : $T_join(", ", &interfaces)
+    })
+    .unwrap();
+
+    let output = render_kt(&block);
+    assert!(
+        output.contains("class User: Serializable, Parcelable"),
+        "got:\n{output}"
+    );
+    assert!(
+        output.contains("import ./interfaces.Parcelable"),
+        "got:\n{output}"
+    );
+    assert!(
+        output.contains("import ./interfaces.Serializable"),
+        "got:\n{output}"
+    );
+}
+
+#[test]
+fn test_t_join_csharp_constraints() {
+    let constraints = vec![
+        TypeName::importable_type("./interfaces", "IDisposable"),
+        TypeName::importable_type("./interfaces", "IComparable"),
+    ];
+
+    let block = sigil_quote!(CSharp {
+        class Foo<T> where T : $T_join(", ", &constraints)
+    })
+    .unwrap();
+
+    let output = render_cs(&block);
+    assert!(
+        output.contains("class Foo<T> where T: IDisposable, IComparable"),
+        "got:\n{output}"
+    );
+    assert!(output.contains("using ./interfaces;"), "got:\n{output}");
+}
+
 #[test]
 fn test_meta_for_with_type_interpolation() {
     let types = vec![TypeName::primitive("string"), TypeName::primitive("number")];

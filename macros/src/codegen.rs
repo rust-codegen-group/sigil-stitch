@@ -144,7 +144,9 @@ fn build_args_tuple(args: &[TypedArg]) -> TokenStream {
             .map(|arg| {
                 let expr = &arg.expr;
                 match arg.kind {
-                    InterpolationKind::Type | InterpolationKind::Code => {
+                    InterpolationKind::Type
+                    | InterpolationKind::Code
+                    | InterpolationKind::TypeJoin => {
                         quote! { #expr }
                     }
                     InterpolationKind::Literal => {

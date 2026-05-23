@@ -235,4 +235,22 @@ fn else_if_chain() {
 
     println!("With env = \"staging\":");
     println!("{}", render_ts(&block));
+
+    // ── $T_join — type join with import tracking ──────────
+    println!();
+    println!("--- $T_join: Type Union with Import Tracking ---");
+    println!();
+
+    let variants = vec![
+        TypeName::importable_type("./events", "UserCreated"),
+        TypeName::importable_type("./events", "UserDeleted"),
+        TypeName::primitive("null"),
+    ];
+
+    let block = sigil_quote!(TypeScript {
+        export type UserEvent = $T_join(" | ", &variants);
+    })
+    .unwrap();
+
+    println!("{}", render_ts(&block));
 }

@@ -2,7 +2,8 @@
 //!
 //! Demonstrates: abstract class with abstract method, class inheritance with
 //! override, enum with simple variants, async function returning `Future<T>`,
-//! generic method with multiple type parameters, and interface with generics.
+//! generic method with multiple type parameters, interface with generics,
+//! and `$T_join` for mixin composition.
 //!
 //! Run: `cargo run --example dart_codegen`
 
@@ -174,6 +175,16 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join comparison: manual mixin list ---
+    let mixin1 = TypeName::importable("./mixins", "JsonSerializable");
+    let mixin2 = TypeName::importable("./mixins", "EquatableMixin");
+    let mut join_body = CodeBlock::builder();
+    join_body.add("class User extends BaseModel with ", ());
+    join_body.add("%T", (mixin1,));
+    join_body.add(", ", ());
+    join_body.add("%T", (mixin2,));
+    join_body.add(" {\n  final String name;\n  User(this.name);\n}", ());
+
     FileSpec::builder_with("task.dart", DartLang::new())
         .add_type(status)
         .add_type(base_entity)
@@ -182,6 +193,7 @@ fn builder_approach() -> String {
         .add_function(parse_task)
         .add_function(fetch_task)
         .add_function(transform)
+        .add_code(join_body.build().unwrap())
         .build()
         .unwrap()
         .render(80)
@@ -292,6 +304,19 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join: mixin composition with import tracking ---
+    let mixins = vec![
+        TypeName::importable("./mixins", "JsonSerializable"),
+        TypeName::importable("./mixins", "EquatableMixin"),
+    ];
+    let join_body = sigil_quote!(DartLang {
+        class User extends BaseModel with $T_join(", ", &mixins) {
+            final String name;
+            User(this.name);
+        }
+    })
+    .unwrap();
+
     FileSpec::builder_with("task.dart", DartLang::new())
         .add_type(status)
         .add_type(base_entity)
@@ -300,6 +325,7 @@ fn macro_approach() -> String {
         .add_function(parse_task)
         .add_function(fetch_task)
         .add_function(transform)
+        .add_code(join_body)
         .build()
         .unwrap()
         .render(80)

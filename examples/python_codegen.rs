@@ -1,7 +1,8 @@
 //! Generate a Python file — builder API vs `sigil_quote!` comparison.
 //!
 //! Demonstrates: dataclass with decorator, enum, optional types (`T | None`),
-//! default parameter values, static methods, and standalone functions.
+//! default parameter values, static methods, standalone functions,
+//! and `$T_join` for type unions.
 //!
 //! Run: `cargo run --example python_codegen`
 
@@ -157,10 +158,17 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join comparison: manual type union ---
+    let date = TypeName::importable("datetime", "date");
+    let mut join_body = CodeBlock::builder();
+    join_body.add("JsonValue = str | int | float | bool | None | ", ());
+    join_body.add("%T", (date,));
+
     FileSpec::builder_with("config.py", Python::new())
         .add_type(level_enum)
         .add_type(config_with_methods)
         .add_function(greet)
+        .add_code(join_body.build().unwrap())
         .build()
         .unwrap()
         .render(80)
@@ -265,7 +273,7 @@ fn macro_approach() -> String {
         .unwrap();
 
     let greet_body = sigil_quote!(Python {
-        return $L("f'Hello, {name}!'")
+        return $V("Hello, {name}!")
     })
     .unwrap();
 
@@ -276,10 +284,25 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join: type union with import tracking ---
+    let types = vec![
+        TypeName::primitive("str"),
+        TypeName::primitive("int"),
+        TypeName::primitive("float"),
+        TypeName::primitive("bool"),
+        TypeName::primitive("None"),
+        TypeName::importable("datetime", "date"),
+    ];
+    let join_body = sigil_quote!(Python {
+        JsonValue = $T_join(" | ", &types)
+    })
+    .unwrap();
+
     FileSpec::builder_with("config.py", Python::new())
         .add_type(level_enum)
         .add_type(config_with_methods)
         .add_function(greet)
+        .add_code(join_body)
         .build()
         .unwrap()
         .render(80)

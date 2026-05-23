@@ -108,6 +108,9 @@ pub(crate) enum InterpolationKind {
     Literal,
     /// `$C(expr)` — nested code block.
     Code,
+    /// `$T_join(sep, iter)` — join TypeName items with a separator,
+    /// tracking imports for each item via `%T` slots.
+    TypeJoin,
 }
 
 /// A compile error with span information.

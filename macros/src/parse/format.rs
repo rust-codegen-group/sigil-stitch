@@ -161,6 +161,62 @@ fn tokens_to_format_inner(
                 ));
             }
 
+            // `$T_join(sep, iter)` — inline type join; each item tracked via %T.
+            if is_ident(next, "T_join") {
+                pos += 1;
+                if pos >= tokens.len() {
+                    return Err(CompileError::new(
+                        next.span(),
+                        "$T_join requires parenthesized arguments: $T_join(sep, iter)",
+                    ));
+                }
+                let group = match &tokens[pos] {
+                    TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g,
+                    _ => {
+                        return Err(CompileError::new(
+                            tokens[pos].span(),
+                            "$T_join requires parenthesized arguments: $T_join(sep, iter)",
+                        ));
+                    }
+                };
+                let (sep_expr, iter_expr) = split_join_args(group)?;
+
+                if !adjacent_to_prev_specifier {
+                    maybe_space(
+                        format,
+                        state,
+                        PrevTokenKind::Specifier,
+                        TokenAnnotation::Normal,
+                    );
+                }
+                format.push_str("%L");
+                state.prev = PrevTokenKind::Specifier;
+                let group_end = group.span().end();
+                state.prev_specifier_end = Some((group_end.line, group_end.column));
+
+                let join_expr: TokenStream = quote::quote! {
+                    {
+                        let mut __sigil_cb =
+                            ::sigil_stitch::code_block::CodeBlock::builder();
+                        for (__sigil_idx, __sigil_i) in (#iter_expr).into_iter().enumerate() {
+                            if __sigil_idx > 0 {
+                                __sigil_cb.add("%L", (#sep_expr).to_string());
+                            }
+                            __sigil_cb.add("%T", __sigil_i.clone());
+                        }
+                        __sigil_cb.build().unwrap()
+                    }
+                };
+
+                args.push(TypedArg {
+                    kind: InterpolationKind::TypeJoin,
+                    expr: join_expr,
+                });
+
+                pos += 1;
+                continue;
+            }
+
             // `$join(sep, iter)` — inline join expression, emits as %L.
             if is_ident(next, "join") {
                 pos += 1;
@@ -229,7 +285,7 @@ fn tokens_to_format_inner(
                             id.span(),
                             format!(
                                 "unknown interpolation kind `${kind_str}`. \
-                                     Expected $T, $N, $S, $V, $L, $C, $W, $join, or $C_each"
+                                     Expected $T, $N, $S, $V, $L, $C, $W, $T_join, $join, or $C_each"
                             ),
                         ));
                     }
@@ -262,7 +318,9 @@ fn tokens_to_format_inner(
                     InterpolationKind::Name => "%N",
                     InterpolationKind::StringLit => "%S",
                     InterpolationKind::VerbatimStr => "%V",
-                    InterpolationKind::Literal | InterpolationKind::Code => "%L",
+                    InterpolationKind::Literal
+                    | InterpolationKind::Code
+                    | InterpolationKind::TypeJoin => "%L",
                 };
 
                 if !adjacent_to_prev_specifier {
@@ -289,7 +347,7 @@ fn tokens_to_format_inner(
 
             return Err(CompileError::new(
                 next.span(),
-                "expected interpolation kind after `$`: $T, $N, $S, $L, $C, $W, $join, $C_each, $for, or $$",
+                "expected interpolation kind after `$`: $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $C_each, $for, or $$",
             ));
         }
 
