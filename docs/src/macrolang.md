@@ -61,6 +61,10 @@ These share a common `is_shell()` check and enable:
 - **`<-` prefix receive**: When `-` follows a Joint `<` (not GenericOpen) and is span-adjacent
   to the next token, it gets `PrefixOp` annotation — suppressing the space to produce `<-ch`.
   When NOT adjacent (`ch <- 42`), the `-` stays `Normal` and the space is preserved.
+- **Paren-delimited blocks**: `const (`, `var (`, `import (`, and `type (` are detected as
+  structural blocks. The parser recursively processes the body so `$for`, `$if`, and other
+  directives expand inside. The codegen emits `%>` after the header and `%<` before the
+  closing `)` for proper indentation.
 
 ### Haskell
 

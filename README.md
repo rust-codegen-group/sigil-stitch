@@ -67,13 +67,17 @@ let body = sigil_quote!(TypeScript {
 }).unwrap();
 ```
 
-The macro uses `$T`/`$S`/`$N`/`$L`/`$C`/`$W` interpolation markers that expand to
-the equivalent `%T`/`%S`/`%N`/`%L` format specifiers at compile time. It also
+The macro uses `$T`/`$S`/`$N`/`$L`/`$C`/`$V`/`$W` interpolation markers that expand to
+the equivalent `%T`/`%S`/`%N`/`%L`/`%V` format specifiers at compile time. It also
 supports `$V("@{expr}")` for compile-time interpolation in verbatim strings,
+`$attr("text")` for structural annotations with language-specific rendering,
+`$T_join(sep, iter)` for type-name joins with per-item import tracking,
 `$C_each` for splicing iterables of code blocks, `$if`/`$else_if`/`$else`
 for meta-conditionals, `$for` for compile-time iteration, `$let` for Rust-level
 variable bindings, `$join` for separator-joined lists, and `$+` for line
-continuation in multi-line expressions.
+continuation in multi-line expressions. Go `const (`, `var (`, `import (`, and
+`type (` paren-delimited blocks are recognized as structural blocks so `$for`,
+`$if`, and `$C_each` expand inside them.
 
 ## Format Specifiers
 
@@ -150,7 +154,7 @@ The [sigil-stitch book](docs/src/SUMMARY.md) covers everything in depth:
 - [Building Functions & Fields](docs/src/functions_and_fields.md) -- ParameterSpec, FieldSpec, FunSpec
 - [Building Types & Enums](docs/src/types_and_enums.md) -- TypeSpec, PropertySpec, AnnotationSpec, EnumVariantSpec
 - [Files & Projects](docs/src/files_and_projects.md) -- ImportSpec, FileSpec, ProjectSpec
-- [sigil_quote! Macro](docs/src/sigil_quote.md) -- inline code with `$T`/`$S`/`$N`/`$L`/`$C_each`/`$if`/`$for`/`$let`/`$join`/`$+` interpolation
+- [sigil_quote! Macro](docs/src/sigil_quote.md) -- inline code with `$T`/`$S`/`$N`/`$L`/`$V`/`$C_each`/`$if`/`$for`/`$let`/`$join`/`$+`/`$attr`/`$T_join` interpolation, plus Go paren-block support
 - [Code Templates](docs/src/code_templates.md) -- reusable `#{name:K}` templates
 - [Language Cookbook](docs/src/language_cookbook.md) -- idiomatic recipes per language
 

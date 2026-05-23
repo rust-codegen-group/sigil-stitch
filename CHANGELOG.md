@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.6.4
+
+### Added
+
+- `$attr("text")` directive in `sigil_quote!` — structural annotations/attributes
+  that render with the target language's prefix/suffix. Rust: `#[text]`,
+  Java/Python: `@text`, C++: `[[text]]`. Blank lines after `$attr(...)` are
+  automatically suppressed so the annotation attaches to the following declaration.
+- `$T_join(sep, iter)` interpolation — joins `TypeName` items with a separator,
+  tracking imports for each item via `%T` slots. Generates a nested `CodeBlock`
+  at compile time. Use for type unions (`str | int`) in Python, trait bounds
+  (`Read + Write`) in Rust, intersection types (`T & U`) in Java/TypeScript,
+  protocol composition (`Codable & Hashable`) in Swift, and interface embedding
+  in Go.
+- **Go paren-delimited blocks** — `sigil_quote!(GoLang { ... })` now recognizes
+  `const ( ... )`, `var ( ... )`, `import ( ... )`, and `type ( ... )` as
+  structural blocks. `$for`, `$if`, `$C_each`, etc. expand correctly inside.
+  Body content is auto-indented and the closing `)` is at the outer indent level.
+
+### Fixed
+
+- Blank lines after `$comment(...)` in `sigil_quote!` are now suppressed,
+  matching the spec-level behavior where doc comments attach to the following
+  declaration without a separator.
+- `$C_each` inside object literals after `$N(...) =` no longer fails — the brace
+  classifier now detects sigil-stitch statement markers inside brace groups.
+
 ## 0.6.3
 
 ### Added
