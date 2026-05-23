@@ -138,6 +138,15 @@ pub(super) fn parse_one_statement(
             return Ok((stmt, next_pos));
         }
 
+        // Check for paren group — potential declaration block (Go: const, var, import, type).
+        if let TokenTree::Group(g) = tt
+            && g.delimiter() == Delimiter::Parenthesis
+            && is_paren_block_start(&collected, lang)
+        {
+            let (stmt, next_pos) = parse_paren_block(&collected, g, pos, lang)?;
+            return Ok((stmt, next_pos));
+        }
+
         // Line-break detection: split statement when tokens span multiple lines.
         if !collected.is_empty()
             && let Some(pel) = prev_end_line
@@ -750,6 +759,44 @@ fn try_parse_attr(
         next += 1;
     }
     Ok(Some((text, next)))
+}
+
+/// Check whether the collected prefix tokens and language indicate a
+/// paren-delimited declaration block (Go: `const`, `var`, `import`, `type`).
+fn is_paren_block_start(collected: &[TokenTree], lang: MacroLang) -> bool {
+    if lang != MacroLang::GoLang {
+        return false;
+    }
+    collected.last().is_some_and(|tt| {
+        let s = tt.to_string();
+        matches!(s.as_str(), "const" | "var" | "import" | "type")
+    })
+}
+
+/// Parse a parenthesized declaration block.
+///
+/// Formats the header tokens (e.g., `"const"`) as `"const ("`, then recursively
+/// parses the body inside the paren group.
+fn parse_paren_block(
+    header_tokens: &[TokenTree],
+    paren_group: &proc_macro2::Group,
+    _paren_pos: usize,
+    lang: MacroLang,
+) -> Result<(Statement, usize), CompileError> {
+    let (header_format, header_args) = tokens_to_format(header_tokens, lang)?;
+    let header_format = format!("{header_format} (");
+
+    let body_tokens: Vec<TokenTree> = paren_group.stream().into_iter().collect();
+    let body = parse_body(&body_tokens, lang)?;
+
+    Ok((
+        Statement::ParenBlock {
+            header_format,
+            header_args,
+            body,
+        },
+        _paren_pos + 1,
+    ))
 }
 
 #[cfg(test)]

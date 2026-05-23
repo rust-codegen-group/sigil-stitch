@@ -141,6 +141,85 @@ fn go_for_with_embedded_semicolons() {
     }
 }
 
+#[test]
+fn go_const_paren_block() {
+    let stmt = parse_stmt_lang("const ( x = 1 )", MacroLang::GoLang);
+    match stmt {
+        Statement::ParenBlock {
+            header_format,
+            header_args,
+            body,
+        } => {
+            assert_eq!(header_format, "const (");
+            assert!(header_args.is_empty());
+            assert_eq!(body.len(), 1);
+        }
+        _ => panic!("expected ParenBlock, got {:?}", stmt_kind(&stmt)),
+    }
+}
+
+#[test]
+fn go_var_paren_block() {
+    let stmt = parse_stmt_lang("var ( x int )", MacroLang::GoLang);
+    match stmt {
+        Statement::ParenBlock { header_format, .. } => {
+            assert_eq!(header_format, "var (");
+        }
+        _ => panic!("expected ParenBlock, got {:?}", stmt_kind(&stmt)),
+    }
+}
+
+#[test]
+fn go_import_paren_block() {
+    let stmt = parse_stmt_lang("import ( \"fmt\" )", MacroLang::GoLang);
+    match stmt {
+        Statement::ParenBlock { header_format, .. } => {
+            assert_eq!(header_format, "import (");
+        }
+        _ => panic!("expected ParenBlock, got {:?}", stmt_kind(&stmt)),
+    }
+}
+
+#[test]
+fn go_type_paren_block() {
+    let stmt = parse_stmt_lang("type ( A struct{} )", MacroLang::GoLang);
+    match stmt {
+        Statement::ParenBlock { header_format, .. } => {
+            assert_eq!(header_format, "type (");
+        }
+        _ => panic!("expected ParenBlock, got {:?}", stmt_kind(&stmt)),
+    }
+}
+
+#[test]
+fn go_paren_block_with_metafor() {
+    // Verify that $for inside a Go const paren block is parsed recursively.
+    let stmt = parse_stmt_lang(
+        "const ( $for(v in items) { $L(\"x\") } )",
+        MacroLang::GoLang,
+    );
+    match stmt {
+        Statement::ParenBlock { body, .. } => {
+            assert_eq!(body.len(), 1);
+            assert!(matches!(body[0], Statement::MetaFor { .. }));
+        }
+        _ => panic!("expected ParenBlock, got {:?}", stmt_kind(&stmt)),
+    }
+}
+
+#[test]
+fn non_go_paren_block_is_literal() {
+    // Without MacroLang::GoLang, `const ( ... )` stays as a literal line.
+    let stmt = parse_stmt_lang("const ( x = 1 )", MacroLang::Unaware);
+    match stmt {
+        Statement::Line { format, .. } => {
+            assert!(format.contains("const"));
+            assert!(format.contains("("));
+        }
+        _ => panic!("expected Line, got {:?}", stmt_kind(&stmt)),
+    }
+}
+
 fn stmt_kind(s: &Statement) -> &'static str {
     match s {
         Statement::Statement { .. } => "Statement",
@@ -155,5 +234,6 @@ fn stmt_kind(s: &Statement) -> &'static str {
         Statement::MetaIf { .. } => "MetaIf",
         Statement::MetaFor { .. } => "MetaFor",
         Statement::MetaLet { .. } => "MetaLet",
+        Statement::ParenBlock { .. } => "ParenBlock",
     }
 }

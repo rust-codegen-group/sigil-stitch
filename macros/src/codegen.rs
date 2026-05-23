@@ -121,6 +121,24 @@ fn generate_statements(statements: &[Statement]) -> Vec<TokenStream> {
                     let #binding;
                 });
             }
+            Statement::ParenBlock {
+                header_format,
+                header_args,
+                body,
+            } => {
+                let header_args_tuple = build_args_tuple(header_args);
+                let body_calls = generate_statements(body);
+                calls.push(quote! {
+                    __sigil_builder.add(#header_format, #header_args_tuple);
+                    __sigil_builder.add_line();
+                    __sigil_builder.add("%>", ());
+                });
+                calls.extend(body_calls);
+                calls.push(quote! {
+                    __sigil_builder.add("%<", ());
+                    __sigil_builder.add(")", ());
+                });
+            }
         }
     }
     calls

@@ -67,6 +67,14 @@ pub(crate) enum Statement {
     },
     /// `$let(binding);` — Rust-level `let` binding inside macro body.
     MetaLet { binding: TokenStream },
+    /// A parenthesized declaration block (Go: `const (...)`, `var (...)`,
+    /// `import (...)`, `type (...)`). The body is recursively parsed so
+    /// `$for`, `$if`, etc. expand inside.
+    ParenBlock {
+        header_format: String,
+        header_args: Vec<TypedArg>,
+        body: Vec<Statement>,
+    },
 }
 
 /// A single branch in a control flow chain.

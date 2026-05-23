@@ -1,7 +1,9 @@
 //! Generate a Go file — builder API vs `sigil_quote!` comparison.
 //!
 //! Demonstrates: struct with tags, embedded types (composition), interface,
-//! `[]T` slices, `map[K]V` maps, receiver methods, and Go generics.
+//! `[]T` slices, `map[K]V` maps, receiver methods, Go generics,
+//! `$T_join` for interface composition, and `const ( ... )` paren blocks
+//! with `$for`.
 //!
 //! Run: `cargo run --example go_codegen`
 
@@ -137,6 +139,41 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join comparison: manual interface embedding ---
+    let reader = TypeName::importable("io", "Reader");
+    let writer = TypeName::importable("io", "Writer");
+    let closer = TypeName::importable("io", "Closer");
+    let mut join_body = CodeBlock::builder();
+    join_body.add("type FileOps interface {", ());
+    join_body.add_line();
+    join_body.add("    %T", (reader,));
+    join_body.add_line();
+    join_body.add("    %T", (writer,));
+    join_body.add_line();
+    join_body.add("    %T", (closer,));
+    join_body.add_line();
+    join_body.add("}", ());
+
+    // --- const paren block comparison: manual enum generation ---
+    let mut enum_body = CodeBlock::builder();
+    let variants = ["Alpha", "Beta", "Gamma"];
+    enum_body.add("const (", ());
+    enum_body.add_line();
+    enum_body.add("%>", ());
+    for v in &variants {
+        enum_body.add(
+            "%L %L = %S",
+            (
+                *v,
+                format!("{v}Kind").as_str(),
+                StringLitArg(v.to_lowercase()),
+            ),
+        );
+        enum_body.add_line();
+    }
+    enum_body.add("%<", ());
+    enum_body.add(")", ());
+
     FileSpec::builder_with("server.go", GoLang::new())
         .header(CodeBlock::of("package server", ()).unwrap())
         .add_type(logger)
@@ -144,6 +181,8 @@ fn builder_approach() -> String {
         .add_function(start_fn)
         .add_function(add_route)
         .add_function(sort_fn)
+        .add_code(join_body.build().unwrap())
+        .add_code(enum_body.build().unwrap())
         .build()
         .unwrap()
         .render(100)
@@ -203,6 +242,30 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join: interface composition with import tracking ---
+    let ifaces = vec![
+        TypeName::importable("io", "Reader"),
+        TypeName::importable("io", "Writer"),
+        TypeName::importable("io", "Closer"),
+    ];
+    let join_body = sigil_quote!(GoLang {
+        type FileOps interface {
+            $T_join("\n", &ifaces)
+        }
+    })
+    .unwrap();
+
+    // --- const paren block: generate enum-like constants with $for ---
+    let variants = ["Alpha", "Beta", "Gamma"];
+    let enum_body = sigil_quote!(GoLang {
+        const (
+        $for(v in &variants) {
+            $L("@{v} @{v}Kind = \"@{v}\"")
+        }
+        )
+    })
+    .unwrap();
+
     FileSpec::builder_with("server.go", GoLang::new())
         .header(CodeBlock::of("package server", ()).unwrap())
         .add_type(logger)
@@ -210,6 +273,8 @@ fn macro_approach() -> String {
         .add_function(start_fn)
         .add_function(add_route)
         .add_function(sort_fn)
+        .add_code(join_body)
+        .add_code(enum_body)
         .build()
         .unwrap()
         .render(100)

@@ -52,3 +52,17 @@ fn test_switch_init_semicolon() {
     .unwrap();
     golden::assert_golden("go/quote_switch_init.go", &render(&block));
 }
+
+#[test]
+fn test_const_paren_block_with_for() {
+    let items = vec!["a", "b", "c"];
+    let block = sigil_quote!(GoLang {
+        const (
+        $for(v in &items) {
+            $L("@{v}Const = \"@{v}\"")
+        }
+        )
+    })
+    .unwrap();
+    golden::assert_golden("go/quote_const_paren_block.go", &render(&block));
+}
