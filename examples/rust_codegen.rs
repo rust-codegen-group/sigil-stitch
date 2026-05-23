@@ -2,7 +2,7 @@
 //!
 //! Demonstrates: enum with tuple/struct variants, newtype, references with lifetimes,
 //! `impl Trait` / `dyn Trait`, where constraints, generic functions, `pub(crate)`,
-//! `Option<T>`, tuples, and derive annotations.
+//! `Option<T>`, tuples, derive annotations, and `$T_join` for trait bounds.
 //!
 //! Run: `cargo run --example rust_codegen`
 
@@ -180,6 +180,19 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join comparison: manual trait join ---
+    let read = TypeName::importable("std::io", "Read");
+    let write = TypeName::importable("std::io", "Write");
+    let mut join_body = CodeBlock::builder();
+    join_body.add("fn process(stream: &mut (dyn ", ());
+    join_body.add("%T", (read,));
+    join_body.add(" + ", ());
+    join_body.add("%T", (write,));
+    join_body.add(
+        " + Send)) {\n    let mut buf = [0u8; 1024];\n    stream.read(&mut buf).unwrap();\n}",
+        (),
+    );
+
     FileSpec::builder_with("events.rs", RustLang::new())
         .add_type(event_enum)
         .add_type(user_id)
@@ -187,6 +200,7 @@ fn builder_approach() -> String {
         .add_function(print_fn)
         .add_function(handler_fn)
         .add_function(dispatch_fn)
+        .add_code(join_body.build().unwrap())
         .build()
         .unwrap()
         .render(100)
@@ -257,6 +271,18 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join: trait bounds with import tracking ---
+    let read = TypeName::importable("std::io", "Read");
+    let write = TypeName::importable("std::io", "Write");
+    let traits = vec![read, write, TypeName::primitive("Send")];
+    let join_body = sigil_quote!(RustLang {
+        fn process(stream: &mut (dyn $T_join(" + ", &traits))) {
+            let mut buf = [0u8; 1024];
+            stream.read(&mut buf).unwrap();
+        }
+    })
+    .unwrap();
+
     FileSpec::builder_with("events.rs", RustLang::new())
         .add_type(event_enum)
         .add_type(user_id)
@@ -264,6 +290,7 @@ fn macro_approach() -> String {
         .add_function(print_fn)
         .add_function(handler_fn)
         .add_function(dispatch_fn)
+        .add_code(join_body)
         .build()
         .unwrap()
         .render(100)

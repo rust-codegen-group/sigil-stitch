@@ -2,8 +2,8 @@
 //!
 //! Demonstrates: interface with generics, abstract class, enum with constructor-arg
 //! values, static/override methods, constructor delegation (`super()`), wildcard
-//! type bounds (`? extends T`, `? super T`), protected visibility, and
-//! import-tracked annotations.
+//! type bounds (`? extends T`, `? super T`), protected visibility,
+//! import-tracked annotations, and `$T_join` for intersection bounds.
 //!
 //! Run: `cargo run --example java_codegen`
 
@@ -243,12 +243,26 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join comparison: manual intersection bounds ---
+    let serializable = TypeName::importable("java.io", "Serializable");
+    let comparable_bound = TypeName::importable("java.lang", "Comparable");
+    let mut join_body = CodeBlock::builder();
+    join_body.add("class Box<T extends ", ());
+    join_body.add("%T", (serializable,));
+    join_body.add(" & ", ());
+    join_body.add("%T", (comparable_bound,));
+    join_body.add(
+        "> {\n    private T value;\n    Box(T value) { this.value = value; }\n}",
+        (),
+    );
+
     FileSpec::builder_with("User.java", JavaLang::new())
         .add_type(priority_enum)
         .add_type(repo_iface)
         .add_type(base_entity)
         .add_type(user_cls)
         .add_function(sort_fn)
+        .add_code(join_body.build().unwrap())
         .build()
         .unwrap()
         .render(80)
@@ -386,12 +400,26 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
+    // --- $T_join: intersection bounds with import tracking ---
+    let bounds = vec![
+        TypeName::importable("java.io", "Serializable"),
+        TypeName::importable("java.lang", "Comparable"),
+    ];
+    let join_body = sigil_quote!(JavaLang {
+        class Box<T extends $T_join(" & ", &bounds)> {
+            private T value;
+            Box(T value) { this.value = value; }
+        }
+    })
+    .unwrap();
+
     FileSpec::builder_with("User.java", JavaLang::new())
         .add_type(priority_enum)
         .add_type(repo_iface)
         .add_type(base_entity)
         .add_type(user_cls)
         .add_function(sort_fn)
+        .add_code(join_body)
         .build()
         .unwrap()
         .render(80)
