@@ -145,3 +145,46 @@ func Max[T comparable](a T, b T) T {
 	return b
 }
 ```
+
+## Const block with enum generation
+
+Use `sigil_quote!` with a `$for` inside `const ( ... )` to generate enum-like
+const blocks:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::go_lang::GoLang;
+# fn main() {
+let variants = vec!["Alpha", "Beta", "Gamma"];
+
+let const_block = sigil_quote!(GoLang {
+    const (
+    $for(v in &variants) {
+        $L("@{v}Kind @{v} = \"@{v}\"");
+    }
+    )
+}).unwrap();
+
+let file = FileSpec::builder("kind.go")
+    .header(CodeBlock::of("package main", ()).unwrap())
+    .add_code(const_block)
+    .build()
+    .unwrap();
+let output = file.render(80).unwrap();
+# }
+```
+
+```go
+package main
+
+const (
+	AlphaKind Alpha = "Alpha"
+	BetaKind Beta = "Beta"
+	GammaKind Gamma = "Gamma"
+)
+```
+
+The parser recognizes `const (`, `var (`, `import (`, and `type (` as structural
+blocks in GoLang, so `$for`, `$if`, `$C_each`, and interpolation markers all
+work inside the parentheses. The body is auto-indented with tabs.

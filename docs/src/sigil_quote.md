@@ -45,6 +45,8 @@ It returns `Result<CodeBlock, SigilStitchError>`.
 | `$<` | `%<` | (none) | Decrease indent level |
 | `$$` | `$` | (none) | Literal dollar sign |
 | `$C_each(expr)` | — | `impl IntoIterator<Item: Into<CodeBlock>>` | Splice each code block from iterable |
+| `$attr("text")` | — | `impl ToString` | Structural annotation (language-specific prefix/suffix) |
+| `$T_join(sep, iter)` | `%T` | separator + `impl IntoIterator<Item: TypeName>` | Type name join with per-item import tracking |
 | `$if(cond) { ... }` | — | Rust expression | Meta-conditional (runtime codegen control) |
 | `$for(pat in expr) { ... }` | — | Rust pattern + iterable | Meta-loop (emit body per iteration) |
 | `$let(binding);` | — | Rust `let` binding | Rust-level variable binding inside macro body |
@@ -293,6 +295,97 @@ sigil_quote!(TypeScript {
 // Output:
 // // Initialize the connection pool
 // const pool = createPool();
+# Ok(())
+# }
+```
+
+### Annotations (`$attr`)
+
+`$attr("text")` emits a structural annotation/attribute rendered with the target
+language's syntax. This keeps the macro body language-agnostic — write `$attr("override")`
+and it renders as `@override` in TypeScript/Java, `#[override]` in Rust, or
+`[[override]]` in C++.
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+sigil_quote!(TypeScript {
+    $attr("injectable()");
+    class MyService {}
+})?;
+// Output:
+// @injectable()
+// class MyService {}
+# Ok(())
+# }
+```
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::rust_lang::RustLang;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+sigil_quote!(RustLang {
+    $attr("derive(Debug, Clone, Serialize, Deserialize)");
+    struct Config {}
+})?;
+// Output:
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// struct Config {}
+# Ok(())
+# }
+```
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::cpp_lang::CppLang;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+sigil_quote!(CppLang {
+    $attr("nodiscard");
+    Result compute();
+})?;
+// Output: [[nodiscard]] Result compute();
+# Ok(())
+# }
+```
+
+Each language defines its own prefix/suffix via `attribute_syntax()`. Stacking
+multiple `$attr` lines is common:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+sigil_quote!(TypeScript {
+    $attr("injectable()");
+    $attr("singleton()");
+    class AppService {}
+})?;
+// Output:
+// @injectable()
+// @singleton()
+// class AppService {}
+# Ok(())
+# }
+```
+
+`$attr` works inside `$if` blocks for conditional annotations:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::rust_lang::RustLang;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let needs_serde = true;
+sigil_quote!(RustLang {
+    $attr("derive(Debug, Clone)");
+    $if(needs_serde) {
+        $attr("serde(rename_all = \"camelCase\")");
+    }
+    struct Config {}
+})?;
 # Ok(())
 # }
 ```
@@ -784,6 +877,73 @@ sigil_quote!(TypeScript {
 # }
 ```
 
+### Type Join (`$T_join`)
+
+`$T_join(sep, iter)` joins `TypeName` items with a separator, tracking imports for
+each item. Unlike `$join` (which calls `.to_string()` on each element), `$T_join`
+uses `%T` slots so every type in the join contributes its import to the file.
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let types = vec![
+    TypeName::importable_type("./models", "User"),
+    TypeName::importable_type("./models", "Admin"),
+    TypeName::primitive("null"),
+];
+sigil_quote!(TypeScript {
+    export type Actor = $T_join(" | ", &types);
+})?;
+// Output: export type Actor = User | Admin | null;
+// Imports: import type { Admin, User } from './models'
+# Ok(())
+# }
+```
+
+The separator can be any string — `" | "` for TypeScript unions, `" & "` for
+intersections, `" + "` for Rust trait bounds, `"\n"` for Go interface embedding:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::rust_lang::RustLang;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let traits = vec![
+    TypeName::importable_type("./traits", "Serializable"),
+    TypeName::importable_type("./traits", "Cloneable"),
+];
+sigil_quote!(RustLang {
+    fn process(stream: &mut (dyn $T_join(" + ", &traits))) {}
+})?;
+// Output: fn process(stream: &mut (dyn Serializable + Cloneable)) {}
+# Ok(())
+# }
+```
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::go_lang::GoLang;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let ifaces = vec![
+    TypeName::importable_type("./io", "Reader"),
+    TypeName::importable_type("./io", "Writer"),
+];
+sigil_quote!(GoLang {
+    type FileOps interface {
+        $T_join("\n", &ifaces)
+    }
+})?;
+// Output:
+// type FileOps interface {
+//     Reader
+//     Writer
+// }
+# Ok(())
+# }
+```
+
 ## Line Continuation (`$+`)
 
 `sigil_quote!` splits statements on line breaks — each source line becomes a
@@ -867,6 +1027,45 @@ sigil_quote!(RustLang {
 # Ok(())
 # }
 ```
+
+## Paren-Delimited Blocks (Go)
+
+Go uses parenthesized blocks for multi-line declarations — `const ( ... )`,
+`var ( ... )`, `import ( ... )`, and `type ( ... )`. `sigil_quote!` recognizes
+these as structural blocks, so `$for`, `$if`, `$C_each`, and other directives
+expand inside them:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::go_lang::GoLang;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let variants = vec!["A", "B", "C"];
+
+sigil_quote!(GoLang {
+    const (
+    $for(v in &variants) {
+        $L("@{v}Kind @{v} = \"@{v}\"");
+    }
+    )
+})?;
+// Output:
+// const (
+//     AKind A = "A"
+//     BKind B = "B"
+//     CKind C = "C"
+// )
+# Ok(())
+# }
+```
+
+The paren-block body is indented automatically (the codegen emits `%>` after the
+opening header and `%<` before the closing `)`). Interpolation markers, meta-loops,
+and meta-conditionals all work normally inside the block.
+
+This detection is language-aware — only `GoLang` recognizes `const`, `var`,
+`import`, and `type` as paren-block headers. In other languages, `const ( ... )`
+is treated as a plain statement.
 
 ## Known Limitations and Quirks
 
