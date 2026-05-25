@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.6
+
+### Fixed
+
+- Trailing `;` is now preserved after expression braces with statement markers.
+  `return { $C_each(items); };` and `const x = { $for((k,v) in pairs) { ... } };`
+  correctly emit `};`. Previously the `;` after `}` was silently dropped.
+- `$for` / `$C_each` / `$if` inside brace object literals (e.g.,
+  `return { $C_each(entries); };`) are now parsed correctly with the trailing
+  `;` preserved.
+
+### Added
+
+- `$attr(expr)` now accepts any Rust expression with `@{expr}` interpolation,
+  matching the `$comment(expr)` behavior from 0.6.5:
+  `$attr("derive(@{trait_name}, Clone)")` resolves `trait_name` at compile time
+  and produces `#[derive(Display, Clone)]`.
+- `@@` escape in `$attr` string literals — `$attr("cfg@@target")` emits
+  `#[cfg@target]`.
+
 ## 0.6.5
 
 ### Added
