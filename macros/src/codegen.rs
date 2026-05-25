@@ -42,13 +42,13 @@ fn generate_statements(statements: &[Statement]) -> Vec<TokenStream> {
                 });
             }
             Statement::Comment(expr) => {
-                let comment_expr = resolve_verbatim_interpolation(expr);
+                let comment_expr = resolve_at_interpolation(expr);
                 calls.push(quote! {
                     __sigil_builder.add_comment(&#comment_expr);
                 });
             }
             Statement::Attr(expr) => {
-                let attr_expr = resolve_verbatim_interpolation(expr);
+                let attr_expr = resolve_at_interpolation(expr);
                 calls.push(quote! {
                     __sigil_builder.add_attribute(&#attr_expr);
                 });
@@ -320,7 +320,7 @@ fn generate_meta_if(branches: &[MetaBranch]) -> TokenStream {
 /// If the expression is a string literal containing `@{...}` patterns,
 /// emits a `format!()` call. If it's a plain string literal, emits a
 /// `String::from()` call. Otherwise, emits `(#expr).to_string()`.
-fn resolve_verbatim_interpolation(expr: &TokenStream) -> TokenStream {
+fn resolve_at_interpolation(expr: &TokenStream) -> TokenStream {
     match extract_at_interpolation(expr) {
         Some(VerbatimResult::Interpolated {
             format_string,
