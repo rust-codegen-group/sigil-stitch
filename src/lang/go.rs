@@ -28,14 +28,14 @@ use crate::type_name::{FunctionPresentation, TypePresentation, WildcardPresentat
 /// fb.returns(TypeName::raw("(int, error)"));
 /// ```
 #[derive(Debug, Clone)]
-pub struct GoLang {
+pub struct Go {
     /// Indent with this string (default: "\t").
     pub indent: String,
     /// File extension (default: "go").
     pub extension: String,
 }
 
-impl Default for GoLang {
+impl Default for Go {
     fn default() -> Self {
         Self {
             indent: "\t".to_string(),
@@ -44,7 +44,7 @@ impl Default for GoLang {
     }
 }
 
-impl GoLang {
+impl Go {
     /// Create a new Go language instance.
     pub fn new() -> Self {
         Self::default()
@@ -107,7 +107,7 @@ fn is_stdlib(module: &str) -> bool {
     !first_segment.contains('.')
 }
 
-impl GoLang {
+impl Go {
     /// Rewrite IIFE continuation: fuse `}` + `()` onto the same line.
     ///
     /// The pattern `go func() { ... }();` produces nodes:
@@ -201,7 +201,7 @@ impl GoLang {
     }
 }
 
-impl RendererLang for GoLang {
+impl RendererLang for Go {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -294,7 +294,7 @@ impl RendererLang for GoLang {
     }
 }
 
-impl CodeLang for GoLang {
+impl CodeLang for Go {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -452,13 +452,13 @@ mod tests {
 
     #[test]
     fn test_file_extension() {
-        let go = GoLang::new();
+        let go = Go::new();
         assert_eq!(go.file_extension(), "go");
     }
 
     #[test]
     fn test_escape_reserved() {
-        let go = GoLang::new();
+        let go = Go::new();
         assert_eq!(go.escape_reserved("type"), "type_");
         assert_eq!(go.escape_reserved("name"), "name");
         assert_eq!(go.escape_reserved("func"), "func_");
@@ -466,7 +466,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_single() {
-        let go = GoLang::new();
+        let go = Go::new();
         let imports = ImportGroup {
             entries: vec![ImportEntry {
                 module: "fmt".into(),
@@ -482,7 +482,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_multiple_grouped() {
-        let go = GoLang::new();
+        let go = Go::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -524,7 +524,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_dedup_same_package() {
-        let go = GoLang::new();
+        let go = Go::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -552,7 +552,7 @@ mod tests {
 
     #[test]
     fn test_qualify_import_name() {
-        let go = GoLang::new();
+        let go = Go::new();
         assert_eq!(go.qualify_import_name("net/http", "Server"), "http.Server");
         assert_eq!(go.qualify_import_name("fmt", "Println"), "fmt.Println");
         assert_eq!(
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_doc_comment() {
-        let go = GoLang::new();
+        let go = Go::new();
         let doc = go.render_doc_comment(&["Config holds configuration.", "", "It is thread-safe."]);
         assert!(doc.contains("// Config holds configuration."));
         assert!(doc.contains("//\n"));
@@ -572,7 +572,7 @@ mod tests {
 
     #[test]
     fn test_string_literal() {
-        let go = GoLang::new();
+        let go = Go::new();
         assert_eq!(go.render_string_literal("hello"), "\"hello\"");
         assert_eq!(go.render_string_literal("it\"s"), "\"it\\\"s\"");
     }
@@ -596,14 +596,14 @@ mod tests {
 
     #[test]
     fn test_generic_delimiters() {
-        let go = GoLang::new();
+        let go = Go::new();
         assert_eq!(go.generic_syntax().open, "[");
         assert_eq!(go.generic_syntax().close, "]");
     }
 
     #[test]
     fn test_type_kind_suffix() {
-        let go = GoLang::new();
+        let go = Go::new();
         assert_eq!(go.type_kind_suffix(TypeKind::Struct), "struct");
         assert_eq!(go.type_kind_suffix(TypeKind::Interface), "interface");
         assert_eq!(go.type_kind_suffix(TypeKind::Enum), "");
@@ -611,14 +611,14 @@ mod tests {
 
     #[test]
     fn test_go_builder_fluent() {
-        let go = GoLang::new().with_indent("    ").with_extension("go2");
+        let go = Go::new().with_indent("    ").with_extension("go2");
         assert_eq!(go.file_extension(), "go2");
         assert_eq!(go.block_syntax().indent_unit, "    ");
     }
 
     #[test]
     fn test_module_separator() {
-        let go = GoLang::new();
+        let go = Go::new();
         assert_eq!(go.module_separator(), Some("."));
     }
 }

@@ -7,7 +7,7 @@
 //! Run: `cargo run --example multi_language_project`
 
 use sigil_stitch::lang::csharp::CSharp;
-use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::lang::go::Go;
 use sigil_stitch::lang::python::Python;
 use sigil_stitch::prelude::*;
 
@@ -192,7 +192,7 @@ fn build_go_handler(schema: &[SchemaField]) -> FileSpec {
 
     let trigger = CodeBlock::of("// %T", (http,)).unwrap();
 
-    FileSpec::builder_with("handler.go", GoLang::new())
+    FileSpec::builder_with("handler.go", Go::new())
         .header(CodeBlock::of("package api", ()).unwrap())
         .add_code(trigger)
         .add_type(ts.build().unwrap())

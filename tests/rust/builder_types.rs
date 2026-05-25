@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -61,7 +61,7 @@ fn test_struct_with_impl() {
                 .unwrap(),
         );
 
-    let output = FileSpec::builder_with("config.rs", RustLang::new())
+    let output = FileSpec::builder_with("config.rs", Rust::new())
         .add_type(tb.build().unwrap())
         .build()
         .unwrap()
@@ -100,7 +100,7 @@ fn test_generic_struct() {
                 .unwrap(),
         );
 
-    let output = FileSpec::builder_with("container.rs", RustLang::new())
+    let output = FileSpec::builder_with("container.rs", Rust::new())
         .add_type(tb.build().unwrap())
         .build()
         .unwrap()
@@ -120,7 +120,7 @@ fn test_enum() {
         .add_variant(EnumVariantSpec::new("Green").unwrap())
         .add_variant(EnumVariantSpec::new("Blue").unwrap());
 
-    let output = FileSpec::builder_with("color.rs", RustLang::new())
+    let output = FileSpec::builder_with("color.rs", Rust::new())
         .add_type(tb.build().unwrap())
         .build()
         .unwrap()
@@ -157,7 +157,7 @@ fn test_enum_tuple_variants() {
                 .unwrap(),
         );
 
-    let output = FileSpec::builder_with("expr.rs", RustLang::new())
+    let output = FileSpec::builder_with("expr.rs", Rust::new())
         .add_type(tb.build().unwrap())
         .build()
         .unwrap()
@@ -216,7 +216,7 @@ fn test_enum_struct_variants() {
                 .unwrap(),
         );
 
-    let output = FileSpec::builder_with("message.rs", RustLang::new())
+    let output = FileSpec::builder_with("message.rs", Rust::new())
         .add_type(tb.build().unwrap())
         .build()
         .unwrap()

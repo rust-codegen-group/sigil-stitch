@@ -6,7 +6,7 @@ use super::helpers::*;
 
 #[test]
 fn test_cpp_nested_templates() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         std::vector<std::vector<std::map<std::string, uint64_t>>> nested;
     })
     .unwrap();
@@ -21,7 +21,7 @@ fn test_cpp_nested_templates() {
 
 #[test]
 fn test_cpp_right_shift_operator() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         int result = x >> 2;
     })
     .unwrap();
@@ -35,7 +35,7 @@ fn test_cpp_right_shift_operator() {
 
 #[test]
 fn test_cpp_left_shift_operator() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         int result = x << 2;
     })
     .unwrap();
@@ -49,7 +49,7 @@ fn test_cpp_left_shift_operator() {
 
 #[test]
 fn test_cpp_namespace_path() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         std::unique_ptr<std::vector<int>> ptr = std::make_unique<std::vector<int>>();
     })
     .unwrap();
@@ -63,7 +63,7 @@ fn test_cpp_namespace_path() {
 fn test_cpp_pointer_and_reference() {
     // After an ident, `&`/`*` are treated as binary (ambiguous with bitwise ops).
     // For tight reference/pointer params, use ParameterSpec or TypeName.
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         void foo(const std::string &name, int *ptr);
     })
     .unwrap();
@@ -79,7 +79,7 @@ fn test_cpp_pointer_and_reference() {
 
 #[test]
 fn test_cpp_template_with_comparison() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         if(x < 5 && y > 10) {
             return;
         }
@@ -99,7 +99,7 @@ fn test_cpp_template_with_comparison() {
 
 #[test]
 fn test_cpp_stream_operators() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         std::cout << "value: " << x << std::endl;
     })
     .unwrap();
@@ -122,7 +122,7 @@ fn test_cpp_stream_operators() {
 
 #[test]
 fn test_java_nested_generics() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         Map<String, List<Set<Integer>>> map = new HashMap<>();
     })
     .unwrap();
@@ -140,7 +140,7 @@ fn test_java_nested_generics() {
 
 #[test]
 fn test_java_right_shift() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         int x = value >> 3;
     })
     .unwrap();
@@ -154,7 +154,7 @@ fn test_java_right_shift() {
 
 #[test]
 fn test_java_unsigned_right_shift() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         int x = value >>> 3;
     })
     .unwrap();
@@ -168,7 +168,7 @@ fn test_java_unsigned_right_shift() {
 
 #[test]
 fn test_java_generic_method_call() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         List<String> items = Collections.<String>emptyList();
     })
     .unwrap();
@@ -182,7 +182,7 @@ fn test_java_generic_method_call() {
 
 #[test]
 fn test_java_wildcard_generics() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         List<? extends Comparable<? super T>> items;
     })
     .unwrap();
@@ -418,7 +418,7 @@ fn test_swift_right_shift() {
 
 #[test]
 fn test_rust_array_typing() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let matrix: [[i32; N]; M] = [[0; N]; M];
     })
     .unwrap();
@@ -436,7 +436,7 @@ fn test_rust_array_typing() {
 
 #[test]
 fn test_rust_deeply_nested_generics() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x: Arc<Mutex<HashMap<String, Vec<Option<u32>>>>> = Arc::new(Mutex::new(HashMap::new()));
     })
     .unwrap();
@@ -450,7 +450,7 @@ fn test_rust_deeply_nested_generics() {
 
 #[test]
 fn test_rust_right_shift_operator() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x = value >> 2;
     })
     .unwrap();
@@ -464,7 +464,7 @@ fn test_rust_right_shift_operator() {
 
 #[test]
 fn test_rust_left_shift_operator() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x = 1 << 8;
     })
     .unwrap();
@@ -478,7 +478,7 @@ fn test_rust_left_shift_operator() {
 
 #[test]
 fn test_rust_generic_with_trait_bounds_inline() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x: Box<dyn Iterator<Item = u32>> = todo!();
     })
     .unwrap();
@@ -496,7 +496,7 @@ fn test_rust_generic_with_trait_bounds_inline() {
 
 #[test]
 fn test_rust_multiple_macro_calls() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         vec![1, 2, 3];
         println!("done");
         assert!(true);
@@ -519,7 +519,7 @@ fn test_rust_multiple_macro_calls() {
 
 #[test]
 fn test_rust_double_reference() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         fn foo(x: &&str) {}
     })
     .unwrap();
@@ -530,7 +530,7 @@ fn test_rust_double_reference() {
 
 #[test]
 fn test_rust_deref_field_access() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x = (*ptr).field;
     })
     .unwrap();
@@ -564,7 +564,7 @@ fn test_scala_nested_generics() {
 
 #[test]
 fn test_dart_nested_generics() {
-    let block = sigil_quote!(DartLang {
+    let block = sigil_quote!(Dart {
         Map<String, List<Set<int>>> map = {};
     })
     .unwrap();
@@ -578,7 +578,7 @@ fn test_dart_nested_generics() {
 
 #[test]
 fn test_dart_null_aware_access() {
-    let block = sigil_quote!(DartLang {
+    let block = sigil_quote!(Dart {
         var len = obj?.name?.length;
     })
     .unwrap();
@@ -596,7 +596,7 @@ fn test_dart_null_aware_access() {
 
 #[test]
 fn test_go_pointer_and_address() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         ptr := &x;
         val := *ptr;
     })
@@ -609,7 +609,7 @@ fn test_go_pointer_and_address() {
 
 #[test]
 fn test_go_shift_operators() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         x := y << 2;
         z := w >> 3;
     })
@@ -628,7 +628,7 @@ fn test_go_shift_operators() {
 
 #[test]
 fn test_go_comparison_operators() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         if x < 5 && y > 10 {
             return;
         }

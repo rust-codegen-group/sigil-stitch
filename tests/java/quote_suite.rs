@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
@@ -9,7 +9,7 @@ pub struct JavaSuite;
 
 impl LanguageTestSuite for JavaSuite {
     fn control_flow_block() -> CodeBlock {
-        sigil_quote!(JavaLang {
+        sigil_quote!(Java {
             if(x > 0) {
                 return $S("positive");
             } else {
@@ -24,7 +24,7 @@ impl LanguageTestSuite for JavaSuite {
     }
 
     fn basic_block() -> CodeBlock {
-        sigil_quote!(JavaLang {
+        sigil_quote!(Java {
             String name = $S("Alice");
             int age = 30;
             System.out.println(name);
@@ -37,7 +37,7 @@ impl LanguageTestSuite for JavaSuite {
     }
 
     fn render(block: CodeBlock) -> String {
-        FileSpec::builder_with("Test.java", JavaLang::new())
+        FileSpec::builder_with("Test.java", Java::new())
             .add_code(block)
             .build()
             .unwrap()

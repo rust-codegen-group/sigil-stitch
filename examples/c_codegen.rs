@@ -5,7 +5,7 @@
 //!
 //! Run: `cargo run --example c_codegen`
 
-use sigil_stitch::lang::c_lang::CLang;
+use sigil_stitch::lang::c::C;
 use sigil_stitch::prelude::*;
 
 fn main() {
@@ -146,7 +146,7 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
-    FileSpec::builder_with("config.h", CLang::header())
+    FileSpec::builder_with("config.h", C::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_type(log_level)
         .add_type(callback)
@@ -170,7 +170,7 @@ fn macro_approach() -> String {
     let comment_note = "validate input";
     let v_interp = "Config";
 
-    let create_body = sigil_quote!(CLang {
+    let create_body = sigil_quote!(C {
         $comment("@{comment_label}: @{comment_reason}");
         struct Config* cfg = (struct Config*)$T(malloc)(sizeof($V("@{v_interp}")));
         cfg->host = host; $comment(comment_note)
@@ -189,7 +189,7 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
-    let destroy_body = sigil_quote!(CLang { $T(free)(cfg); }).unwrap();
+    let destroy_body = sigil_quote!(C { $T(free)(cfg); }).unwrap();
     let config_destroy = FunSpec::builder("config_destroy")
         .add_param(ParameterSpec::new("cfg", TypeName::primitive("struct Config*")).unwrap())
         .returns(TypeName::primitive("void"))
@@ -197,7 +197,7 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
-    let print_body = sigil_quote!(CLang {
+    let print_body = sigil_quote!(C {
         $T(printf)($S("Config { host=%%s, port=%%d, level=%%d }\\n"), cfg->host, cfg->port, cfg->level);
     })
     .unwrap();
@@ -208,7 +208,7 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
-    FileSpec::builder_with("config.h", CLang::header())
+    FileSpec::builder_with("config.h", C::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_type(log_level)
         .add_type(callback)

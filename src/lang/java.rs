@@ -41,14 +41,14 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 /// Omit `.returns()` — with `return_type_is_prefix()`, no return type means
 /// the signature starts with modifiers then name: `public ClassName(...)`.
 #[derive(Debug, Clone)]
-pub struct JavaLang {
+pub struct Java {
     /// Indent with this string (default: "    " — 4 spaces).
     pub indent: String,
     /// File extension (default: "java").
     pub extension: String,
 }
 
-impl Default for JavaLang {
+impl Default for Java {
     fn default() -> Self {
         Self {
             indent: "    ".to_string(),
@@ -57,7 +57,7 @@ impl Default for JavaLang {
     }
 }
 
-impl JavaLang {
+impl Java {
     /// Create a new Java language instance.
     pub fn new() -> Self {
         Self::default()
@@ -100,7 +100,7 @@ fn import_group_order(module: &str) -> u8 {
     }
 }
 
-impl RendererLang for JavaLang {
+impl RendererLang for Java {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -145,7 +145,7 @@ impl RendererLang for JavaLang {
     }
 }
 
-impl CodeLang for JavaLang {
+impl CodeLang for Java {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -303,13 +303,13 @@ mod tests {
 
     #[test]
     fn test_file_extension() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(java.file_extension(), "java");
     }
 
     #[test]
     fn test_escape_reserved() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(java.escape_reserved("class"), "class_");
         assert_eq!(java.escape_reserved("import"), "import_");
         assert_eq!(java.escape_reserved("synchronized"), "synchronized_");
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_single() {
-        let java = JavaLang::new();
+        let java = Java::new();
         let imports = ImportGroup {
             entries: vec![ImportEntry {
                 module: "java.util".into(),
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_grouped() {
-        let java = JavaLang::new();
+        let java = Java::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_sorted_within_group() {
-        let java = JavaLang::new();
+        let java = Java::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -412,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_dedup() {
-        let java = JavaLang::new();
+        let java = Java::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -438,7 +438,7 @@ mod tests {
 
     #[test]
     fn test_doc_comment_single() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(
             java.render_doc_comment(&["A brief description."]),
             "/**\n * A brief description.\n */"
@@ -447,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_doc_comment_multi() {
-        let java = JavaLang::new();
+        let java = Java::new();
         let doc = java.render_doc_comment(&["Container class.", "", "@param <T> the element type"]);
         assert_eq!(
             doc,
@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn test_string_literal() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(java.render_string_literal("hello"), "\"hello\"");
         assert_eq!(java.render_string_literal("it\"s"), "\"it\\\"s\"");
         assert_eq!(java.render_string_literal("new\nline"), "\"new\\nline\"");
@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn test_type_keyword() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(java.type_keyword(TypeKind::Class), "class");
         assert_eq!(java.type_keyword(TypeKind::Struct), "class");
         assert_eq!(java.type_keyword(TypeKind::Interface), "interface");
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_visibility_top_level() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(
             java.render_visibility(Visibility::Public, DeclarationContext::TopLevel),
             "public "
@@ -488,7 +488,7 @@ mod tests {
 
     #[test]
     fn test_visibility_member() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(
             java.render_visibility(Visibility::Public, DeclarationContext::Member),
             "public "
@@ -505,25 +505,25 @@ mod tests {
 
     #[test]
     fn test_type_before_name() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert!(java.type_decl_syntax().type_before_name);
     }
 
     #[test]
     fn test_return_type_is_prefix() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert!(java.type_decl_syntax().return_type_is_prefix);
     }
 
     #[test]
     fn test_readonly_keyword() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(java.enum_and_annotation().readonly_keyword, "final ");
     }
 
     #[test]
     fn test_no_async() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(java.function_syntax().async_keyword, "");
     }
 
@@ -538,20 +538,20 @@ mod tests {
 
     #[test]
     fn test_java_builder_fluent() {
-        let java = JavaLang::new().with_indent("\t").with_extension("jav");
+        let java = Java::new().with_indent("\t").with_extension("jav");
         assert_eq!(java.file_extension(), "jav");
         assert_eq!(java.block_syntax().indent_unit, "\t");
     }
 
     #[test]
     fn test_module_separator() {
-        let java = JavaLang::new();
+        let java = Java::new();
         assert_eq!(java.module_separator(), Some("."));
     }
 
     #[test]
     fn test_enum_and_annotation_config() {
-        let java = JavaLang::new();
+        let java = Java::new();
         let ea = java.enum_and_annotation();
         assert_eq!(
             ea.variant_value_format,

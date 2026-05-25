@@ -9,7 +9,7 @@ pub(crate) enum MacroLang {
     Unaware,
     Bash,
     Zsh,
-    GoLang,
+    Go,
     Haskell,
     OCaml,
 }

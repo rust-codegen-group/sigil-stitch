@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::type_name::TypeName;
@@ -7,7 +7,7 @@ use sigil_stitch::type_name::TypeName;
 use super::golden;
 
 fn render(block: &CodeBlock) -> String {
-    FileSpec::builder_with("test.rs", RustLang::new())
+    FileSpec::builder_with("test.rs", Rust::new())
         .add_code(block.clone())
         .build()
         .unwrap()
@@ -25,7 +25,7 @@ fn test_imports() {
         TypeName::importable("std::collections", "VecDeque"),
         vec![TypeName::primitive("String")],
     );
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         fn demo() {
             let map: $T(hashmap) = HashMap::new();
             let deque: $T(vec_deque) = VecDeque::new();

@@ -73,7 +73,7 @@ Since templates are language-agnostic, the same template can target different la
 
 ```rust
 # extern crate sigil_stitch;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # use sigil_stitch::prelude::*;
 # fn main() {
 let decl = CodeTemplate::new("#{name:N}: #{type:T} = #{value:L}").unwrap();

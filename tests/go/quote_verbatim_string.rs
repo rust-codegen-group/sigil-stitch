@@ -21,7 +21,7 @@ fn render(block: &CodeBlock) -> String {
 #[test]
 fn verbatim_at_interpolation_simple() {
     let name = "world";
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         msg := $V("hello @{name}")
     })
     .unwrap();
@@ -33,7 +33,7 @@ fn verbatim_at_interpolation_simple() {
 fn verbatim_at_interpolation_multiple() {
     let host = "localhost";
     let port = "8080";
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         addr := $V("@{host}:@{port}")
     })
     .unwrap();
@@ -43,7 +43,7 @@ fn verbatim_at_interpolation_multiple() {
 
 #[test]
 fn verbatim_at_escape() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         email := $V("user@@host.com")
     })
     .unwrap();

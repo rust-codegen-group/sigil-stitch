@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::dart::DartLang;
+use sigil_stitch::lang::dart::Dart;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -14,7 +14,7 @@ fn test_function_with_imports() {
     b.add_statement("%T<%T> users = fetchAll()", (future, user));
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("app.dart", DartLang::new())
+    let file = FileSpec::builder_with("app.dart", Dart::new())
         .add_code(block)
         .build()
         .unwrap();
@@ -40,7 +40,7 @@ fn test_import_grouping() {
     b.add_line();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("imports.dart", DartLang::new())
+    let file = FileSpec::builder_with("imports.dart", Dart::new())
         .add_code(block)
         .build()
         .unwrap();

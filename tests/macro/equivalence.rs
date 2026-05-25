@@ -167,7 +167,7 @@ fn test_equiv_wrap_point() {
 #[test]
 fn test_name_escaping_via_macro_rust() {
     let field_name = "type";
-    let macro_block = sigil_quote!(RustLang {
+    let macro_block = sigil_quote!(Rust {
         let $N(field_name) = value;
     })
     .unwrap();
@@ -182,7 +182,7 @@ fn test_name_escaping_via_macro_rust() {
 #[test]
 fn test_name_escaping_via_macro_go() {
     let var_name = "func";
-    let macro_block = sigil_quote!(GoLang {
+    let macro_block = sigil_quote!(Go {
         var $N(var_name) int
     })
     .unwrap();
@@ -217,7 +217,7 @@ fn test_name_no_escape_via_macro() {
 fn test_name_and_type_combined() {
     let field_name = "type";
     let field_type = TypeName::primitive("String");
-    let macro_block = sigil_quote!(RustLang {
+    let macro_block = sigil_quote!(Rust {
         pub $N(field_name): $T(field_type)
     })
     .unwrap();

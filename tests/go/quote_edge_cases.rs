@@ -1,12 +1,12 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::lang::go::Go;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
 
 fn render(block: &CodeBlock) -> String {
-    FileSpec::builder_with("test.go", GoLang::new())
+    FileSpec::builder_with("test.go", Go::new())
         .add_code(block.clone())
         .build()
         .unwrap()
@@ -16,7 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_indent() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         func printDirections() {
         $>
         fmt.Println("North");
@@ -33,7 +33,7 @@ fn test_indent() {
 #[test]
 fn test_name_escape_in_macro() {
     let name = "type";
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         var $N(name) string
     })
     .unwrap();
@@ -50,7 +50,7 @@ fn test_name_escape_in_macro() {
 fn test_name_escape_multiple_keywords_in_macro() {
     let pkg = "package";
     let ret = "return";
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         $N(pkg) = $N(ret)
     })
     .unwrap();
@@ -64,7 +64,7 @@ fn test_name_escape_multiple_keywords_in_macro() {
 #[test]
 fn test_name_no_escape_in_macro() {
     let name = "myHandler";
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         func $N(name)()
     })
     .unwrap();
@@ -79,7 +79,7 @@ fn test_name_no_escape_in_macro() {
 
 #[test]
 fn test_goroutine() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         go func() {
             fmt.Println($S("hello from goroutine"));
         }();
@@ -90,7 +90,7 @@ fn test_goroutine() {
 
 #[test]
 fn test_channel() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         ch := make(chan int, 10);
         ch <- 42;
         val := <-ch;
@@ -101,7 +101,7 @@ fn test_channel() {
 
 #[test]
 fn test_interface() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         type Reader interface {
             Read(p []byte) (int, error);
         }
@@ -112,7 +112,7 @@ fn test_interface() {
 
 #[test]
 fn test_defer() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         f, err := os.Open(path);
         defer f.Close();
     })
@@ -124,7 +124,7 @@ fn test_defer() {
 
 #[test]
 fn test_channel_receive_tight() {
-    let block = sigil_quote!(GoLang { val := <-ch; }).unwrap();
+    let block = sigil_quote!(Go { val := <-ch; }).unwrap();
     let output = render(&block);
     assert!(
         output.contains("<-ch"),
@@ -138,7 +138,7 @@ fn test_channel_receive_tight() {
 
 #[test]
 fn test_channel_send_has_space() {
-    let block = sigil_quote!(GoLang { ch <- 42; }).unwrap();
+    let block = sigil_quote!(Go { ch <- 42; }).unwrap();
     let output = render(&block);
     assert!(
         output.contains("<- 42") || output.contains("ch <- 42"),
@@ -148,7 +148,7 @@ fn test_channel_send_has_space() {
 
 #[test]
 fn test_channel_receive_standalone() {
-    let block = sigil_quote!(GoLang { <-done; }).unwrap();
+    let block = sigil_quote!(Go { <-done; }).unwrap();
     let output = render(&block);
     assert!(
         output.contains("<-done"),

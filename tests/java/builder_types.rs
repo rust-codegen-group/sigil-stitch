@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -59,7 +59,7 @@ fn test_class_with_methods() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("UserService.java", JavaLang::new())
+    let file = FileSpec::builder_with("UserService.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -100,7 +100,7 @@ fn test_interface() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Repository.java", JavaLang::new())
+    let file = FileSpec::builder_with("Repository.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -137,7 +137,7 @@ fn test_abstract_class() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Shape.java", JavaLang::new())
+    let file = FileSpec::builder_with("Shape.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -169,7 +169,7 @@ fn test_class_extends_implements() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("AdminService.java", JavaLang::new())
+    let file = FileSpec::builder_with("AdminService.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -189,7 +189,7 @@ fn test_enum() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Color.java", JavaLang::new())
+    let file = FileSpec::builder_with("Color.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -245,7 +245,7 @@ fn test_enum_with_values() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("PetStatus.java", JavaLang::new())
+    let file = FileSpec::builder_with("PetStatus.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -283,7 +283,7 @@ fn test_generic_class() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("SortedContainer.java", JavaLang::new())
+    let file = FileSpec::builder_with("SortedContainer.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();

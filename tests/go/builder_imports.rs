@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::lang::go::Go;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -22,7 +22,7 @@ fn test_function_with_imports() {
     b.add_line();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("server.go", GoLang::new())
+    let file = FileSpec::builder_with("server.go", Go::new())
         .header(CodeBlock::of("package main", ()).unwrap())
         .add_code(block)
         .build()
@@ -44,7 +44,7 @@ fn test_import_grouping() {
     b.add_statement("_ = %T{}", (gin_ctx,));
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("main.go", GoLang::new())
+    let file = FileSpec::builder_with("main.go", Go::new())
         .header(CodeBlock::of("package main", ()).unwrap())
         .add_code(block)
         .build()
@@ -66,7 +66,7 @@ fn test_same_package_symbols() {
     b.add_statement("_ = %T", (listen,));
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("http.go", GoLang::new())
+    let file = FileSpec::builder_with("http.go", Go::new())
         .header(CodeBlock::of("package main", ()).unwrap())
         .add_code(block)
         .build()

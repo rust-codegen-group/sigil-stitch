@@ -760,7 +760,7 @@ fn handle_expression_brace_with_markers(
 /// Check whether the collected prefix tokens and language indicate a
 /// paren-delimited declaration block (Go: `const`, `var`, `import`, `type`).
 fn is_paren_block_start(collected: &[TokenTree], lang: MacroLang) -> bool {
-    if lang != MacroLang::GoLang {
+    if lang != MacroLang::Go {
         return false;
     }
     collected.last().is_some_and(|tt| {

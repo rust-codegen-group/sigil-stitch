@@ -133,7 +133,7 @@ The renderer and import collector only see `CodeBlock` trees. They don't know or
 
 ## Configuring a Language
 
-Each language type (`TypeScript`, `JavaScript`, `Python`, `JavaLang`, and so on)
+Each language type (`TypeScript`, `JavaScript`, `Python`, `Java`, and so on)
 is a struct with public fields. The ones you usually want to tweak are exposed
 as fluent `with_*` builders:
 
@@ -157,16 +157,16 @@ let ts = TypeScript::new()
 | `TypeScript` | yes | yes | yes | yes |
 | `JavaScript` | yes | yes | yes | yes |
 | `Python`     | yes | yes | n/a | yes (e.g. `pyi`) |
-| `JavaLang`   | n/a | yes | n/a | yes |
-| `RustLang`   | n/a | yes | n/a | yes |
-| `GoLang`     | n/a | yes | n/a | yes |
+| `Java`   | n/a | yes | n/a | yes |
+| `Rust`   | n/a | yes | n/a | yes |
+| `Go`     | n/a | yes | n/a | yes |
 | `Kotlin`     | n/a | yes | n/a | yes (e.g. `kts`) |
 | `Swift`      | n/a | yes | n/a | yes |
-| `DartLang`   | n/a | yes | n/a | yes |
+| `Dart`   | n/a | yes | n/a | yes |
 | `CSharp`     | n/a | yes | n/a | yes |
 | `Lua`        | n/a | yes | n/a | yes |
-| `CLang`      | n/a | yes | n/a | yes (e.g. `h`) |
-| `CppLang`    | n/a | yes | n/a | yes (e.g. `hpp`, `cxx`) |
+| `C`      | n/a | yes | n/a | yes (e.g. `h`) |
+| `Cpp`    | n/a | yes | n/a | yes (e.g. `hpp`, `cxx`) |
 | `Bash`       | n/a | yes | n/a | yes (e.g. `sh`) |
 | `Zsh`        | n/a | yes | n/a | yes |
 

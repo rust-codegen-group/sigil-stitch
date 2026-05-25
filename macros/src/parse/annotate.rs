@@ -255,7 +255,7 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                             // Go: `<-ch` is prefix receive — suppress space after
                             // if span-adjacent to next token. `ch <- 42` (send) has
                             // whitespace after `-`, so it keeps the space.
-                            if lang == MacroLang::GoLang && i + 1 < tokens.len() {
+                            if lang == MacroLang::Go && i + 1 < tokens.len() {
                                 let dash_end = p.span().end();
                                 let next_start = tokens[i + 1].span().start();
                                 if dash_end.line == next_start.line

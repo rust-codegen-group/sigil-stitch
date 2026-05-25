@@ -53,7 +53,7 @@
   (`Read + Write`) in Rust, intersection types (`T & U`) in Java/TypeScript,
   protocol composition (`Codable & Hashable`) in Swift, and interface embedding
   in Go.
-- **Go paren-delimited blocks** — `sigil_quote!(GoLang { ... })` now recognizes
+- **Go paren-delimited blocks** — `sigil_quote!(Go { ... })` now recognizes
   `const ( ... )`, `var ( ... )`, `import ( ... )`, and `type ( ... )` as
   structural blocks. `$for`, `$if`, `$C_each`, etc. expand correctly inside.
   Body content is auto-indented and the closing `)` is at the outer indent level.
@@ -527,11 +527,11 @@
   - JavaScript / Bash / Zsh → rendered without any optionality marker
 - `OptionalFieldStyle` enum and shared `QuoteStyle` enum in a new
   `sigil_stitch::lang::config` module.
-- Fluent config builders on `TypeScript`, `JavaScript`, `Python`, and `JavaLang`:
+- Fluent config builders on `TypeScript`, `JavaScript`, `Python`, and `Java`:
   `.with_quote_style()`, `.with_indent()`, `.with_semicolons()`,
   `.with_extension()` (available per-language as appropriate).
 - `.with_indent()` and `.with_extension()` on the remaining languages
-  (`RustLang`, `GoLang`, `Kotlin`, `Swift`, `DartLang`, `CLang`, `CppLang`,
+  (`Rust`, `Go`, `Kotlin`, `Swift`, `Dart`, `C`, `Cpp`,
   `Bash`, `Zsh`). Every language struct now has a public `extension: String`
   field; defaults are unchanged.
 
@@ -548,7 +548,7 @@
   semicolon-less output or `.tsx` files without a custom `CodeLang` impl.
 - `Python` gains `quote_style` and `extension` fields for `.pyi` stubs and
   Black-style double quotes.
-- `JavaLang` gains an `extension` field.
+- `Java` gains an `extension` field.
 
 ## 0.1.0
 

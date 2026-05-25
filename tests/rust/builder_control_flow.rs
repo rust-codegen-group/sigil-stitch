@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
@@ -25,7 +25,7 @@ fn test_control_flow() {
     b.add_line();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("classify.rs", RustLang::new())
+    let file = FileSpec::builder_with("classify.rs", Rust::new())
         .add_code(block)
         .build()
         .unwrap();

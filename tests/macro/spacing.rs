@@ -51,7 +51,7 @@ fn test_arrow_function() {
 
 #[test]
 fn test_rust_path_separator() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x = std::mem::size_of::<u32>();
     })
     .unwrap();
@@ -134,7 +134,7 @@ fn test_array_literal() {
 
 #[test]
 fn test_java_ternary_colon_spacing() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         String result = x != null ? x.toString() : "default";
     })
     .unwrap();
@@ -194,7 +194,7 @@ fn test_type_annotation_colon_no_space() {
 
 #[test]
 fn test_go_walrus_spacing() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         x := 42;
     })
     .unwrap();
@@ -390,7 +390,7 @@ fn test_colon_ternary_resets_at_statement_boundary() {
 
 #[test]
 fn test_colon_ternary_in_java_error_handling() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         String msg = error != null ? error.getMessage() : "unknown";
     })
     .unwrap();
@@ -404,7 +404,7 @@ fn test_colon_ternary_in_java_error_handling() {
 
 #[test]
 fn test_colon_path_separator_rust() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let v = std::collections::HashMap::new();
     })
     .unwrap();
@@ -420,12 +420,12 @@ fn test_colon_path_separator_rust() {
 
 #[test]
 fn test_colon_path_separator_cpp() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         auto v = std::make_unique(42);
     })
     .unwrap();
 
-    let file = FileSpec::builder_with("test.cpp", sigil_stitch::lang::cpp_lang::CppLang::new())
+    let file = FileSpec::builder_with("test.cpp", sigil_stitch::lang::cpp::Cpp::new())
         .add_code(block)
         .build()
         .unwrap();
@@ -439,7 +439,7 @@ fn test_colon_path_separator_cpp() {
 
 #[test]
 fn test_colon_path_then_type_annotation() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x: std::string::String = String::new();
     })
     .unwrap();
@@ -451,7 +451,7 @@ fn test_colon_path_then_type_annotation() {
 
 #[test]
 fn test_colon_walrus_with_expression() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         result := computeValue(42);
     })
     .unwrap();
@@ -465,7 +465,7 @@ fn test_colon_walrus_with_expression() {
 
 #[test]
 fn test_colon_walrus_multiple_assignments() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         x := 1;
         y := 2;
         z := x + y;
@@ -480,7 +480,7 @@ fn test_colon_walrus_multiple_assignments() {
 
 #[test]
 fn test_colon_walrus_in_control_flow() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         if err := doSomething() {
             return err;
         }
@@ -544,7 +544,7 @@ fn test_colon_context_kotlin_full_scenario() {
 
 #[test]
 fn test_colon_switch_case_label() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         switch(x) {
             case(1):
             return "one";
@@ -582,7 +582,7 @@ fn test_safe_call_let_no_space() {
 
 #[test]
 fn test_ternary_still_has_space_before_question() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         String result = x != null ? x.toString() : "default";
     })
     .unwrap();
@@ -607,7 +607,7 @@ fn test_elvis_no_space_before_question() {
 
 #[test]
 fn test_postfix_star_pointer_type() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         Config* cfg = get_config();
     })
     .unwrap();
@@ -621,7 +621,7 @@ fn test_postfix_star_pointer_type() {
 
 #[test]
 fn test_postfix_star_const_pointer() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         const char* host = get_host();
     })
     .unwrap();
@@ -707,7 +707,7 @@ fn test_binary_minus_still_spaced() {
 
 #[test]
 fn test_binary_star_still_spaced() {
-    let block = sigil_quote!(CLang {
+    let block = sigil_quote!(C {
         int x = a * b;
     })
     .unwrap();

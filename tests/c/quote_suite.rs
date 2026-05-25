@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::c_lang::CLang;
+use sigil_stitch::lang::c::C;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
@@ -9,7 +9,7 @@ pub struct CSuite;
 
 impl LanguageTestSuite for CSuite {
     fn control_flow_block() -> CodeBlock {
-        sigil_quote!(CLang {
+        sigil_quote!(C {
             if(x > 0) {
                 return 1;
             } else if (x < 0) {
@@ -26,7 +26,7 @@ impl LanguageTestSuite for CSuite {
     }
 
     fn basic_block() -> CodeBlock {
-        sigil_quote!(CLang {
+        sigil_quote!(C {
             int x = 42;
             float y = 3.14;
             printf($S("x=%d y=%f"), x, y);
@@ -39,7 +39,7 @@ impl LanguageTestSuite for CSuite {
     }
 
     fn render(block: CodeBlock) -> String {
-        FileSpec::builder_with("test.c", CLang::new())
+        FileSpec::builder_with("test.c", C::new())
             .add_code(block)
             .build()
             .unwrap()

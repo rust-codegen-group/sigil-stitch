@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::lang::go::Go;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
@@ -22,7 +22,7 @@ fn test_control_flow() {
     b.add_line();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("classify.go", GoLang::new())
+    let file = FileSpec::builder_with("classify.go", Go::new())
         .header(CodeBlock::of("package main", ()).unwrap())
         .add_code(block)
         .build()
@@ -40,7 +40,7 @@ fn test_if_init_semicolon() {
     b.end_control_flow();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("test.go", GoLang::new())
+    let file = FileSpec::builder_with("test.go", Go::new())
         .add_code(block)
         .build()
         .unwrap();

@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::cpp_lang::CppLang;
+use sigil_stitch::lang::cpp::Cpp;
 use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -12,13 +12,13 @@ use super::golden;
 
 /// Helper: emit a FunSpec as a CodeBlock for embedding in extra_member.
 fn emit_fun(fun: &FunSpec) -> CodeBlock {
-    let lang = CppLang::new();
+    let lang = Cpp::new();
     fun.emit(&lang, DeclarationContext::Member).unwrap()
 }
 
 /// Helper: emit a FieldSpec as a CodeBlock for embedding in extra_member.
 fn emit_field(field: &FieldSpec) -> CodeBlock {
-    let lang = CppLang::new();
+    let lang = Cpp::new();
     field.emit(&lang, DeclarationContext::Member).unwrap()
 }
 
@@ -35,7 +35,7 @@ fn test_namespace_wrapping() {
     b.add_line();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("math.hpp", CppLang::header())
+    let file = FileSpec::builder_with("math.hpp", Cpp::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_raw("namespace math {\n")
         .add_code(block)
@@ -129,7 +129,7 @@ fn test_full_header() {
     let import_trigger =
         CodeBlock::of("// Uses %T", (TypeName::importable("./base.hpp", "Base"),)).unwrap();
 
-    let file = FileSpec::builder_with("logger.hpp", CppLang::header())
+    let file = FileSpec::builder_with("logger.hpp", Cpp::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_code(import_trigger)
         .add_type(ts)
@@ -150,7 +150,7 @@ fn test_annotation_attribute() {
         .unwrap();
 
     let rendered = emit_fun(&fun);
-    let file = FileSpec::builder_with("compute.hpp", CppLang::header())
+    let file = FileSpec::builder_with("compute.hpp", Cpp::header())
         .add_code(rendered)
         .build()
         .unwrap();

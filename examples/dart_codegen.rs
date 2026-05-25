@@ -7,7 +7,7 @@
 //!
 //! Run: `cargo run --example dart_codegen`
 
-use sigil_stitch::lang::dart::DartLang;
+use sigil_stitch::lang::dart::Dart;
 use sigil_stitch::prelude::*;
 
 fn main() {
@@ -198,7 +198,7 @@ fn builder_approach() -> String {
     join_body.add("%T", (mixin2,));
     join_body.add(" {\n  final String name;\n  User(this.name);\n}", ());
 
-    FileSpec::builder_with("task.dart", DartLang::new())
+    FileSpec::builder_with("task.dart", Dart::new())
         .add_type(status)
         .add_type(base_entity)
         .add_type(task)
@@ -244,7 +244,7 @@ fn macro_approach() -> String {
                 .unwrap(),
         );
 
-    let ctor_body = sigil_quote!(DartLang {
+    let ctor_body = sigil_quote!(Dart {
         $comment("@{comment_label}: @{comment_reason}");
         super(id); $comment(comment_note)
         this.name = name;
@@ -252,7 +252,7 @@ fn macro_approach() -> String {
     })
     .unwrap();
 
-    let validate_body = sigil_quote!(DartLang {
+    let validate_body = sigil_quote!(Dart {
         $attr("override");
         return id.isNotEmpty && name.isNotEmpty
     })
@@ -279,7 +279,7 @@ fn macro_approach() -> String {
         .unwrap();
 
     // --- parseTask function ---
-    let parse_body = sigil_quote!(DartLang {
+    let parse_body = sigil_quote!(Dart {
         final data = $T(convert)(json);
         return Task(data[$S("id")], data[$S("name")]);
     })
@@ -292,7 +292,7 @@ fn macro_approach() -> String {
         .unwrap();
 
     // --- Async function: fetchTask ---
-    let fetch_body = sigil_quote!(DartLang {
+    let fetch_body = sigil_quote!(Dart {
         final json = await http.get($S("https://api.example.com/task"))
         return parseTask(json.body)
     })
@@ -309,7 +309,7 @@ fn macro_approach() -> String {
         .unwrap();
 
     // --- Generic function: transform<T, R> ---
-    let transform_body = sigil_quote!(DartLang {
+    let transform_body = sigil_quote!(Dart {
         return mapper(input)
     })
     .unwrap();
@@ -329,7 +329,7 @@ fn macro_approach() -> String {
         TypeName::importable("./mixins", "JsonSerializable"),
         TypeName::importable("./mixins", "EquatableMixin"),
     ];
-    let join_body = sigil_quote!(DartLang {
+    let join_body = sigil_quote!(Dart {
         class User extends BaseModel with $T_join(", ", &mixins) {
             final String name;
             User(this.name);
@@ -337,7 +337,7 @@ fn macro_approach() -> String {
     })
     .unwrap();
 
-    FileSpec::builder_with("task.dart", DartLang::new())
+    FileSpec::builder_with("task.dart", Dart::new())
         .add_type(status)
         .add_type(base_entity)
         .add_type(task)

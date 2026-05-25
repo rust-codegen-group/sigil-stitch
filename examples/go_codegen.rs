@@ -7,7 +7,7 @@
 //!
 //! Run: `cargo run --example go_codegen`
 
-use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::lang::go::Go;
 use sigil_stitch::prelude::*;
 
 fn main() {
@@ -186,7 +186,7 @@ fn builder_approach() -> String {
     enum_body.add("%<", ());
     enum_body.add(")", ());
 
-    FileSpec::builder_with("server.go", GoLang::new())
+    FileSpec::builder_with("server.go", Go::new())
         .header(CodeBlock::of("package server", ()).unwrap())
         .add_type(logger)
         .add_type(server)
@@ -211,7 +211,7 @@ fn macro_approach() -> String {
     let comment_note = "format address";
     let v_interp = "8080";
 
-    let start_body = sigil_quote!(GoLang {
+    let start_body = sigil_quote!(Go {
         $comment("@{comment_label}: @{comment_reason}");
         $V("// default port: @{v_interp}");
         addr := $T(fmt_sprintf)("%s:%d", s.host, s.port) $comment(comment_note)
@@ -229,7 +229,7 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
-    let add_body = sigil_quote!(GoLang {
+    let add_body = sigil_quote!(Go {
         s.routes[path] = handler
     })
     .unwrap();
@@ -244,7 +244,7 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
-    let sort_body = sigil_quote!(GoLang {
+    let sort_body = sigil_quote!(Go {
         $T(sort_slice)(items, func(i, j int) bool {
             return items[i] < items[j]
         })
@@ -266,7 +266,7 @@ fn macro_approach() -> String {
         TypeName::importable("io", "Writer"),
         TypeName::importable("io", "Closer"),
     ];
-    let join_body = sigil_quote!(GoLang {
+    let join_body = sigil_quote!(Go {
         type FileOps interface {
             $T_join("\n", &ifaces)
         }
@@ -275,7 +275,7 @@ fn macro_approach() -> String {
 
     // --- const paren block: generate enum-like constants with $for ---
     let variants = ["Alpha", "Beta", "Gamma"];
-    let enum_body = sigil_quote!(GoLang {
+    let enum_body = sigil_quote!(Go {
         const (
         $for(v in &variants) {
             $L("@{v} @{v}Kind = \"@{v}\"")
@@ -284,7 +284,7 @@ fn macro_approach() -> String {
     })
     .unwrap();
 
-    FileSpec::builder_with("server.go", GoLang::new())
+    FileSpec::builder_with("server.go", Go::new())
         .header(CodeBlock::of("package server", ()).unwrap())
         .add_type(logger)
         .add_type(server)

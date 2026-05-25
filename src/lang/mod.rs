@@ -1,21 +1,21 @@
 /// Bash shell language support.
 pub mod bash;
 /// C language support.
-pub mod c_lang;
+pub mod c;
 /// Shared configuration types (quote style, optional-field rendering).
 pub mod config;
 /// C++ language support.
-pub mod cpp_lang;
+pub mod cpp;
 /// C# language support.
 pub mod csharp;
 /// Dart language support.
 pub mod dart;
 /// Go language support.
-pub mod go_lang;
+pub mod go;
 /// Haskell language support.
 pub mod haskell;
 /// Java language support.
-pub mod java_lang;
+pub mod java;
 /// JavaScript language support.
 pub mod javascript;
 /// Kotlin language support.
@@ -27,7 +27,7 @@ pub mod ocaml;
 /// Python language support.
 pub mod python;
 /// Rust language support.
-pub mod rust_lang;
+pub mod rust;
 /// Scala language support.
 pub mod scala;
 /// Swift language support.
@@ -399,18 +399,18 @@ pub fn lang_from_extension(ext: &str) -> Option<Box<dyn CodeLang>> {
     match ext {
         "ts" | "tsx" => Some(Box::new(typescript::TypeScript::default())),
         "js" | "jsx" | "mjs" | "cjs" => Some(Box::new(javascript::JavaScript::default())),
-        "rs" => Some(Box::new(rust_lang::RustLang::default())),
-        "go" => Some(Box::new(go_lang::GoLang::default())),
+        "rs" => Some(Box::new(rust::Rust::default())),
+        "go" => Some(Box::new(go::Go::default())),
         "py" | "pyi" => Some(Box::new(python::Python::default())),
-        "java" => Some(Box::new(java_lang::JavaLang::default())),
+        "java" => Some(Box::new(java::Java::default())),
         "kt" | "kts" => Some(Box::new(kotlin::Kotlin::default())),
         "swift" => Some(Box::new(swift::Swift::default())),
-        "dart" => Some(Box::new(dart::DartLang::default())),
+        "dart" => Some(Box::new(dart::Dart::default())),
         "scala" | "sc" => Some(Box::new(scala::Scala::default())),
         "hs" => Some(Box::new(haskell::Haskell::default())),
         "ml" | "mli" => Some(Box::new(ocaml::OCaml::default())),
-        "c" | "h" => Some(Box::new(c_lang::CLang::default())),
-        "cpp" | "cxx" | "cc" | "hpp" | "hxx" => Some(Box::new(cpp_lang::CppLang::default())),
+        "c" | "h" => Some(Box::new(c::C::default())),
+        "cpp" | "cxx" | "cc" | "hpp" | "hxx" => Some(Box::new(cpp::Cpp::default())),
         "cs" => Some(Box::new(csharp::CSharp::default())),
         "lua" => Some(Box::new(lua::Lua::default())),
         "sh" | "bash" => Some(Box::new(bash::Bash::default())),

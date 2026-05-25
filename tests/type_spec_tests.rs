@@ -1,7 +1,7 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::code_renderer::CodeRenderer;
 use sigil_stitch::import::ImportGroup;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::field_spec::FieldSpec;
@@ -27,7 +27,7 @@ fn render_blocks_ts(blocks: &[CodeBlock]) -> String {
 }
 
 fn render_blocks_rs(blocks: &[CodeBlock]) -> String {
-    let lang = RustLang::new();
+    let lang = Rust::new();
     let imports = ImportGroup::new();
     let mut output = String::new();
     for (i, block) in blocks.iter().enumerate() {
@@ -115,7 +115,7 @@ fn test_rust_struct_with_impl() {
         .build()
         .unwrap();
 
-    let blocks = ts.emit(&RustLang::new()).unwrap();
+    let blocks = ts.emit(&Rust::new()).unwrap();
     let output = render_blocks_rs(&blocks);
     assert!(output.contains("pub struct Config {"));
     assert!(output.contains("pub name: String,"));
@@ -200,7 +200,7 @@ fn test_type_alias_rust() {
         .extends(TypeName::primitive("f64"))
         .build()
         .unwrap();
-    let blocks = spec.emit(&RustLang::new()).unwrap();
+    let blocks = spec.emit(&Rust::new()).unwrap();
     let output = render_blocks_rs(&blocks);
     assert_eq!(output.trim(), "type Meters = f64;");
 }
@@ -212,7 +212,7 @@ fn test_type_alias_rust_pub() {
         .extends(TypeName::primitive("f64"))
         .build()
         .unwrap();
-    let blocks = spec.emit(&RustLang::new()).unwrap();
+    let blocks = spec.emit(&Rust::new()).unwrap();
     let output = render_blocks_rs(&blocks);
     assert_eq!(output.trim(), "pub type Meters = f64;");
 }
@@ -231,12 +231,12 @@ fn test_type_alias_ts() {
 
 #[test]
 fn test_type_alias_cpp() {
-    use sigil_stitch::lang::cpp_lang::CppLang;
+    use sigil_stitch::lang::cpp::Cpp;
     let spec = TypeSpec::builder("Meters", TypeKind::TypeAlias)
         .extends(TypeName::primitive("double"))
         .build()
         .unwrap();
-    let lang = CppLang::new();
+    let lang = Cpp::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
     let mut renderer = CodeRenderer::new(&lang, &imports, 80);
@@ -246,12 +246,12 @@ fn test_type_alias_cpp() {
 
 #[test]
 fn test_type_alias_c() {
-    use sigil_stitch::lang::c_lang::CLang;
+    use sigil_stitch::lang::c::C;
     let spec = TypeSpec::builder("Meters", TypeKind::TypeAlias)
         .extends(TypeName::primitive("double"))
         .build()
         .unwrap();
-    let lang = CLang::new();
+    let lang = C::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
     let mut renderer = CodeRenderer::new(&lang, &imports, 80);
@@ -261,12 +261,12 @@ fn test_type_alias_c() {
 
 #[test]
 fn test_type_alias_go() {
-    use sigil_stitch::lang::go_lang::GoLang;
+    use sigil_stitch::lang::go::Go;
     let spec = TypeSpec::builder("Meters", TypeKind::TypeAlias)
         .extends(TypeName::primitive("float64"))
         .build()
         .unwrap();
-    let lang = GoLang::new();
+    let lang = Go::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
     let mut renderer = CodeRenderer::new(&lang, &imports, 80);
@@ -312,19 +312,19 @@ fn test_newtype_rust() {
         .extends(TypeName::primitive("f64"))
         .build()
         .unwrap();
-    let blocks = spec.emit(&RustLang::new()).unwrap();
+    let blocks = spec.emit(&Rust::new()).unwrap();
     let output = render_blocks_rs(&blocks);
     assert_eq!(output.trim(), "pub struct Meters(f64);");
 }
 
 #[test]
 fn test_newtype_go() {
-    use sigil_stitch::lang::go_lang::GoLang;
+    use sigil_stitch::lang::go::Go;
     let spec = TypeSpec::builder("Meters", TypeKind::Newtype)
         .extends(TypeName::primitive("float64"))
         .build()
         .unwrap();
-    let lang = GoLang::new();
+    let lang = Go::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
     let mut renderer = CodeRenderer::new(&lang, &imports, 80);
@@ -421,7 +421,7 @@ fn test_where_clause_rust_struct() {
         )
         .build()
         .unwrap();
-    let blocks = type_spec.emit(&RustLang::new()).unwrap();
+    let blocks = type_spec.emit(&Rust::new()).unwrap();
     let output = render_blocks_rs(&blocks);
     assert!(
         output.contains("pub struct Container<T>"),
@@ -454,7 +454,7 @@ fn test_emittable_returns_multiple_blocks_for_rust() {
         .add_method(FunSpec::builder("hello").build().unwrap())
         .build()
         .unwrap();
-    let lang = RustLang::new();
+    let lang = Rust::new();
     let blocks = ts.emit_members(&lang).unwrap();
     assert!(
         blocks.len() >= 2,
@@ -466,8 +466,8 @@ fn test_emittable_returns_multiple_blocks_for_rust() {
 // ── Embedded types ──────────────────────────────────────
 
 fn render_blocks_go(blocks: &[CodeBlock]) -> String {
-    use sigil_stitch::lang::go_lang::GoLang;
-    let lang = GoLang::new();
+    use sigil_stitch::lang::go::Go;
+    let lang = Go::new();
     let imports = ImportGroup::new();
     let mut output = String::new();
     for (i, block) in blocks.iter().enumerate() {
@@ -482,7 +482,7 @@ fn render_blocks_go(blocks: &[CodeBlock]) -> String {
 
 #[test]
 fn test_embedded_go_struct_emit() {
-    use sigil_stitch::lang::go_lang::GoLang;
+    use sigil_stitch::lang::go::Go;
     let spec = TypeSpec::builder("UserAdmin", TypeKind::Struct)
         .add_embedded(TypeName::primitive("User"))
         .add_embedded(TypeName::primitive("Admin"))
@@ -493,7 +493,7 @@ fn test_embedded_go_struct_emit() {
         )
         .build()
         .unwrap();
-    let blocks = spec.emit(&GoLang::new()).unwrap();
+    let blocks = spec.emit(&Go::new()).unwrap();
     let output = render_blocks_go(&blocks);
     assert!(output.contains("User\n"), "embedded User: {output}");
     assert!(output.contains("Admin\n"), "embedded Admin: {output}");
@@ -542,7 +542,7 @@ fn test_embedded_rust_struct_emit() {
         )
         .build()
         .unwrap();
-    let blocks = spec.emit(&RustLang::new()).unwrap();
+    let blocks = spec.emit(&Rust::new()).unwrap();
     let output = render_blocks_rs(&blocks);
     assert!(output.contains("Base,"), "embedded Base: {output}");
     assert!(output.contains("extra: String,"), "field extra: {output}");
@@ -550,13 +550,13 @@ fn test_embedded_rust_struct_emit() {
 
 #[test]
 fn test_embedded_only_no_fields() {
-    use sigil_stitch::lang::go_lang::GoLang;
+    use sigil_stitch::lang::go::Go;
     let spec = TypeSpec::builder("ReadCloser", TypeKind::Interface)
         .add_embedded(TypeName::primitive("Reader"))
         .add_embedded(TypeName::primitive("Closer"))
         .build()
         .unwrap();
-    let blocks = spec.emit(&GoLang::new()).unwrap();
+    let blocks = spec.emit(&Go::new()).unwrap();
     let output = render_blocks_go(&blocks);
     assert!(output.contains("Reader\n"), "Reader embedded: {output}");
     assert!(output.contains("Closer\n"), "Closer embedded: {output}");
@@ -594,14 +594,14 @@ fn test_embedded_with_methods_after() {
 
 #[test]
 fn test_embedded_import_tracking() {
-    use sigil_stitch::lang::go_lang::GoLang;
+    use sigil_stitch::lang::go::Go;
     let io_reader = TypeName::importable("io", "Reader");
     let spec = TypeSpec::builder("MyReader", TypeKind::Struct)
         .add_embedded(io_reader)
         .build()
         .unwrap();
 
-    let file = sigil_stitch::spec::file_spec::FileSpec::builder_with("reader.go", GoLang::new())
+    let file = sigil_stitch::spec::file_spec::FileSpec::builder_with("reader.go", Go::new())
         .header(CodeBlock::of("package main", ()).unwrap())
         .add_type(spec)
         .build()

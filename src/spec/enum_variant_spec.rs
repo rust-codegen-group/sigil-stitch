@@ -315,7 +315,7 @@ impl EnumVariantSpecBuilder {
 mod tests {
     use super::*;
     use crate::lang::CodeLang;
-    use crate::lang::rust_lang::RustLang;
+    use crate::lang::rust::Rust;
     use crate::lang::swift::Swift;
     use crate::lang::typescript::TypeScript;
     use crate::spec::field_spec::FieldSpec;
@@ -345,7 +345,7 @@ mod tests {
             .add_variant(EnumVariantSpec::new("Blue").unwrap())
             .build()
             .unwrap();
-        let output = render_enum(&ts, &RustLang::new());
+        let output = render_enum(&ts, &Rust::new());
         assert!(output.contains("Red,"));
         assert!(output.contains("Green,"));
         assert!(output.contains("Blue,"));
@@ -386,7 +386,7 @@ mod tests {
             .add_variant(EnumVariantSpec::new("Red").unwrap())
             .build()
             .unwrap();
-        let output = render_enum(&ts, &RustLang::new());
+        let output = render_enum(&ts, &Rust::new());
         // Rust has trailing comma.
         assert!(output.contains("Red,"));
     }
@@ -398,7 +398,7 @@ mod tests {
             .add_variant(EnumVariantSpec::new("GREEN").unwrap())
             .build()
             .unwrap();
-        let output = render_enum(&ts, &crate::lang::c_lang::CLang::new());
+        let output = render_enum(&ts, &crate::lang::c::C::new());
         assert!(output.contains("RED,"));
         // Last variant has no trailing comma in C.
         assert!(output.contains("GREEN\n"));
@@ -441,7 +441,7 @@ mod tests {
             .add_variant(EnumVariantSpec::new("Unit").unwrap())
             .build()
             .unwrap();
-        let output = render_enum(&ts, &RustLang::new());
+        let output = render_enum(&ts, &Rust::new());
         assert!(output.contains("Literal(i64),"));
         assert!(output.contains("Unit,"));
     }
@@ -458,7 +458,7 @@ mod tests {
             )
             .build()
             .unwrap();
-        let output = render_enum(&ts, &RustLang::new());
+        let output = render_enum(&ts, &Rust::new());
         assert!(output.contains("Both(String, i32),"));
     }
 
@@ -483,7 +483,7 @@ mod tests {
             )
             .build()
             .unwrap();
-        let output = render_enum(&ts, &RustLang::new());
+        let output = render_enum(&ts, &Rust::new());
         assert!(output.contains("Quit,"));
         assert!(output.contains("Move {"));
         assert!(output.contains("x: i32,"));

@@ -154,11 +154,11 @@ const blocks:
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::go_lang::GoLang;
+# use sigil_stitch::lang::go::Go;
 # fn main() {
 let variants = vec!["Alpha", "Beta", "Gamma"];
 
-let const_block = sigil_quote!(GoLang {
+let const_block = sigil_quote!(Go {
     const (
     $for(v in &variants) {
         $L("@{v}Kind @{v} = \"@{v}\"");
@@ -186,5 +186,5 @@ const (
 ```
 
 The parser recognizes `const (`, `var (`, `import (`, and `type (` as structural
-blocks in GoLang, so `$for`, `$if`, `$C_each`, and interpolation markers all
+blocks in Go, so `$for`, `$if`, `$C_each`, and interpolation markers all
 work inside the parentheses. The body is auto-indented with tabs.

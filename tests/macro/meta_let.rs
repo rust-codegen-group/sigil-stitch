@@ -172,7 +172,7 @@ fn test_meta_let_with_code_block_interpolation() {
 fn test_meta_let_in_for_with_conditional() {
     let variants = vec![("red", "Red"), ("green_ish", "GreenIsh"), ("blue", "Blue")];
 
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $for((raw, pascal) in &variants) {
             $let(needs_rename = *raw != pascal.to_lowercase());
             $if(needs_rename) {
@@ -452,7 +452,7 @@ fn test_meta_let_result_question_mark_propagates_err() {
 
 #[test]
 fn test_meta_let_with_rust_lang() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $let(name = "MyStruct");
         $let(field_name = "value");
         pub struct $N(name) {
@@ -486,7 +486,7 @@ fn test_meta_let_with_python() {
 #[test]
 fn test_meta_let_with_go() {
     let constants = vec![("StatusOK", "200"), ("StatusNotFound", "404")];
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         $for((name, code) in &constants) {
             $let(full = format!("HTTP{name}"));
             const $N(full) = $L(*code);
@@ -514,7 +514,7 @@ fn test_real_world_rust_string_enum() {
         ("BLUE", Some("BLUE")),
     ];
 
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $for((raw, json_val) in &values) {
             $let(pascal = raw
                 .split('_')
@@ -557,7 +557,7 @@ fn helper_real_world_fallible_enum() -> Option<String> {
         Value::String("blue".into()),
     ];
 
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $for(v in &values) {
             $let(s = v.as_str()?);
             $let(variant = s
@@ -598,7 +598,7 @@ fn helper_real_world_fallible_enum_with_non_string() -> Option<String> {
     use serde_json::Value;
     let values: Vec<Value> = vec![Value::String("red".into()), Value::Number(42.into())];
 
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $for(v in &values) {
             $let(s = v.as_str()?);
             $L(format!("{},", s))

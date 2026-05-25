@@ -885,8 +885,8 @@ mod tests {
 
     #[test]
     fn test_tuple_with_lang_rust() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::tuple(vec![
             TypeName::primitive("String"),
             TypeName::primitive("i32"),
@@ -910,8 +910,8 @@ mod tests {
 
     #[test]
     fn test_tuple_with_lang_cpp() {
-        use crate::lang::cpp_lang::CppLang;
-        let lang = CppLang::new();
+        use crate::lang::cpp::Cpp;
+        let lang = Cpp::new();
         let t = TypeName::tuple(vec![
             TypeName::primitive("int"),
             TypeName::primitive("std::string"),
@@ -927,8 +927,8 @@ mod tests {
 
     #[test]
     fn test_unit_tuple_with_lang_rust() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::unit();
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -959,8 +959,8 @@ mod tests {
 
     #[test]
     fn test_reference_with_lang_rust() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::reference(TypeName::primitive("String"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -970,8 +970,8 @@ mod tests {
 
     #[test]
     fn test_reference_mut_with_lang_rust() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::reference_mut(TypeName::primitive("String"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -981,8 +981,8 @@ mod tests {
 
     #[test]
     fn test_reference_with_lang_cpp() {
-        use crate::lang::cpp_lang::CppLang;
-        let lang = CppLang::new();
+        use crate::lang::cpp::Cpp;
+        let lang = Cpp::new();
         let t = TypeName::reference(TypeName::primitive("std::string"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -992,8 +992,8 @@ mod tests {
 
     #[test]
     fn test_reference_mut_with_lang_cpp() {
-        use crate::lang::cpp_lang::CppLang;
-        let lang = CppLang::new();
+        use crate::lang::cpp::Cpp;
+        let lang = Cpp::new();
         let t = TypeName::reference_mut(TypeName::primitive("std::string"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1013,8 +1013,8 @@ mod tests {
 
     #[test]
     fn test_reference_mut_with_lang_go() {
-        use crate::lang::go_lang::GoLang;
-        let lang = GoLang::new();
+        use crate::lang::go::Go;
+        let lang = Go::new();
         let t = TypeName::reference_mut(TypeName::primitive("int"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1024,8 +1024,8 @@ mod tests {
 
     #[test]
     fn test_reference_with_lang_go() {
-        use crate::lang::go_lang::GoLang;
-        let lang = GoLang::new();
+        use crate::lang::go::Go;
+        let lang = Go::new();
         let t = TypeName::reference(TypeName::primitive("int"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1035,8 +1035,8 @@ mod tests {
 
     #[test]
     fn test_reference_with_lang_c() {
-        use crate::lang::c_lang::CLang;
-        let lang = CLang::new();
+        use crate::lang::c::C;
+        let lang = C::new();
         let t = TypeName::reference(TypeName::primitive("int"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1046,8 +1046,8 @@ mod tests {
 
     #[test]
     fn test_reference_mut_with_lang_c() {
-        use crate::lang::c_lang::CLang;
-        let lang = CLang::new();
+        use crate::lang::c::C;
+        let lang = C::new();
         let t = TypeName::reference_mut(TypeName::primitive("int"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1143,8 +1143,8 @@ mod tests {
 
     #[test]
     fn test_associated_type_rust_qualified() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::associated_type(
             TypeName::primitive("T"),
             Some(TypeName::primitive("Iterator")),
@@ -1158,8 +1158,8 @@ mod tests {
 
     #[test]
     fn test_associated_type_rust_simple() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::member_type(TypeName::primitive("Self"), "Output");
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1183,8 +1183,8 @@ mod tests {
 
     #[test]
     fn test_associated_type_java_dot() {
-        use crate::lang::java_lang::JavaLang;
-        let lang = JavaLang::new();
+        use crate::lang::java::Java;
+        let lang = Java::new();
         let t = TypeName::member_type(TypeName::primitive("Map"), "Entry");
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1208,8 +1208,8 @@ mod tests {
 
     #[test]
     fn test_impl_trait_rust() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::impl_trait(vec![
             TypeName::primitive("Display"),
             TypeName::primitive("Debug"),
@@ -1222,8 +1222,8 @@ mod tests {
 
     #[test]
     fn test_dyn_trait_rust() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::dyn_trait(vec![TypeName::primitive("Error")]);
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1246,8 +1246,8 @@ mod tests {
 
     #[test]
     fn test_wildcard_java_unbounded() {
-        use crate::lang::java_lang::JavaLang;
-        let lang = JavaLang::new();
+        use crate::lang::java::Java;
+        let lang = Java::new();
         let t = TypeName::wildcard();
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1257,8 +1257,8 @@ mod tests {
 
     #[test]
     fn test_wildcard_java_extends() {
-        use crate::lang::java_lang::JavaLang;
-        let lang = JavaLang::new();
+        use crate::lang::java::Java;
+        let lang = Java::new();
         let t = TypeName::wildcard_extends(TypeName::primitive("Comparable"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1268,8 +1268,8 @@ mod tests {
 
     #[test]
     fn test_wildcard_java_super() {
-        use crate::lang::java_lang::JavaLang;
-        let lang = JavaLang::new();
+        use crate::lang::java::Java;
+        let lang = Java::new();
         let t = TypeName::wildcard_super(TypeName::primitive("Number"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1312,8 +1312,8 @@ mod tests {
 
     #[test]
     fn test_wildcard_go() {
-        use crate::lang::go_lang::GoLang;
-        let lang = GoLang::new();
+        use crate::lang::go::Go;
+        let lang = Go::new();
         let t = TypeName::wildcard();
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1323,8 +1323,8 @@ mod tests {
 
     #[test]
     fn test_wildcard_rust() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::wildcard();
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1417,8 +1417,8 @@ mod tests {
 
     #[test]
     fn test_reference_with_lifetime_rust() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::reference_with_lifetime(TypeName::primitive("str"), "'a");
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1428,8 +1428,8 @@ mod tests {
 
     #[test]
     fn test_reference_mut_with_lifetime_rust() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::reference_mut_with_lifetime(TypeName::primitive("String"), "'a");
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1445,8 +1445,8 @@ mod tests {
 
     #[test]
     fn test_reference_without_lifetime_unchanged() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::reference(TypeName::primitive("String"));
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1456,8 +1456,8 @@ mod tests {
 
     #[test]
     fn test_qualified_renders_with_rust_separator() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::qualified("serde_json", "Value");
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1467,8 +1467,8 @@ mod tests {
 
     #[test]
     fn test_qualified_renders_with_go_separator() {
-        use crate::lang::go_lang::GoLang;
-        let lang = GoLang::new();
+        use crate::lang::go::Go;
+        let lang = Go::new();
         let t = TypeName::qualified("net/http", "Server");
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
@@ -1491,8 +1491,8 @@ mod tests {
         t.collect_imports(&mut imports);
         assert!(imports.is_empty());
 
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let doc = t.to_doc_with_lang(&identity_resolve, &lang);
         let mut buf = Vec::new();
         doc.render(80, &mut buf).unwrap();
@@ -1501,8 +1501,8 @@ mod tests {
 
     #[test]
     fn test_qualified_in_generic() {
-        use crate::lang::rust_lang::RustLang;
-        let lang = RustLang::new();
+        use crate::lang::rust::Rust;
+        let lang = Rust::new();
         let t = TypeName::generic(
             TypeName::qualified("std::collections", "HashMap"),
             vec![

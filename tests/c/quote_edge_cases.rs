@@ -1,12 +1,12 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::c_lang::CLang;
+use sigil_stitch::lang::c::C;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
 
 fn render(block: &CodeBlock) -> String {
-    FileSpec::builder_with("test.c", CLang::new())
+    FileSpec::builder_with("test.c", C::new())
         .add_code(block.clone())
         .build()
         .unwrap()
@@ -16,7 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_pointer_declaration() {
-    let block = sigil_quote!(CLang {
+    let block = sigil_quote!(C {
         int* ptr = malloc(sizeof(int));
         const char* msg = "hello";
         void* data = NULL;
@@ -27,7 +27,7 @@ fn test_pointer_declaration() {
 
 #[test]
 fn test_struct_access() {
-    let block = sigil_quote!(CLang {
+    let block = sigil_quote!(C {
         node->next = NULL;
         node->data = value;
         result.x = node->point.x;
@@ -38,7 +38,7 @@ fn test_struct_access() {
 
 #[test]
 fn test_preprocessor_define() {
-    let block = sigil_quote!(CLang {
+    let block = sigil_quote!(C {
         #define MAX_SIZE 1024
         #define MIN(a, b) ((a) < (b) ? (a) : (b))
     })
@@ -48,7 +48,7 @@ fn test_preprocessor_define() {
 
 #[test]
 fn test_cast_and_sizeof() {
-    let block = sigil_quote!(CLang {
+    let block = sigil_quote!(C {
         size_t size = sizeof(struct Node);
         int* arr = (int*)malloc(size * sizeof(int));
     })
@@ -58,7 +58,7 @@ fn test_cast_and_sizeof() {
 
 #[test]
 fn test_for_loop_with_pointer() {
-    let block = sigil_quote!(CLang {
+    let block = sigil_quote!(C {
         for (int i = 0; i < n; i++) {
             arr[i] = i * 2;
         }
@@ -70,7 +70,7 @@ fn test_for_loop_with_pointer() {
 #[test]
 fn test_name_keyword_escape_in_macro() {
     let name = "auto";
-    let block = sigil_quote!(CLang {
+    let block = sigil_quote!(C {
         $N(name) = 1;
     })
     .unwrap();

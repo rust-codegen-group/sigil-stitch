@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::lang::go::Go;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -13,7 +13,7 @@ use super::golden;
 
 #[test]
 fn test_struct_with_tags() {
-    let file = FileSpec::builder_with("config.go", GoLang::new())
+    let file = FileSpec::builder_with("config.go", Go::new())
         .header(CodeBlock::of("package config", ()).unwrap())
         .add_type(
             TypeSpec::builder("Config", TypeKind::Struct)
@@ -73,7 +73,7 @@ fn test_struct_with_methods() {
         .body(CodeBlock::of("return nil", ()).unwrap());
 
     // Method 2: ToJSON.
-    let file = FileSpec::builder_with("server.go", GoLang::new())
+    let file = FileSpec::builder_with("server.go", Go::new())
         .header(CodeBlock::of("package server", ()).unwrap())
         .add_type(tb.build().unwrap())
         .add_function(m1.build().unwrap())
@@ -97,7 +97,7 @@ fn test_struct_with_methods() {
 
 #[test]
 fn test_interface() {
-    let file = FileSpec::builder_with("repo.go", GoLang::new())
+    let file = FileSpec::builder_with("repo.go", Go::new())
         .header(CodeBlock::of("package repo", ()).unwrap())
         .add_type(
             TypeSpec::builder("Repository", TypeKind::Interface)
@@ -146,7 +146,7 @@ fn test_generic_function() {
         .returns(TypeName::primitive("T"))
         .body(body);
 
-    let file = FileSpec::builder_with("max.go", GoLang::new())
+    let file = FileSpec::builder_with("max.go", Go::new())
         .header(CodeBlock::of("package main", ()).unwrap())
         .add_function(fb.build().unwrap())
         .build()
@@ -158,7 +158,7 @@ fn test_generic_function() {
 
 #[test]
 fn test_embedded_struct() {
-    let file = FileSpec::builder_with("admin.go", GoLang::new())
+    let file = FileSpec::builder_with("admin.go", Go::new())
         .header(CodeBlock::of("package models", ()).unwrap())
         .add_type(
             TypeSpec::builder("UserAdmin", TypeKind::Struct)

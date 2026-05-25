@@ -1,7 +1,7 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::code_renderer::CodeRenderer;
 use sigil_stitch::import::ImportGroup;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -19,7 +19,7 @@ fn emit_fun_ts(spec: &FunSpec, ctx: DeclarationContext) -> String {
 }
 
 fn emit_fun_rs(spec: &FunSpec, ctx: DeclarationContext) -> String {
-    let lang = RustLang::new();
+    let lang = Rust::new();
     let block = spec.emit(&lang, ctx).unwrap();
     let imports = ImportGroup::new();
     let mut renderer = CodeRenderer::new(&lang, &imports, 80);

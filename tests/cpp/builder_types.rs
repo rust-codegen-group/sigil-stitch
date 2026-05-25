@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::cpp_lang::CppLang;
+use sigil_stitch::lang::cpp::Cpp;
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -13,13 +13,13 @@ use super::golden;
 
 /// Helper: emit a FunSpec as a CodeBlock for embedding in extra_member.
 fn emit_fun(fun: &FunSpec) -> CodeBlock {
-    let lang = CppLang::new();
+    let lang = Cpp::new();
     fun.emit(&lang, DeclarationContext::Member).unwrap()
 }
 
 /// Helper: emit a FieldSpec as a CodeBlock for embedding in extra_member.
 fn emit_field(field: &FieldSpec) -> CodeBlock {
-    let lang = CppLang::new();
+    let lang = Cpp::new();
     field.emit(&lang, DeclarationContext::Member).unwrap()
 }
 
@@ -82,7 +82,7 @@ fn test_class_with_methods() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("counter.hpp", CppLang::header())
+    let file = FileSpec::builder_with("counter.hpp", Cpp::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_type(ts)
         .build()
@@ -114,7 +114,7 @@ fn test_struct_with_fields() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("point.hpp", CppLang::header())
+    let file = FileSpec::builder_with("point.hpp", Cpp::header())
         .add_type(ts)
         .build()
         .unwrap();
@@ -133,7 +133,7 @@ fn test_enum_class() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("color.hpp", CppLang::header())
+    let file = FileSpec::builder_with("color.hpp", Cpp::header())
         .add_type(ts)
         .build()
         .unwrap();
@@ -179,7 +179,7 @@ fn test_virtual_method() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("shape.hpp", CppLang::header())
+    let file = FileSpec::builder_with("shape.hpp", Cpp::header())
         .add_type(ts)
         .build()
         .unwrap();
@@ -240,7 +240,7 @@ fn test_template_class() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("stack.hpp", CppLang::header())
+    let file = FileSpec::builder_with("stack.hpp", Cpp::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_type(ts)
         .build()
@@ -295,7 +295,7 @@ fn test_inheritance() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("animals.hpp", CppLang::header())
+    let file = FileSpec::builder_with("animals.hpp", Cpp::header())
         .add_type(base)
         .add_type(derived)
         .build()

@@ -25,7 +25,7 @@ fn parse_macro_lang(ts: &TokenStream) -> MacroLang {
         match id.to_string().as_str() {
             "Bash" => MacroLang::Bash,
             "Zsh" => MacroLang::Zsh,
-            "GoLang" => MacroLang::GoLang,
+            "Go" => MacroLang::Go,
             "Haskell" => MacroLang::Haskell,
             "OCaml" => MacroLang::OCaml,
             _ => MacroLang::Unaware,

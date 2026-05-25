@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::{CodeBlock, StringLitArg};
-use sigil_stitch::lang::c_lang::CLang;
+use sigil_stitch::lang::c::C;
 use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -19,7 +19,7 @@ fn test_arrow_and_pointer_spacing() {
     b.add_statement("cfg->port = 8080", ());
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("test.c", CLang::new())
+    let file = FileSpec::builder_with("test.c", C::new())
         .add_code(block)
         .build()
         .unwrap();
@@ -42,7 +42,7 @@ fn test_struct_basic() {
     b.add_line();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("point.c", CLang::new())
+    let file = FileSpec::builder_with("point.c", C::new())
         .add_code(block)
         .build()
         .unwrap();
@@ -76,7 +76,7 @@ fn test_struct_with_function() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("point.c", CLang::new())
+    let file = FileSpec::builder_with("point.c", C::new())
         .add_type(ts)
         .add_function(fun)
         .build()
@@ -124,7 +124,7 @@ fn test_top_level_with_includes() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("server.h", CLang::header())
+    let file = FileSpec::builder_with("server.h", C::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_type(ts)
         .add_function(fun)
@@ -152,7 +152,7 @@ fn test_annotation_attribute() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("packed.h", CLang::header())
+    let file = FileSpec::builder_with("packed.h", C::header())
         .add_type(ts)
         .build()
         .unwrap();

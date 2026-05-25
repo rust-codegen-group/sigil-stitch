@@ -156,14 +156,14 @@ fn bash_slash_leading_path() {
 #[test]
 fn go_receive_adjacent() {
     // <-ch → < is Joint, - adjacent to ch → PrefixOp on -
-    let a = annotate_lang("<-ch", MacroLang::GoLang);
+    let a = annotate_lang("<-ch", MacroLang::Go);
     assert_eq!(ann_at(&a, 1), TokenAnnotation::PrefixOp);
 }
 
 #[test]
 fn go_send_not_prefix() {
     // ch <- 42 → - is NOT adjacent to 42 → stays Normal
-    let a = annotate_lang("ch <- 42", MacroLang::GoLang);
+    let a = annotate_lang("ch <- 42", MacroLang::Go);
     assert_eq!(ann_at(&a, 2), TokenAnnotation::Normal);
 }
 

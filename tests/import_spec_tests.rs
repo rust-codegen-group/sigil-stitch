@@ -1,11 +1,11 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::dart::DartLang;
-use sigil_stitch::lang::go_lang::GoLang;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::dart::Dart;
+use sigil_stitch::lang::go::Go;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::lang::javascript::JavaScript;
 use sigil_stitch::lang::kotlin::Kotlin;
 use sigil_stitch::lang::python::Python;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::swift::Swift;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::import_spec::ImportSpec;
@@ -151,7 +151,7 @@ fn test_js_wildcard_import() {
 
 #[test]
 fn test_rust_forced_named_import() {
-    let output = FileSpec::builder_with("main.rs", RustLang::new())
+    let output = FileSpec::builder_with("main.rs", Rust::new())
         .add_import(ImportSpec::named("std::collections", "HashMap"))
         .add_code(CodeBlock::of("// code", ()).unwrap())
         .build()
@@ -164,7 +164,7 @@ fn test_rust_forced_named_import() {
 
 #[test]
 fn test_rust_wildcard_import() {
-    let output = FileSpec::builder_with("main.rs", RustLang::new())
+    let output = FileSpec::builder_with("main.rs", Rust::new())
         .add_import(ImportSpec::wildcard("std::collections"))
         .add_code(CodeBlock::of("// code", ()).unwrap())
         .build()
@@ -179,7 +179,7 @@ fn test_rust_wildcard_import() {
 
 #[test]
 fn test_go_side_effect_import() {
-    let output = FileSpec::builder_with("main.go", GoLang::new())
+    let output = FileSpec::builder_with("main.go", Go::new())
         .header(CodeBlock::of("package main", ()).unwrap())
         .add_import(ImportSpec::side_effect("database/sql"))
         .add_code(CodeBlock::of("// init", ()).unwrap())
@@ -193,7 +193,7 @@ fn test_go_side_effect_import() {
 
 #[test]
 fn test_go_wildcard_import() {
-    let output = FileSpec::builder_with("main.go", GoLang::new())
+    let output = FileSpec::builder_with("main.go", Go::new())
         .header(CodeBlock::of("package main", ()).unwrap())
         .add_import(ImportSpec::wildcard("math"))
         .add_code(CodeBlock::of("// use math", ()).unwrap())
@@ -209,7 +209,7 @@ fn test_go_wildcard_import() {
 fn test_go_mixed_side_effect_and_named() {
     let fmt = TypeName::importable("fmt", "Println");
 
-    let output = FileSpec::builder_with("main.go", GoLang::new())
+    let output = FileSpec::builder_with("main.go", Go::new())
         .header(CodeBlock::of("package main", ()).unwrap())
         .add_import(ImportSpec::side_effect("github.com/lib/pq"))
         .add_code(CodeBlock::of("%T(\"hello\")", (fmt,)).unwrap())
@@ -255,7 +255,7 @@ fn test_python_wildcard_import() {
 
 #[test]
 fn test_java_wildcard_import() {
-    let output = FileSpec::builder_with("App.java", JavaLang::new())
+    let output = FileSpec::builder_with("App.java", Java::new())
         .add_import(ImportSpec::wildcard("java.util"))
         .add_code(CodeBlock::of("// code", ()).unwrap())
         .build()
@@ -268,7 +268,7 @@ fn test_java_wildcard_import() {
 
 #[test]
 fn test_java_forced_named_import() {
-    let output = FileSpec::builder_with("App.java", JavaLang::new())
+    let output = FileSpec::builder_with("App.java", Java::new())
         .add_import(ImportSpec::named("java.util", "List"))
         .add_code(CodeBlock::of("// code", ()).unwrap())
         .build()
@@ -313,7 +313,7 @@ fn test_swift_forced_module_import() {
 
 #[test]
 fn test_dart_side_effect_import() {
-    let output = FileSpec::builder_with("app.dart", DartLang::new())
+    let output = FileSpec::builder_with("app.dart", Dart::new())
         .add_import(ImportSpec::side_effect("package:flutter/material.dart"))
         .add_code(CodeBlock::of("// code", ()).unwrap())
         .build()

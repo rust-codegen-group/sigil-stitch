@@ -76,7 +76,7 @@ A struct field or class property: name, type, visibility, static/readonly flags,
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
 # use sigil_stitch::lang::typescript::TypeScript;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # fn main() {
 let field = FieldSpec::builder("name", TypeName::primitive("string"))
     .visibility(Visibility::Private)

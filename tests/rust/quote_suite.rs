@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
@@ -9,7 +9,7 @@ pub struct RustSuite;
 
 impl LanguageTestSuite for RustSuite {
     fn control_flow_block() -> CodeBlock {
-        sigil_quote!(RustLang {
+        sigil_quote!(Rust {
             if x > 0 {
                 return Ok(x);
             } else {
@@ -24,7 +24,7 @@ impl LanguageTestSuite for RustSuite {
     }
 
     fn basic_block() -> CodeBlock {
-        sigil_quote!(RustLang {
+        sigil_quote!(Rust {
             let x: i32 = 42;
             let name = $S("Alice");
             println!($S("{}: {}"), name, x);
@@ -37,7 +37,7 @@ impl LanguageTestSuite for RustSuite {
     }
 
     fn render(block: CodeBlock) -> String {
-        FileSpec::builder_with("test.rs", RustLang::new())
+        FileSpec::builder_with("test.rs", Rust::new())
             .add_code(block)
             .build()
             .unwrap()

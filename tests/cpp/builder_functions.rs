@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::cpp_lang::CppLang;
+use sigil_stitch::lang::cpp::Cpp;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
@@ -16,7 +16,7 @@ fn test_const_method() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("api.hpp", CppLang::header())
+    let file = FileSpec::builder_with("api.hpp", Cpp::header())
         .add_function(fun)
         .build()
         .unwrap();
@@ -37,7 +37,7 @@ fn test_template_function() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("algo.hpp", CppLang::header())
+    let file = FileSpec::builder_with("algo.hpp", Cpp::header())
         .add_function(fun)
         .build()
         .unwrap();
@@ -56,7 +56,7 @@ fn test_static_method() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("helpers.cpp", CppLang::new())
+    let file = FileSpec::builder_with("helpers.cpp", Cpp::new())
         .add_function(fun)
         .build()
         .unwrap();
@@ -77,7 +77,7 @@ fn test_function_with_doc() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("math_doc.cpp", CppLang::new())
+    let file = FileSpec::builder_with("math_doc.cpp", Cpp::new())
         .add_function(fun)
         .build()
         .unwrap();

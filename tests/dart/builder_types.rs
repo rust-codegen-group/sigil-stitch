@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::dart::DartLang;
+use sigil_stitch::lang::dart::Dart;
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -54,7 +54,7 @@ fn test_class_with_fields() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("user_service.dart", DartLang::new())
+    let file = FileSpec::builder_with("user_service.dart", Dart::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -88,7 +88,7 @@ fn test_abstract_class() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("shape.dart", DartLang::new())
+    let file = FileSpec::builder_with("shape.dart", Dart::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -118,7 +118,7 @@ fn test_class_extends_implements() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("admin_service.dart", DartLang::new())
+    let file = FileSpec::builder_with("admin_service.dart", Dart::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -137,7 +137,7 @@ fn test_enum() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("color.dart", DartLang::new())
+    let file = FileSpec::builder_with("color.dart", Dart::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -171,7 +171,7 @@ fn test_generic_class() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("sorted_list.dart", DartLang::new())
+    let file = FileSpec::builder_with("sorted_list.dart", Dart::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -208,7 +208,7 @@ fn test_static_final() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("constants.dart", DartLang::new())
+    let file = FileSpec::builder_with("constants.dart", Dart::new())
         .add_type(ts)
         .build()
         .unwrap();

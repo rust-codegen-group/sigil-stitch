@@ -166,13 +166,10 @@ fn if_with_parens() {
 
 #[test]
 fn go_slice_type() {
-    assert_eq!(fmt_lang("[]byte", MacroLang::GoLang), "[]byte");
+    assert_eq!(fmt_lang("[]byte", MacroLang::Go), "[]byte");
 }
 
 #[test]
 fn go_map_type() {
-    assert_eq!(
-        fmt_lang("map[string]int", MacroLang::GoLang),
-        "map[string]int"
-    );
+    assert_eq!(fmt_lang("map[string]int", MacroLang::Go), "map[string]int");
 }

@@ -422,9 +422,9 @@ sigil_quote!(TypeScript {
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-sigil_quote!(RustLang {
+sigil_quote!(Rust {
     $attr("derive(Debug, Clone, Serialize, Deserialize)");
     struct Config {}
 })?;
@@ -438,9 +438,9 @@ sigil_quote!(RustLang {
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::cpp_lang::CppLang;
+# use sigil_stitch::lang::cpp::Cpp;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-sigil_quote!(CppLang {
+sigil_quote!(Cpp {
     $attr("nodiscard");
     Result compute();
 })?;
@@ -474,10 +474,10 @@ sigil_quote!(TypeScript {
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 let needs_serde = true;
-sigil_quote!(RustLang {
+sigil_quote!(Rust {
     $attr("derive(Debug, Clone)");
     $if(needs_serde) {
         $attr("serde(rename_all = \"camelCase\")");
@@ -911,7 +911,7 @@ propagates to the enclosing function:
 
 ```rust,ignore
 fn emit_enum(en: &Enum) -> Option<FileSpec> {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $for(v in &en.values) {
             $let(s = v.value.as_str()?);
             $let(variant = s.to_pascal_case());
@@ -1005,13 +1005,13 @@ intersections, `" + "` for Rust trait bounds, `"\n"` for Go interface embedding:
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 let traits = vec![
     TypeName::importable_type("./traits", "Serializable"),
     TypeName::importable_type("./traits", "Cloneable"),
 ];
-sigil_quote!(RustLang {
+sigil_quote!(Rust {
     fn process(stream: &mut (dyn $T_join(" + ", &traits))) {}
 })?;
 // Output: fn process(stream: &mut (dyn Serializable + Cloneable)) {}
@@ -1022,13 +1022,13 @@ sigil_quote!(RustLang {
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::go_lang::GoLang;
+# use sigil_stitch::lang::go::Go;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 let ifaces = vec![
     TypeName::importable_type("./io", "Reader"),
     TypeName::importable_type("./io", "Writer"),
 ];
-sigil_quote!(GoLang {
+sigil_quote!(Go {
     type FileOps interface {
         $T_join("\n", &ifaces)
     }
@@ -1104,10 +1104,10 @@ sigil_quote!(Python {
 
 ```rust
 # extern crate sigil_stitch;
-# use sigil_stitch::lang::go_lang::GoLang;
+# use sigil_stitch::lang::go::Go;
 # use sigil_stitch::prelude::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-sigil_quote!(GoLang {
+sigil_quote!(Go {
     x := 42;
 })?;
 # Ok(())
@@ -1116,10 +1116,10 @@ sigil_quote!(GoLang {
 
 ```rust
 # extern crate sigil_stitch;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # use sigil_stitch::prelude::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-sigil_quote!(RustLang {
+sigil_quote!(Rust {
     let x: i32 = 42;
 })?;
 # Ok(())
@@ -1136,11 +1136,11 @@ expand inside them:
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::go_lang::GoLang;
+# use sigil_stitch::lang::go::Go;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 let variants = vec!["A", "B", "C"];
 
-sigil_quote!(GoLang {
+sigil_quote!(Go {
     const (
     $for(v in &variants) {
         $L("@{v}Kind @{v} = \"@{v}\"");
@@ -1161,7 +1161,7 @@ The paren-block body is indented automatically (the codegen emits `%>` after the
 opening header and `%<` before the closing `)`). Interpolation markers, meta-loops,
 and meta-conditionals all work normally inside the block.
 
-This detection is language-aware — only `GoLang` recognizes `const`, `var`,
+This detection is language-aware — only `Go` recognizes `const`, `var`,
 `import`, and `type` as paren-block headers. In other languages, `const ( ... )`
 is treated as a plain statement.
 

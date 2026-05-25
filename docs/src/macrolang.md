@@ -11,11 +11,11 @@ tokenizer annotation pass language-aware.
 The `sigil_quote!` macro pipeline has three stages:
 
 ```text
-sigil_quote!(GoLang { val := <-ch; })
+sigil_quote!(Go { val := <-ch; })
         │
         ▼
 ┌─ parse_input ─────────────────────────────────────┐
-│  1. Extract language: MacroLang::GoLang           │
+│  1. Extract language: MacroLang::Go           │
 │  2. Parse body tokens                             │
 │  3. annotate_tokens(tokens, lang)                 │
 │     └─ Pre-scan: classify each token              │
@@ -28,7 +28,7 @@ sigil_quote!(GoLang { val := <-ch; })
 ```
 
 The `MacroLang` enum is extracted from the first identifier in the macro invocation
-(`Bash`, `Zsh`, `GoLang`, `Haskell`, etc.) and threaded through the entire parse pipeline.
+(`Bash`, `Zsh`, `Go`, `Haskell`, etc.) and threaded through the entire parse pipeline.
 Languages not in the enum get `MacroLang::Unaware`, which applies only universal heuristics.
 
 ## MacroLang Variants
@@ -38,7 +38,7 @@ Languages not in the enum get `MacroLang::Unaware`, which applies only universal
 | `Unaware` | All other languages | Universal heuristics only |
 | `Bash` | `sigil_quote!(Bash { ... })` | Shell-specific (see below) |
 | `Zsh` | `sigil_quote!(Zsh { ... })` | Shell-specific (same as Bash) |
-| `GoLang` | `sigil_quote!(GoLang { ... })` | `<-` prefix receive |
+| `Go` | `sigil_quote!(Go { ... })` | `<-` prefix receive |
 | `Haskell` | `sigil_quote!(Haskell { ... })` | `$$` dollar operator spacing |
 
 ### Shell Languages (Bash, Zsh)

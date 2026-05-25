@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -36,7 +36,7 @@ fn test_function_with_imports() {
     b2.add_line();
     let struct_block = b2.build().unwrap();
 
-    let file = FileSpec::builder_with("lib.rs", RustLang::new())
+    let file = FileSpec::builder_with("lib.rs", Rust::new())
         .add_code(func_block)
         .add_code(struct_block)
         .build()
@@ -76,7 +76,7 @@ fn test_import_grouping() {
     b.add_line();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("main.rs", RustLang::new())
+    let file = FileSpec::builder_with("main.rs", Rust::new())
         .add_code(block)
         .build()
         .unwrap();
@@ -95,7 +95,7 @@ fn test_import_conflict() {
     b.add_statement("let u2: %T = todo!()", (user2,));
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("conflict.rs", RustLang::new())
+    let file = FileSpec::builder_with("conflict.rs", Rust::new())
         .add_code(block)
         .build()
         .unwrap();

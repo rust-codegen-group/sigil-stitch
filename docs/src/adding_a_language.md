@@ -44,7 +44,7 @@ These are enough for CodeBlock-level code generation:
 
 Override `render_verbatim_string()` if your language has string interpolation (e.g., Bash `"$x"`, TypeScript `` `${x}` ``, Python `f"{x}"`).
 
-`render_imports()` is the most complex. It receives an `ImportGroup` (deduplicated, with aliases resolved) and must emit the full import header string. Study `src/lang/typescript.rs` for ES module imports or `src/lang/rust_lang.rs` for `use` paths.
+`render_imports()` is the most complex. It receives an `ImportGroup` (deduplicated, with aliases resolved) and must emit the full import header string. Study `src/lang/typescript.rs` for ES module imports or `src/lang/rust.rs` for `use` paths.
 
 ## The CodeLang Trait
 
@@ -349,11 +349,11 @@ Study these existing implementations for patterns similar to your target:
 | Language | File | Notable Patterns |
 |----------|------|-----------------|
 | TypeScript | `src/lang/typescript.rs` | ES module imports, type-only imports, single-quoted strings |
-| Rust | `src/lang/rust_lang.rs` | `use` paths, struct+impl split, `pub(crate)` visibility |
+| Rust | `src/lang/rust.rs` | `use` paths, struct+impl split, `pub(crate)` visibility |
 | Python | `src/lang/python.rs` | Indent-only blocks (no braces), docstrings inside body, `from x import y` |
-| Go | `src/lang/go_lang.rs` | Package-qualified names (`http.Server`), bracket generics, `func` keyword |
-| C | `src/lang/c_lang.rs` | Type-before-name, `#include`, `__attribute__`, struct close semicolon |
-| C++ | `src/lang/cpp_lang.rs` | `virtual` instead of `abstract`, `#include` + `using`, `[[attributes]]` |
+| Go | `src/lang/go.rs` | Package-qualified names (`http.Server`), bracket generics, `func` keyword |
+| C | `src/lang/c.rs` | Type-before-name, `#include`, `__attribute__`, struct close semicolon |
+| C++ | `src/lang/cpp.rs` | `virtual` instead of `abstract`, `#include` + `using`, `[[attributes]]` |
 | Bash | `src/lang/bash.rs` | Keyword-based block closers (`fi`/`done`/`esac`), `source` imports, shell escaping |
 | Scala | `src/lang/scala.rs` | `case class`, `trait`, `[T]` generics, `<:` bounds, `= {`/`}` blocks |
 | Haskell | `src/lang/haskell.rs` | Split signature style, `where`/indentation blocks, postfix generics, `deriving` |

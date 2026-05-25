@@ -29,7 +29,7 @@ use crate::type_name::TypeName;
 ///
 /// ```
 /// use sigil_stitch::spec::annotation_spec::AnnotationSpec;
-/// use sigil_stitch::lang::rust_lang::RustLang;
+/// use sigil_stitch::lang::rust::Rust;
 ///
 /// // Simple: #[allow(dead_code)]
 /// let ann = AnnotationSpec::new("allow").arg("dead_code");
@@ -160,7 +160,7 @@ impl AnnotationSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::rust_lang::RustLang;
+    use crate::lang::rust::Rust;
     use crate::lang::typescript::TypeScript;
 
     #[test]
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_rust_prefix() {
-        let rs = RustLang::new();
+        let rs = Rust::new();
         let ann = AnnotationSpec::new("allow").arg("dead_code");
         let cb = ann.emit(&rs).unwrap();
         assert!(!cb.is_empty());
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_arg_chaining() {
-        let rs = RustLang::new();
+        let rs = Rust::new();
         let ann = AnnotationSpec::new("cfg")
             .arg("test")
             .arg("feature = \"nightly\"");

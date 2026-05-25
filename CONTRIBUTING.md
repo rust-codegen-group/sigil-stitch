@@ -25,9 +25,9 @@ sigil-stitch/
 │   │   ├── config.rs       # Config structs (BlockSyntaxConfig, FunctionSyntaxConfig, etc.)
 │   │   ├── rewrite.rs      # Runtime node rewrite walker
 │   │   ├── typescript.rs   # One file per language: typescript, javascript,
-│   │   └── ...             # rust_lang, go_lang, python, java_lang, kotlin,
-│   │                       # swift, dart, scala, haskell, ocaml, c_lang,
-│   │                       # cpp_lang, bash, zsh, lua, csharp
+│   │   └── ...             # rust, go, python, java, kotlin,
+│   │                       # swift, dart, scala, haskell, ocaml, c,
+│   │                       # cpp, bash, zsh, lua, csharp
 │   └── spec/               # Structural builders (emit CodeBlocks)
 │       ├── type_spec.rs    # Class, struct, interface, trait, enum, type alias, newtype
 │       ├── fun_spec.rs     # Functions and methods

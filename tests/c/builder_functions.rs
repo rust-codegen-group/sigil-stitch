@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::{CodeBlock, StringLitArg};
-use sigil_stitch::lang::c_lang::CLang;
+use sigil_stitch::lang::c::C;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::Visibility;
@@ -19,7 +19,7 @@ fn test_function_with_params() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("math.c", CLang::new())
+    let file = FileSpec::builder_with("math.c", C::new())
         .add_function(fun)
         .build()
         .unwrap();
@@ -43,7 +43,7 @@ fn test_void_function() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("greet.c", CLang::new())
+    let file = FileSpec::builder_with("greet.c", C::new())
         .add_function(fun)
         .build()
         .unwrap();
@@ -64,7 +64,7 @@ fn test_static_function() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("helpers.c", CLang::new())
+    let file = FileSpec::builder_with("helpers.c", C::new())
         .add_function(fun)
         .build()
         .unwrap();
@@ -83,7 +83,7 @@ fn test_function_declaration() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("api.h", CLang::header())
+    let file = FileSpec::builder_with("api.h", C::header())
         .add_function(fun)
         .build()
         .unwrap();
@@ -104,7 +104,7 @@ fn test_function_with_doc() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("math_doc.c", CLang::new())
+    let file = FileSpec::builder_with("math_doc.c", C::new())
         .add_function(fun)
         .build()
         .unwrap();

@@ -6,7 +6,7 @@
 //!
 //! Run: `cargo run --example rust_codegen`
 
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::prelude::*;
 
 fn main() {
@@ -204,7 +204,7 @@ fn builder_approach() -> String {
         (),
     );
 
-    FileSpec::builder_with("events.rs", RustLang::new())
+    FileSpec::builder_with("events.rs", Rust::new())
         .add_type(event_enum)
         .add_type(user_id)
         .add_type(config)
@@ -226,7 +226,7 @@ fn macro_approach() -> String {
     let comment_note = "validate event";
     let (event_enum, user_id, config) = build_shared_types();
 
-    let print_body = sigil_quote!(RustLang {
+    let print_body = sigil_quote!(Rust {
         $attr("derive(Debug)")
         $comment("@{comment_label}: @{comment_reason}");
         let _ev = $V("@{v_interp}");
@@ -248,7 +248,7 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
-    let handler_body = sigil_quote!(RustLang {
+    let handler_body = sigil_quote!(Rust {
         move |event: &Event| {
             println!("handling {:?}", event);
         }
@@ -265,7 +265,7 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
-    let dispatch_body = sigil_quote!(RustLang {
+    let dispatch_body = sigil_quote!(Rust {
         handler.handle(event)
     })
     .unwrap();
@@ -293,7 +293,7 @@ fn macro_approach() -> String {
     let read = TypeName::importable("std::io", "Read");
     let write = TypeName::importable("std::io", "Write");
     let traits = vec![read, write, TypeName::primitive("Send")];
-    let join_body = sigil_quote!(RustLang {
+    let join_body = sigil_quote!(Rust {
         fn process(stream: &mut (dyn $T_join(" + ", &traits))) {
             let mut buf = [0u8; 1024];
             stream.read(&mut buf).unwrap();
@@ -301,7 +301,7 @@ fn macro_approach() -> String {
     })
     .unwrap();
 
-    FileSpec::builder_with("events.rs", RustLang::new())
+    FileSpec::builder_with("events.rs", Rust::new())
         .add_type(event_enum)
         .add_type(user_id)
         .add_type(config)

@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::dart::DartLang;
+use sigil_stitch::lang::dart::Dart;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
@@ -16,7 +16,7 @@ fn test_control_flow() {
     b.end_control_flow();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("flow.dart", DartLang::new())
+    let file = FileSpec::builder_with("flow.dart", Dart::new())
         .add_code(block)
         .build()
         .unwrap();

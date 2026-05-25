@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::{CodeBlock, StringLitArg};
-use sigil_stitch::lang::cpp_lang::CppLang;
+use sigil_stitch::lang::cpp::Cpp;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -17,7 +17,7 @@ fn test_includes() {
     b.add_statement("%T obj", (myclass,));
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("test.cpp", CppLang::new())
+    let file = FileSpec::builder_with("test.cpp", Cpp::new())
         .add_code(block)
         .build()
         .unwrap();

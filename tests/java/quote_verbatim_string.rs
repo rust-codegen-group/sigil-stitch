@@ -45,7 +45,7 @@ fn verbatim_at_interpolation_multiple() {
 
 #[test]
 fn attr_annotation_java() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         $attr("Override")
 
         public String toString() {

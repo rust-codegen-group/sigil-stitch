@@ -7,7 +7,7 @@
 //!
 //! Run: `cargo run --example java_codegen`
 
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::prelude::*;
 
 fn main() {
@@ -268,7 +268,7 @@ fn builder_approach() -> String {
         (),
     );
 
-    FileSpec::builder_with("User.java", JavaLang::new())
+    FileSpec::builder_with("User.java", Java::new())
         .add_type(priority_enum)
         .add_type(repo_iface)
         .add_type(base_entity)
@@ -304,7 +304,7 @@ fn macro_approach() -> String {
                 .visibility(Visibility::Protected)
                 .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
                 .body(
-                    sigil_quote!(JavaLang {
+                    sigil_quote!(Java {
                         $comment("@{comment_label}: @{comment_reason}");
                         this.name = name;
                     })
@@ -317,7 +317,7 @@ fn macro_approach() -> String {
             FunSpec::builder("getName")
                 .visibility(Visibility::Public)
                 .returns(TypeName::primitive("String"))
-                .body(sigil_quote!(JavaLang { $V("// @{v_interp} name"); return this.name; $comment(comment_note) }).unwrap())
+                .body(sigil_quote!(Java { $V("// @{v_interp} name"); return this.name; $comment(comment_note) }).unwrap())
                 .build()
                 .unwrap(),
         )
@@ -349,7 +349,7 @@ fn macro_approach() -> String {
                 .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
                 .add_param(ParameterSpec::new("email", TypeName::primitive("String")).unwrap())
                 .delegation(CodeBlock::of("super(name)", ()).unwrap())
-                .body(sigil_quote!(JavaLang { this.email = email; }).unwrap())
+                .body(sigil_quote!(Java { this.email = email; }).unwrap())
                 .build()
                 .unwrap(),
         )
@@ -359,7 +359,7 @@ fn macro_approach() -> String {
                 .is_override()
                 .returns(TypeName::primitive("boolean"))
                 .body(
-                    sigil_quote!(JavaLang {
+                    sigil_quote!(Java {
                         $attr("Override");
                         return this.name != null && !this.name.isEmpty();
                     })
@@ -372,7 +372,7 @@ fn macro_approach() -> String {
             FunSpec::builder("getEmail")
                 .visibility(Visibility::Public)
                 .returns(TypeName::primitive("String"))
-                .body(sigil_quote!(JavaLang { return this.email; }).unwrap())
+                .body(sigil_quote!(Java { return this.email; }).unwrap())
                 .build()
                 .unwrap(),
         )
@@ -382,7 +382,7 @@ fn macro_approach() -> String {
                 .is_override()
                 .returns(TypeName::primitive("String"))
                 .body(
-                    sigil_quote!(JavaLang {
+                    sigil_quote!(Java {
                         return "User{name=" + this.name + ", email=" + this.email + "}";
                     })
                     .unwrap(),
@@ -395,7 +395,7 @@ fn macro_approach() -> String {
 
     // --- Static generic method ---
     let collections = TypeName::importable("java.util", "Collections");
-    let sort_body = sigil_quote!(JavaLang {
+    let sort_body = sigil_quote!(Java {
         $T(collections).sort(list);
         return list;
     })
@@ -428,7 +428,7 @@ fn macro_approach() -> String {
         TypeName::importable("java.io", "Serializable"),
         TypeName::importable("java.lang", "Comparable"),
     ];
-    let join_body = sigil_quote!(JavaLang {
+    let join_body = sigil_quote!(Java {
         class Box<T extends $T_join(" & ", &bounds)> {
             private T value;
             Box(T value) { this.value = value; }
@@ -436,7 +436,7 @@ fn macro_approach() -> String {
     })
     .unwrap();
 
-    FileSpec::builder_with("User.java", JavaLang::new())
+    FileSpec::builder_with("User.java", Java::new())
         .add_type(priority_enum)
         .add_type(repo_iface)
         .add_type(base_entity)

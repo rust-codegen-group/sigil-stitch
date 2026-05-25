@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
@@ -16,7 +16,7 @@ fn test_control_flow() {
     b.end_control_flow();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("Flow.java", JavaLang::new())
+    let file = FileSpec::builder_with("Flow.java", Java::new())
         .add_code(block)
         .build()
         .unwrap();

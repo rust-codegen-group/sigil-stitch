@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::{CodeBlock, StringLitArg};
-use sigil_stitch::lang::c_lang::CLang;
+use sigil_stitch::lang::c::C;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -26,7 +26,7 @@ fn test_function_with_includes() {
     b.add_line();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("main.c", CLang::new())
+    let file = FileSpec::builder_with("main.c", C::new())
         .add_code(block)
         .build()
         .unwrap();
@@ -57,7 +57,7 @@ fn test_include_grouping() {
     b.add_statement("%T()", (utils,));
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("test.c", CLang::new())
+    let file = FileSpec::builder_with("test.c", C::new())
         .add_code(block)
         .build()
         .unwrap();

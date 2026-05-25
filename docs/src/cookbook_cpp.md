@@ -99,10 +99,10 @@ C++ abstract classes with pure virtual methods require the `extra_member` escape
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::cpp_lang::CppLang;
+# use sigil_stitch::lang::cpp::Cpp;
 # fn main() {
 fn emit_fun(fun: &FunSpec) -> CodeBlock {
-    let lang = CppLang::new();
+    let lang = Cpp::new();
     fun.emit(&lang, DeclarationContext::Member).unwrap()
 }
 

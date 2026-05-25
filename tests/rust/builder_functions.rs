@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::Visibility;
@@ -20,7 +20,7 @@ fn test_top_level_function() {
         .add_param(ParameterSpec::new("value", TypeName::primitive("&T")).unwrap())
         .body(body);
 
-    let output = FileSpec::builder_with("utils.rs", RustLang::new())
+    let output = FileSpec::builder_with("utils.rs", Rust::new())
         .add_function(fb.build().unwrap())
         .build()
         .unwrap()
@@ -40,7 +40,7 @@ fn test_function_with_doc() {
         .returns(TypeName::primitive("String"))
         .body(body);
 
-    let output = FileSpec::builder_with("greet.rs", RustLang::new())
+    let output = FileSpec::builder_with("greet.rs", Rust::new())
         .add_function(fb.build().unwrap())
         .build()
         .unwrap()

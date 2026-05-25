@@ -339,20 +339,20 @@ fn test_c_each_in_control_flow_no_blank_lines() {
 
 #[test]
 fn test_c_each_no_trailing_blank_line_in_fun_spec_body() {
-    use sigil_stitch::lang::java_lang::JavaLang;
+    use sigil_stitch::lang::java::Java;
 
     let fields = ["statusCode", "raw", "status200"];
     let assignments: Vec<CodeBlock> = fields
         .iter()
         .map(|f| {
-            sigil_quote!(JavaLang {
+            sigil_quote!(Java {
                 this.$N(*f) = $N(*f);
             })
             .unwrap()
         })
         .collect();
 
-    let ctor_body = sigil_quote!(JavaLang {
+    let ctor_body = sigil_quote!(Java {
         $C_each(assignments);
     })
     .unwrap();
@@ -363,7 +363,7 @@ fn test_c_each_no_trailing_blank_line_in_fun_spec_body() {
     ctor = ctor.body(ctor_body);
     cls = cls.add_method(ctor.build().unwrap());
 
-    let file = FileSpec::builder_with("TestClass.java", JavaLang::new())
+    let file = FileSpec::builder_with("TestClass.java", Java::new())
         .add_type(cls.build().unwrap())
         .build()
         .unwrap();

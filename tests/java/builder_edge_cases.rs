@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -41,7 +41,7 @@ fn test_static_final_field() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Constants.java", JavaLang::new())
+    let file = FileSpec::builder_with("Constants.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -68,7 +68,7 @@ fn test_annotated_method() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Dog.java", JavaLang::new())
+    let file = FileSpec::builder_with("Dog.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -154,7 +154,7 @@ fn test_full_module() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("UserRepo.java", JavaLang::new())
+    let file = FileSpec::builder_with("UserRepo.java", Java::new())
         .add_type(iface_spec)
         .add_type(cls_spec)
         .build()

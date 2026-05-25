@@ -84,13 +84,13 @@ Reserved-word escaping happens at render time based on the target language:
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::code_block::{CodeBlock, NameArg};
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # use sigil_stitch::spec::file_spec::FileSpec;
 # use sigil_stitch::prelude::*;
 # fn main() {
 let field_name = "type"; // reserved in Rust
 let block = CodeBlock::of("let %N = value", NameArg(field_name.into())).unwrap();
-let file = FileSpec::builder_with("test.rs", RustLang::new())
+let file = FileSpec::builder_with("test.rs", Rust::new())
     .add_code(block)
     .build()
     .unwrap();

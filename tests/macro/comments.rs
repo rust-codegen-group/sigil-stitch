@@ -253,7 +253,7 @@ fn test_attr_with_dynamic_expression() {
 #[test]
 fn test_attr_with_format_expression() {
     let name = "Debug";
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $attr(format!("derive({name}, Clone)"));
 
         struct Foo;
@@ -285,7 +285,7 @@ fn test_attr_with_to_string_expression() {
 #[test]
 fn test_attr_with_at_interpolation() {
     let trait_name = "Debug";
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $attr("derive(@{trait_name}, Clone)");
 
         struct Foo;
@@ -334,7 +334,7 @@ fn test_attr_basic_typescript() {
 
 #[test]
 fn test_attr_basic_rust() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $attr("derive(Debug, Clone)")
 
         struct Foo;
@@ -362,7 +362,7 @@ fn test_attr_multiple() {
 
 #[test]
 fn test_attr_cpp_double_bracket() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         $attr("nodiscard")
 
         int getValue() {
@@ -377,7 +377,7 @@ fn test_attr_cpp_double_bracket() {
 
 #[test]
 fn test_attr_rust_derive() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $attr("derive(Debug, Clone, Serialize, Deserialize)")
 
         pub struct $N("User") {
@@ -396,7 +396,7 @@ fn test_attr_rust_derive() {
 #[test]
 fn test_attr_with_if_conditional() {
     let needs_serde = true;
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         $attr("derive(Debug, Clone)")
 
         $if(needs_serde) {

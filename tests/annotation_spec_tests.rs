@@ -1,10 +1,10 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::c_lang::CLang;
-use sigil_stitch::lang::cpp_lang::CppLang;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::c::C;
+use sigil_stitch::lang::cpp::Cpp;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::lang::kotlin::Kotlin;
 use sigil_stitch::lang::python::Python;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
@@ -121,7 +121,7 @@ fn test_ts_annotation_on_field() {
 
 #[test]
 fn test_rust_derive_annotation() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let output = render_type(
         &TypeSpec::builder("Config", TypeKind::Struct)
             .annotate(AnnotationSpec::new("derive").arg("Debug, Clone, Serialize"))
@@ -136,7 +136,7 @@ fn test_rust_derive_annotation() {
 
 #[test]
 fn test_rust_allow_annotation() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let output = render_fun(
         &FunSpec::builder("old_func")
             .annotate(AnnotationSpec::new("allow").arg("dead_code"))
@@ -152,7 +152,7 @@ fn test_rust_allow_annotation() {
 
 #[test]
 fn test_rust_no_args_annotation() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let output = render_fun(
         &FunSpec::builder("my_test")
             .annotate(AnnotationSpec::new("test"))
@@ -167,7 +167,7 @@ fn test_rust_no_args_annotation() {
 
 #[test]
 fn test_rust_annotation_on_field() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let output = render_field(
         &FieldSpec::builder("name", TypeName::primitive("String"))
             .annotate(AnnotationSpec::new("serde").arg("rename = \"user_name\""))
@@ -183,7 +183,7 @@ fn test_rust_annotation_on_field() {
 
 #[test]
 fn test_rust_annotation_on_enum_variant() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let output = render_type(
         &TypeSpec::builder("Color", TypeKind::Enum)
             .add_variant(
@@ -206,7 +206,7 @@ fn test_rust_annotation_on_enum_variant() {
 
 #[test]
 fn test_cpp_nodiscard_annotation() {
-    let cpp = CppLang::new();
+    let cpp = Cpp::new();
     let output = render_fun(
         &FunSpec::builder("compute")
             .annotate(AnnotationSpec::new("nodiscard"))
@@ -222,7 +222,7 @@ fn test_cpp_nodiscard_annotation() {
 
 #[test]
 fn test_cpp_deprecated_with_reason() {
-    let cpp = CppLang::new();
+    let cpp = Cpp::new();
     let output = render_fun(
         &FunSpec::builder("oldFunc")
             .annotate(AnnotationSpec::new("deprecated").arg("\"use newFunc instead\""))
@@ -240,7 +240,7 @@ fn test_cpp_deprecated_with_reason() {
 
 #[test]
 fn test_c_attribute_annotation() {
-    let c = CLang::new();
+    let c = C::new();
     let output = render_fun(
         &FunSpec::builder("init")
             .annotate(AnnotationSpec::new("constructor"))
@@ -256,7 +256,7 @@ fn test_c_attribute_annotation() {
 
 #[test]
 fn test_c_attribute_with_args() {
-    let c = CLang::new();
+    let c = C::new();
     let output = render_fun(
         &FunSpec::builder("alloc")
             .annotate(AnnotationSpec::new("malloc").arg("free, 1"))
@@ -274,7 +274,7 @@ fn test_c_attribute_with_args() {
 
 #[test]
 fn test_java_override_annotation() {
-    let java = JavaLang::new();
+    let java = Java::new();
     let output = render_fun(
         &FunSpec::builder("toString")
             .annotate(AnnotationSpec::new("Override"))
@@ -292,7 +292,7 @@ fn test_java_override_annotation() {
 
 #[test]
 fn test_java_suppress_warnings() {
-    let java = JavaLang::new();
+    let java = Java::new();
     let output = render_fun(
         &FunSpec::builder("process")
             .annotate(AnnotationSpec::new("SuppressWarnings").arg("\"unchecked\""))
@@ -358,7 +358,7 @@ fn test_python_dataclass_decorator() {
 
 #[test]
 fn test_mixed_annotation_and_codeblock() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let fb = FunSpec::builder("test_it")
         .annotate(AnnotationSpec::new("cfg").arg("test"))
         .annotation(CodeBlock::of("#[ignore]", ()).unwrap())
@@ -419,7 +419,7 @@ fn test_importable_annotation_java() {
 
 #[test]
 fn test_multiple_annotations_on_fun() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let output = render_fun(
         &FunSpec::builder("bench_it")
             .annotate(AnnotationSpec::new("cfg").arg("test"))
@@ -439,7 +439,7 @@ fn test_multiple_annotations_on_fun() {
 
 #[test]
 fn test_multiple_args() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let output = render_fun(
         &FunSpec::builder("handler")
             .annotate(
@@ -460,7 +460,7 @@ fn test_multiple_args() {
 
 #[test]
 fn test_rust_args_bulk_derive() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let ann = AnnotationSpec::new("derive").args(["Debug", "Clone", "Serialize"]);
     let block = ann.emit(&rs).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
@@ -471,7 +471,7 @@ fn test_rust_args_bulk_derive() {
 
 #[test]
 fn test_args_combined_with_arg() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let ann = AnnotationSpec::new("serde")
         .arg("rename_all = \"camelCase\"")
         .args(["deny_unknown_fields"]);
@@ -487,7 +487,7 @@ fn test_args_combined_with_arg() {
 
 #[test]
 fn test_args_empty_iter_no_parens() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let ann = AnnotationSpec::new("test").args(Vec::<&str>::new());
     let block = ann.emit(&rs).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
@@ -500,7 +500,7 @@ fn test_args_empty_iter_no_parens() {
 
 #[test]
 fn test_name_ref_escapes_rust_keyword() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let block = CodeBlock::of(
         "let %N = 1",
         sigil_stitch::code_block::NameArg("type".into()),
@@ -514,8 +514,8 @@ fn test_name_ref_escapes_rust_keyword() {
 
 #[test]
 fn test_name_ref_escapes_go_keyword() {
-    use sigil_stitch::lang::go_lang::GoLang;
-    let go = GoLang::new();
+    use sigil_stitch::lang::go::Go;
+    let go = Go::new();
     let block = CodeBlock::of(
         "var %N int",
         sigil_stitch::code_block::NameArg("func".into()),
@@ -529,7 +529,7 @@ fn test_name_ref_escapes_go_keyword() {
 
 #[test]
 fn test_name_ref_no_escape_non_keyword() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let block = CodeBlock::of(
         "let %N = 1",
         sigil_stitch::code_block::NameArg("myVar".into()),

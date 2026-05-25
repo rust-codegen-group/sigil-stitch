@@ -1,12 +1,12 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::dart::DartLang;
+use sigil_stitch::lang::dart::Dart;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
 
 fn render(block: &CodeBlock) -> String {
-    FileSpec::builder_with("test.dart", DartLang::new())
+    FileSpec::builder_with("test.dart", Dart::new())
         .add_code(block.clone())
         .build()
         .unwrap()
@@ -16,7 +16,7 @@ fn render(block: &CodeBlock) -> String {
 
 #[test]
 fn test_cascade() {
-    let block = sigil_quote!(DartLang {
+    let block = sigil_quote!(Dart {
         final builder = StringBuffer()
             ..write("hello")
             ..write(" world");
@@ -27,7 +27,7 @@ fn test_cascade() {
 
 #[test]
 fn test_named_params() {
-    let block = sigil_quote!(DartLang {
+    let block = sigil_quote!(Dart {
         void configure({required String host, int port = 8080}) {
             print(host);
         }
@@ -38,7 +38,7 @@ fn test_named_params() {
 
 #[test]
 fn test_null_aware() {
-    let block = sigil_quote!(DartLang {
+    let block = sigil_quote!(Dart {
         String name = user?.name ?? $S("anonymous");
         list ??= [];
         final length = items?.length ?? 0;
@@ -49,7 +49,7 @@ fn test_null_aware() {
 
 #[test]
 fn test_async_await() {
-    let block = sigil_quote!(DartLang {
+    let block = sigil_quote!(Dart {
         Future<String> fetchData(String url) async {
             final response = await http.get(Uri.parse(url));
             return response.body;

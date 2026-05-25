@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
@@ -22,7 +22,7 @@ fn test_function_with_doc() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Greet.java", JavaLang::new())
+    let file = FileSpec::builder_with("Greet.java", Java::new())
         .add_function(fun)
         .build()
         .unwrap();
@@ -47,7 +47,7 @@ fn test_generic_type_params_before_return_type() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Sort.java", JavaLang::new())
+    let file = FileSpec::builder_with("Sort.java", Java::new())
         .add_function(fun)
         .build()
         .unwrap();
@@ -81,7 +81,7 @@ fn test_override_annotation() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Dog.java", JavaLang::new())
+    let file = FileSpec::builder_with("Dog.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();
@@ -111,7 +111,7 @@ fn test_generic_params_before_return_golden() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Utils.java", JavaLang::new())
+    let file = FileSpec::builder_with("Utils.java", Java::new())
         .add_type(ts)
         .build()
         .unwrap();

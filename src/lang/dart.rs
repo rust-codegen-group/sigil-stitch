@@ -51,14 +51,14 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 ///   .is_async();
 /// ```
 #[derive(Debug, Clone)]
-pub struct DartLang {
+pub struct Dart {
     /// Indent with this string (default: "  " — 2 spaces per Dart style guide).
     pub indent: String,
     /// File extension (default: "dart").
     pub extension: String,
 }
 
-impl Default for DartLang {
+impl Default for Dart {
     fn default() -> Self {
         Self {
             indent: "  ".to_string(),
@@ -67,7 +67,7 @@ impl Default for DartLang {
     }
 }
 
-impl DartLang {
+impl Dart {
     /// Create a new Dart language instance.
     pub fn new() -> Self {
         Self::default()
@@ -112,7 +112,7 @@ fn import_group_order(module: &str) -> u8 {
     }
 }
 
-impl RendererLang for DartLang {
+impl RendererLang for Dart {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -186,7 +186,7 @@ impl RendererLang for DartLang {
     }
 }
 
-impl CodeLang for DartLang {
+impl CodeLang for Dart {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -310,13 +310,13 @@ mod tests {
 
     #[test]
     fn test_file_extension() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(d.file_extension(), "dart");
     }
 
     #[test]
     fn test_escape_reserved() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(d.escape_reserved("class"), "class_");
         assert_eq!(d.escape_reserved("import"), "import_");
         assert_eq!(d.escape_reserved("final"), "final_");
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_single() {
-        let d = DartLang::new();
+        let d = Dart::new();
         let imports = ImportGroup {
             entries: vec![ImportEntry {
                 module: "dart:async".into(),
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_grouped() {
-        let d = DartLang::new();
+        let d = Dart::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_sorted_within_group() {
-        let d = DartLang::new();
+        let d = Dart::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_dedup() {
-        let d = DartLang::new();
+        let d = Dart::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn test_doc_comment_single() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(
             d.render_doc_comment(&["A brief description."]),
             "/// A brief description."
@@ -454,14 +454,14 @@ mod tests {
 
     #[test]
     fn test_doc_comment_multi() {
-        let d = DartLang::new();
+        let d = Dart::new();
         let doc = d.render_doc_comment(&["Container class.", "", "See also [OtherClass]."]);
         assert_eq!(doc, "/// Container class.\n///\n/// See also [OtherClass].");
     }
 
     #[test]
     fn test_string_literal() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(d.render_string_literal("hello"), "'hello'");
         assert_eq!(d.render_string_literal("it's"), "'it\\'s'");
         assert_eq!(d.render_string_literal("new\nline"), "'new\\nline'");
@@ -471,7 +471,7 @@ mod tests {
 
     #[test]
     fn test_type_keyword() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(d.type_keyword(TypeKind::Class), "class");
         assert_eq!(d.type_keyword(TypeKind::Struct), "class");
         assert_eq!(d.type_keyword(TypeKind::Interface), "abstract class");
@@ -481,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_no_visibility_keywords() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(
             d.render_visibility(Visibility::Public, DeclarationContext::TopLevel),
             ""
@@ -498,31 +498,31 @@ mod tests {
 
     #[test]
     fn test_type_before_name() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert!(d.type_decl_syntax().type_before_name);
     }
 
     #[test]
     fn test_return_type_is_prefix() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert!(d.type_decl_syntax().return_type_is_prefix);
     }
 
     #[test]
     fn test_readonly_keyword() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(d.enum_and_annotation().readonly_keyword, "final ");
     }
 
     #[test]
     fn test_no_async_keyword() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(d.function_syntax().async_keyword, "");
     }
 
     #[test]
     fn test_async_suffix() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(d.function_syntax().async_suffix, " async");
     }
 
@@ -538,14 +538,14 @@ mod tests {
 
     #[test]
     fn test_dart_builder_fluent() {
-        let d = DartLang::new().with_indent("    ").with_extension("g.dart");
+        let d = Dart::new().with_indent("    ").with_extension("g.dart");
         assert_eq!(d.file_extension(), "g.dart");
         assert_eq!(d.block_syntax().indent_unit, "    ");
     }
 
     #[test]
     fn test_module_separator() {
-        let d = DartLang::new();
+        let d = Dart::new();
         assert_eq!(d.module_separator(), Some("."));
     }
 }

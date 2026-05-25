@@ -1,12 +1,12 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
 
 fn render(block: &CodeBlock) -> String {
-    FileSpec::builder_with("Test.java", JavaLang::new())
+    FileSpec::builder_with("Test.java", Java::new())
         .add_code(block.clone())
         .build()
         .unwrap()
@@ -21,7 +21,7 @@ fn test_basic() {
 
 #[test]
 fn test_override_method() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         @Override
         public String speak() {
             return "Woof!";
@@ -33,7 +33,7 @@ fn test_override_method() {
 
 #[test]
 fn test_generic_static_method() {
-    let block = sigil_quote!(JavaLang {
+    let block = sigil_quote!(Java {
         public static <T extends Comparable> List<T> sortList(List<T> list) {
             Collections.sort(list);
             return list;

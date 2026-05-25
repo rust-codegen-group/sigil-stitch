@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::{CodeBlock, StringLitArg};
-use sigil_stitch::lang::dart::DartLang;
+use sigil_stitch::lang::dart::Dart;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -91,7 +91,7 @@ fn test_full_module() {
     // Trigger Future import.
     let future_trigger = CodeBlock::of("// %T", (future,)).unwrap();
 
-    let file = FileSpec::builder_with("user_repo.dart", DartLang::new())
+    let file = FileSpec::builder_with("user_repo.dart", Dart::new())
         .add_code(future_trigger)
         .add_type(iface_spec)
         .add_type(cls_spec)
@@ -119,7 +119,7 @@ fn test_string_dollar_escape() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("greet.dart", DartLang::new())
+    let file = FileSpec::builder_with("greet.dart", Dart::new())
         .add_function(fun)
         .build()
         .unwrap();

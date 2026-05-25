@@ -10,14 +10,14 @@ use crate::type_name::{FunctionPresentation, TypePresentation, WildcardPresentat
 
 /// Rust language implementation.
 #[derive(Debug, Clone)]
-pub struct RustLang {
+pub struct Rust {
     /// Indent with this string (default: "    ").
     pub indent: String,
     /// File extension (default: "rs").
     pub extension: String,
 }
 
-impl Default for RustLang {
+impl Default for Rust {
     fn default() -> Self {
         Self {
             indent: "    ".to_string(),
@@ -26,7 +26,7 @@ impl Default for RustLang {
     }
 }
 
-impl RustLang {
+impl Rust {
     /// Create a new Rust language instance.
     pub fn new() -> Self {
         Self::default()
@@ -56,7 +56,7 @@ const RUST_RESERVED: &[&str] = &[
     "unsized", "virtual", "yield",
 ];
 
-impl RendererLang for RustLang {
+impl RendererLang for Rust {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -138,7 +138,7 @@ impl RendererLang for RustLang {
     }
 }
 
-impl CodeLang for RustLang {
+impl CodeLang for Rust {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -317,13 +317,13 @@ mod tests {
 
     #[test]
     fn test_file_extension() {
-        let rs = RustLang::new();
+        let rs = Rust::new();
         assert_eq!(rs.file_extension(), "rs");
     }
 
     #[test]
     fn test_escape_reserved() {
-        let rs = RustLang::new();
+        let rs = Rust::new();
         assert_eq!(rs.escape_reserved("type"), "r#type");
         assert_eq!(rs.escape_reserved("my_var"), "my_var");
         // 2024 edition: gen is reserved
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_grouped() {
-        let rs = RustLang::new();
+        let rs = Rust::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -385,7 +385,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_with_alias() {
-        let rs = RustLang::new();
+        let rs = Rust::new();
         let imports = ImportGroup {
             entries: vec![ImportEntry {
                 module: "models".into(),
@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn test_doc_comment() {
-        let rs = RustLang::new();
+        let rs = Rust::new();
         let doc = rs.render_doc_comment(&["Get the user.", "", "Returns None if not found."]);
         assert!(doc.contains("/// Get the user."));
         assert!(doc.contains("///\n"));
@@ -411,21 +411,21 @@ mod tests {
 
     #[test]
     fn test_string_literal() {
-        let rs = RustLang::new();
+        let rs = Rust::new();
         assert_eq!(rs.render_string_literal("hello"), "\"hello\"");
         assert_eq!(rs.render_string_literal("it\"s"), "\"it\\\"s\"");
     }
 
     #[test]
     fn test_rust_builder_fluent() {
-        let rs = RustLang::new().with_indent("\t").with_extension("rsi");
+        let rs = Rust::new().with_indent("\t").with_extension("rsi");
         assert_eq!(rs.file_extension(), "rsi");
         assert_eq!(rs.block_syntax().indent_unit, "\t");
     }
 
     #[test]
     fn test_module_separator() {
-        let rs = RustLang::new();
+        let rs = Rust::new();
         assert_eq!(rs.module_separator(), Some("::"));
     }
 }

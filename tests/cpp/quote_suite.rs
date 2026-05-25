@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::cpp_lang::CppLang;
+use sigil_stitch::lang::cpp::Cpp;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
@@ -9,7 +9,7 @@ pub struct CppSuite;
 
 impl LanguageTestSuite for CppSuite {
     fn control_flow_block() -> CodeBlock {
-        sigil_quote!(CppLang {
+        sigil_quote!(Cpp {
             if(x > 0) {
                 return true;
             } else {
@@ -24,7 +24,7 @@ impl LanguageTestSuite for CppSuite {
     }
 
     fn basic_block() -> CodeBlock {
-        sigil_quote!(CppLang {
+        sigil_quote!(Cpp {
             int x = 42;
             std::string name = $S("Alice");
             std::cout << name << std::endl;
@@ -37,7 +37,7 @@ impl LanguageTestSuite for CppSuite {
     }
 
     fn render(block: CodeBlock) -> String {
-        FileSpec::builder_with("test.cpp", CppLang::new())
+        FileSpec::builder_with("test.cpp", Cpp::new())
             .add_code(block)
             .build()
             .unwrap()

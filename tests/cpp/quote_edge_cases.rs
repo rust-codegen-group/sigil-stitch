@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::cpp_lang::CppLang;
+use sigil_stitch::lang::cpp::Cpp;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::type_name::TypeName;
@@ -7,7 +7,7 @@ use sigil_stitch::type_name::TypeName;
 use super::golden;
 
 fn render(block: &CodeBlock) -> String {
-    FileSpec::builder_with("test.cpp", CppLang::new())
+    FileSpec::builder_with("test.cpp", Cpp::new())
         .add_code(block.clone())
         .build()
         .unwrap()
@@ -19,7 +19,7 @@ fn render(block: &CodeBlock) -> String {
 fn test_includes() {
     let iostream = TypeName::importable("iostream", "cout");
     let memory = TypeName::importable("memory", "unique_ptr");
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         auto ptr = std::make_unique<int>(42);
         $T(iostream) << $T(memory)(ptr.get()) << std::endl;
     })
@@ -29,7 +29,7 @@ fn test_includes() {
 
 #[test]
 fn test_lambda() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         auto fn = [&](int x) {
             return x * 2;
         };
@@ -41,7 +41,7 @@ fn test_lambda() {
 
 #[test]
 fn test_template_angle_brackets() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         std::vector<std::pair<int, std::string>> items;
         std::map<std::string, std::vector<int>> index;
     })
@@ -51,7 +51,7 @@ fn test_template_angle_brackets() {
 
 #[test]
 fn test_range_for() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         for (const auto& item : items) {
             std::cout << item << std::endl;
         }
@@ -62,7 +62,7 @@ fn test_range_for() {
 
 #[test]
 fn test_smart_pointers() {
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         auto ptr = std::make_unique<Config>();
         auto shared = std::make_shared<Node>(42);
         std::weak_ptr<Node> weak = shared;
@@ -74,7 +74,7 @@ fn test_smart_pointers() {
 #[test]
 fn test_name_keyword_escape_in_macro() {
     let name = "class";
-    let block = sigil_quote!(CppLang {
+    let block = sigil_quote!(Cpp {
         $N(name) = 1;
     })
     .unwrap();

@@ -2,7 +2,7 @@ use super::helpers::*;
 
 #[test]
 fn test_path_separator_no_space() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x = std::fmt::Display;
     })
     .unwrap();
@@ -15,7 +15,7 @@ fn test_path_separator_no_space() {
 
 #[test]
 fn test_reference_prefix() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         fn foo(&self, x: &mut T) {}
     })
     .unwrap();
@@ -32,7 +32,7 @@ fn test_reference_prefix() {
 
 #[test]
 fn test_deref_prefix() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x = *self;
     })
     .unwrap();
@@ -47,7 +47,7 @@ fn test_deref_prefix() {
 
 #[test]
 fn test_macro_call_no_space() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         println!("hello");
     })
     .unwrap();
@@ -62,7 +62,7 @@ fn test_macro_call_no_space() {
 
 #[test]
 fn test_generic_angle_brackets() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x: Vec<T> = Vec::new();
         let y: Option<String> = None;
     })
@@ -75,7 +75,7 @@ fn test_generic_angle_brackets() {
 
 #[test]
 fn test_turbofish() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let size = std::mem::size_of::<u32>();
     })
     .unwrap();
@@ -86,7 +86,7 @@ fn test_turbofish() {
 
 #[test]
 fn test_nested_generics() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x: HashMap<K, Vec<V>> = HashMap::new();
     })
     .unwrap();
@@ -97,7 +97,7 @@ fn test_nested_generics() {
 
 #[test]
 fn test_lifetime_in_generic() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         fn fmt(&self, f: &mut Formatter<'_>) {}
     })
     .unwrap();
@@ -108,7 +108,7 @@ fn test_lifetime_in_generic() {
 
 #[test]
 fn test_generic_close_then_call() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let v = iter.collect::<Vec<i32>>();
     })
     .unwrap();
@@ -119,7 +119,7 @@ fn test_generic_close_then_call() {
 
 #[test]
 fn test_binary_and_still_spaced() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x = a & b;
     })
     .unwrap();
@@ -143,7 +143,7 @@ fn test_comparison_still_spaced() {
 
 #[test]
 fn test_arrow_return_type() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let f: fn() -> T = foo;
     })
     .unwrap();

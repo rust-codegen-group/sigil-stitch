@@ -1,12 +1,12 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::lang::go::Go;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
 
 fn render(block: &CodeBlock) -> String {
-    FileSpec::builder_with("test.go", GoLang::new())
+    FileSpec::builder_with("test.go", Go::new())
         .add_code(block.clone())
         .build()
         .unwrap()
@@ -21,7 +21,7 @@ fn test_control_flow() {
 
 #[test]
 fn test_if_init_semicolon() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         if err := doStuff(); err != nil {
             return err;
         }
@@ -32,7 +32,7 @@ fn test_if_init_semicolon() {
 
 #[test]
 fn test_for_init_semicolon() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         for i := 0; i < 10; i++ {
             fmt.Println(i);
         }
@@ -43,7 +43,7 @@ fn test_for_init_semicolon() {
 
 #[test]
 fn test_switch_init_semicolon() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         switch v := getValue(); v {
         case "hello":
             fmt.Println(v);
@@ -56,7 +56,7 @@ fn test_switch_init_semicolon() {
 #[test]
 fn test_const_paren_block_with_for() {
     let items = vec!["a", "b", "c"];
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         const (
         $for(v in &items) {
             $L("@{v}Const = \"@{v}\"")

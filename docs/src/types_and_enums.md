@@ -56,7 +56,7 @@ When `methods_inside_type_body(kind)` returns `false` (Rust structs and enums), 
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # fn main() {
 let body = CodeBlock::of("Self { name: name.to_string() }", ()).unwrap();
 
@@ -79,7 +79,7 @@ let type_spec = TypeSpec::builder("Config", TypeKind::Struct)
     )
     .build()
     .unwrap();
-let blocks = type_spec.emit(&RustLang::new()).unwrap();
+let blocks = type_spec.emit(&Rust::new()).unwrap();
 // blocks.len() == 2
 //
 // Block 0:
@@ -121,7 +121,7 @@ Use `add_embedded(TypeName)` for unnamed type references inside a struct body. T
 
 ```rust
 # extern crate sigil_stitch;
-# use sigil_stitch::lang::go_lang::GoLang;
+# use sigil_stitch::lang::go::Go;
 # use sigil_stitch::prelude::*;
 # fn main() {
 let type_spec = TypeSpec::builder("UserAdmin", TypeKind::Struct)
@@ -146,7 +146,7 @@ Embedded types render before regular fields. If the embedded type is `TypeName::
 
 ```rust
 # extern crate sigil_stitch;
-# use sigil_stitch::lang::go_lang::GoLang;
+# use sigil_stitch::lang::go::Go;
 # use sigil_stitch::prelude::*;
 # fn main() {
 let io_reader = TypeName::importable("io", "Reader");
@@ -172,7 +172,7 @@ let type_spec = TypeSpec::builder("ReadWriter", TypeKind::Interface)
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
 # use sigil_stitch::lang::typescript::TypeScript;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # fn main() {
 // TypeScript: export type UserId = string;
 let type_spec = TypeSpec::builder("UserId", TypeKind::TypeAlias)
@@ -224,8 +224,8 @@ let type_spec = TypeSpec::builder("Result", TypeKind::TypeAlias)
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::lang::rust_lang::RustLang;
-# use sigil_stitch::lang::go_lang::GoLang;
+# use sigil_stitch::lang::rust::Rust;
+# use sigil_stitch::lang::go::Go;
 # fn main() {
 // Rust: pub struct Meters(f64);
 let type_spec = TypeSpec::builder("Meters", TypeKind::Newtype)
@@ -328,7 +328,7 @@ Structured annotations that render with language-appropriate syntax. The prefix 
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::spec::annotation_spec::AnnotationSpec;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # use sigil_stitch::prelude::*;
 # fn main() {
 // Simple annotation: #[allow(dead_code)]
@@ -371,7 +371,7 @@ Individual enum variants. Four forms are supported:
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # use sigil_stitch::prelude::*;
 # fn main() {
 let v = EnumVariantSpec::new("Red").unwrap();
@@ -400,7 +400,7 @@ let variant = EnumVariantSpec::builder("Up")
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # use sigil_stitch::prelude::*;
 # fn main() {
 let variant = EnumVariantSpec::builder("Literal")
@@ -425,7 +425,7 @@ let variant = EnumVariantSpec::builder("Pair")
 # extern crate sigil_stitch;
 # use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 # use sigil_stitch::spec::field_spec::FieldSpec;
-# use sigil_stitch::lang::rust_lang::RustLang;
+# use sigil_stitch::lang::rust::Rust;
 # use sigil_stitch::prelude::*;
 # fn main() {
 let variant = EnumVariantSpec::builder("Move")

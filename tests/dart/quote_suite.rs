@@ -7,7 +7,7 @@ pub struct DartSuite;
 
 impl LanguageTestSuite for DartSuite {
     fn control_flow_block() -> CodeBlock {
-        sigil_quote!(DartLang {
+        sigil_quote!(Dart {
             if(x > 0) {
                 return true;
             } else {
@@ -22,7 +22,7 @@ impl LanguageTestSuite for DartSuite {
     }
 
     fn basic_block() -> CodeBlock {
-        sigil_quote!(DartLang {
+        sigil_quote!(Dart {
             final name = $S("Alice");
             final age = 30;
             print(name);

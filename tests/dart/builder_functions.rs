@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::dart::DartLang;
+use sigil_stitch::lang::dart::Dart;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::TypeKind;
@@ -25,7 +25,7 @@ fn test_async_function() {
     // Trigger User import.
     let trigger = CodeBlock::of("// %T", (user,)).unwrap();
 
-    let file = FileSpec::builder_with("api.dart", DartLang::new())
+    let file = FileSpec::builder_with("api.dart", Dart::new())
         .add_code(trigger)
         .add_function(fun)
         .build()
@@ -55,7 +55,7 @@ fn test_annotated_method() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("dog.dart", DartLang::new())
+    let file = FileSpec::builder_with("dog.dart", Dart::new())
         .add_type(ts)
         .build()
         .unwrap();

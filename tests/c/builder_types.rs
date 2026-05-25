@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::c_lang::CLang;
+use sigil_stitch::lang::c::C;
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -31,7 +31,7 @@ fn test_struct_with_fields() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("config.h", CLang::header())
+    let file = FileSpec::builder_with("config.h", C::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_type(ts)
         .build()
@@ -52,7 +52,7 @@ fn test_enum() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("direction.h", CLang::header())
+    let file = FileSpec::builder_with("direction.h", C::header())
         .add_type(ts)
         .build()
         .unwrap();
@@ -74,7 +74,7 @@ fn test_typedef_function_pointer() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("callback.h", CLang::header())
+    let file = FileSpec::builder_with("callback.h", C::header())
         .add_type(callback)
         .build()
         .unwrap();
@@ -90,7 +90,7 @@ fn test_typedef_non_function() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("types.h", CLang::header())
+    let file = FileSpec::builder_with("types.h", C::header())
         .add_type(size)
         .build()
         .unwrap();

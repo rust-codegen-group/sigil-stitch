@@ -18,7 +18,7 @@ fn render(block: &CodeBlock) -> String {
 fn test_imports() {
     let http = TypeName::importable("package:http/http.dart", "Client");
     let convert = TypeName::importable("dart:convert", "jsonDecode");
-    let block = sigil_quote!(DartLang {
+    let block = sigil_quote!(Dart {
         final client = $T(http)();
         final data = $T(convert)(response.body);
     })

@@ -1,11 +1,11 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::cpp_lang::CppLang;
-use sigil_stitch::lang::dart::DartLang;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::cpp::Cpp;
+use sigil_stitch::lang::dart::Dart;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::lang::javascript::JavaScript;
 use sigil_stitch::lang::kotlin::Kotlin;
 use sigil_stitch::lang::python::Python;
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::swift::Swift;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -107,7 +107,7 @@ fn test_js_constructor() {
 
 #[test]
 fn test_java_constructor() {
-    let java = JavaLang::new();
+    let java = Java::new();
     let output = render_fun(
         &FunSpec::builder("UserService")
             .is_constructor()
@@ -128,7 +128,7 @@ fn test_java_constructor() {
 
 #[test]
 fn test_cpp_constructor() {
-    let cpp = CppLang::new();
+    let cpp = Cpp::new();
     let output = render_fun(
         &FunSpec::builder("Counter")
             .is_constructor()
@@ -147,7 +147,7 @@ fn test_cpp_constructor() {
 
 #[test]
 fn test_dart_constructor() {
-    let dart = DartLang::new();
+    let dart = Dart::new();
     let output = render_fun(
         &FunSpec::builder("Task")
             .is_constructor()
@@ -269,7 +269,7 @@ fn test_python_constructor() {
 
 #[test]
 fn test_rust_constructor() {
-    let rs = RustLang::new();
+    let rs = Rust::new();
     let output = render_fun(
         &FunSpec::builder("new")
             .is_constructor()
@@ -309,7 +309,7 @@ fn test_js_constructor_with_super() {
 
 #[test]
 fn test_java_constructor_with_super() {
-    let java = JavaLang::new();
+    let java = Java::new();
     let output = render_fun(
         &FunSpec::builder("Dog")
             .is_constructor()
@@ -347,7 +347,7 @@ fn test_backward_compat_ts_constructor_without_flag() {
 #[test]
 fn test_backward_compat_java_constructor_without_flag() {
     // Existing pattern: FunSpec with class name and no is_constructor flag.
-    let java = JavaLang::new();
+    let java = Java::new();
     let output = render_fun(
         &FunSpec::builder("UserService")
             .visibility(Visibility::Public)
@@ -406,7 +406,7 @@ fn test_ts_constructor_with_this_delegation() {
 
 #[test]
 fn test_java_constructor_with_super_delegation() {
-    let java = JavaLang::new();
+    let java = Java::new();
     let output = render_fun(
         &FunSpec::builder("Dog")
             .is_constructor()
@@ -430,7 +430,7 @@ fn test_java_constructor_with_super_delegation() {
 
 #[test]
 fn test_java_constructor_with_this_delegation() {
-    let java = JavaLang::new();
+    let java = Java::new();
     let output = render_fun(
         &FunSpec::builder("Config")
             .is_constructor()
@@ -510,7 +510,7 @@ fn test_swift_constructor_with_super_delegation() {
 
 #[test]
 fn test_dart_constructor_with_super_delegation() {
-    let dart = DartLang::new();
+    let dart = Dart::new();
     let output = render_fun(
         &FunSpec::builder("Dog")
             .is_constructor()
@@ -549,7 +549,7 @@ fn test_python_constructor_with_super_delegation() {
 
 #[test]
 fn test_cpp_constructor_with_super_delegation() {
-    let cpp = CppLang::new();
+    let cpp = Cpp::new();
     let output = render_fun(
         &FunSpec::builder("Dog")
             .is_constructor()

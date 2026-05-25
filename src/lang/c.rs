@@ -33,14 +33,14 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 /// fb.header(CodeBlock::of("#pragma once", ()).unwrap());
 /// ```
 #[derive(Debug, Clone)]
-pub struct CLang {
+pub struct C {
     /// Indent with this string (default: "    " — 4 spaces).
     pub indent: String,
     /// File extension (default: "c"). Set to "h" for header files.
     pub extension: String,
 }
 
-impl Default for CLang {
+impl Default for C {
     fn default() -> Self {
         Self {
             indent: "    ".to_string(),
@@ -49,13 +49,13 @@ impl Default for CLang {
     }
 }
 
-impl CLang {
+impl C {
     /// Create a new C language instance.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create a CLang configured for header files (.h extension).
+    /// Create a C configured for header files (.h extension).
     pub fn header() -> Self {
         Self {
             indent: "    ".to_string(),
@@ -134,7 +134,7 @@ fn strip_local_prefix(module: &str) -> &str {
     module.strip_prefix("./").unwrap_or(module)
 }
 
-impl RendererLang for CLang {
+impl RendererLang for C {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -183,7 +183,7 @@ impl RendererLang for CLang {
     }
 }
 
-impl CodeLang for CLang {
+impl CodeLang for C {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -311,19 +311,19 @@ mod tests {
 
     #[test]
     fn test_file_extension() {
-        let c = CLang::new();
+        let c = C::new();
         assert_eq!(c.file_extension(), "c");
     }
 
     #[test]
     fn test_header_extension() {
-        let c = CLang::header();
+        let c = C::header();
         assert_eq!(c.file_extension(), "h");
     }
 
     #[test]
     fn test_escape_reserved() {
-        let c = CLang::new();
+        let c = C::new();
         assert_eq!(c.escape_reserved("int"), "int_");
         assert_eq!(c.escape_reserved("struct"), "struct_");
         assert_eq!(c.escape_reserved("name"), "name");
@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_system() {
-        let c = CLang::new();
+        let c = C::new();
         let imports = ImportGroup {
             entries: vec![ImportEntry {
                 module: "stdio.h".into(),
@@ -347,7 +347,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_local() {
-        let c = CLang::new();
+        let c = C::new();
         let imports = ImportGroup {
             entries: vec![ImportEntry {
                 module: "./config.h".into(),
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_grouped() {
-        let c = CLang::new();
+        let c = C::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_dedup() {
-        let c = CLang::new();
+        let c = C::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_doc_comment_single() {
-        let c = CLang::new();
+        let c = C::new();
         assert_eq!(
             c.render_doc_comment(&["A brief description."]),
             "/* A brief description. */"
@@ -437,7 +437,7 @@ mod tests {
 
     #[test]
     fn test_doc_comment_multi() {
-        let c = CLang::new();
+        let c = C::new();
         let doc = c.render_doc_comment(&["Configuration struct.", "", "Thread-safe."]);
         assert!(doc.starts_with("/*"));
         assert!(doc.ends_with(" */"));
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn test_string_literal() {
-        let c = CLang::new();
+        let c = C::new();
         assert_eq!(c.render_string_literal("hello"), "\"hello\"");
         assert_eq!(c.render_string_literal("it\"s"), "\"it\\\"s\"");
         assert_eq!(c.render_string_literal("new\nline"), "\"new\\nline\"");
@@ -456,19 +456,19 @@ mod tests {
 
     #[test]
     fn test_type_before_name() {
-        let c = CLang::new();
+        let c = C::new();
         assert!(c.type_decl_syntax().type_before_name);
     }
 
     #[test]
     fn test_return_type_is_prefix() {
-        let c = CLang::new();
+        let c = C::new();
         assert!(c.type_decl_syntax().return_type_is_prefix);
     }
 
     #[test]
     fn test_type_close_terminator() {
-        let c = CLang::new();
+        let c = C::new();
         assert_eq!(c.block_syntax().type_close_terminator, ";");
     }
 
@@ -483,14 +483,14 @@ mod tests {
 
     #[test]
     fn test_c_builder_fluent() {
-        let c = CLang::new().with_indent("\t").with_extension("h");
+        let c = C::new().with_indent("\t").with_extension("h");
         assert_eq!(c.file_extension(), "h");
         assert_eq!(c.block_syntax().indent_unit, "\t");
     }
 
     #[test]
     fn test_module_separator() {
-        let c = CLang::new();
+        let c = C::new();
         assert_eq!(c.module_separator(), None);
     }
 }

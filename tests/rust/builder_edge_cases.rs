@@ -1,7 +1,7 @@
 use super::golden;
 
 use sigil_stitch::code_block::{CodeBlock, NameArg};
-use sigil_stitch::lang::rust_lang::RustLang;
+use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -11,7 +11,7 @@ use sigil_stitch::type_name::TypeName;
 
 #[test]
 fn test_optional_field() {
-    let output = FileSpec::builder_with("config.rs", RustLang::new())
+    let output = FileSpec::builder_with("config.rs", Rust::new())
         .add_type(
             TypeSpec::builder("Config", TypeKind::Struct)
                 .visibility(Visibility::Public)
@@ -54,7 +54,7 @@ fn test_derive_annotation() {
                 .unwrap(),
         );
 
-    let output = FileSpec::builder_with("point.rs", RustLang::new())
+    let output = FileSpec::builder_with("point.rs", Rust::new())
         .add_type(tb.build().unwrap())
         .build()
         .unwrap()
@@ -73,7 +73,7 @@ fn test_name_escapes_rust_keywords() {
     ];
     for kw in keywords {
         let block = CodeBlock::of("let %N = value", NameArg(kw.into())).unwrap();
-        let file = FileSpec::builder_with("test.rs", RustLang::new())
+        let file = FileSpec::builder_with("test.rs", Rust::new())
             .add_code(block)
             .build()
             .unwrap();
@@ -90,7 +90,7 @@ fn test_name_no_escape_non_keywords() {
     let names = ["user_id", "count", "my_struct", "TypeName", "snake_case"];
     for name in names {
         let block = CodeBlock::of("let %N = value", NameArg(name.into())).unwrap();
-        let file = FileSpec::builder_with("test.rs", RustLang::new())
+        let file = FileSpec::builder_with("test.rs", Rust::new())
             .add_code(block)
             .build()
             .unwrap();
@@ -112,7 +112,7 @@ fn test_name_escape_in_format_string() {
     cb.add_line();
     let block = cb.build().unwrap();
 
-    let file = FileSpec::builder_with("test.rs", RustLang::new())
+    let file = FileSpec::builder_with("test.rs", Rust::new())
         .add_code(block)
         .build()
         .unwrap();
@@ -124,7 +124,7 @@ fn test_name_escape_in_format_string() {
 
 #[test]
 fn test_annotation_args_with_type_spec() {
-    let output = FileSpec::builder_with("config.rs", RustLang::new())
+    let output = FileSpec::builder_with("config.rs", Rust::new())
         .add_type(
             TypeSpec::builder("Config", TypeKind::Struct)
                 .visibility(Visibility::Public)
@@ -148,7 +148,7 @@ fn test_annotation_args_with_type_spec() {
 
 #[test]
 fn test_annotation_args_serde_field() {
-    let output = FileSpec::builder_with("model.rs", RustLang::new())
+    let output = FileSpec::builder_with("model.rs", Rust::new())
         .add_type(
             TypeSpec::builder("User", TypeKind::Struct)
                 .visibility(Visibility::Public)

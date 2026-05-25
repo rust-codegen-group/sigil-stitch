@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::java_lang::JavaLang;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -14,7 +14,7 @@ fn test_function_with_imports() {
     b.add_statement("%T<%T> users = getAll()", (list, user));
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("App.java", JavaLang::new())
+    let file = FileSpec::builder_with("App.java", Java::new())
         .add_code(block)
         .build()
         .unwrap();
@@ -36,7 +36,7 @@ fn test_import_grouping() {
     b.add_line();
     let block = b.build().unwrap();
 
-    let file = FileSpec::builder_with("Imports.java", JavaLang::new())
+    let file = FileSpec::builder_with("Imports.java", Java::new())
         .add_code(block)
         .build()
         .unwrap();

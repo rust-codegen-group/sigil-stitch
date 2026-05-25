@@ -56,14 +56,14 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 /// fb.suffix("= 0");       // emits "= 0" after params
 /// ```
 #[derive(Debug, Clone)]
-pub struct CppLang {
+pub struct Cpp {
     /// Indent with this string (default: "    " — 4 spaces).
     pub indent: String,
     /// File extension (default: "cpp"). Set to "hpp" or "h" for header files.
     pub extension: String,
 }
 
-impl Default for CppLang {
+impl Default for Cpp {
     fn default() -> Self {
         Self {
             indent: "    ".to_string(),
@@ -72,13 +72,13 @@ impl Default for CppLang {
     }
 }
 
-impl CppLang {
+impl Cpp {
     /// Create a new C++ language instance.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create a CppLang configured for header files (.hpp extension).
+    /// Create a Cpp configured for header files (.hpp extension).
     pub fn header() -> Self {
         Self {
             indent: "    ".to_string(),
@@ -86,7 +86,7 @@ impl CppLang {
         }
     }
 
-    /// Create a CppLang configured for .h header files.
+    /// Create a Cpp configured for .h header files.
     pub fn header_h() -> Self {
         Self {
             indent: "    ".to_string(),
@@ -165,7 +165,7 @@ fn strip_local_prefix(module: &str) -> &str {
     module.strip_prefix("./").unwrap_or(module)
 }
 
-impl RendererLang for CppLang {
+impl RendererLang for Cpp {
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -239,7 +239,7 @@ impl RendererLang for CppLang {
     }
 }
 
-impl CodeLang for CppLang {
+impl CodeLang for Cpp {
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
@@ -372,25 +372,25 @@ mod tests {
 
     #[test]
     fn test_file_extension() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(cpp.file_extension(), "cpp");
     }
 
     #[test]
     fn test_header_extension() {
-        let cpp = CppLang::header();
+        let cpp = Cpp::header();
         assert_eq!(cpp.file_extension(), "hpp");
     }
 
     #[test]
     fn test_header_h_extension() {
-        let cpp = CppLang::header_h();
+        let cpp = Cpp::header_h();
         assert_eq!(cpp.file_extension(), "h");
     }
 
     #[test]
     fn test_escape_reserved() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(cpp.escape_reserved("class"), "class_");
         assert_eq!(cpp.escape_reserved("virtual"), "virtual_");
         assert_eq!(cpp.escape_reserved("template"), "template_");
@@ -399,7 +399,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_system() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         let imports = ImportGroup {
             entries: vec![ImportEntry {
                 module: "iostream".into(),
@@ -415,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_local() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         let imports = ImportGroup {
             entries: vec![ImportEntry {
                 module: "./myclass.hpp".into(),
@@ -431,7 +431,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_grouped() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn test_render_imports_dedup() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         let imports = ImportGroup {
             entries: vec![
                 ImportEntry {
@@ -496,7 +496,7 @@ mod tests {
 
     #[test]
     fn test_doc_comment_single() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(
             cpp.render_doc_comment(&["A brief description."]),
             "/// A brief description."
@@ -505,14 +505,14 @@ mod tests {
 
     #[test]
     fn test_doc_comment_multi() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         let doc = cpp.render_doc_comment(&["Container class.", "", "Thread-safe."]);
         assert_eq!(doc, "/// Container class.\n///\n/// Thread-safe.");
     }
 
     #[test]
     fn test_string_literal() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(cpp.render_string_literal("hello"), "\"hello\"");
         assert_eq!(cpp.render_string_literal("it\"s"), "\"it\\\"s\"");
         assert_eq!(cpp.render_string_literal("new\nline"), "\"new\\nline\"");
@@ -520,25 +520,25 @@ mod tests {
 
     #[test]
     fn test_type_before_name() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert!(cpp.type_decl_syntax().type_before_name);
     }
 
     #[test]
     fn test_return_type_is_prefix() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert!(cpp.type_decl_syntax().return_type_is_prefix);
     }
 
     #[test]
     fn test_type_close_terminator() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(cpp.block_syntax().type_close_terminator, ";");
     }
 
     #[test]
     fn test_type_keyword() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(cpp.type_keyword(TypeKind::Class), "class");
         assert_eq!(cpp.type_keyword(TypeKind::Struct), "struct");
         assert_eq!(cpp.type_keyword(TypeKind::Enum), "enum class");
@@ -547,25 +547,25 @@ mod tests {
 
     #[test]
     fn test_abstract_keyword() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(cpp.function_syntax().abstract_keyword, "virtual ");
     }
 
     #[test]
     fn test_super_type_keyword() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(cpp.type_decl_syntax().super_type_keyword, " : public ");
     }
 
     #[test]
     fn test_super_type_separator() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(cpp.type_decl_syntax().super_type_separator, ", public ");
     }
 
     #[test]
     fn test_methods_inside_type_body() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert!(cpp.methods_inside_type_body(TypeKind::Class));
         assert!(cpp.methods_inside_type_body(TypeKind::Interface));
         assert!(!cpp.methods_inside_type_body(TypeKind::Struct));
@@ -583,14 +583,14 @@ mod tests {
 
     #[test]
     fn test_cpp_builder_fluent() {
-        let cpp = CppLang::new().with_indent("  ").with_extension("cxx");
+        let cpp = Cpp::new().with_indent("  ").with_extension("cxx");
         assert_eq!(cpp.file_extension(), "cxx");
         assert_eq!(cpp.block_syntax().indent_unit, "  ");
     }
 
     #[test]
     fn test_module_separator() {
-        let cpp = CppLang::new();
+        let cpp = Cpp::new();
         assert_eq!(cpp.module_separator(), Some("::"));
     }
 }

@@ -2,7 +2,7 @@ use super::helpers::*;
 
 #[test]
 fn test_rust_language() {
-    let block = sigil_quote!(RustLang {
+    let block = sigil_quote!(Rust {
         let x = 42;
     })
     .unwrap();
@@ -37,7 +37,7 @@ fn test_python_control_flow() {
 
 #[test]
 fn test_go_language() {
-    let block = sigil_quote!(GoLang {
+    let block = sigil_quote!(Go {
         x := 42;
     })
     .unwrap();

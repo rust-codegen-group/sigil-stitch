@@ -1,6 +1,6 @@
 use sigil_stitch::code_block::{CodeBlock, NameArg};
 use sigil_stitch::lang::CodeLang;
-use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::lang::go::Go;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -18,7 +18,7 @@ fn test_enum() {
     //   const ( North Direction = iota; East; ... )
     //
     // This doesn't fit TypeSpec, so we build it as a raw CodeBlock.
-    let go = GoLang::new();
+    let go = Go::new();
 
     let mut cb = CodeBlock::builder();
     let doc = go.render_doc_comment(&["Direction represents a cardinal direction."]);
@@ -43,7 +43,7 @@ fn test_enum() {
     cb.add_line();
     let block = cb.build().unwrap();
 
-    let file = FileSpec::builder_with("direction.go", GoLang::new())
+    let file = FileSpec::builder_with("direction.go", Go::new())
         .header(CodeBlock::of("package direction", ()).unwrap())
         .add_code(block)
         .build()
@@ -60,7 +60,7 @@ fn test_name_escapes_go_keywords() {
     let keywords = ["func", "type", "var", "map", "range", "select", "chan"];
     for kw in keywords {
         let block = CodeBlock::of("var %N int", NameArg(kw.into())).unwrap();
-        let file = FileSpec::builder_with("test.go", GoLang::new())
+        let file = FileSpec::builder_with("test.go", Go::new())
             .add_code(block)
             .build()
             .unwrap();
@@ -72,7 +72,7 @@ fn test_name_escapes_go_keywords() {
     }
     // Non-reserved word should not be escaped.
     let block = CodeBlock::of("var %N int", NameArg("myVar".into())).unwrap();
-    let file = FileSpec::builder_with("test.go", GoLang::new())
+    let file = FileSpec::builder_with("test.go", Go::new())
         .add_code(block)
         .build()
         .unwrap();
@@ -95,7 +95,7 @@ fn test_name_escape_in_struct_context() {
     cb.add_line();
     let block = cb.build().unwrap();
 
-    let file = FileSpec::builder_with("test.go", GoLang::new())
+    let file = FileSpec::builder_with("test.go", Go::new())
         .header(CodeBlock::of("package models", ()).unwrap())
         .add_code(block)
         .build()
@@ -109,7 +109,7 @@ fn test_name_escape_in_struct_context() {
 
 #[test]
 fn test_embedded_struct_basic() {
-    let file = FileSpec::builder_with("models.go", GoLang::new())
+    let file = FileSpec::builder_with("models.go", Go::new())
         .header(CodeBlock::of("package models", ()).unwrap())
         .add_type(
             TypeSpec::builder("ReadWriter", TypeKind::Struct)
@@ -128,7 +128,7 @@ fn test_embedded_struct_basic() {
 #[test]
 fn test_embedded_with_methods() {
     let body = CodeBlock::of("return fmt.Sprintf(\"%%s/%%s\", a.Host, a.Path)", ()).unwrap();
-    let file = FileSpec::builder_with("models.go", GoLang::new())
+    let file = FileSpec::builder_with("models.go", Go::new())
         .header(CodeBlock::of("package models", ()).unwrap())
         .add_type(
             TypeSpec::builder("Endpoint", TypeKind::Struct)
@@ -161,7 +161,7 @@ fn test_embedded_with_methods() {
 
 #[test]
 fn test_embedded_only_no_fields() {
-    let file = FileSpec::builder_with("compose.go", GoLang::new())
+    let file = FileSpec::builder_with("compose.go", Go::new())
         .header(CodeBlock::of("package compose", ()).unwrap())
         .add_type(
             TypeSpec::builder("Combined", TypeKind::Struct)
@@ -187,7 +187,7 @@ fn test_embedded_with_importable_type() {
     let io_reader = TypeName::importable("io", "Reader");
     let io_writer = TypeName::importable("io", "Writer");
 
-    let file = FileSpec::builder_with("rw.go", GoLang::new())
+    let file = FileSpec::builder_with("rw.go", Go::new())
         .header(CodeBlock::of("package rw", ()).unwrap())
         .add_type(
             TypeSpec::builder("ReadWriter", TypeKind::Interface)

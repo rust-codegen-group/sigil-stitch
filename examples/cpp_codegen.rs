@@ -5,7 +5,7 @@
 //!
 //! Run: `cargo run --example cpp_codegen`
 
-use sigil_stitch::lang::cpp_lang::CppLang;
+use sigil_stitch::lang::cpp::Cpp;
 use sigil_stitch::prelude::*;
 
 fn main() {
@@ -19,8 +19,7 @@ fn main() {
 }
 
 fn emit_fun(fun: &FunSpec) -> CodeBlock {
-    fun.emit(&CppLang::new(), DeclarationContext::Member)
-        .unwrap()
+    fun.emit(&Cpp::new(), DeclarationContext::Member).unwrap()
 }
 
 fn builder_approach() -> String {
@@ -203,7 +202,7 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
-    FileSpec::builder_with("logging.hpp", CppLang::header())
+    FileSpec::builder_with("logging.hpp", Cpp::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_type(log_level)
         .add_type(config)
@@ -272,7 +271,7 @@ fn macro_approach() -> String {
         pub_section.add_line();
         pub_section.add("%>", ());
 
-        let ctor_body = sigil_quote!(CppLang {
+        let ctor_body = sigil_quote!(Cpp {
             $comment("@{comment_label}: @{comment_reason}");
             name_ = name; $comment(comment_note)
         })
@@ -288,7 +287,7 @@ fn macro_approach() -> String {
         ));
         pub_section.add_line();
 
-        let log_body = sigil_quote!(CppLang {
+        let log_body = sigil_quote!(Cpp {
             $T(iostream) << $V("@{v_interp}: ") << "[" << name_ << "] " << msg << std::endl;
         })
         .unwrap();
@@ -304,7 +303,7 @@ fn macro_approach() -> String {
         pub_section.add_line();
 
         // Static method: defaultLevel
-        let default_level_body = sigil_quote!(CppLang {
+        let default_level_body = sigil_quote!(Cpp {
             $attr("nodiscard");
             return LogLevel::Info;
         })
@@ -359,7 +358,7 @@ fn macro_approach() -> String {
         .unwrap();
 
     // --- Free function with reference and pointer params: logAll ---
-    let log_all_body = sigil_quote!(CppLang {
+    let log_all_body = sigil_quote!(Cpp {
         for (const auto& msg : messages) {
             logger->log(msg.c_str());
         }
@@ -382,7 +381,7 @@ fn macro_approach() -> String {
         .unwrap();
 
     // --- Template function: make_vector ---
-    let vec_body = sigil_quote!(CppLang {
+    let vec_body = sigil_quote!(Cpp {
         $T(vector_h)<T> result;
         result.push_back(first);
         result.push_back(second);
@@ -398,7 +397,7 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
-    FileSpec::builder_with("logging.hpp", CppLang::header())
+    FileSpec::builder_with("logging.hpp", Cpp::header())
         .header(CodeBlock::of("#pragma once", ()).unwrap())
         .add_type(log_level)
         .add_type(config)

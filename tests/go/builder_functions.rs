@@ -1,5 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::go_lang::GoLang;
+use sigil_stitch::lang::go::Go;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::Visibility;
@@ -12,7 +12,7 @@ use super::golden;
 fn test_top_level_function() {
     let fmt_sprintf = TypeName::importable("fmt", "Sprintf");
 
-    let file = FileSpec::builder_with("greet.go", GoLang::new())
+    let file = FileSpec::builder_with("greet.go", Go::new())
         .header(CodeBlock::of("package greet", ()).unwrap())
         .add_function(
             FunSpec::builder("Greet")
@@ -42,7 +42,7 @@ fn test_function_with_doc() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("add.go", GoLang::new())
+    let file = FileSpec::builder_with("add.go", Go::new())
         .add_function(fun)
         .build()
         .unwrap();

@@ -1,12 +1,12 @@
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::lang::c_lang::CLang;
+use sigil_stitch::lang::c::C;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 use super::golden;
 
 fn render(block: &CodeBlock) -> String {
-    FileSpec::builder_with("test.c", CLang::new())
+    FileSpec::builder_with("test.c", C::new())
         .add_code(block.clone())
         .build()
         .unwrap()
@@ -21,7 +21,7 @@ fn test_basic() {
 
 #[test]
 fn test_function_pointer_usage() {
-    let block = sigil_quote!(CLang {
+    let block = sigil_quote!(C {
         typedef void (*Callback)(int, const char*);
         Callback cb = NULL;
         cb(42, $S("hello"));
@@ -32,7 +32,7 @@ fn test_function_pointer_usage() {
 
 #[test]
 fn test_arrow_and_pointer_spacing() {
-    let block = sigil_quote!(CLang {
+    let block = sigil_quote!(C {
         struct Config* cfg = create_config();
         cfg->host = $S("localhost");
         cfg->port = 8080;
