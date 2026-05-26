@@ -92,7 +92,7 @@ fn builder_approach() -> String {
 fn macro_approach() -> String {
     let body = sigil_quote!(Ruby {
         class Greeter {
-            attr_reader "name"
+            attr_reader :name
 
             def initialize(name) {
                 @name = name

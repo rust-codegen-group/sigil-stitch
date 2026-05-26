@@ -110,12 +110,17 @@ pub(super) fn maybe_space(
         match ch {
             ',' | ';' | ')' | ']' => return,
             '.' if annotation != TokenAnnotation::DotArg => return,
-            ':' if annotation != TokenAnnotation::DoubleColonOp => match state.colon_ctx {
-                ColonContext::Ternary | ColonContext::WalrusAssign | ColonContext::ForRange => {}
-                ColonContext::TypeAnnotation
-                | ColonContext::MapEntry
-                | ColonContext::PathSeparator => return,
-            },
+            ':' if annotation != TokenAnnotation::DoubleColonOp
+                && annotation != TokenAnnotation::SymbolColon =>
+            {
+                match state.colon_ctx {
+                    ColonContext::Ternary | ColonContext::WalrusAssign | ColonContext::ForRange => {
+                    }
+                    ColonContext::TypeAnnotation
+                    | ColonContext::MapEntry
+                    | ColonContext::PathSeparator => return,
+                }
+            }
             _ => {}
         }
     }

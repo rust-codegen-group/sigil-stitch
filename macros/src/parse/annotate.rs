@@ -15,6 +15,8 @@ pub(super) enum TokenAnnotation {
     GenericOpen,
     /// `>` used as generic closer (matched via stack).
     GenericClose,
+    /// `<` used as Ruby inheritance operator (`class Dog < Animal`).
+    InheritanceAngle,
     /// `&` or `*` used as prefix operator (not binary).
     PrefixOp,
     /// `!` used as macro-call bang (after ident).
@@ -40,6 +42,8 @@ pub(super) enum TokenAnnotation {
     AssignAdjacent,
     /// `:` span-adjacent to both neighbors (Lua method call `obj:method()`).
     MethodCallColon,
+    /// `:` used as Ruby symbol prefix (`:name`, `:foo`).
+    SymbolColon,
     /// `-` that acts as flag prefix (like `-q`, `-f`). Does NOT suppress space
     /// before (so `declare -q` keeps the space). Only suppresses space after via
     /// `PrevTokenKind::PrefixOp`.
@@ -172,6 +176,28 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                                 && colon_end.column == next_start.column
                             {
                                 annotations[i] = TokenAnnotation::MethodCallColon;
+                            }
+                        }
+
+                        // Ruby symbol prefix: `:foo` — space before, no space after.
+                        if lang == MacroLang::Ruby
+                            && p.spacing() == Spacing::Alone
+                            && i + 1 < tokens.len()
+                            && matches!(&tokens[i + 1], TokenTree::Ident(_))
+                        {
+                            let colon_start = p.span().start();
+                            let colon_end = p.span().end();
+                            let next_start = tokens[i + 1].span().start();
+                            let prev_adjacent = i > 0 && {
+                                let prev_end = tokens[i - 1].span().end();
+                                prev_end.line == colon_start.line
+                                    && prev_end.column == colon_start.column
+                            };
+                            if !prev_adjacent
+                                && colon_end.line == next_start.line
+                                && colon_end.column == next_start.column
+                            {
+                                annotations[i] = TokenAnnotation::SymbolColon;
                             }
                         }
                     }
@@ -548,8 +574,12 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                             }
                         };
                         if is_generic {
-                            annotations[i] = TokenAnnotation::GenericOpen;
-                            generic_stack.push(i);
+                            if lang == MacroLang::Ruby {
+                                annotations[i] = TokenAnnotation::InheritanceAngle;
+                            } else {
+                                annotations[i] = TokenAnnotation::GenericOpen;
+                                generic_stack.push(i);
+                            }
                         }
                     }
                     '>' if !generic_stack.is_empty() => {

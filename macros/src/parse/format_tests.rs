@@ -173,3 +173,12 @@ fn go_slice_type() {
 fn go_map_type() {
     assert_eq!(fmt_lang("map[string]int", MacroLang::Go), "map[string]int");
 }
+
+#[test]
+fn ruby_symbol_colon_spacing() {
+    // space before :, none after
+    assert_eq!(
+        fmt_lang("attr_reader :name", MacroLang::Ruby),
+        "attr_reader :name"
+    );
+}

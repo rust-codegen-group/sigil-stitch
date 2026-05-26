@@ -168,6 +168,21 @@ fn go_send_not_prefix() {
 }
 
 #[test]
+fn ruby_symbol_colon() {
+    // space before :, NOT after (:name is adjacent)
+    let a = annotate_lang("attr_reader :name", MacroLang::Ruby);
+    assert_eq!(
+        ann_at(&a, 1),
+        TokenAnnotation::SymbolColon,
+        "expected SymbolColon, tokens: {}",
+        a.iter()
+            .map(|(t, a)| format!("{t}({a:?})"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+}
+
+#[test]
 fn normal_tokens_stay_normal() {
     let a = annotate_src("let x = 42");
     for (_, ann) in &a {

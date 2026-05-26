@@ -411,7 +411,9 @@ fn tokens_to_format_inner(
                 state.prev = match annotation {
                     TokenAnnotation::PathSepComplete => PrevTokenKind::PathSep,
                     TokenAnnotation::GenericOpen => PrevTokenKind::GenericOpen,
-                    TokenAnnotation::PrefixOp => PrevTokenKind::PrefixOp(ch),
+                    TokenAnnotation::PrefixOp | TokenAnnotation::SymbolColon => {
+                        PrevTokenKind::PrefixOp(ch)
+                    }
                     TokenAnnotation::NullablePrefix => PrevTokenKind::PrefixOp('?'),
                     TokenAnnotation::DashFlag => PrevTokenKind::PrefixOp(ch),
                     TokenAnnotation::ArrowOp
