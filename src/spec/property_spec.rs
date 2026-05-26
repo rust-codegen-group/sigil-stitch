@@ -153,6 +153,7 @@ impl PropertySpec {
             sig.push_str("set ");
             sig.push_str(&self.name);
             sig.push('(');
+            sig.push_str(lang.variable_prefix());
             sig.push_str(&lang.escape_reserved(&setter.param_name));
 
             if !self.property_type.is_empty() {
@@ -210,6 +211,7 @@ impl PropertySpec {
             sig.push_str(lang.enum_and_annotation().readonly_keyword);
         }
 
+        sig.push_str(lang.variable_prefix());
         sig.push_str(&lang.escape_field_name(&self.name));
 
         if !self.property_type.is_empty() {

@@ -27,6 +27,8 @@ pub(super) enum TokenAnnotation {
     PostfixStar,
     /// `?` used as postfix type marker (e.g. `Int?`, `String?`) — suppress space before.
     PostfixQuestion,
+    /// `?` used as nullable prefix (e.g. `?User`, `?string`) — suppress space around.
+    NullablePrefix,
     /// `-` starting `->` when adjacent to preceding token (member access, not type arrow).
     ArrowOp,
     /// First `:` of `::` used as operator (not path separator) — space before it.
@@ -490,6 +492,18 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                                 if is_type_context {
                                     annotations[i] = TokenAnnotation::PostfixQuestion;
                                 }
+                            }
+                        }
+                        // NullablePrefix: `?` span-adjacent to a following ident —
+                        // nullable type prefix like `?User` or `?string`.
+                        if annotations[i] == TokenAnnotation::Normal
+                            && i + 1 < tokens.len()
+                            && matches!(&tokens[i + 1], TokenTree::Ident(_))
+                        {
+                            let q_end = p.span().end();
+                            let next_start = tokens[i + 1].span().start();
+                            if q_end.line == next_start.line && q_end.column == next_start.column {
+                                annotations[i] = TokenAnnotation::NullablePrefix;
                             }
                         }
                     }

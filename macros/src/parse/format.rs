@@ -412,6 +412,7 @@ fn tokens_to_format_inner(
                     TokenAnnotation::PathSepComplete => PrevTokenKind::PathSep,
                     TokenAnnotation::GenericOpen => PrevTokenKind::GenericOpen,
                     TokenAnnotation::PrefixOp => PrevTokenKind::PrefixOp(ch),
+                    TokenAnnotation::NullablePrefix => PrevTokenKind::PrefixOp('?'),
                     TokenAnnotation::DashFlag => PrevTokenKind::PrefixOp(ch),
                     TokenAnnotation::ArrowOp
                     | TokenAnnotation::AssignAdjacent

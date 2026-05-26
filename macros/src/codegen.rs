@@ -66,7 +66,10 @@ fn generate_statements(statements: &[Statement]) -> Vec<TokenStream> {
                     __sigil_builder.add_line();
                 });
             }
-            Statement::ControlFlow { branches } => {
+            Statement::ControlFlow {
+                branches,
+                trailing_semicolon,
+            } => {
                 for (i, branch) in branches.iter().enumerate() {
                     let fmt = &branch.condition_format;
                     let args_tuple = build_args_tuple(&branch.condition_args);
@@ -84,9 +87,15 @@ fn generate_statements(statements: &[Statement]) -> Vec<TokenStream> {
 
                     calls.extend(body_calls);
                 }
-                calls.push(quote! {
-                    __sigil_builder.end_control_flow();
-                });
+                if *trailing_semicolon {
+                    calls.push(quote! {
+                        __sigil_builder.end_control_flow_with_semicolon();
+                    });
+                } else {
+                    calls.push(quote! {
+                        __sigil_builder.end_control_flow();
+                    });
+                }
             }
             Statement::SpliceEach { expr } => {
                 calls.push(quote! {

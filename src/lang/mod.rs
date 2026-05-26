@@ -24,6 +24,8 @@ pub mod kotlin;
 pub mod lua;
 /// OCaml language support.
 pub mod ocaml;
+/// PHP language support.
+pub mod php;
 /// Python language support.
 pub mod python;
 /// Rust language support.
@@ -248,6 +250,12 @@ pub trait CodeLang: RendererLang {
         self.escape_reserved(name)
     }
 
+    /// Prefix applied to variable names (parameters, fields, properties,
+    /// receiver names). Returns `""` by default. PHP returns `"$"`.
+    fn variable_prefix(&self) -> &str {
+        ""
+    }
+
     /// Optional kind suffix after the type name (e.g., Go's `type Foo struct`).
     ///
     /// Default: empty (TS/Rust put the kind keyword before the name).
@@ -415,6 +423,7 @@ pub fn lang_from_extension(ext: &str) -> Option<Box<dyn CodeLang>> {
         "lua" => Some(Box::new(lua::Lua::default())),
         "sh" | "bash" => Some(Box::new(bash::Bash::default())),
         "zsh" => Some(Box::new(zsh::Zsh::default())),
+        "php" => Some(Box::new(php::Php::default())),
         _ => None,
     }
 }

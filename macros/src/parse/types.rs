@@ -12,6 +12,7 @@ pub(crate) enum MacroLang {
     Go,
     Haskell,
     OCaml,
+    Php,
 }
 
 impl MacroLang {
@@ -52,7 +53,12 @@ pub(crate) enum Statement {
     /// Control flow: `begin_control_flow` / `next_control_flow` / `end_control_flow`.
     /// Only for actual control flow (`if`/`for`/`while`/`class`/`function`).
     /// Expression braces are routed through `Statement::Statement` + `ParsedBlock`.
-    ControlFlow { branches: Vec<Branch> },
+    ControlFlow {
+        branches: Vec<Branch>,
+        /// Emit a `;` after the closing brace (for expression-level control
+        /// flow like `match` in PHP/Rust).
+        trailing_semicolon: bool,
+    },
     /// `add("%>", ())` — increase indent.
     Indent,
     /// `add("%<", ())` — decrease indent.

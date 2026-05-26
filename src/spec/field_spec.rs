@@ -179,6 +179,7 @@ impl FieldSpec {
                 fmt.push(' ');
             }
             fmt.push_str(name_prefix);
+            fmt.push_str(lang.variable_prefix());
             fmt.push_str(&lang.escape_field_name(&self.name));
             fmt.push_str(name_suffix);
         } else {
@@ -191,6 +192,7 @@ impl FieldSpec {
                     fmt.push_str(mk);
                 }
             }
+            fmt.push_str(lang.variable_prefix());
             fmt.push_str(&lang.escape_field_name(&self.name));
             fmt.push_str(name_suffix);
 

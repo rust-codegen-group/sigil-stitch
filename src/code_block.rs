@@ -379,6 +379,18 @@ impl CodeBlockBuilder {
         self
     }
 
+    /// End a control flow block with a trailing semicolon (for expression-level
+    /// control flow like `match` in PHP/Rust).
+    pub fn end_control_flow_with_semicolon(&mut self) -> &mut Self {
+        let condition = self.block_stack.pop().unwrap_or_default();
+        self.nodes.push(CodeNode::Dedent);
+        self.indent_depth -= 1;
+        self.nodes.push(CodeNode::BlockClose(condition));
+        self.nodes.push(CodeNode::StatementEnd);
+        self.nodes.push(CodeNode::Newline);
+        self
+    }
+
     /// Add a blank line.
     pub fn add_line(&mut self) -> &mut Self {
         self.nodes.push(CodeNode::Newline);

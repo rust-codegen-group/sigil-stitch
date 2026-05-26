@@ -146,12 +146,26 @@ pub(super) fn parse_one_statement(
 
             // Control flow detected (if/for/while/function/class).
             let (stmt, mut next_pos) = parse_control_flow(tokens, &collected, g, pos, lang)?;
-            // Consume trailing `;` as DSL statement terminator only.
-            // Control flow constructs (if/for/while) don't have `;` in
-            // generated code.
+            // Expression-level control flow (e.g., `match` in PHP/Rust)
+            // should emit a trailing `;` when one is present in the source.
+            let is_expression_cf = collected
+                .iter()
+                .any(|tt| is_ident(tt, "match") || is_ident(tt, "switch"));
+            let trailing_semicolon =
+                is_expression_cf && next_pos < tokens.len() && is_semicolon(&tokens[next_pos]);
+            // Always consume trailing `;` — it's a DSL statement terminator,
+            // not target-language syntax.
             if next_pos < tokens.len() && is_semicolon(&tokens[next_pos]) {
                 next_pos += 1;
             }
+            let stmt = if let Statement::ControlFlow { branches, .. } = stmt {
+                Statement::ControlFlow {
+                    branches,
+                    trailing_semicolon,
+                }
+            } else {
+                stmt
+            };
             return Ok((stmt, next_pos));
         }
 
@@ -286,7 +300,13 @@ fn parse_control_flow(
         }
     }
 
-    Ok((Statement::ControlFlow { branches }, pos))
+    Ok((
+        Statement::ControlFlow {
+            branches,
+            trailing_semicolon: false,
+        },
+        pos,
+    ))
 }
 
 /// Try to parse `$C_each(expr)` at position `start`.

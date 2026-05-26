@@ -28,6 +28,7 @@ fn parse_macro_lang(ts: &TokenStream) -> MacroLang {
             "Go" => MacroLang::Go,
             "Haskell" => MacroLang::Haskell,
             "OCaml" => MacroLang::OCaml,
+            "Php" => MacroLang::Php,
             _ => MacroLang::Unaware,
         }
     } else {

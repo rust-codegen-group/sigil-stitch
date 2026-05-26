@@ -93,6 +93,7 @@ impl ParameterSpec {
                     fmt.push_str(mk);
                 }
             }
+            fmt.push_str(lang.variable_prefix());
             fmt.push_str(&lang.escape_reserved(&self.name));
         } else {
             // TS/Rust/Go/Python-style: name sep type
@@ -107,6 +108,7 @@ impl ParameterSpec {
                     fmt.push_str(mk);
                 }
             }
+            fmt.push_str(lang.variable_prefix());
             fmt.push_str(&lang.escape_reserved(&self.name));
 
             // Skip type annotation when the type is empty (e.g., Python's bare `self`).

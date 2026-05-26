@@ -84,6 +84,7 @@ pub(super) fn maybe_space(
         | TokenAnnotation::PostfixIncDec
         | TokenAnnotation::PostfixStar
         | TokenAnnotation::PostfixQuestion
+        | TokenAnnotation::NullablePrefix
         | TokenAnnotation::ArrowOp
         | TokenAnnotation::AssignAdjacent
         | TokenAnnotation::MethodCallColon

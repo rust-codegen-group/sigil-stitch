@@ -72,7 +72,7 @@ fn multiple_statements() {
 fn control_flow_if_with_body() {
     let stmt = parse_stmt("if (x > 0) { return x; }");
     match stmt {
-        Statement::ControlFlow { branches } => {
+        Statement::ControlFlow { branches, .. } => {
             assert_eq!(branches.len(), 1);
             assert_eq!(branches[0].condition_format, "if (x > 0)");
             assert_eq!(branches[0].body.len(), 1);
@@ -85,7 +85,7 @@ fn control_flow_if_with_body() {
 fn control_flow_if_else() {
     let stmt = parse_stmt("if (x) { a(); } else { b(); }");
     match stmt {
-        Statement::ControlFlow { branches } => {
+        Statement::ControlFlow { branches, .. } => {
             assert_eq!(branches.len(), 2);
             assert_eq!(branches[0].condition_format, "if (x)");
             assert_eq!(branches[1].condition_format, "else");
@@ -151,7 +151,7 @@ fn statement_with_interpolation() {
 fn go_for_with_embedded_semicolons() {
     let stmt = parse_stmt_lang("for i := 0; i < n; i++ { body(); }", MacroLang::Go);
     match stmt {
-        Statement::ControlFlow { branches } => {
+        Statement::ControlFlow { branches, .. } => {
             assert!(branches[0].condition_format.contains("for"));
             assert!(branches[0].condition_format.contains(";"));
         }

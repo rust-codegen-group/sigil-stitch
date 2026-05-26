@@ -227,6 +227,7 @@ impl FunSpec {
         // Receiver (e.g., Go: `func (s *Server) Handle()`).
         if let Some(recv) = &self.receiver {
             sig.push('(');
+            sig.push_str(lang.variable_prefix());
             sig.push_str(&lang.escape_reserved(&recv.name));
             sig.push_str(lang.type_decl_syntax().type_annotation_separator);
             sig.push_str("%T");
@@ -455,6 +456,7 @@ impl FunSpec {
         def.push_str(&self.name);
         for param in &self.params {
             def.push(' ');
+            def.push_str(lang.variable_prefix());
             def.push_str(&lang.escape_reserved(&param.name));
         }
         def.push_str(lang.block_syntax().block_open);

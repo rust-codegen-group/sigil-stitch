@@ -1,0 +1,3 @@
+while ($running) {
+    $running = false;
+}
