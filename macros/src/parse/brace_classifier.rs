@@ -31,6 +31,11 @@ pub(super) enum BraceKind {
 /// handled inline because they depend on outer loop context.
 pub(super) fn classify(prefix_tokens: &[TokenTree], group: &proc_macro2::Group) -> BraceKind {
     if looks_like_control_flow_header(prefix_tokens) {
+        // Don't intercept `$if(cond) { ... }` or `$for(pat in expr) { ... }`
+        // — these are inline meta directives, not target-language control flow.
+        if ends_with_sigil_directive(prefix_tokens) {
+            return BraceKind::Literal;
+        }
         return BraceKind::ControlFlow;
     }
 
@@ -164,8 +169,39 @@ fn is_interpolation_paren(tokens: &[TokenTree], pos: usize) -> bool {
         && matches!(&tokens[pos - 1], TokenTree::Ident(_))
 }
 
+/// Check whether the prefix tokens end with a sigil-stitch inline directive
+/// pattern. Recognizes:
+/// - `$if(expr)` / `$for(expr)` / `$else_if(expr)` → brace is directive body
+/// - `$else` → brace is `$else { ... }` directive body
+fn ends_with_sigil_directive(tokens: &[TokenTree]) -> bool {
+    let n = tokens.len();
+    // Pattern: `$`, `else`, (no paren group needed — $else has no condition)
+    if n >= 2
+        && let TokenTree::Punct(dollar) = &tokens[n - 2]
+        && dollar.as_char() == '$'
+        && let TokenTree::Ident(id) = &tokens[n - 1]
+        && id.to_string().as_str() == "else"
+    {
+        return true;
+    }
+    // Pattern: `$`, `if`/`for`/`else_if`, `(...)`
+    if n >= 3
+        && let TokenTree::Punct(dollar) = &tokens[n - 3]
+        && dollar.as_char() == '$'
+        && let TokenTree::Ident(id) = &tokens[n - 2]
+        && matches!(id.to_string().as_str(), "if" | "for" | "else_if")
+        && let TokenTree::Group(g) = &tokens[n - 1]
+        && g.delimiter() == Delimiter::Parenthesis
+    {
+        return true;
+    }
+    false
+}
+
 /// Check if a brace group contains a statement-level sigil marker
-/// (`$C_each`, `$for`, `$if`, `$let`) that requires a control-flow context.
+/// (`$C_each`, `$let`) that requires a control-flow context.
+/// Note: `$for`/`$if`/`$else_if`/`$else` are now handled inline by
+/// `tokens_to_format_inner` and do NOT need statement-level interception.
 /// Unlike `has_meta_marker`, this skips inline specifiers (`$S`, `$V`, `$L`,
 /// `$N`, `$T`, `$join`) which work fine inside literal brace groups.
 pub(super) fn has_statement_marker(g: &proc_macro2::Group) -> bool {
@@ -178,10 +214,7 @@ pub(super) fn has_statement_marker(g: &proc_macro2::Group) -> bool {
             && let TokenTree::Ident(id) = &stream[i + 1]
         {
             let s = id.to_string();
-            if matches!(
-                s.as_str(),
-                "C_each" | "for" | "if" | "else_if" | "else" | "let"
-            ) {
+            if matches!(s.as_str(), "C_each" | "let") {
                 return true;
             }
         }

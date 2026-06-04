@@ -3,8 +3,9 @@ use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
 use super::annotate::{
     CONTROL_FLOW_KEYWORDS, DECLARATION_KEYWORDS, TokenAnnotation, annotate_tokens,
 };
+use super::directives::{parse_for_components, parse_if_components};
 use super::spacing::{ColonContext, PrevTokenKind, SpacingState, maybe_space};
-use super::types::{CompileError, InterpolationKind, MacroLang, TypedArg};
+use super::types::{CompileError, InterpolationKind, MacroLang, Statement, TypedArg};
 use super::util::is_ident;
 
 /// Convert a sequence of tokens into a format string and typed argument list.
@@ -143,16 +144,90 @@ fn tokens_to_format_inner(
                 ));
             }
 
-            // `$if`/`$else_if`/`$else`/`$for`/`$let` should have been caught earlier (statement-level).
-            if is_ident(next, "if")
-                || is_ident(next, "else_if")
-                || is_ident(next, "else")
-                || is_ident(next, "for")
-                || is_ident(next, "let")
-            {
+            // `$for(pat in expr) { body }` — inline meta-for loop.
+            if is_ident(next, "for") {
+                pos += 1;
+                if pos >= tokens.len() {
+                    return Err(CompileError::new(
+                        next.span(),
+                        "$for requires a parenthesized pattern: $for(pat in expr) { ... }",
+                    ));
+                }
+                let (after_for, pat, iter_expr, body) = parse_for_components(tokens, pos, lang)?;
+
+                if !adjacent_to_prev_specifier {
+                    maybe_space(
+                        format,
+                        state,
+                        PrevTokenKind::Specifier,
+                        TokenAnnotation::Normal,
+                    );
+                }
+                format.push_str("%L");
+                state.prev = PrevTokenKind::Specifier;
+                let end = tokens[after_for - 1].span().end();
+                state.prev_specifier_end = Some((end.line, end.column));
+
+                args.push(TypedArg {
+                    kind: InterpolationKind::ParsedSplice,
+                    expr: TokenStream::new(),
+                    parsed_body: Some(vec![Statement::MetaFor {
+                        pat,
+                        iter_expr,
+                        body,
+                    }]),
+                });
+                pos = after_for;
+                continue;
+            }
+
+            // `$if(cond) { body } [$else_if(cond) { body }]* [$else { body }]`
+            // — inline meta-conditional.
+            if is_ident(next, "if") {
+                pos += 1;
+                if pos >= tokens.len() {
+                    return Err(CompileError::new(
+                        next.span(),
+                        "$if requires a parenthesized condition: $if(condition) { ... }",
+                    ));
+                }
+                let (after_if, branches) = parse_if_components(tokens, pos, lang)?;
+
+                if !adjacent_to_prev_specifier {
+                    maybe_space(
+                        format,
+                        state,
+                        PrevTokenKind::Specifier,
+                        TokenAnnotation::Normal,
+                    );
+                }
+                format.push_str("%L");
+                state.prev = PrevTokenKind::Specifier;
+                let end = tokens[after_if - 1].span().end();
+                state.prev_specifier_end = Some((end.line, end.column));
+
+                args.push(TypedArg {
+                    kind: InterpolationKind::ParsedSplice,
+                    expr: TokenStream::new(),
+                    parsed_body: Some(vec![Statement::MetaIf { branches }]),
+                });
+                pos = after_if;
+                continue;
+            }
+
+            // `$else_if` / `$else` only valid as continuation of `$if`.
+            if is_ident(next, "else_if") || is_ident(next, "else") {
                 return Err(CompileError::new(
                     next.span(),
-                    "$if/$else_if/$else/$for/$let must appear at the start of a line",
+                    "$else_if/$else must immediately follow a $if(condition) { ... } branch",
+                ));
+            }
+
+            // `$let` is a Rust-level binding, only meaningful at statement level.
+            if is_ident(next, "let") {
+                return Err(CompileError::new(
+                    next.span(),
+                    "$let must appear at the start of a line",
                 ));
             }
 
@@ -283,7 +358,7 @@ fn tokens_to_format_inner(
                             id.span(),
                             format!(
                                 "unknown interpolation kind `${kind_str}`. \
-                                     Expected $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $comment, or $C_each"
+                                     Expected $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $comment, $for, $if, or $C_each"
                             ),
                         ));
                     }
@@ -319,7 +394,8 @@ fn tokens_to_format_inner(
                     InterpolationKind::Literal
                     | InterpolationKind::Code
                     | InterpolationKind::TypeJoin
-                    | InterpolationKind::ParsedBlock => "%L",
+                    | InterpolationKind::ParsedBlock
+                    | InterpolationKind::ParsedSplice => "%L",
                     InterpolationKind::Comment => "%R",
                 };
 
@@ -348,7 +424,7 @@ fn tokens_to_format_inner(
 
             return Err(CompileError::new(
                 next.span(),
-                "expected interpolation kind after `$`: $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $C_each, $for, or $$",
+                "expected interpolation kind after `$`: $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $for, $if, or $$",
             ));
         }
 

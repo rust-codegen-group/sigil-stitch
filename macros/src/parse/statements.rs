@@ -1,11 +1,10 @@
 use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
 
 use super::brace_classifier::{self, BraceKind};
+use super::directives::{parse_for_components, parse_if_components};
 use super::format::tokens_to_format;
 use super::parse_body;
-use super::types::{
-    Branch, CompileError, InterpolationKind, MacroLang, MetaBranch, Statement, TypedArg,
-};
+use super::types::{Branch, CompileError, InterpolationKind, MacroLang, Statement, TypedArg};
 use super::util::{is_ident, is_semicolon};
 
 /// Parse a single statement starting at `pos`.
@@ -375,125 +374,9 @@ fn try_parse_meta_if(
         return Ok(None);
     }
 
-    let mut pos = start + 2;
-    let mut branches = Vec::new();
+    let (next_pos, branches) = parse_if_components(tokens, start + 2, lang)?;
 
-    // Parse `(cond) { body }` for the $if branch.
-    let cond_group = match &tokens[pos] {
-        TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g.clone(),
-        _ => {
-            return Err(CompileError::new(
-                tokens[pos].span(),
-                "$if requires a parenthesized condition: $if(condition) { ... }",
-            ));
-        }
-    };
-    pos += 1;
-
-    let body_group = match &tokens[pos] {
-        TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => g.clone(),
-        _ => {
-            return Err(CompileError::new(
-                tokens[pos].span(),
-                "$if requires a brace body: $if(condition) { ... }",
-            ));
-        }
-    };
-    pos += 1;
-
-    let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-    let body = parse_body(&body_tokens, lang)?;
-    branches.push(MetaBranch {
-        condition: Some(cond_group.stream()),
-        body,
-    });
-
-    // Parse optional $else_if / $else continuations.
-    loop {
-        // Look for `$` `else_if` or `$` `else`.
-        if pos + 1 >= tokens.len() {
-            break;
-        }
-        let is_dollar = matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$');
-        if !is_dollar {
-            break;
-        }
-
-        if is_ident(&tokens[pos + 1], "else_if") {
-            // $else_if(cond) { body }
-            pos += 2;
-            if pos >= tokens.len() {
-                return Err(CompileError::new(
-                    tokens[pos - 1].span(),
-                    "$else_if requires a parenthesized condition",
-                ));
-            }
-            let cond_group = match &tokens[pos] {
-                TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g.clone(),
-                _ => {
-                    return Err(CompileError::new(
-                        tokens[pos].span(),
-                        "$else_if requires a parenthesized condition: $else_if(condition) { ... }",
-                    ));
-                }
-            };
-            pos += 1;
-            if pos >= tokens.len() {
-                return Err(CompileError::new(
-                    tokens[pos - 1].span(),
-                    "$else_if requires a brace body",
-                ));
-            }
-            let body_group = match &tokens[pos] {
-                TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => g.clone(),
-                _ => {
-                    return Err(CompileError::new(
-                        tokens[pos].span(),
-                        "$else_if requires a brace body: $else_if(condition) { ... }",
-                    ));
-                }
-            };
-            pos += 1;
-
-            let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-            let body = parse_body(&body_tokens, lang)?;
-            branches.push(MetaBranch {
-                condition: Some(cond_group.stream()),
-                body,
-            });
-        } else if is_ident(&tokens[pos + 1], "else") {
-            // $else { body }
-            pos += 2;
-            if pos >= tokens.len() {
-                return Err(CompileError::new(
-                    tokens[pos - 1].span(),
-                    "$else requires a brace body",
-                ));
-            }
-            let body_group = match &tokens[pos] {
-                TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => g.clone(),
-                _ => {
-                    return Err(CompileError::new(
-                        tokens[pos].span(),
-                        "$else requires a brace body: $else { ... }",
-                    ));
-                }
-            };
-            pos += 1;
-
-            let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-            let body = parse_body(&body_tokens, lang)?;
-            branches.push(MetaBranch {
-                condition: None,
-                body,
-            });
-            break; // $else is always last.
-        } else {
-            break;
-        }
-    }
-
-    Ok(Some((Statement::MetaIf { branches }, pos)))
+    Ok(Some((Statement::MetaIf { branches }, next_pos)))
 }
 
 /// Try to parse `$for(pat in expr) { ... }` at position `start`.
@@ -517,57 +400,7 @@ fn try_parse_meta_for(
         return Ok(None);
     }
 
-    let paren_group = match &tokens[start + 2] {
-        TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g.clone(),
-        _ => {
-            return Err(CompileError::new(
-                tokens[start + 2].span(),
-                "$for requires a parenthesized pattern: $for(pat in expr) { ... }",
-            ));
-        }
-    };
-
-    let body_group = match &tokens[start + 3] {
-        TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => g.clone(),
-        _ => {
-            return Err(CompileError::new(
-                tokens[start + 3].span(),
-                "$for requires a brace body: $for(pat in expr) { ... }",
-            ));
-        }
-    };
-
-    // Split paren contents on the first `in` keyword.
-    let paren_tokens: Vec<TokenTree> = paren_group.stream().into_iter().collect();
-    let in_pos = paren_tokens.iter().position(|tt| is_ident(tt, "in"));
-    let in_pos = match in_pos {
-        Some(p) => p,
-        None => {
-            return Err(CompileError::new(
-                paren_group.span(),
-                "$for requires `in` keyword: $for(pat in expr) { ... }",
-            ));
-        }
-    };
-
-    if in_pos == 0 {
-        return Err(CompileError::new(
-            paren_group.span(),
-            "$for pattern cannot be empty: $for(pat in expr) { ... }",
-        ));
-    }
-    if in_pos + 1 >= paren_tokens.len() {
-        return Err(CompileError::new(
-            paren_group.span(),
-            "$for iterator expression cannot be empty: $for(pat in expr) { ... }",
-        ));
-    }
-
-    let pat: proc_macro2::TokenStream = paren_tokens[..in_pos].iter().cloned().collect();
-    let iter_expr: proc_macro2::TokenStream = paren_tokens[in_pos + 1..].iter().cloned().collect();
-
-    let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-    let body = parse_body(&body_tokens, lang)?;
+    let (next_pos, pat, iter_expr, body) = parse_for_components(tokens, start + 2, lang)?;
 
     Ok(Some((
         Statement::MetaFor {
@@ -575,7 +408,7 @@ fn try_parse_meta_for(
             iter_expr,
             body,
         },
-        start + 4,
+        next_pos, // helper returns paren_pos + 2 = start + 4
     )))
 }
 

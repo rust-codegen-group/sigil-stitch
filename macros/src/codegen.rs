@@ -281,6 +281,19 @@ fn build_args_tuple(args: &[TypedArg]) -> TokenStream {
                             }
                         }
                     }
+                    InterpolationKind::ParsedSplice => {
+                        let body_stmts = arg.parsed_body.as_ref()
+                            .expect("ParsedSplice must have parsed_body");
+                        let body_calls = generate_statements(body_stmts);
+                        quote! {
+                            {
+                                let mut __sigil_builder =
+                                    ::sigil_stitch::code_block::CodeBlock::builder();
+                                #(#body_calls)*
+                                __sigil_builder.build().unwrap()
+                            }
+                        }
+                    }
                 }
             })
             .collect();

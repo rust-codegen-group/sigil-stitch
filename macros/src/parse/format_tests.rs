@@ -182,3 +182,64 @@ fn ruby_symbol_colon_spacing() {
         "attr_reader :name"
     );
 }
+
+#[test]
+fn inline_for_emits_parsed_splice() {
+    let (format, kinds) = fmt_with_args("($for(x in items) { $N(*x) })");
+    assert_eq!(format, "(%L)");
+    assert_eq!(kinds.len(), 1);
+    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
+}
+
+#[test]
+fn inline_for_mixed_with_literals() {
+    let (format, kinds) = fmt_with_args("prefix $for(x in items) { $N(*x) } suffix");
+    assert!(format.starts_with("prefix "));
+    assert!(format.contains(" %L "));
+    assert!(format.ends_with(" suffix"));
+    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
+}
+
+#[test]
+fn inline_if_emits_parsed_splice() {
+    let (format, kinds) = fmt_with_args("($if(cond) { a } $else { b })");
+    assert_eq!(format, "(%L)");
+    assert_eq!(kinds.len(), 1);
+    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
+}
+
+#[test]
+fn inline_else_if_standalone_rejected() {
+    let ts: TokenStream = "$else_if(cond) { body }".parse().unwrap();
+    let tokens: Vec<TokenTree> = ts.into_iter().collect();
+    let result = tokens_to_format(&tokens, MacroLang::Unaware);
+    assert!(result.is_err());
+}
+
+#[test]
+fn inline_else_standalone_rejected() {
+    let ts: TokenStream = "$else { body }".parse().unwrap();
+    let tokens: Vec<TokenTree> = ts.into_iter().collect();
+    let result = tokens_to_format(&tokens, MacroLang::Unaware);
+    assert!(result.is_err());
+}
+
+#[test]
+fn inline_let_rejected() {
+    let ts: TokenStream = "($let(x = 1))".parse().unwrap();
+    let tokens: Vec<TokenTree> = ts.into_iter().collect();
+    let result = tokens_to_format(&tokens, MacroLang::Unaware);
+    assert!(result.is_err());
+}
+
+#[test]
+fn inline_for_adjacent_to_prev_specifier() {
+    // $T(type)$for(x in items) { $N(*x) } — no space between specifiers
+    let ts: TokenStream = "$T(my_type)$for(x in items) { $N(*x) }".parse().unwrap();
+    let tokens: Vec<TokenTree> = ts.into_iter().collect();
+    let (format, args) = tokens_to_format(&tokens, MacroLang::Unaware).unwrap();
+    assert_eq!(format, "%T%L");
+    assert_eq!(args.len(), 2);
+    assert!(matches!(args[0].kind, InterpolationKind::Type));
+    assert!(matches!(args[1].kind, InterpolationKind::ParsedSplice));
+}

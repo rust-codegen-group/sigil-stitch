@@ -166,6 +166,10 @@ pub(crate) enum InterpolationKind {
     /// (`$C_each`, `$for`, `$if`, `$let`). Emitted as a nested
     /// `CodeBlock` via `%L`.
     ParsedBlock,
+    /// Parsed inline splice (`$for`/`$if` inside expressions).
+    /// Emitted as `%L` + nested CodeBlock WITHOUT synthetic block delimiters
+    /// (no `begin_control_flow` / `end_control_flow_no_newline` wrapping).
+    ParsedSplice,
 }
 
 /// A compile error with span information.

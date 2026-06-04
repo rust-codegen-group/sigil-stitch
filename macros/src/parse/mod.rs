@@ -5,6 +5,7 @@
 
 mod annotate;
 mod brace_classifier;
+mod directives;
 mod format;
 mod spacing;
 mod statements;
