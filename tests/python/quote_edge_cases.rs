@@ -83,3 +83,29 @@ fn test_name_keyword_escape_in_macro() {
     let output = render(&block);
     assert!(output.contains("class_ = 1"), "got: {output}");
 }
+
+#[test]
+fn test_multiline_paren_union_type() {
+    // Newline between `(` and `$for` in a multiline parenthesized group
+    // should be preserved in the output.
+    let members = ["Member1", "Member2"];
+    let block = sigil_quote!(Python {
+        type MyType = (
+        $for((i, m) in members.iter().enumerate()) {
+            $if(i == 0) { $S(*m) }
+            $if(i > 0) { | $S(*m) }
+        }
+        )
+    })
+    .unwrap();
+    let output = render(&block);
+    // Content should appear on a new line after `(`
+    assert!(
+        output.contains("= (\n"),
+        "newline after ( missing, got:\n{output}"
+    );
+    assert!(
+        output.contains("\n)"),
+        "newline before ) missing, got:\n{output}"
+    );
+}

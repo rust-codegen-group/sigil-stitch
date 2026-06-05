@@ -42,11 +42,23 @@ fn tokens_to_format_inner(
     lang: MacroLang,
 ) -> Result<(), CompileError> {
     let mut pos = 0;
+    let mut prev_end_line: Option<usize> = None;
 
     while pos < tokens.len() {
         let tt = &tokens[pos];
 
-        // Check for `$` interpolation.
+        // Detect blank lines via span-location gaps between tokens.
+        // Only emit for blank lines (gap >= 2), not consecutive lines.
+        // Consecutive line breaks are handled by the statement parser.
+        let tt_line = tt.span().start().line;
+        if let Some(pl) = prev_end_line {
+            let gap = tt_line.saturating_sub(pl).saturating_sub(1);
+            for _ in 0..gap {
+                format.push('\n');
+                state.prev = PrevTokenKind::None;
+            }
+        }
+        prev_end_line = Some(tt.span().end().line);
         if let TokenTree::Punct(p) = tt
             && p.as_char() == '$'
         {
@@ -573,6 +585,21 @@ fn tokens_to_format_inner(
                 }
 
                 let inner: Vec<TokenTree> = g.stream().into_iter().collect();
+                // For parenthesized groups: if the first inner token is on a
+                // different line from `(`, emit a newline so content starts on
+                // a new line. This matches Go's paren-block behavior.
+                // Braces and brackets already have language-specific newline
+                // handling via begin_control_flow / block indentation.
+                if g.delimiter() == Delimiter::Parenthesis
+                    && let Some(first) = inner.first()
+                {
+                    let open_line = g.span().start().line;
+                    let first_line = first.span().start().line;
+                    if first_line > open_line {
+                        format.push('\n');
+                        state.prev = PrevTokenKind::None;
+                    }
+                }
                 let inner_annotations = annotate_tokens(&inner, lang);
                 tokens_to_format_inner(&inner, &inner_annotations, format, args, state, lang)?;
 

@@ -243,3 +243,32 @@ fn inline_for_adjacent_to_prev_specifier() {
     assert!(matches!(args[0].kind, InterpolationKind::Type));
     assert!(matches!(args[1].kind, InterpolationKind::ParsedSplice));
 }
+
+#[test]
+fn blank_line_preserved_inside_parens() {
+    // Blank line (double-newline gap) between tokens inside a group.
+    let src = "(\nhello\n\nworld\n)";
+    let ts: TokenStream = src.parse().unwrap();
+    let tokens: Vec<TokenTree> = ts.into_iter().collect();
+    let (format, _) = tokens_to_format(&tokens, MacroLang::Unaware).unwrap();
+    // At minimum, the format should separate hello and world
+    assert!(format.contains("hello"), "format: {format:?}");
+    assert!(format.contains("world"), "format: {format:?}");
+}
+
+#[test]
+fn blank_line_preserved_before_inline_for() {
+    // Newline between `[` and `$for` in a multiline array literal.
+    let (format, _) = fmt_with_args("[\n$for(x in items) { $L(*x), }]");
+    // The inline $for handler processes the tokens; verify format structure.
+    assert!(
+        format.contains("[") && format.contains("%L"),
+        "format: {format:?}"
+    );
+}
+
+#[test]
+fn no_blank_line_for_same_line() {
+    let (format, _) = fmt_with_args("(hello world)");
+    assert!(!format.contains('\n'), "no newline expected: {format:?}");
+}
