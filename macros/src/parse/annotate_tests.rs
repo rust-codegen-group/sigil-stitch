@@ -313,3 +313,125 @@ fn assign_adjacent_not_in_non_shell() {
         TokenAnnotation::Normal
     );
 }
+
+// --- Compound operator tests ---
+
+#[test]
+fn compound_and_infix() {
+    // a && b: second & should be Normal (infix)
+    assert_eq!(
+        ann_at(&annotate_lang("a && b", MacroLang::Cpp), 2),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
+fn compound_and_prefix() {
+    // &&str: second & should be PrefixOp (prefix compound)
+    assert_eq!(
+        ann_at(&annotate_lang("&&str", MacroLang::Unaware), 1),
+        TokenAnnotation::PrefixOp
+    );
+}
+
+#[test]
+fn compound_and_postfix() {
+    // auto&& item: second & should be Normal (postfix)
+    assert_eq!(
+        ann_at(&annotate_lang("auto&& item", MacroLang::Cpp), 2),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
+fn compound_star_infix() {
+    // a ** b: second * should be Normal (infix)
+    assert_eq!(
+        ann_at(&annotate_lang("a ** b", MacroLang::Unaware), 2),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
+fn compound_star_prefix() {
+    // **ptr: second * should be PrefixOp (prefix compound)
+    assert_eq!(
+        ann_at(&annotate_lang("**ptr", MacroLang::Unaware), 1),
+        TokenAnnotation::PrefixOp
+    );
+}
+
+// --- PostfixQuestion ternary tests ---
+
+#[test]
+fn postfix_question_ternary_literal() {
+    // x?1:2: ? should be Normal (compact ternary with literal)
+    assert_eq!(
+        ann_at(&annotate_lang("x?1:2", MacroLang::CSharp), 1),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
+fn postfix_question_ternary_ident() {
+    // x?y:z: ? should be Normal (compact ternary with ident)
+    assert_eq!(
+        ann_at(&annotate_lang("x?y:z", MacroLang::CSharp), 1),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
+fn postfix_question_nullable_with_space() {
+    // Int? name: ? followed by space then ident → nullable, not ternary
+    assert_eq!(
+        ann_at(&annotate_lang("Int? name", MacroLang::CSharp), 1),
+        TokenAnnotation::PostfixQuestion
+    );
+}
+
+#[test]
+fn postfix_question_nullable_comma() {
+    // Int?,: ? followed by comma → nullable
+    assert_eq!(
+        ann_at(&annotate_lang("Int?, x", MacroLang::CSharp), 1),
+        TokenAnnotation::PostfixQuestion
+    );
+}
+
+#[test]
+fn postfix_question_optional_property() {
+    // name?: string: ? followed by : is TS optional property, not ternary
+    assert_eq!(
+        ann_at(&annotate_lang("name?: string", MacroLang::TypeScript), 1),
+        TokenAnnotation::PostfixQuestion
+    );
+}
+
+// --- GenericOpen gate tests ---
+
+#[test]
+fn generic_open_gated_for_c() {
+    // C has no angle generics — < should be Normal
+    assert_eq!(
+        ann_at(&annotate_lang("Array<T>", MacroLang::C), 1),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
+fn generic_open_allowed_for_generic_lang() {
+    // Unaware (C-like) — < should be GenericOpen
+    assert_eq!(
+        ann_at(&annotate_lang("Vec<T>", MacroLang::Unaware), 1),
+        TokenAnnotation::GenericOpen
+    );
+}
+
+#[test]
+fn ruby_inheritance_angle_preserved() {
+    assert_eq!(
+        ann_at(&annotate_lang("class Dog < Animal", MacroLang::Ruby), 2),
+        TokenAnnotation::InheritanceAngle
+    );
+}

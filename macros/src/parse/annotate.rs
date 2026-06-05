@@ -362,6 +362,24 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                             }
                         }
 
+                        // Compound-operator second char (&&, **):
+                        // When preceded by same-char Joint punct and current
+                        // is Alone, normalize for infix/separator/postfix.
+                        // Note: `--` is NOT included — the shell downgrade
+                        // below already handles the separator case, and prefix
+                        // `--x` in C-like languages needs PrefixOp preserved.
+                        if matches!(ch, '&' | '*')
+                            && i > 0
+                            && let TokenTree::Punct(prev_p) = &tokens[i - 1]
+                            && prev_p.as_char() == ch
+                            && prev_p.spacing() == Spacing::Joint
+                            && annotations[i - 1] != TokenAnnotation::PrefixOp
+                            && p.spacing() != Spacing::Joint
+                        {
+                            i += 1;
+                            continue;
+                        }
+
                         // PrefixOp: NOT preceded by non-keyword ident, literal, `)`, or `]`
                         // After keywords like `return`, `-` is prefix (unary minus)
                         let is_prefix = if i == 0 {
@@ -531,7 +549,47 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                                     _ => false,
                                 };
                                 if is_type_context {
-                                    annotations[i] = TokenAnnotation::PostfixQuestion;
+                                    // If `:` appears after an expression consequent
+                                    // (not immediately), this is a compact ternary
+                                    // (x?y:z, x?1:2, x?(a):b), not a nullable type.
+                                    // `?:` (TS optional property, Kotlin Elvis) is
+                                    // NOT a ternary — `:` immediately follows `?`.
+                                    let is_ternary = i + 1 < tokens.len()
+                                        && !matches!(
+                                            &tokens[i + 1],
+                                            TokenTree::Punct(p2) if p2.as_char() == ':'
+                                        )
+                                        && {
+                                            let mut j = i + 1;
+                                            let mut found = false;
+                                            while j < tokens.len() {
+                                                match &tokens[j] {
+                                                    TokenTree::Punct(p2) if p2.as_char() == ':' => {
+                                                        found = true;
+                                                        break;
+                                                    }
+                                                    TokenTree::Punct(p2) if p2.as_char() == ';' => {
+                                                        break;
+                                                    }
+                                                    TokenTree::Group(_) => {
+                                                        // skip — could be (a) in x?(a):b
+                                                    }
+                                                    _ => {}
+                                                }
+                                                if j > 0 {
+                                                    let prev_end = tokens[j - 1].span().end();
+                                                    let curr_start = tokens[j].span().start();
+                                                    if curr_start.line > prev_end.line {
+                                                        break;
+                                                    }
+                                                }
+                                                j += 1;
+                                            }
+                                            found
+                                        };
+                                    if !is_ternary {
+                                        annotations[i] = TokenAnnotation::PostfixQuestion;
+                                    }
                                 }
                             }
                         }
@@ -593,7 +651,7 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                         if is_generic {
                             if lang == MacroLang::Ruby {
                                 annotations[i] = TokenAnnotation::InheritanceAngle;
-                            } else {
+                            } else if lang.has_angle_generics() {
                                 annotations[i] = TokenAnnotation::GenericOpen;
                                 generic_stack.push(i);
                             }
