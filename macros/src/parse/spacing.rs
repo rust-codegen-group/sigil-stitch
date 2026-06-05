@@ -91,6 +91,7 @@ pub(super) fn maybe_space(
         | TokenAnnotation::SafeCallQ
         | TokenAnnotation::PostfixIncDec
         | TokenAnnotation::PostfixStar
+        | TokenAnnotation::PostfixAmpersand
         | TokenAnnotation::PostfixQuestion
         | TokenAnnotation::NullablePrefix
         | TokenAnnotation::ArrowOp

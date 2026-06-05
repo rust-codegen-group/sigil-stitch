@@ -8,12 +8,18 @@ use proc_macro2::{Span, TokenStream};
 pub(crate) enum MacroLang {
     Unaware,
     Bash,
+    C,
+    Cpp,
     CSharp,
+    Dart,
     Go,
     Haskell,
+    Kotlin,
     OCaml,
     Php,
     Ruby,
+    Swift,
+    TypeScript,
     Zsh,
 }
 
@@ -38,6 +44,7 @@ impl MacroLang {
             self,
             Self::Ruby
                 | Self::Bash
+                | Self::C
                 | Self::Zsh
                 | Self::OCaml
                 | Self::Php
@@ -49,6 +56,27 @@ impl MacroLang {
     /// Whether `?Ident` (nullable prefix like `?User`, `?string`) is valid syntax.
     pub fn nullable_prefix_is_valid(self) -> bool {
         matches!(self, Self::Php | Self::OCaml)
+    }
+
+    /// Whether `*` adjacent to a preceding ident means a postfix pointer type
+    /// (C/C++ `Config*`, C# `int*` in unsafe context).
+    pub fn has_postfix_star(self) -> bool {
+        matches!(self, Self::C | Self::Cpp | Self::CSharp)
+    }
+
+    /// Whether `&` adjacent to a preceding ident means a postfix reference type
+    /// (C++ `auto&`, `int&`).
+    pub fn has_postfix_ampersand(self) -> bool {
+        matches!(self, Self::Cpp)
+    }
+
+    /// Whether `?` adjacent to a preceding ident means a postfix nullable type
+    /// (C# `int?`, TS `string?`, Swift `Int?`, Kotlin `Int?`, Dart `int?`).
+    pub fn has_postfix_question_type(self) -> bool {
+        matches!(
+            self,
+            Self::CSharp | Self::Dart | Self::Kotlin | Self::Swift | Self::TypeScript
+        )
     }
 }
 
