@@ -27,6 +27,8 @@ pub(super) enum TokenAnnotation {
     PostfixIncDec,
     /// `*` used as postfix pointer marker (e.g. `Config*`) — suppress space before.
     PostfixStar,
+    /// `&` used as postfix reference marker (e.g. `auto&`, `int&`) — suppress space before.
+    PostfixAmpersand,
     /// `?` used as postfix type marker (e.g. `Int?`, `String?`) — suppress space before.
     PostfixQuestion,
     /// `?` used as nullable prefix (e.g. `?User`, `?string`) — suppress space around.
@@ -325,7 +327,12 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                         }
 
                         // PostfixStar: `*` span-adjacent to preceding ident (pointer type like `Config*`).
-                        if ch == '*' && i > 0 && matches!(&tokens[i - 1], TokenTree::Ident(_)) {
+                        // Only for languages with postfix pointer syntax (C, C++, C#).
+                        if ch == '*'
+                            && lang.has_postfix_star()
+                            && i > 0
+                            && matches!(&tokens[i - 1], TokenTree::Ident(_))
+                        {
                             let prev_end = tokens[i - 1].span().end();
                             let star_start = p.span().start();
                             if prev_end.line == star_start.line
@@ -338,14 +345,18 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                         }
 
                         // PostfixAmpersand: `&` span-adjacent to preceding ident/keyword
-                        // (reference type like `auto&`, `int&`).
-                        if ch == '&' && i > 0 && matches!(&tokens[i - 1], TokenTree::Ident(_)) {
+                        // (reference type like `auto&`, `int&`). C++ only.
+                        if ch == '&'
+                            && lang.has_postfix_ampersand()
+                            && i > 0
+                            && matches!(&tokens[i - 1], TokenTree::Ident(_))
+                        {
                             let prev_end = tokens[i - 1].span().end();
                             let amp_start = p.span().start();
                             if prev_end.line == amp_start.line
                                 && prev_end.column == amp_start.column
                             {
-                                annotations[i] = TokenAnnotation::PostfixStar;
+                                annotations[i] = TokenAnnotation::PostfixAmpersand;
                                 i += 1;
                                 continue;
                             }
@@ -503,7 +514,9 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                         }
                         // PostfixQuestion: `?` span-adjacent to preceding ident or group-close
                         // (e.g. `Int?`, `String?`, `(Int)?`)
-                        else if i > 0 {
+                        // Only for languages with postfix nullable type syntax
+                        // (C#, TS, Swift, Kotlin, Dart).
+                        else if lang.has_postfix_question_type() && i > 0 {
                             let prev_end = tokens[i - 1].span().end();
                             let q_start = p.span().start();
                             let is_adjacent =
@@ -594,7 +607,7 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                         // Reset generic stack at statement boundaries
                         generic_stack.clear();
                     }
-                    '=' if i > 0 => {
+                    '=' if lang.is_shell() && i > 0 => {
                         let prev_is_assignable = matches!(
                             &tokens[i - 1],
                             TokenTree::Ident(_) | TokenTree::Literal(_) | TokenTree::Group(_)

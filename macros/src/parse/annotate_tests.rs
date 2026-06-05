@@ -113,22 +113,22 @@ fn prefix_op_ampersand() {
 
 #[test]
 fn postfix_question_adjacent() {
-    let a = annotate_src("Int?");
-    // "Int" "?" — adjacent → PostfixQuestion
+    let a = annotate_lang("Int?", MacroLang::CSharp);
+    // "Int" "?" — adjacent → PostfixQuestion (C# nullable)
     assert_eq!(ann_at(&a, 1), TokenAnnotation::PostfixQuestion);
 }
 
 #[test]
 fn postfix_star_adjacent() {
-    let a = annotate_src("Config*");
-    // "Config" "*" — adjacent → PostfixStar
+    let a = annotate_lang("Config*", MacroLang::C);
+    // "Config" "*" — adjacent → PostfixStar (C pointer)
     assert_eq!(ann_at(&a, 1), TokenAnnotation::PostfixStar);
 }
 
 #[test]
 fn assign_adjacent() {
-    let a = annotate_src("NAME=val");
-    // "NAME" "=" "val"
+    let a = annotate_lang("NAME=val", MacroLang::Bash);
+    // "NAME" "=" "val" — shell adjacent assign
     assert_eq!(ann_at(&a, 1), TokenAnnotation::AssignAdjacent);
 }
 
@@ -188,4 +188,128 @@ fn normal_tokens_stay_normal() {
     for (_, ann) in &a {
         assert_eq!(*ann, TokenAnnotation::Normal);
     }
+}
+
+// --- Language-gated annotation tests ---
+
+#[test]
+fn postfix_star_c_languages() {
+    // C, C++, C# use postfix * for pointer types
+    assert_eq!(
+        ann_at(&annotate_lang("Config*", MacroLang::C), 1),
+        TokenAnnotation::PostfixStar
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("Config*", MacroLang::Cpp), 1),
+        TokenAnnotation::PostfixStar
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("int*", MacroLang::CSharp), 1),
+        TokenAnnotation::PostfixStar
+    );
+}
+
+#[test]
+fn postfix_star_not_in_other_languages() {
+    assert_eq!(
+        ann_at(&annotate_lang("Config*", MacroLang::Go), 1),
+        TokenAnnotation::Normal
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("Config*", MacroLang::Ruby), 1),
+        TokenAnnotation::Normal
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("Config*", MacroLang::Bash), 1),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
+fn postfix_ampersand_cpp_only() {
+    assert_eq!(
+        ann_at(&annotate_lang("auto&", MacroLang::Cpp), 1),
+        TokenAnnotation::PostfixAmpersand
+    );
+}
+
+#[test]
+fn postfix_ampersand_not_in_other_languages() {
+    // C has no references, & is address-of (prefix)
+    assert_eq!(
+        ann_at(&annotate_lang("auto&", MacroLang::C), 1),
+        TokenAnnotation::Normal
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("auto&", MacroLang::Go), 1),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
+fn postfix_question_nullable_languages() {
+    assert_eq!(
+        ann_at(&annotate_lang("Int?", MacroLang::CSharp), 1),
+        TokenAnnotation::PostfixQuestion
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("string?", MacroLang::TypeScript), 1),
+        TokenAnnotation::PostfixQuestion
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("Int?", MacroLang::Swift), 1),
+        TokenAnnotation::PostfixQuestion
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("Int?", MacroLang::Kotlin), 1),
+        TokenAnnotation::PostfixQuestion
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("int?", MacroLang::Dart), 1),
+        TokenAnnotation::PostfixQuestion
+    );
+}
+
+#[test]
+fn postfix_question_not_in_other_languages() {
+    assert_eq!(
+        ann_at(&annotate_lang("foo?", MacroLang::Ruby), 1),
+        TokenAnnotation::Normal
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("x?", MacroLang::Php), 1),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
+fn assign_adjacent_shell_only() {
+    assert_eq!(
+        ann_at(&annotate_lang("NAME=val", MacroLang::Bash), 1),
+        TokenAnnotation::AssignAdjacent
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("NAME=val", MacroLang::Zsh), 1),
+        TokenAnnotation::AssignAdjacent
+    );
+}
+
+#[test]
+fn assign_adjacent_not_in_non_shell() {
+    assert_eq!(
+        ann_at(&annotate_lang("x=5", MacroLang::Go), 1),
+        TokenAnnotation::Normal
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("x=5", MacroLang::C), 1),
+        TokenAnnotation::Normal
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("x=5", MacroLang::Cpp), 1),
+        TokenAnnotation::Normal
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("x=5", MacroLang::Unaware), 1),
+        TokenAnnotation::Normal
+    );
 }
