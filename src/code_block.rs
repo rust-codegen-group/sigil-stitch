@@ -197,6 +197,30 @@ impl CodeBlock {
         check_last(&self.nodes)
     }
 
+    /// Remove one trailing newline from this block.
+    ///
+    /// This is used by `sigil_quote!` for inline meta-splices (`$for`/`$if`
+    /// inside expressions). Statement bodies naturally emit a final newline,
+    /// but expression splices must not leak that newline before `]`, `)`, `}`,
+    /// or `;` in the surrounding expression.
+    #[doc(hidden)]
+    pub fn __sigil_trim_trailing_newline(mut self) -> Self {
+        fn trim(nodes: &mut Vec<CodeNode>) -> bool {
+            match nodes.last_mut() {
+                Some(CodeNode::Newline) => {
+                    nodes.pop();
+                    true
+                }
+                Some(CodeNode::Sequence(children)) => trim(children),
+                Some(CodeNode::Nested(inner)) => trim(&mut inner.nodes),
+                _ => false,
+            }
+        }
+
+        trim(&mut self.nodes);
+        self
+    }
+
     /// Collect all import references from this code block.
     pub fn collect_imports(&self, out: &mut Vec<ImportRef>) {
         crate::import_collector::walk_nodes(&self.nodes, out);

@@ -19,6 +19,8 @@ pub(super) enum PrevTokenKind {
     Specifier,
     /// `%W` soft-break — already provides a space, so suppress `maybe_space`.
     SoftBreak,
+    /// Inline `$for`/`$if` parsed splice emitted as `%L`.
+    ParsedSplice,
     /// `$$` literal dollar — suppress space after it so `$$1` renders as `$1`.
     DollarLiteral,
 }
@@ -155,7 +157,7 @@ pub(super) fn maybe_space(
     // No space before a group when preceded by a specifier ($T, $N, etc.)
     // — handles `$T(x){}` struct literals and `$T(x)()` calls.
     if let PrevTokenKind::GroupOpen = current
-        && prev == PrevTokenKind::Specifier
+        && matches!(prev, PrevTokenKind::Specifier | PrevTokenKind::ParsedSplice)
     {
         return;
     }

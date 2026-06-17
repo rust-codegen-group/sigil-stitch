@@ -220,6 +220,11 @@ impl CompileError {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn message(&self) -> &str {
+        &self.message
+    }
+
     /// Convert to a `compile_error!()` token stream.
     pub fn into_compile_error(self) -> TokenStream {
         let msg = &self.message;

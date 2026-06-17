@@ -1,23 +1,35 @@
 pub use sigil_stitch::code_block::{CodeBlock, NameArg, StringLitArg};
 pub use sigil_stitch::import_collector;
+pub use sigil_stitch::lang::bash::Bash;
 pub use sigil_stitch::lang::c::C;
 pub use sigil_stitch::lang::cpp::Cpp;
 pub use sigil_stitch::lang::csharp::CSharp;
 pub use sigil_stitch::lang::dart::Dart;
 pub use sigil_stitch::lang::haskell::Haskell;
 pub use sigil_stitch::lang::java::Java;
+pub use sigil_stitch::lang::javascript::JavaScript;
 pub use sigil_stitch::lang::kotlin::Kotlin;
 pub use sigil_stitch::lang::lua::Lua;
 pub use sigil_stitch::lang::ocaml::OCaml;
+pub use sigil_stitch::lang::php::Php;
+pub use sigil_stitch::lang::ruby::Ruby;
 pub use sigil_stitch::lang::scala::Scala;
 pub use sigil_stitch::lang::swift::Swift;
+pub use sigil_stitch::lang::zsh::Zsh;
 pub use sigil_stitch::prelude::*;
 pub use sigil_stitch::spec::file_spec::FileSpec;
 pub use sigil_stitch::type_name::TypeName;
 
 pub fn render_js(block: &CodeBlock) -> String {
-    use sigil_stitch::lang::javascript::JavaScript;
     let file = FileSpec::builder_with("test.js", JavaScript::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
+pub fn render_bash(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.sh", Bash::new())
         .add_code(block.clone())
         .build()
         .unwrap();
@@ -120,6 +132,22 @@ pub fn render_lua(block: &CodeBlock) -> String {
     file.render(80).unwrap()
 }
 
+pub fn render_php(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.php", Php::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
+pub fn render_rb(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.rb", Ruby::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
 pub fn render_swift(block: &CodeBlock) -> String {
     let file = FileSpec::builder_with("test.swift", Swift::new())
         .add_code(block.clone())
@@ -138,6 +166,14 @@ pub fn render_dart(block: &CodeBlock) -> String {
 
 pub fn render_scala(block: &CodeBlock) -> String {
     let file = FileSpec::builder_with("test.scala", Scala::new())
+        .add_code(block.clone())
+        .build()
+        .unwrap();
+    file.render(80).unwrap()
+}
+
+pub fn render_zsh(block: &CodeBlock) -> String {
+    let file = FileSpec::builder_with("test.zsh", Zsh::new())
         .add_code(block.clone())
         .build()
         .unwrap();

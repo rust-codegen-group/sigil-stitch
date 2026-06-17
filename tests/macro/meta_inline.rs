@@ -254,12 +254,7 @@ fn test_inline_for_ts_array_exact() {
     })
     .unwrap();
     let output = render_ts(&block);
-    assert!(output.contains("const x = ["), "got: {output}");
-    assert!(output.contains("'a'"), "got: {output}");
-    assert!(output.contains("];"), "got: {output}");
-    // No stray block braces
-    assert!(!output.contains('{'), "got: {output}");
-    assert!(!output.contains('}'), "got: {output}");
+    assert_eq!(output, "const x = ['a'];\n");
 }
 
 #[test]
@@ -270,9 +265,182 @@ fn test_inline_if_function_call_exact() {
     })
     .unwrap();
     let output = render_ts(&block);
-    assert!(output.contains("foo("), "got: {output}");
-    assert!(output.contains("\"active\""), "got: {output}");
-    assert!(output.contains(");"), "got: {output}");
-    // No stray block braces
-    assert!(!output.contains('{'), "got: {output}");
+    assert_eq!(output, "foo(\"active\");\n");
 }
+
+#[test]
+fn test_inline_for_python_multiline_list_exact() {
+    let items = vec!["a", "b"];
+    let block = sigil_quote!(Python {
+        x = [
+            $for(item in &items) { $S(*item), }
+        ]
+    })
+    .unwrap();
+    let output = render_py(&block);
+    assert_eq!(output, "x = ['a',\n'b',]\n");
+}
+
+#[test]
+fn test_inline_if_ts_object_literal_exact() {
+    let enabled = true;
+    let block = sigil_quote!(TypeScript {
+        const obj = { enabled: $if(enabled) { true } $else { false } };
+    })
+    .unwrap();
+    let output = render_ts(&block);
+    assert_eq!(output, "const obj = {enabled: true};\n");
+}
+
+#[test]
+fn test_inline_if_ruby_hash_literal_preserves_braces() {
+    let enabled = false;
+    let block = sigil_quote!(Ruby {
+        config = { enabled: $if(enabled) { true } $else { false } }
+    })
+    .unwrap();
+    let output = render_rb(&block);
+    assert_eq!(output, "config = {enabled: false}\n");
+}
+
+#[test]
+fn test_inline_if_php_array_literal_preserves_brackets() {
+    let enabled = true;
+    let block = sigil_quote!(Php {
+        $$config = ["enabled" => $if(enabled) { true } $else { false }];
+    })
+    .unwrap();
+    let output = render_php(&block);
+    assert_eq!(output, "$config = [\"enabled\" => true];\n");
+}
+
+#[test]
+fn test_inline_if_lua_table_literal_preserves_braces() {
+    let enabled = true;
+    let block = sigil_quote!(Lua {
+        config = { enabled = $if(enabled) { true } $else { false } }
+    })
+    .unwrap();
+    let output = render_lua(&block);
+    assert_eq!(output, "config = {enabled = true}\n");
+}
+
+macro_rules! assert_multiline_paren_close_not_restored_for_plain_specifier {
+    ($test_name:ident, $lang:ident, $render:ident) => {
+        #[test]
+        fn $test_name() {
+            let block = sigil_quote!($lang {
+                call(
+                    $S("x")
+                )
+            })
+            .unwrap();
+            let output = $render(&block);
+            assert!(
+                !output.contains("\n)"),
+                "plain specifier should not restore a newline before `)`, got:\n{output}"
+            );
+        }
+    };
+}
+
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_bash,
+    Bash,
+    render_bash
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_c,
+    C,
+    render_c
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_cpp,
+    Cpp,
+    render_cpp
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_csharp,
+    CSharp,
+    render_cs
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_dart,
+    Dart,
+    render_dart
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_go,
+    Go,
+    render_go
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_haskell,
+    Haskell,
+    render_hs
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_java,
+    Java,
+    render_java
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_javascript,
+    JavaScript,
+    render_js
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_kotlin,
+    Kotlin,
+    render_kt
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_lua,
+    Lua,
+    render_lua
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_ocaml,
+    OCaml,
+    render_ml
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_php,
+    Php,
+    render_php
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_python,
+    Python,
+    render_py
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_ruby,
+    Ruby,
+    render_rb
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_rust,
+    Rust,
+    render_rs
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_scala,
+    Scala,
+    render_scala
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_swift,
+    Swift,
+    render_swift
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_typescript,
+    TypeScript,
+    render_ts
+);
+assert_multiline_paren_close_not_restored_for_plain_specifier!(
+    test_plain_specifier_multiline_paren_zsh,
+    Zsh,
+    render_zsh
+);

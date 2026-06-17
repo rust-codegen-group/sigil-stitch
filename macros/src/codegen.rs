@@ -290,7 +290,7 @@ fn build_args_tuple(args: &[TypedArg]) -> TokenStream {
                                 let mut __sigil_builder =
                                     ::sigil_stitch::code_block::CodeBlock::builder();
                                 #(#body_calls)*
-                                __sigil_builder.build().unwrap()
+                                __sigil_builder.build().unwrap().__sigil_trim_trailing_newline()
                             }
                         }
                     }

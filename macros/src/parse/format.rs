@@ -176,7 +176,7 @@ fn tokens_to_format_inner(
                     );
                 }
                 format.push_str("%L");
-                state.prev = PrevTokenKind::Specifier;
+                state.prev = PrevTokenKind::ParsedSplice;
                 let end = tokens[after_for - 1].span().end();
                 state.prev_specifier_end = Some((end.line, end.column));
 
@@ -214,7 +214,7 @@ fn tokens_to_format_inner(
                     );
                 }
                 format.push_str("%L");
-                state.prev = PrevTokenKind::Specifier;
+                state.prev = PrevTokenKind::ParsedSplice;
                 let end = tokens[after_if - 1].span().end();
                 state.prev_specifier_end = Some((end.line, end.column));
 
@@ -602,6 +602,20 @@ fn tokens_to_format_inner(
                 }
                 let inner_annotations = annotate_tokens(&inner, lang);
                 tokens_to_format_inner(&inner, &inner_annotations, format, args, state, lang)?;
+
+                if g.delimiter() == Delimiter::Parenthesis
+                    && let Some(last) = inner.last()
+                {
+                    let last_line = last.span().end().line;
+                    let close_line = g.span().end().line;
+                    if close_line > last_line
+                        && state.prev == PrevTokenKind::ParsedSplice
+                        && !format.ends_with('\n')
+                    {
+                        format.push('\n');
+                        state.prev = PrevTokenKind::None;
+                    }
+                }
 
                 state.colon_ctx = saved_ctx;
                 if add_bracket_spaces {

@@ -24,6 +24,15 @@ fn fmt_with_args(src: &str) -> (String, Vec<InterpolationKind>) {
     (format, kinds)
 }
 
+fn fmt_err(src: &str) -> String {
+    let ts: TokenStream = src.parse().unwrap();
+    let tokens: Vec<TokenTree> = ts.into_iter().collect();
+    match tokens_to_format(&tokens, MacroLang::Unaware) {
+        Ok(_) => panic!("expected error for {src}"),
+        Err(err) => err.message().to_string(),
+    }
+}
+
 #[test]
 fn simple_assignment() {
     assert_eq!(fmt("const x = 42"), "const x = 42");
@@ -230,6 +239,33 @@ fn inline_let_rejected() {
     let tokens: Vec<TokenTree> = ts.into_iter().collect();
     let result = tokens_to_format(&tokens, MacroLang::Unaware);
     assert!(result.is_err());
+}
+
+#[test]
+fn inline_c_each_rejected() {
+    let message = fmt_err("($C_each(blocks))");
+    assert!(
+        message.contains("$C_each() must appear at the start of a line"),
+        "got: {message}"
+    );
+}
+
+#[test]
+fn inline_for_missing_body_rejected() {
+    let message = fmt_err("($for(x in items))");
+    assert!(
+        message.contains("$for requires a brace body"),
+        "got: {message}"
+    );
+}
+
+#[test]
+fn inline_if_empty_condition_rejected() {
+    let message = fmt_err("($if() { body })");
+    assert!(
+        message.contains("$if condition cannot be empty"),
+        "got: {message}"
+    );
 }
 
 #[test]
