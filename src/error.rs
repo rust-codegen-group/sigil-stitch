@@ -43,6 +43,18 @@ pub enum SigilStitchError {
         depth: i32,
     },
 
+    /// A structural indentation marker reached output as raw literal text.
+    #[snafu(display(
+        "unresolved indentation marker '{marker}' in {context}. \
+         Pass structured fragments as CodeBlock/CodeFragment instead of raw %L text."
+    ))]
+    UnresolvedIndentMarker {
+        /// The unresolved marker, e.g. `%>` or `%<`.
+        marker: String,
+        /// Where the marker was found.
+        context: String,
+    },
+
     /// Error during code rendering.
     #[snafu(display("{context}: {message}"))]
     Render {

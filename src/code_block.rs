@@ -161,6 +161,33 @@ pub struct CodeBlock {
     pub(crate) nodes: Vec<CodeNode>,
 }
 
+/// A parsed, composable code fragment.
+///
+/// `CodeFragment` is for snippets that should preserve sigil-stitch structure
+/// such as `%>` / `%<` indentation markers. Raw `&str` / `String` values passed
+/// through `%L` remain literal text; use `CodeFragment::of(...)` when a fragment
+/// contains format markers that must compose structurally inside another block.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CodeFragment {
+    block: CodeBlock,
+}
+
+impl CodeFragment {
+    /// Parse a format string and arguments into a composable fragment.
+    pub fn of(format: &str, args: impl IntoArgs) -> Result<Self, crate::error::SigilStitchError> {
+        Ok(Self {
+            block: CodeBlock {
+                nodes: format_to_nodes(format, args.into_args())?,
+            },
+        })
+    }
+
+    /// Convert this fragment into a `CodeBlock`.
+    pub fn into_code_block(self) -> CodeBlock {
+        self.block
+    }
+}
+
 impl CodeBlock {
     /// Create a new CodeBlockBuilder.
     pub fn builder() -> CodeBlockBuilder {
@@ -182,6 +209,14 @@ impl CodeBlock {
     /// Check if this code block is empty.
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
+    }
+
+    /// Create a parsed fragment from a single format string and arguments.
+    pub fn fragment(
+        format: &str,
+        args: impl IntoArgs,
+    ) -> Result<CodeFragment, crate::error::SigilStitchError> {
+        CodeFragment::of(format, args)
     }
 
     /// Check if this code block ends with a newline or block close.
@@ -284,50 +319,13 @@ impl CodeBlockBuilder {
 
     /// Add a formatted code fragment.
     pub fn add(&mut self, format: &str, args: impl IntoArgs) -> &mut Self {
-        let arg_vec = args.into_args();
-        let parsed = match parse_format(format) {
-            Ok(parts) => parts,
+        let new_nodes = match format_to_nodes(format, args.into_args()) {
+            Ok(nodes) => nodes,
             Err(err) => {
                 self.errors.push(err);
                 return self;
             }
         };
-
-        let consuming_specifiers: Vec<String> = parsed
-            .iter()
-            .filter_map(|p| match p {
-                FormatPart::Arg(s) => Some(format!("%{}", s.format_char())),
-                _ => None,
-            })
-            .collect();
-
-        let expected_args = consuming_specifiers.len();
-
-        if expected_args != arg_vec.len() {
-            let actual_arg_kinds: Vec<String> = arg_vec
-                .iter()
-                .map(|a| match a {
-                    Arg::TypeName(_) => "TypeName".to_string(),
-                    Arg::Name(_) => "Name".to_string(),
-                    Arg::StringLit(_) => "StringLit".to_string(),
-                    Arg::VerbatimStr(_) => "VerbatimStr".to_string(),
-                    Arg::Literal(_) => "Literal".to_string(),
-                    Arg::Code(_) => "Code".to_string(),
-                    Arg::Comment(_) => "Comment".to_string(),
-                })
-                .collect();
-            self.errors
-                .push(crate::error::SigilStitchError::FormatArgCount {
-                    format: format.to_string(),
-                    expected: expected_args,
-                    actual: arg_vec.len(),
-                    expected_specifiers: consuming_specifiers,
-                    actual_arg_kinds,
-                });
-            return self;
-        }
-
-        let new_nodes = parts_args_to_nodes(&parsed, &arg_vec);
         self.nodes.extend(new_nodes);
         self
     }
@@ -444,6 +442,11 @@ impl CodeBlockBuilder {
         self
     }
 
+    /// Add a parsed fragment inline.
+    pub fn add_fragment(&mut self, fragment: CodeFragment) -> &mut Self {
+        self.add_code(fragment.into_code_block())
+    }
+
     /// Build the immutable CodeBlock.
     ///
     /// Returns an error if any format string had an argument count mismatch,
@@ -458,6 +461,7 @@ impl CodeBlockBuilder {
                 depth: self.indent_depth,
             });
         }
+        validate_no_unresolved_indent_markers(&self.nodes)?;
         Ok(CodeBlock { nodes: self.nodes })
     }
 
@@ -470,6 +474,76 @@ impl CodeBlockBuilder {
 impl Default for CodeBlockBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn format_to_nodes(
+    format: &str,
+    args: Vec<Arg>,
+) -> Result<Vec<CodeNode>, crate::error::SigilStitchError> {
+    let parsed = parse_format(format)?;
+    let consuming_specifiers: Vec<String> = parsed
+        .iter()
+        .filter_map(|p| match p {
+            FormatPart::Arg(s) => Some(format!("%{}", s.format_char())),
+            _ => None,
+        })
+        .collect();
+
+    let expected_args = consuming_specifiers.len();
+
+    if expected_args != args.len() {
+        let actual_arg_kinds: Vec<String> = args.iter().map(arg_kind_name).collect();
+        return Err(crate::error::SigilStitchError::FormatArgCount {
+            format: format.to_string(),
+            expected: expected_args,
+            actual: args.len(),
+            expected_specifiers: consuming_specifiers,
+            actual_arg_kinds,
+        });
+    }
+
+    let nodes = parts_args_to_nodes(&parsed, &args);
+    validate_no_unresolved_indent_markers(&nodes)?;
+    Ok(nodes)
+}
+
+pub(crate) fn validate_no_unresolved_indent_markers(
+    nodes: &[CodeNode],
+) -> Result<(), crate::error::SigilStitchError> {
+    fn check_text(text: &str, context: &str) -> Result<(), crate::error::SigilStitchError> {
+        for marker in ["%>", "%<"] {
+            if text.contains(marker) {
+                return Err(crate::error::SigilStitchError::UnresolvedIndentMarker {
+                    marker: marker.to_string(),
+                    context: context.to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    for node in nodes {
+        match node {
+            CodeNode::Literal(text) => check_text(text, "format literal")?,
+            CodeNode::InlineLiteral(text) => check_text(text, "%L literal")?,
+            CodeNode::Nested(block) => validate_no_unresolved_indent_markers(&block.nodes)?,
+            CodeNode::Sequence(children) => validate_no_unresolved_indent_markers(children)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn arg_kind_name(arg: &Arg) -> String {
+    match arg {
+        Arg::TypeName(_) => "TypeName".to_string(),
+        Arg::Name(_) => "Name".to_string(),
+        Arg::StringLit(_) => "StringLit".to_string(),
+        Arg::VerbatimStr(_) => "VerbatimStr".to_string(),
+        Arg::Literal(_) => "Literal".to_string(),
+        Arg::Code(_) => "Code".to_string(),
+        Arg::Comment(_) => "Comment".to_string(),
     }
 }
 
@@ -574,6 +648,13 @@ impl IntoArgs for String {
 impl IntoArgs for CodeBlock {
     fn into_args(self) -> Vec<Arg> {
         vec![Arg::Code(self)]
+    }
+}
+
+/// Single parsed fragment arg.
+impl IntoArgs for CodeFragment {
+    fn into_args(self) -> Vec<Arg> {
+        vec![Arg::Code(self.into_code_block())]
     }
 }
 
@@ -697,6 +778,12 @@ impl From<CodeBlock> for Arg {
     }
 }
 
+impl From<CodeFragment> for Arg {
+    fn from(fragment: CodeFragment) -> Self {
+        Arg::Code(fragment.into_code_block())
+    }
+}
+
 impl From<NameArg> for Arg {
     fn from(n: NameArg) -> Self {
         Arg::Name(n.0)
@@ -747,6 +834,7 @@ impl_into_args_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H);
 mod tests {
     use super::*;
     use crate::code_node::CodeNode;
+    use crate::lang::typescript::TypeScript;
 
     #[test]
     fn test_parse_all_specifiers() {
@@ -863,6 +951,54 @@ mod tests {
         let args: Vec<Arg> = "hello".into_args();
         assert_eq!(args.len(), 1);
         assert!(matches!(&args[0], Arg::Literal(s) if s == "hello"));
+    }
+
+    #[test]
+    fn test_raw_literal_rejects_unresolved_indent_marker() {
+        let result = CodeBlock::of("%L", "%>");
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("unresolved indentation marker '%>'"));
+        assert!(err_msg.contains("CodeBlock/CodeFragment"));
+    }
+
+    #[test]
+    fn test_raw_literal_rejects_unresolved_dedent_marker() {
+        let result = CodeBlock::of("%L", "%<");
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("unresolved indentation marker '%<'"));
+    }
+
+    #[test]
+    fn test_fragment_composes_indent_markers_structurally() {
+        let fragment = CodeFragment::of("%>nested%<", ()).unwrap();
+        let mut b = CodeBlock::builder();
+        b.add("outer\n", ());
+        b.add_fragment(fragment);
+        let block = b.build().unwrap();
+
+        let output = block.render_standalone(&TypeScript::new(), 80).unwrap();
+        assert_eq!(output, "outer\n  nested");
+    }
+
+    #[test]
+    fn test_fragment_can_be_passed_to_percent_l() {
+        let fragment = CodeFragment::of("%>nested%<", ()).unwrap();
+        let block = CodeBlock::of("outer\n%L", fragment).unwrap();
+
+        let output = block.render_standalone(&TypeScript::new(), 80).unwrap();
+        assert_eq!(output, "outer\n  nested");
+    }
+
+    #[test]
+    fn test_ordinary_percent_text_stays_raw() {
+        let block = CodeBlock::of("progress = %L", "100%").unwrap();
+
+        let output = block.render_standalone(&TypeScript::new(), 80).unwrap();
+        assert_eq!(output, "progress = 100%");
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::code_block::{CodeBlock, CodeFragment};
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
@@ -107,5 +107,37 @@ fn test_multiline_paren_union_type() {
     assert!(
         output.contains("\n)"),
         "newline before ) missing, got:\n{output}"
+    );
+}
+
+#[test]
+fn test_code_fragment_composes_python_indentation() {
+    let fragment = CodeFragment::of("if enabled:\n%>return value%<", ()).unwrap();
+    let block = sigil_quote!(Python {
+        def choose(enabled: bool, value: str) -> str: {
+            $L(fragment)
+            return "fallback"
+        }
+    })
+    .unwrap();
+
+    let output = render(&block);
+    assert!(
+        output.contains("def choose(enabled: bool, value: str) -> str:\n    if enabled:\n        return value\n    return \"fallback\""),
+        "fragment indentation should compose structurally, got:\n{output}"
+    );
+    assert!(!output.contains("%>"), "indent marker leaked:\n{output}");
+    assert!(!output.contains("%<"), "dedent marker leaked:\n{output}");
+}
+
+#[test]
+fn test_raw_python_literal_rejects_unresolved_indent_marker() {
+    let result = CodeBlock::of("%L", "if enabled:\n%>return value\n%<");
+
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("unresolved indentation marker '%>'"),
+        "got: {err_msg}"
     );
 }

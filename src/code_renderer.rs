@@ -1,6 +1,6 @@
 use pretty::BoxDoc;
 
-use crate::code_block::CodeBlock;
+use crate::code_block::{CodeBlock, validate_no_unresolved_indent_markers};
 use crate::code_node::CodeNode;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
@@ -41,6 +41,7 @@ impl<'a> CodeRenderer<'a> {
     pub fn render(&mut self, block: &CodeBlock) -> Result<String, SigilStitchError> {
         let mut nodes = block.nodes.clone();
         self.lang.rewrite_nodes(&mut nodes);
+        validate_no_unresolved_indent_markers(&nodes)?;
         self.render_nodes(&nodes)?;
         Ok(std::mem::take(&mut self.output))
     }
