@@ -11,7 +11,7 @@
 | `%S` | String | `StringLitArg` | Emit escaped string literal |
 | `%V` | Verbatim | `VerbatimStrArg` | Emit string with interpolation preserved |
 | `%R` | Remark | `CommentArg` | Emit inline comment |
-| `%L` | Literal | `&str`, `String`, `CodeBlock` | Emit raw value or nested block |
+| `%L` | Literal | `&str`, `String`, `CodeBlock`, `CodeFragment` | Emit raw value or nested block/fragment |
 | `%W` | Wrap | (none) | Soft line break point |
 | `%>` | Indent | (none) | Increase indent level |
 | `%<` | Dedent | (none) | Decrease indent level |
@@ -274,15 +274,17 @@ let block = sigil_quote!(Bash {
 
 If the expression is not a string literal (e.g. `$V(my_var)` or `$L(format!(...))`), `@{...}` processing is skipped and the expression is used as-is.
 
-## `%L` -- Literal
+## `%L` -- Literal and Nested Code
 
-Emits a raw value with no transformation. This is the default for bare `&str` and `String` arguments, so no wrapper is needed. Also accepts `CodeBlock` for embedding nested blocks. Supports `@{expr}` interpolation inside string literals (see above).
-
-Emits a raw value with no transformation. This is the default for bare `&str` and `String` arguments, so no wrapper is needed. Also accepts `CodeBlock` for embedding nested blocks.
+Emits raw literal text or structured nested code. Bare `&str` and `String`
+arguments map to raw `Arg::Literal`, so no wrapper is needed for ordinary
+language text. `%L` also accepts `CodeBlock` and `CodeFragment` for nested code
+that should keep imports, indentation, and other structure. Supports `@{expr}`
+interpolation inside string literals in `sigil_quote!` (see above).
 
 ```rust
 # extern crate sigil_stitch;
-# use sigil_stitch::code_block::CodeBlock;
+# use sigil_stitch::code_block::{CodeBlock, CodeFragment};
 # use sigil_stitch::prelude::*;
 # fn main() {
 let mut cb = CodeBlock::builder();
@@ -294,11 +296,29 @@ cb.add_statement("const count = %L", "42");
 let inner = CodeBlock::of("getValue()", ()).unwrap();
 cb.add_statement("const x = %L", inner);
 
+// Parsed CodeFragment -> Arg::Code -> structural markers compose
+let branch = CodeFragment::of("if (ready) {\n%>return true;%<\n}", ()).unwrap();
+cb.add("%L", branch);
+
 let block = cb.build().unwrap();
 // const count = 42;
 // const x = getValue();
+// if (ready) {
+//   return true;
+// }
 # }
 ```
+
+Raw literal strings are intentionally not reparsed as format strings. If a raw
+`&str` / `String` passed through `%L` contains `%>` or `%<`, `build()` returns an
+`UnresolvedIndentMarker` error instead of rendering those markers literally. Use
+`CodeFragment::of(...)` for snippets that contain structural markers.
+
+`CodeFragment` snippets must balance their own `%>` / `%<` markers. A fragment
+with `%>` and no matching `%<` is rejected because it would leak indentation into
+whatever code is rendered after it. If you need indentation to span multiple
+builder calls, use `CodeBlock::builder()` and balance the markers before
+`build()`.
 
 ## `%W` -- Soft Line Break
 
@@ -389,7 +409,7 @@ let block = CodeBlock::of("progress: 100%%", ()).unwrap();
 
 ## Arguments and the `IntoArgs` Trait
 
-Every method that accepts a format string (`add`, `add_statement`, `begin_control_flow`, `next_control_flow`, `CodeBlock::of`) takes `args: impl IntoArgs`. This trait converts Rust values into `Vec<Arg>` for the format engine.
+Every method that accepts a format string (`add`, `add_statement`, `begin_control_flow`, `next_control_flow`, `CodeBlock::of`, `CodeFragment::of`) takes `args: impl IntoArgs`. This trait converts Rust values into `Vec<Arg>` for the format engine.
 
 The critical rule: **bare strings map to `Arg::Literal`** (consumed by `%L`), not to `Arg::Name` or `Arg::StringLit`. To target `%N` or `%S`, use the `NameArg` and `StringLitArg` wrappers from `sigil_stitch::code_block`.
 
@@ -402,6 +422,7 @@ The critical rule: **bare strings map to `Arg::Literal`** (consumed by `%L`), no
 | `&str` | `Arg::Literal` | `%L` |
 | `String` | `Arg::Literal` | `%L` |
 | `CodeBlock` | `Arg::Code` | `%L` |
+| `CodeFragment` | `Arg::Code` | `%L` |
 | `NameArg(String)` | `Arg::Name` | `%N` |
 | `StringLitArg(String)` | `Arg::StringLit` | `%S` |
 | `VerbatimStrArg(String)` | `Arg::VerbatimStr` | `%V` |

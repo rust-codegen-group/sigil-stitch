@@ -38,7 +38,7 @@ It returns `Result<CodeBlock, SigilStitchError>`.
 | `$N(expr)` | `%N` | `impl ToString` | Name identifier |
 | `$S(expr)` | `%S` | `impl ToString` | String literal (quoted in output) |
 | `$V(expr)` | `%V` | `impl ToString` | Verbatim string (interpolation preserved) |
-| `$L(expr)` | `%L` | `impl Into<Arg>` | Literal value or nested code |
+| `$L(expr)` | `%L` | `impl Into<Arg>` | Literal value, nested code, or parsed fragment |
 | `$C(expr)` | `%L` | `CodeBlock` | Nested code block |
 | `$W` | `%W` | (none) | Soft line-break point |
 | `$>` | `%>` | (none) | Increase indent level |
@@ -176,6 +176,43 @@ let block = sigil_quote!(TypeScript {
 // Output: const count = 0;
 # }
 ```
+
+`$L` can also splice structured code via `CodeBlock` or `CodeFragment`. Use
+`CodeFragment` when the snippet contains format markers such as `%>` / `%<` and
+must carry indentation state instead of rendering those markers as text:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::python::Python;
+# use sigil_stitch::spec::file_spec::FileSpec;
+# fn main() {
+let early_return = CodeFragment::of("if enabled:\n%>return value%<", ()).unwrap();
+
+let block = sigil_quote!(Python {
+    def choose(enabled: bool, value: str) -> str: {
+        $L(early_return)
+        return "fallback"
+    }
+}).unwrap();
+
+let output = FileSpec::builder_with("demo.py", Python::new())
+    .add_code(block)
+    .build()
+    .unwrap()
+    .render(80)
+    .unwrap();
+
+assert!(output.contains("if enabled:\n        return value"));
+# }
+```
+
+Raw strings passed through `$L` are not reparsed. A raw string containing `%>` or
+`%<` fails with `UnresolvedIndentMarker`; wrap that snippet in `CodeFragment::of`
+when the markers are intended to control indentation.
+
+`CodeFragment` must have balanced indentation markers. Write `%>...%<` inside the
+fragment, not `%>...` with the expectation that the caller will dedent later.
 
 ### Nested Code Blocks (`$C`)
 

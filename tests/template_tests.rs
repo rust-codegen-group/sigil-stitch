@@ -1,4 +1,4 @@
-use sigil_stitch::code_block::{CodeBlock, NameArg};
+use sigil_stitch::code_block::{CodeBlock, CodeFragment, NameArg};
 use sigil_stitch::code_template::CodeTemplate;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::type_name::TypeName;
@@ -87,6 +87,30 @@ fn test_template_composition_via_literal() {
 
     assert!(output.contains("function getAnswer()"));
     assert!(output.contains("return 42"));
+}
+
+#[test]
+fn test_template_composition_via_code_fragment() {
+    let body = CodeFragment::of("%>return 42;%<", ()).unwrap();
+    let tmpl = CodeTemplate::new("function #{name:N}() {\n#{body:L}\n}").unwrap();
+
+    let block = tmpl
+        .apply()
+        .set("name", NameArg("getAnswer".into()))
+        .set("body", body)
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder("answer.ts")
+        .add_code(block)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap();
+
+    assert!(output.contains("function getAnswer() {\n  return 42;\n}"));
+    assert!(!output.contains("%>"));
+    assert!(!output.contains("%<"));
 }
 
 // ── RawContentWithImports integration ───────────────────

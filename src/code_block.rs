@@ -175,10 +175,10 @@ pub struct CodeFragment {
 impl CodeFragment {
     /// Parse a format string and arguments into a composable fragment.
     pub fn of(format: &str, args: impl IntoArgs) -> Result<Self, crate::error::SigilStitchError> {
+        let nodes = format_to_nodes(format, args.into_args())?;
+        validate_balanced_indent_markers(&nodes)?;
         Ok(Self {
-            block: CodeBlock {
-                nodes: format_to_nodes(format, args.into_args())?,
-            },
+            block: CodeBlock { nodes },
         })
     }
 
@@ -461,6 +461,7 @@ impl CodeBlockBuilder {
                 depth: self.indent_depth,
             });
         }
+        validate_balanced_indent_markers(&self.nodes)?;
         validate_no_unresolved_indent_markers(&self.nodes)?;
         Ok(CodeBlock { nodes: self.nodes })
     }
@@ -506,6 +507,30 @@ fn format_to_nodes(
     let nodes = parts_args_to_nodes(&parsed, &args);
     validate_no_unresolved_indent_markers(&nodes)?;
     Ok(nodes)
+}
+
+pub(crate) fn validate_balanced_indent_markers(
+    nodes: &[CodeNode],
+) -> Result<(), crate::error::SigilStitchError> {
+    fn walk(nodes: &[CodeNode], depth: &mut i32) -> Result<(), crate::error::SigilStitchError> {
+        for node in nodes {
+            match node {
+                CodeNode::Indent => *depth += 1,
+                CodeNode::Dedent => *depth -= 1,
+                CodeNode::Nested(block) => walk(&block.nodes, depth)?,
+                CodeNode::Sequence(children) => walk(children, depth)?,
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    let mut depth = 0;
+    walk(nodes, &mut depth)?;
+    if depth != 0 {
+        return Err(crate::error::SigilStitchError::UnbalancedIndent { depth });
+    }
+    Ok(())
 }
 
 pub(crate) fn validate_no_unresolved_indent_markers(
@@ -985,12 +1010,80 @@ mod tests {
     }
 
     #[test]
+    fn test_fragment_rejects_unbalanced_indent_marker() {
+        let result = CodeFragment::of("%>nested", ());
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("unbalanced control flow"));
+        assert!(err_msg.contains("indent depth is 1"));
+    }
+
+    #[test]
+    fn test_fragment_rejects_unmatched_dedent_marker() {
+        let result = CodeFragment::of("%<nested", ());
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("unbalanced control flow"));
+        assert!(err_msg.contains("indent depth is -1"));
+    }
+
+    #[test]
+    fn test_builder_allows_incremental_balanced_indent_markers() {
+        let mut b = CodeBlock::builder();
+        b.add("outer\n", ());
+        b.add("%>", ());
+        b.add("nested", ());
+        b.add("%<", ());
+        let block = b.build().unwrap();
+
+        let output = block.render_standalone(&TypeScript::new(), 80).unwrap();
+        assert_eq!(output, "outer\n  nested");
+    }
+
+    #[test]
+    fn test_builder_rejects_unbalanced_parsed_indent_marker_at_build() {
+        let mut b = CodeBlock::builder();
+        b.add("%>", ());
+        let result = b.build();
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("unbalanced control flow"));
+        assert!(err_msg.contains("indent depth is 1"));
+    }
+
+    #[test]
     fn test_fragment_can_be_passed_to_percent_l() {
         let fragment = CodeFragment::of("%>nested%<", ()).unwrap();
         let block = CodeBlock::of("outer\n%L", fragment).unwrap();
 
         let output = block.render_standalone(&TypeScript::new(), 80).unwrap();
         assert_eq!(output, "outer\n  nested");
+    }
+
+    #[test]
+    fn test_fragment_preserves_imports_when_passed_to_percent_l() {
+        let user = TypeName::importable_type("./models", "User");
+        let fragment = CodeFragment::of("const user: %T = loadUser()", (user,)).unwrap();
+        let block = CodeBlock::of("%L", fragment).unwrap();
+
+        let imports = crate::import_collector::collect_imports(&block);
+        assert_eq!(imports.len(), 1);
+        assert_eq!(imports[0].module, "./models");
+        assert_eq!(imports[0].name, "User");
+        assert!(imports[0].is_type_only);
+    }
+
+    #[test]
+    fn test_fragment_accepts_nested_codeblock_arguments() {
+        let inner = CodeBlock::of("compute()", ()).unwrap();
+        let fragment = CodeFragment::of("return %L", inner).unwrap();
+        let block = CodeBlock::of("%L", fragment).unwrap();
+
+        let output = block.render_standalone(&TypeScript::new(), 80).unwrap();
+        assert_eq!(output, "return compute()");
     }
 
     #[test]
