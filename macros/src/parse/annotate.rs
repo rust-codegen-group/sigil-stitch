@@ -344,6 +344,41 @@ pub(super) fn annotate_tokens(tokens: &[TokenTree], lang: MacroLang) -> Vec<Toke
                             }
                         }
 
+                        // Go pointer types use prefix `*T`. Treat `*` as prefix
+                        // when it is span-adjacent to the following type token,
+                        // while preserving binary multiplication (`a*b`, `a * b`).
+                        if ch == '*'
+                            && lang == MacroLang::Go
+                            && i + 1 < tokens.len()
+                            && matches!(&tokens[i + 1], TokenTree::Ident(_) | TokenTree::Group(_))
+                        {
+                            let has_adjacent_expr_left = i > 0 && {
+                                let prev_end = tokens[i - 1].span().end();
+                                let star_start = p.span().start();
+                                prev_end.line == star_start.line
+                                    && prev_end.column == star_start.column
+                                    && match &tokens[i - 1] {
+                                        TokenTree::Ident(id) => {
+                                            let s = id.to_string();
+                                            !CONTROL_FLOW_KEYWORDS.contains(&s.as_str())
+                                                && !DECLARATION_KEYWORDS.contains(&s.as_str())
+                                        }
+                                        TokenTree::Literal(_) => true,
+                                        _ => false,
+                                    }
+                            };
+                            let star_end = p.span().end();
+                            let next_start = tokens[i + 1].span().start();
+                            if star_end.line == next_start.line
+                                && star_end.column == next_start.column
+                                && !has_adjacent_expr_left
+                            {
+                                annotations[i] = TokenAnnotation::PrefixOp;
+                                i += 1;
+                                continue;
+                            }
+                        }
+
                         // PostfixAmpersand: `&` span-adjacent to preceding ident/keyword
                         // (reference type like `auto&`, `int&`). C++ only.
                         if ch == '&'

@@ -126,11 +126,24 @@ pub(crate) enum Statement {
     SpliceEach { expr: TokenStream },
     /// `$if(cond) { ... } $else_if(cond) { ... } $else { ... }` — meta-conditional.
     MetaIf { branches: Vec<MetaBranch> },
-    /// `$for(pat in expr) { ... }` — meta-loop that emits body once per iteration.
+    /// `$for(pat in expr[; separator = expr[, trailing = bool]]) { ... }` —
+    /// meta-loop that emits body once per iteration.
     MetaFor {
         pat: TokenStream,
         iter_expr: TokenStream,
+        separator: Option<TokenStream>,
+        trailing: Option<TokenStream>,
         body: Vec<Statement>,
+    },
+    /// Inline `$for(...) { ... }` splice that emits fragment bodies without
+    /// statement newlines.
+    InlineFor {
+        pat: TokenStream,
+        iter_expr: TokenStream,
+        separator: Option<TokenStream>,
+        trailing: Option<TokenStream>,
+        body_format: String,
+        body_args: Vec<TypedArg>,
     },
     /// `$let(binding);` — Rust-level `let` binding inside macro body.
     MetaLet { binding: TokenStream },

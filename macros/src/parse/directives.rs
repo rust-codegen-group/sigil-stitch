@@ -4,15 +4,48 @@ use super::parse_body;
 use super::types::{CompileError, MacroLang, MetaBranch, Statement};
 use super::util::is_ident;
 
-/// Parse `(pat in expr) { body }` at `paren_pos` (after `$for` confirmed).
+type ForComponents = (
+    usize,
+    TokenStream,
+    TokenStream,
+    Option<TokenStream>,
+    Option<TokenStream>,
+    Vec<Statement>,
+);
+
+type ForRawComponents = (
+    usize,
+    TokenStream,
+    TokenStream,
+    Option<TokenStream>,
+    Option<TokenStream>,
+    Vec<TokenTree>,
+);
+
+/// Parse `(pat in expr[; separator = expr[, trailing = bool]]) { body }` at
+/// `paren_pos` (after `$for` confirmed).
 ///
-/// Returns `(next_pos, pat, iter_expr, body_statements)` where `next_pos`
-/// is the position after the closing `}` group.
+/// Returns `(next_pos, pat, iter_expr, separator, trailing, body_statements)`
+/// where `next_pos` is the position after the closing `}` group.
 pub(super) fn parse_for_components(
     tokens: &[TokenTree],
     paren_pos: usize,
     lang: MacroLang,
-) -> Result<(usize, TokenStream, TokenStream, Vec<Statement>), CompileError> {
+) -> Result<ForComponents, CompileError> {
+    let (next_pos, pat, iter_expr, separator, trailing, body_tokens) =
+        parse_for_raw_components(tokens, paren_pos)?;
+    let body = parse_body(&body_tokens, lang)?;
+
+    Ok((next_pos, pat, iter_expr, separator, trailing, body))
+}
+
+/// Parse `(pat in expr[; separator = expr[, trailing = bool]]) { body }` and
+/// return raw body tokens. Statement-level callers parse the body as statements;
+/// inline callers parse it as a format fragment.
+pub(super) fn parse_for_raw_components(
+    tokens: &[TokenTree],
+    paren_pos: usize,
+) -> Result<ForRawComponents, CompileError> {
     // Bounds checks.
     if paren_pos >= tokens.len() {
         return Err(CompileError::new(
@@ -47,7 +80,8 @@ pub(super) fn parse_for_components(
         }
     };
 
-    // Split paren contents on the first `in` keyword.
+    // Split paren contents on the first `in` keyword, then split loop options
+    // after a top-level `;` so iterator expressions can still contain commas.
     let paren_tokens: Vec<TokenTree> = paren_group.stream().into_iter().collect();
     let in_pos = paren_tokens.iter().position(|tt| is_ident(tt, "in"));
     let in_pos = match in_pos {
@@ -74,12 +108,153 @@ pub(super) fn parse_for_components(
     }
 
     let pat: TokenStream = paren_tokens[..in_pos].iter().cloned().collect();
-    let iter_expr: TokenStream = paren_tokens[in_pos + 1..].iter().cloned().collect();
+    let after_in = &paren_tokens[in_pos + 1..];
+    let options_pos = after_in
+        .iter()
+        .position(|tt| matches!(tt, TokenTree::Punct(p) if p.as_char() == ';'));
+    let (iter_tokens, option_tokens) = match options_pos {
+        Some(pos) => (&after_in[..pos], Some(&after_in[pos + 1..])),
+        None => (after_in, None),
+    };
+
+    let iter_expr: TokenStream = iter_tokens.iter().cloned().collect();
+    if iter_expr.is_empty() {
+        return Err(CompileError::new(
+            paren_group.span(),
+            "$for iterator expression cannot be empty: $for(pat in expr) { ... }",
+        ));
+    }
+
+    let (separator, trailing) = match option_tokens {
+        Some(tokens) => parse_for_options(tokens, paren_group.span())?,
+        None => (None, None),
+    };
 
     let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-    let body = parse_body(&body_tokens, lang)?;
 
-    Ok((paren_pos + 2, pat, iter_expr, body))
+    Ok((
+        paren_pos + 2,
+        pat,
+        iter_expr,
+        separator,
+        trailing,
+        body_tokens,
+    ))
+}
+
+fn parse_for_options(
+    tokens: &[TokenTree],
+    span: proc_macro2::Span,
+) -> Result<(Option<TokenStream>, Option<TokenStream>), CompileError> {
+    if tokens.is_empty() {
+        return Err(CompileError::new(
+            span,
+            "$for options cannot be empty after `;`",
+        ));
+    }
+
+    let mut separator = None;
+    let mut trailing = None;
+
+    for option in split_for_options(tokens) {
+        if option.is_empty() {
+            return Err(CompileError::new(span, "$for option cannot be empty"));
+        }
+
+        let name = match option.first() {
+            Some(TokenTree::Ident(id)) => id.to_string(),
+            Some(tt) => {
+                return Err(CompileError::new(
+                    tt.span(),
+                    "$for options must be named: separator = expr, trailing = bool",
+                ));
+            }
+            None => unreachable!(),
+        };
+
+        let equals_pos = option
+            .iter()
+            .position(|tt| matches!(tt, TokenTree::Punct(p) if p.as_char() == '='));
+        let equals_pos = match equals_pos {
+            Some(pos) => pos,
+            None => {
+                return Err(CompileError::new(
+                    option[0].span(),
+                    "$for options require `=`: separator = expr, trailing = bool",
+                ));
+            }
+        };
+
+        if equals_pos != 1 {
+            return Err(CompileError::new(
+                option[0].span(),
+                "$for option names must be followed by `=`",
+            ));
+        }
+
+        let value: TokenStream = option[equals_pos + 1..].iter().cloned().collect();
+        if value.is_empty() {
+            return Err(CompileError::new(
+                option[0].span(),
+                "$for option value cannot be empty",
+            ));
+        }
+
+        match name.as_str() {
+            "separator" => {
+                if separator.is_some() {
+                    return Err(CompileError::new(
+                        option[0].span(),
+                        "duplicate $for separator option",
+                    ));
+                }
+                separator = Some(value);
+            }
+            "trailing" => {
+                if trailing.is_some() {
+                    return Err(CompileError::new(
+                        option[0].span(),
+                        "duplicate $for trailing option",
+                    ));
+                }
+                trailing = Some(value);
+            }
+            _ => {
+                return Err(CompileError::new(
+                    option[0].span(),
+                    format!("unknown $for option `{name}`. Expected separator or trailing"),
+                ));
+            }
+        }
+    }
+
+    if trailing.is_some() && separator.is_none() {
+        return Err(CompileError::new(
+            span,
+            "$for trailing option requires separator = expr",
+        ));
+    }
+
+    Ok((separator, trailing))
+}
+
+fn split_for_options(tokens: &[TokenTree]) -> Vec<&[TokenTree]> {
+    let mut parts = Vec::new();
+    let mut start = 0;
+    for (i, tt) in tokens.iter().enumerate() {
+        if matches!(tt, TokenTree::Punct(p) if p.as_char() == ',')
+            && starts_for_option(&tokens[i + 1..])
+        {
+            parts.push(&tokens[start..i]);
+            start = i + 1;
+        }
+    }
+    parts.push(&tokens[start..]);
+    parts
+}
+
+fn starts_for_option(tokens: &[TokenTree]) -> bool {
+    matches!(tokens, [TokenTree::Ident(_), TokenTree::Punct(eq), ..] if eq.as_char() == '=')
 }
 
 /// Parse `(cond) { body } [$else_if(cond) { body }]* [$else { body }]`

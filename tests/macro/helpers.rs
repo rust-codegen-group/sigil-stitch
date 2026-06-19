@@ -1,3 +1,4 @@
+pub use sigil_stitch::assert_quote;
 pub use sigil_stitch::code_block::{CodeBlock, NameArg, StringLitArg};
 pub use sigil_stitch::import_collector;
 pub use sigil_stitch::lang::bash::Bash;
@@ -15,6 +16,7 @@ pub use sigil_stitch::lang::php::Php;
 pub use sigil_stitch::lang::ruby::Ruby;
 pub use sigil_stitch::lang::scala::Scala;
 pub use sigil_stitch::lang::swift::Swift;
+pub use sigil_stitch::lang::typescript::TypeScript;
 pub use sigil_stitch::lang::zsh::Zsh;
 pub use sigil_stitch::prelude::*;
 pub use sigil_stitch::spec::file_spec::FileSpec;

@@ -429,6 +429,75 @@ fn test_meta_for_empty_iter() {
     assert!(!output.contains("null"), "got: {output}");
 }
 
+#[test]
+fn test_meta_for_separator_newline() {
+    let names = vec!["alpha", "beta", "gamma"];
+
+    assert_quote!(TypeScript, {
+        $for(name in &names; separator = "\n") {
+            export const $N(*name) = true;
+        }
+    }, "export const alpha = true;\n\nexport const beta = true;\n\nexport const gamma = true;\n");
+}
+
+#[test]
+fn test_meta_for_separator_trailing() {
+    let names = vec!["alpha", "beta"];
+
+    assert_quote!(TypeScript, {
+        const before = 1;
+        $for(name in &names; separator = "\n", trailing = true) {
+            export const $N(*name) = true;
+        }
+        const after = 2;
+    }, "const before = 1;\nexport const alpha = true;\n\nexport const beta = true;\n\nconst after = 2;\n");
+}
+
+#[test]
+fn test_meta_for_separator_compound_expression() {
+    let names = vec!["alpha", "beta"];
+    let prefix = "// next".to_owned();
+    let suffix = "\n";
+
+    let block = sigil_quote!(TypeScript {
+        $for(name in &names; separator = prefix.clone() + suffix) {
+            export const $N(*name) = true;
+        }
+    })
+    .unwrap();
+
+    sigil_stitch::assert_rendered!(
+        TypeScript::new(),
+        block,
+        "export const alpha = true;\n// next\nexport const beta = true;\n",
+    );
+}
+
+#[test]
+fn test_meta_for_separator_comment_between_rows() {
+    let rows = vec![("a", "1"), ("b", "2")];
+    let sep = "// next row\n";
+
+    assert_quote!(TypeScript, {
+        $for((name, value) in &rows; separator = sep) {
+            export const $N(*name) = $L(*value);
+        }
+    }, "export const a = 1;\n// next row\nexport const b = 2;\n");
+}
+
+#[test]
+fn test_meta_for_empty_iter_ignores_trailing_separator() {
+    let names: Vec<&str> = vec![];
+
+    assert_quote!(TypeScript, {
+        const before = 1;
+        $for(name in &names; separator = "\n", trailing = true) {
+            export const $N(*name) = true;
+        }
+        const after = 2;
+    }, "const before = 1;\nconst after = 2;\n");
+}
+
 // --- Real-world pattern: enum variant generation ---
 
 #[test]

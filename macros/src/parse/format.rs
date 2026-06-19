@@ -3,7 +3,7 @@ use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
 use super::annotate::{
     CONTROL_FLOW_KEYWORDS, DECLARATION_KEYWORDS, TokenAnnotation, annotate_tokens,
 };
-use super::directives::{parse_for_components, parse_if_components};
+use super::directives::{parse_for_raw_components, parse_if_components};
 use super::spacing::{ColonContext, PrevTokenKind, SpacingState, maybe_space};
 use super::types::{CompileError, InterpolationKind, MacroLang, Statement, TypedArg};
 use super::util::is_ident;
@@ -43,6 +43,10 @@ fn tokens_to_format_inner(
 ) -> Result<(), CompileError> {
     let mut pos = 0;
     let mut prev_end_line: Option<usize> = None;
+    let base_column = tokens
+        .first()
+        .map(|tt| tt.span().start().column)
+        .unwrap_or(0);
 
     while pos < tokens.len() {
         let tt = &tokens[pos];
@@ -50,11 +54,19 @@ fn tokens_to_format_inner(
         // Detect blank lines via span-location gaps between tokens.
         // Only emit for blank lines (gap >= 2), not consecutive lines.
         // Consecutive line breaks are handled by the statement parser.
-        let tt_line = tt.span().start().line;
-        if let Some(pl) = prev_end_line {
-            let gap = tt_line.saturating_sub(pl).saturating_sub(1);
+        let tt_start = tt.span().start();
+        let tt_line = tt_start.line;
+        if let Some(prev_line) = prev_end_line {
+            let gap = tt_line.saturating_sub(prev_line).saturating_sub(1);
             for _ in 0..gap {
                 format.push('\n');
+                state.prev = PrevTokenKind::None;
+            }
+            if gap == 0 && tt_line > prev_line && starts_inline_for_at(tokens, pos) {
+                format.push('\n');
+                for _ in 0..tt_start.column.saturating_sub(base_column) {
+                    format.push(' ');
+                }
                 state.prev = PrevTokenKind::None;
             }
         }
@@ -165,7 +177,9 @@ fn tokens_to_format_inner(
                         "$for requires a parenthesized pattern: $for(pat in expr) { ... }",
                     ));
                 }
-                let (after_for, pat, iter_expr, body) = parse_for_components(tokens, pos, lang)?;
+                let (after_for, pat, iter_expr, separator, trailing, body_tokens) =
+                    parse_for_raw_components(tokens, pos)?;
+                let (body_format, body_args) = tokens_to_format(&body_tokens, lang)?;
 
                 if !adjacent_to_prev_specifier {
                     maybe_space(
@@ -183,10 +197,13 @@ fn tokens_to_format_inner(
                 args.push(TypedArg {
                     kind: InterpolationKind::ParsedSplice,
                     expr: TokenStream::new(),
-                    parsed_body: Some(vec![Statement::MetaFor {
+                    parsed_body: Some(vec![Statement::InlineFor {
                         pat,
                         iter_expr,
-                        body,
+                        separator,
+                        trailing,
+                        body_format,
+                        body_args,
                     }]),
                 });
                 pos = after_for;
@@ -644,6 +661,12 @@ fn tokens_to_format_inner(
     }
 
     Ok(())
+}
+
+fn starts_inline_for_at(tokens: &[TokenTree], pos: usize) -> bool {
+    pos + 1 < tokens.len()
+        && matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$')
+        && is_ident(&tokens[pos + 1], "for")
 }
 
 /// Split `$join(sep, iter)` arguments on the first top-level comma.

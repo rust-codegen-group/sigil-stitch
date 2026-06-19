@@ -168,6 +168,28 @@ fn go_send_not_prefix() {
 }
 
 #[test]
+fn go_pointer_star_after_field_name() {
+    let a = annotate_lang("Raw *http.Response", MacroLang::Go);
+    assert_eq!(ann_at(&a, 1), TokenAnnotation::PrefixOp);
+}
+
+#[test]
+fn go_compact_star_multiplication_not_prefix() {
+    assert_eq!(
+        ann_at(&annotate_lang("a*b", MacroLang::Go), 1),
+        TokenAnnotation::Normal
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("a*(b+c)", MacroLang::Go), 1),
+        TokenAnnotation::Normal
+    );
+    assert_eq!(
+        ann_at(&annotate_lang("1*2", MacroLang::Go), 1),
+        TokenAnnotation::Normal
+    );
+}
+
+#[test]
 fn ruby_symbol_colon() {
     // space before :, NOT after (:name is adjacent)
     let a = annotate_lang("attr_reader :name", MacroLang::Ruby);

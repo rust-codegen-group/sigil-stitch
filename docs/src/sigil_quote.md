@@ -89,6 +89,7 @@ final newlines are significant.
 | `$T_join(sep, iter)` | `%T` | separator + `impl IntoIterator<Item: TypeName>` | Type name join with per-item import tracking |
 | `$if(cond) { ... }` | — | Rust expression | Meta-conditional (runtime codegen control) |
 | `$for(pat in expr) { ... }` | — | Rust pattern + iterable | Meta-loop (emit body per iteration) |
+| `$for(pat in expr; separator = expr, trailing = bool) { ... }` | — | Rust pattern + iterable + options | Meta-loop with separator control |
 | `$let(binding);` | — | Rust `let` binding | Rust-level variable binding inside macro body |
 | `$join(sep, iter)` | `%L` | separator + `impl IntoIterator<Item: ToString>` | Separator-joined list |
 | `$+` | — | (none) | Line continuation (suppress line-break split) |
@@ -877,6 +878,100 @@ sigil_quote!(TypeScript {
 # }
 ```
 
+### Loop Separators
+
+`$for` can insert a separator between emitted iterations. This is useful when
+each iteration emits a complete chunk and the spacing between chunks should be
+owned by the loop, not repeated inside each body:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let handlers = vec!["createUser", "updateUser"];
+
+sigil_quote!(TypeScript {
+    $for(handler in &handlers; separator = "\n") {
+        export function $N(*handler)() {
+            return runHandler($S(*handler));
+        }
+    }
+})?;
+// Output:
+// export function createUser() {
+//     return runHandler('createUser');
+// }
+//
+// export function updateUser() {
+//     return runHandler('updateUser');
+// }
+# Ok(())
+# }
+```
+
+Inline `$for` acts like a join expression: the surrounding statement layout is
+preserved, and the separator is inserted between inline fragments. This is useful
+when later items need a continuation prefix:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let name = "Pet";
+let members = vec![
+    TypeName::primitive("Cat"),
+    TypeName::primitive("Dog"),
+    TypeName::primitive("null"),
+];
+
+sigil_quote!(TypeScript {
+    export type $N(name) =
+      $for(member in &members; separator = "\n| ") { $T((*member).clone()) };
+})?;
+// Output:
+// export type Pet =
+//   Cat
+// | Dog
+// | null;
+# Ok(())
+# }
+```
+
+Use `trailing = true` only when you really want the same separator after the
+last emitted iteration. Empty loops emit neither separators nor trailing
+separators.
+
+Use `$join(sep, iter)` when each item is just a value that can be converted to
+text. Use inline `$for(...; separator = ...)` when each item is a fragment that
+needs interpolation markers like `$T` / `$N` / `$S`. Use statement `$for` when
+each iteration emits structured code: multiple statements, comments, attributes,
+or nested `$if`.
+
+The separator is a Rust expression. It is converted to a string and inserted via
+`%L`, so `format!(...)` works too. Statement `$for` bodies already emit their
+normal trailing newline, so start a statement-loop separator with text unless you
+intentionally want a blank line:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let rows = vec![("a", "1"), ("b", "2")];
+let sep = "// next row\n";
+
+sigil_quote!(TypeScript {
+    $for((name, value) in &rows; separator = sep) {
+        export const $N(*name) = $L(*value);
+    }
+})?;
+// Output:
+// export const a = 1;
+// // next row
+// export const b = 2;
+# Ok(())
+# }
+```
+
 ### Destructuring Patterns
 
 Any Rust `for` pattern works:
@@ -956,6 +1051,23 @@ let items = vec!["hostname", "platform", "arch"];
 
 sigil_quote!(TypeScript {
     const defaultKeys = [$for(item in &items) { $S(*item), }];
+})?;
+// Output: const defaultKeys = ['hostname', 'platform', 'arch'];
+# Ok(())
+# }
+```
+
+Inline `$for` supports the same separator options, which is useful when the loop
+body is still structured but the result belongs inside a larger expression:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let items = vec!["hostname", "platform", "arch"];
+
+sigil_quote!(TypeScript {
+    const defaultKeys = [$for(item in &items; separator = ", ") { $S(*item) }];
 })?;
 // Output: const defaultKeys = ['hostname', 'platform', 'arch'];
 # Ok(())

@@ -23,6 +23,7 @@ fn main() {
     nested_code_block();
     soft_line_break();
     join_separator();
+    meta_for_separator();
     dollar_escape();
     comment_directive();
     indent_dedent();
@@ -143,6 +144,39 @@ fn join_separator() {
         const keys = [$join(", ", fields)];
     })
     .unwrap();
+    println!("{}", render_ts(&block));
+}
+
+/// `$for(...; separator = ...)` — emit structured bodies with separators.
+fn meta_for_separator() {
+    println!("--- $for: Structured Separator Loop ---\n");
+
+    let handlers = vec!["createUser", "updateUser", "deleteUser"];
+
+    let block = sigil_quote!(TypeScript {
+        $for(handler in &handlers; separator = "\n") {
+            export function $N(*handler)() {
+                return runHandler($S(*handler));
+            }
+        }
+    })
+    .unwrap();
+
+    println!("Blank-line separated generated functions:");
+    println!("{}", render_ts(&block));
+
+    let members = vec![
+        TypeName::primitive("Cat"),
+        TypeName::primitive("Dog"),
+        TypeName::primitive("null"),
+    ];
+    let block = sigil_quote!(TypeScript {
+        export type Pet =
+          $for(member in &members; separator = "\n| ") { $T((*member).clone()) };
+    })
+    .unwrap();
+
+    println!("Inline union members with continuation separators:");
     println!("{}", render_ts(&block));
 }
 

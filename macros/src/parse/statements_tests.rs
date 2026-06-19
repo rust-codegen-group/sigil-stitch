@@ -248,6 +248,7 @@ fn stmt_kind(s: &Statement) -> &'static str {
         Statement::SpliceEach { .. } => "SpliceEach",
         Statement::MetaIf { .. } => "MetaIf",
         Statement::MetaFor { .. } => "MetaFor",
+        Statement::InlineFor { .. } => "InlineFor",
         Statement::MetaLet { .. } => "MetaLet",
         Statement::ParenBlock { .. } => "ParenBlock",
     }

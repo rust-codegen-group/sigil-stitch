@@ -155,3 +155,41 @@ fn test_channel_receive_standalone() {
         "standalone receive should be tight, got: {output}"
     );
 }
+
+#[test]
+fn test_prefix_pointer_type_spacing() {
+    let response_type = "FetchResponse";
+
+    let block = sigil_quote!(Go {
+        type $N(response_type) struct {
+            Raw *http.Response
+        }
+    })
+    .unwrap();
+
+    assert_eq!(
+        render(&block),
+        r#"type FetchResponse struct {
+	Raw *http.Response
+}
+"#,
+    );
+}
+
+#[test]
+fn test_compact_multiplication_spacing() {
+    let block = sigil_quote!(Go {
+        result := a*b;
+        nested := a*(b+c);
+        literal := 1*2;
+    })
+    .unwrap();
+
+    assert_eq!(
+        render(&block),
+        r#"result := a * b
+nested := a * (b + c)
+literal := 1 * 2
+"#,
+    );
+}

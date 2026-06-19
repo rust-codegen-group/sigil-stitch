@@ -118,14 +118,69 @@ fn generate_statements(statements: &[Statement]) -> Vec<TokenStream> {
             Statement::MetaFor {
                 pat,
                 iter_expr,
+                separator,
+                trailing,
                 body,
             } => {
                 let body_calls = generate_statements(body);
-                calls.push(quote! {
-                    for #pat in #iter_expr {
-                        #(#body_calls)*
-                    }
-                });
+                if let Some(separator) = separator {
+                    let trailing = trailing
+                        .as_ref()
+                        .map_or_else(|| quote! { false }, |expr| quote! { #expr });
+                    calls.push(quote! {
+                        let mut __sigil_for_emitted = false;
+                        for #pat in #iter_expr {
+                            if __sigil_for_emitted {
+                                __sigil_builder.add("%L", ::std::string::ToString::to_string(&(#separator)));
+                            }
+                            __sigil_for_emitted = true;
+                            #(#body_calls)*
+                        }
+                        if __sigil_for_emitted && (#trailing) {
+                            __sigil_builder.add("%L", ::std::string::ToString::to_string(&(#separator)));
+                        }
+                    });
+                } else {
+                    calls.push(quote! {
+                        for #pat in #iter_expr {
+                            #(#body_calls)*
+                        }
+                    });
+                }
+            }
+            Statement::InlineFor {
+                pat,
+                iter_expr,
+                separator,
+                trailing,
+                body_format,
+                body_args,
+            } => {
+                let body_args_tuple = build_args_tuple(body_args);
+                if let Some(separator) = separator {
+                    let trailing = trailing
+                        .as_ref()
+                        .map_or_else(|| quote! { false }, |expr| quote! { #expr });
+                    calls.push(quote! {
+                        let mut __sigil_for_emitted = false;
+                        for #pat in #iter_expr {
+                            if __sigil_for_emitted {
+                                __sigil_builder.add("%L", ::std::string::ToString::to_string(&(#separator)));
+                            }
+                            __sigil_for_emitted = true;
+                            __sigil_builder.add(#body_format, #body_args_tuple);
+                        }
+                        if __sigil_for_emitted && (#trailing) {
+                            __sigil_builder.add("%L", ::std::string::ToString::to_string(&(#separator)));
+                        }
+                    });
+                } else {
+                    calls.push(quote! {
+                        for #pat in #iter_expr {
+                            __sigil_builder.add(#body_format, #body_args_tuple);
+                        }
+                    });
+                }
             }
             Statement::MetaLet { binding } => {
                 calls.push(quote! {

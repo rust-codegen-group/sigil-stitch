@@ -258,6 +258,75 @@ fn test_inline_for_ts_array_exact() {
 }
 
 #[test]
+fn test_inline_for_typescript_union_separator_exact() {
+    let name = "Pet";
+    let members = vec![
+        TypeName::primitive("Cat"),
+        TypeName::primitive("Dog"),
+        TypeName::primitive("null"),
+    ];
+
+    assert_quote!(TypeScript, {
+        export type $N(name) =
+          $for(member in &members; separator = "\n| ", trailing = false) { $T((*member).clone()) };
+    }, r#"export type Pet =
+  Cat
+| Dog
+| null;
+"#);
+}
+
+#[test]
+fn test_inline_for_typescript_union_tracks_imports() {
+    let members = vec![
+        TypeName::importable_type("./pets", "Cat"),
+        TypeName::importable_type("./pets", "Dog"),
+    ];
+
+    assert_quote!(TypeScript, {
+        export type Pet =
+          $for(member in &members; separator = "\n| ") { $T((*member).clone()) };
+    }, r#"import type { Cat, Dog } from './pets';
+
+export type Pet =
+  Cat
+| Dog;
+"#);
+}
+
+#[test]
+fn test_inline_for_empty_with_separator_emits_no_items() {
+    let members: Vec<&str> = vec![];
+
+    assert_quote!(TypeScript, {
+        const pets = [$for(member in &members; separator = ", ") { $S(*member) }];
+    }, "const pets = [];\n");
+}
+
+#[test]
+fn test_inline_for_trailing_reuses_separator() {
+    let values = vec!["1", "2"];
+
+    assert_quote!(TypeScript, {
+        const values = [$for(value in &values; separator = ", ", trailing = true) { $L(*value) }];
+    }, "const values = [1, 2, ];\n");
+}
+
+#[test]
+fn test_inline_for_haskell_constructor_separator_exact() {
+    let variants = vec!["Cat", "Dog", "Fish"];
+
+    assert_quote!(Haskell, {
+        data Pet =
+          $for(variant in &variants; separator = "\n  | ") { $N(*variant) }
+    }, r#"data Pet =
+  Cat
+  | Dog
+  | Fish
+"#);
+}
+
+#[test]
 fn test_inline_if_function_call_exact() {
     let flag = true;
     let block = sigil_quote!(TypeScript {
@@ -269,7 +338,7 @@ fn test_inline_if_function_call_exact() {
 }
 
 #[test]
-fn test_inline_for_python_multiline_list_exact() {
+fn test_inline_for_python_list_exact() {
     let items = vec!["a", "b"];
     let block = sigil_quote!(Python {
         x = [
@@ -278,7 +347,7 @@ fn test_inline_for_python_multiline_list_exact() {
     })
     .unwrap();
     let output = render_py(&block);
-    assert_eq!(output, "x = ['a',\n'b',]\n");
+    assert_eq!(output, "x = ['a','b',]\n");
 }
 
 #[test]

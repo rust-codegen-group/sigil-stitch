@@ -190,9 +190,12 @@ pub(super) fn parse_one_statement(
                 collected.pop();
                 collected.pop();
             } else {
-                // Don't split if next line starts with `.` (method chaining)
+                // Don't split if next line starts with `.` (method chaining),
+                // or if an incomplete statement continues with an inline `$for`.
                 let starts_with_dot = matches!(tt, TokenTree::Punct(p) if p.as_char() == '.');
-                if !starts_with_dot {
+                let continues_with_inline_for = starts_with_inline_for(tokens, pos)
+                    && collected_ends_with_assignment(&collected);
+                if !starts_with_dot && !continues_with_inline_for {
                     let (format, args) = tokens_to_format(&collected, lang)?;
                     return Ok((Statement::Line { format, args }, pos));
                 }
@@ -214,6 +217,16 @@ pub(super) fn parse_one_statement(
         let (format, args) = tokens_to_format(&collected, lang)?;
         Ok((Statement::Line { format, args }, pos))
     }
+}
+
+fn starts_with_inline_for(tokens: &[TokenTree], pos: usize) -> bool {
+    pos + 1 < tokens.len()
+        && matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$')
+        && is_ident(&tokens[pos + 1], "for")
+}
+
+fn collected_ends_with_assignment(tokens: &[TokenTree]) -> bool {
+    matches!(tokens.last(), Some(TokenTree::Punct(p)) if p.as_char() == '=')
 }
 
 /// Parse a control flow chain starting from tokens that lead into a brace group.
@@ -400,12 +413,15 @@ fn try_parse_meta_for(
         return Ok(None);
     }
 
-    let (next_pos, pat, iter_expr, body) = parse_for_components(tokens, start + 2, lang)?;
+    let (next_pos, pat, iter_expr, separator, trailing, body) =
+        parse_for_components(tokens, start + 2, lang)?;
 
     Ok(Some((
         Statement::MetaFor {
             pat,
             iter_expr,
+            separator,
+            trailing,
             body,
         },
         next_pos, // helper returns paren_pos + 2 = start + 4
