@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.8
+
+### Added
+
+- `$for` separator options: `separator = expr` inserts text between emitted
+  iterations, and `trailing = true` reuses that separator after the final item.
+- Inline `$for` / `$if` continuations after source lines ending in `=` or `|`,
+  so multiline assignments and union-style declarations can keep their shape.
+
+### Fixed
+
+- Inline `$if` chains now preserve multiline fragments and keep `$else_if` /
+  `$else` attached when chains span source lines.
+- Plain statement-level meta remains statement-level after Python `:`, nullable
+  type `?`, and comma-separated declarations.
+- `$for` option diagnostics now name the invalid option and expected syntax.
+
+### Changed
+
+- Repository metadata, README badge, and mdBook edit links now point at
+  `rust-codegen-group/sigil-stitch` and the `main` branch.
+
 ## 0.6.7
 
 ### Added

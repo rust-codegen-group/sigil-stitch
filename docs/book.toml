@@ -9,8 +9,8 @@ src = "src"
 build-dir = "book"
 
 [output.html]
-git-repository-url = "https://github.com/adamcavendish/sigil-stitch"
-edit-url-template = "https://github.com/adamcavendish/sigil-stitch/edit/master/docs/{path}"
+git-repository-url = "https://github.com/rust-codegen-group/sigil-stitch"
+edit-url-template = "https://github.com/rust-codegen-group/sigil-stitch/edit/main/docs/{path}"
 
 [output.html.search]
 enable = true

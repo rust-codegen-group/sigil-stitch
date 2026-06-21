@@ -3,13 +3,13 @@ members = ["macros"]
 resolver = "3"
 
 [workspace.package]
-version = "0.6.7"
+version = "0.6.8"
 edition = "2024"
 rust-version = "1.88.0"
 license = "MIT OR Apache-2.0"
 authors = ["Adam Cavendish"]
-repository = "https://github.com/adamcavendish/sigil-stitch"
-homepage = "https://github.com/adamcavendish/sigil-stitch"
+repository = "https://github.com/rust-codegen-group/sigil-stitch"
+homepage = "https://github.com/rust-codegen-group/sigil-stitch"
 
 [package]
 name = "sigil-stitch"
@@ -35,7 +35,7 @@ exclude = [
 [dependencies]
 pretty = "0.12"
 snafu = "0.9"
-sigil-stitch-macros = { path = "macros", version = "0.6.6" }
+sigil-stitch-macros = { path = "macros", version = "0.6.8" }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
