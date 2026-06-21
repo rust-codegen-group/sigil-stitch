@@ -13,6 +13,7 @@ pub use sigil_stitch::lang::kotlin::Kotlin;
 pub use sigil_stitch::lang::lua::Lua;
 pub use sigil_stitch::lang::ocaml::OCaml;
 pub use sigil_stitch::lang::php::Php;
+pub use sigil_stitch::lang::python::Python;
 pub use sigil_stitch::lang::ruby::Ruby;
 pub use sigil_stitch::lang::scala::Scala;
 pub use sigil_stitch::lang::swift::Swift;

@@ -129,6 +129,10 @@ groups, array/dict literals, function arguments, and indented blocks. They no lo
 column-0 position. The parser produces `ParsedSplice` (no synthetic block delimiters) so inline
 output splices cleanly without stray `{}` or `:`.
 
+When a source line ends with continuation punctuation such as `=` or `|`, an inline
+`$for`/`$if` on the next line remains part of the same statement. A plain newline before `$for`
+still starts a statement-level meta-loop.
+
 ## Universal Heuristics (all languages)
 
 These annotations fire regardless of `MacroLang`:

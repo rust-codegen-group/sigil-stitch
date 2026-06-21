@@ -937,6 +937,28 @@ sigil_quote!(TypeScript {
 # }
 ```
 
+The same pattern works for constructor-style continuations in non-brace
+languages:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let variants = vec!["Cat", "Dog", "Fish"];
+
+sigil_quote!(Haskell {
+    data Pet =
+      $for(variant in &variants; separator = "\n  | ") { $N(*variant) }
+})?;
+// Output:
+// data Pet =
+//   Cat
+//   | Dog
+//   | Fish
+# Ok(())
+# }
+```
+
 Use `trailing = true` only when you really want the same separator after the
 last emitted iteration. Empty loops emit neither separators nor trailing
 separators.
@@ -1070,6 +1092,39 @@ sigil_quote!(TypeScript {
     const defaultKeys = [$for(item in &items; separator = ", ") { $S(*item) }];
 })?;
 // Output: const defaultKeys = ['hostname', 'platform', 'arch'];
+# Ok(())
+# }
+```
+
+Separators are often clearer than writing punctuation inside the loop body when
+the fragments are function arguments:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let handlers = vec!["createUser", "updateUser", "deleteUser"];
+
+sigil_quote!(TypeScript {
+    registerHandlers($for(handler in &handlers; separator = ", ") { $N(*handler) });
+})?;
+// Output: registerHandlers(createUser, updateUser, deleteUser);
+# Ok(())
+# }
+```
+
+If the iterable is empty, inline `$for` emits no body and no separators:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let items: Vec<&str> = vec![];
+
+sigil_quote!(TypeScript {
+    const defaultKeys = [$for(item in &items; separator = ", ") { $S(*item) }];
+})?;
+// Output: const defaultKeys = [];
 # Ok(())
 # }
 ```

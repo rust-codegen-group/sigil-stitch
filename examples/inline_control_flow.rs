@@ -11,18 +11,22 @@
 
 use sigil_stitch::lang::bash::Bash;
 use sigil_stitch::lang::cpp::Cpp;
+use sigil_stitch::lang::haskell::Haskell;
 use sigil_stitch::lang::ruby::Ruby;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
 fn main() {
     typescript_inline_for_array();
+    typescript_inline_for_function_args();
+    typescript_inline_for_union_separator();
     typescript_inline_if_function_arg();
     typescript_inline_if_else_chain();
     typescript_inline_if_in_object_literal();
     python_inline_for_list();
     python_inline_if_dict();
     cpp_inline_for_vector();
+    haskell_inline_for_constructors();
     ruby_inline_if_expression();
     bash_inline_for_join();
     inline_for_with_type_imports();
@@ -38,6 +42,35 @@ fn typescript_inline_for_array() {
 
     let block = sigil_quote!(TypeScript {
         const defaultKeys = [$for(item in &items) { $S(*item), }];
+    })
+    .unwrap();
+    println!("{}\n", render_ts(&block));
+}
+
+/// Inline `$for` with an explicit separator for function arguments.
+fn typescript_inline_for_function_args() {
+    println!("--- TS: Inline $for with argument separators ---\n");
+    let handlers = vec!["createUser", "updateUser", "deleteUser"];
+
+    let block = sigil_quote!(TypeScript {
+        registerHandlers($for(handler in &handlers; separator = ", ") { $N(*handler) });
+    })
+    .unwrap();
+    println!("{}\n", render_ts(&block));
+}
+
+/// Inline `$for` with a multiline separator for TypeScript union continuations.
+fn typescript_inline_for_union_separator() {
+    println!("--- TS: Inline $for union continuation separators ---\n");
+    let members = vec![
+        TypeName::primitive("Cat"),
+        TypeName::primitive("Dog"),
+        TypeName::primitive("null"),
+    ];
+
+    let block = sigil_quote!(TypeScript {
+        export type Pet =
+          $for(member in &members; separator = "\n| ") { $T((*member).clone()) };
     })
     .unwrap();
     println!("{}\n", render_ts(&block));
@@ -125,6 +158,21 @@ fn cpp_inline_for_vector() {
     println!("{}\n", render_with(&block, &Cpp::new()));
 }
 
+// ── Haskell ──
+
+/// Inline `$for` with constructor separators in a Haskell data declaration.
+fn haskell_inline_for_constructors() {
+    println!("--- Haskell: Inline $for constructor separators ---\n");
+    let variants = vec!["Cat", "Dog", "Fish"];
+
+    let block = sigil_quote!(Haskell {
+        data Pet =
+          $for(variant in &variants; separator = "\n  | ") { $N(*variant) }
+    })
+    .unwrap();
+    println!("{}\n", render_with(&block, &Haskell::new()));
+}
+
 // ── Ruby ──
 
 /// `$if`/`$else` as a value expression in Ruby — selects the branch output.
@@ -173,13 +221,13 @@ fn inline_for_with_type_imports() {
 
 // ── Empty / edge cases ──
 
-/// Empty `$for` produces no output — array literal renders as `[]`.
+/// Empty `$for` produces no output — separators are not emitted either.
 fn empty_for_clean_output() {
     println!("--- Empty $for produces clean output ---\n");
     let items: Vec<&str> = vec![];
 
     let block = sigil_quote!(TypeScript {
-        const keys: string[] = [$for(item in &items) { $S(*item), }];
+        const keys: string[] = [$for(item in &items; separator = ", ") { $S(*item) }];
     })
     .unwrap();
     println!("  TS:  {}", render_ts(&block));

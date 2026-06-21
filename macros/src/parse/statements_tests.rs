@@ -148,6 +148,14 @@ fn statement_with_interpolation() {
 }
 
 #[test]
+fn newline_before_metafor_without_continuation_still_splits() {
+    let stmts = parse_all_stmts("const before = 1\n$for(item in items) { const x = $N(item); }");
+    assert_eq!(stmts.len(), 2);
+    assert!(matches!(stmts[0], Statement::Line { .. }));
+    assert!(matches!(stmts[1], Statement::MetaFor { .. }));
+}
+
+#[test]
 fn go_for_with_embedded_semicolons() {
     let stmt = parse_stmt_lang("for i := 0; i < n; i++ { body(); }", MacroLang::Go);
     match stmt {

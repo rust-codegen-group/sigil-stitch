@@ -191,11 +191,11 @@ pub(super) fn parse_one_statement(
                 collected.pop();
             } else {
                 // Don't split if next line starts with `.` (method chaining),
-                // or if an incomplete statement continues with an inline `$for`.
+                // or if an incomplete statement continues with inline `$for`/`$if`.
                 let starts_with_dot = matches!(tt, TokenTree::Punct(p) if p.as_char() == '.');
-                let continues_with_inline_for = starts_with_inline_for(tokens, pos)
-                    && collected_ends_with_assignment(&collected);
-                if !starts_with_dot && !continues_with_inline_for {
+                let continues_with_inline_meta = starts_with_inline_meta(tokens, pos)
+                    && can_continue_before_inline_meta(&collected);
+                if !starts_with_dot && !continues_with_inline_meta {
                     let (format, args) = tokens_to_format(&collected, lang)?;
                     return Ok((Statement::Line { format, args }, pos));
                 }
@@ -219,14 +219,18 @@ pub(super) fn parse_one_statement(
     }
 }
 
-fn starts_with_inline_for(tokens: &[TokenTree], pos: usize) -> bool {
+fn starts_with_inline_meta(tokens: &[TokenTree], pos: usize) -> bool {
     pos + 1 < tokens.len()
         && matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$')
-        && is_ident(&tokens[pos + 1], "for")
+        && (is_ident(&tokens[pos + 1], "for") || is_ident(&tokens[pos + 1], "if"))
 }
 
-fn collected_ends_with_assignment(tokens: &[TokenTree]) -> bool {
-    matches!(tokens.last(), Some(TokenTree::Punct(p)) if p.as_char() == '=')
+fn can_continue_before_inline_meta(tokens: &[TokenTree]) -> bool {
+    matches!(
+        tokens.last(),
+        Some(TokenTree::Punct(p))
+            if matches!(p.as_char(), '=' | '|')
+    )
 }
 
 /// Parse a control flow chain starting from tokens that lead into a brace group.

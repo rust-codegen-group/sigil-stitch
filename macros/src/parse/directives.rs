@@ -149,7 +149,7 @@ fn parse_for_options(
     if tokens.is_empty() {
         return Err(CompileError::new(
             span,
-            "$for options cannot be empty after `;`",
+            "$for options cannot be empty after ';'; expected separator = expr or trailing = bool",
         ));
     }
 
@@ -158,7 +158,10 @@ fn parse_for_options(
 
     for option in split_for_options(tokens) {
         if option.is_empty() {
-            return Err(CompileError::new(span, "$for option cannot be empty"));
+            return Err(CompileError::new(
+                span,
+                "$for option cannot be empty; expected separator = expr or trailing = bool",
+            ));
         }
 
         let name = match option.first() {
@@ -180,7 +183,7 @@ fn parse_for_options(
             None => {
                 return Err(CompileError::new(
                     option[0].span(),
-                    "$for options require `=`: separator = expr, trailing = bool",
+                    format!("$for option '{name}' requires '='"),
                 ));
             }
         };
@@ -188,7 +191,7 @@ fn parse_for_options(
         if equals_pos != 1 {
             return Err(CompileError::new(
                 option[0].span(),
-                "$for option names must be followed by `=`",
+                format!("$for option '{name}' requires '=' immediately after the name"),
             ));
         }
 
@@ -196,7 +199,7 @@ fn parse_for_options(
         if value.is_empty() {
             return Err(CompileError::new(
                 option[0].span(),
-                "$for option value cannot be empty",
+                format!("$for option '{name}' requires a value"),
             ));
         }
 
@@ -205,7 +208,7 @@ fn parse_for_options(
                 if separator.is_some() {
                     return Err(CompileError::new(
                         option[0].span(),
-                        "duplicate $for separator option",
+                        "duplicate $for option 'separator'",
                     ));
                 }
                 separator = Some(value);
@@ -214,7 +217,7 @@ fn parse_for_options(
                 if trailing.is_some() {
                     return Err(CompileError::new(
                         option[0].span(),
-                        "duplicate $for trailing option",
+                        "duplicate $for option 'trailing'",
                     ));
                 }
                 trailing = Some(value);
@@ -222,7 +225,7 @@ fn parse_for_options(
             _ => {
                 return Err(CompileError::new(
                     option[0].span(),
-                    format!("unknown $for option `{name}`. Expected separator or trailing"),
+                    format!("unknown $for option '{name}'; expected 'separator' or 'trailing'"),
                 ));
             }
         }
@@ -231,7 +234,7 @@ fn parse_for_options(
     if trailing.is_some() && separator.is_none() {
         return Err(CompileError::new(
             span,
-            "$for trailing option requires separator = expr",
+            "$for option 'trailing' requires separator = expr",
         ));
     }
 
@@ -409,4 +412,82 @@ pub(super) fn parse_if_components(
     }
 
     Ok((pos, branches))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn for_error(src: &str) -> String {
+        let ts: TokenStream = src.parse().unwrap();
+        let tokens: Vec<TokenTree> = ts.into_iter().collect();
+        parse_for_raw_components(&tokens, 0)
+            .unwrap_err()
+            .message()
+            .to_owned()
+    }
+
+    fn assert_for_error_contains(src: &str, expected: &str) {
+        let actual = for_error(src);
+        assert!(
+            actual.contains(expected),
+            "expected error to contain {expected:?}, got {actual:?}"
+        );
+    }
+
+    #[test]
+    fn for_options_reject_empty_after_semicolon() {
+        assert_for_error_contains(
+            "(item in items;) { item }",
+            "$for options cannot be empty after ';'; expected separator = expr or trailing = bool",
+        );
+    }
+
+    #[test]
+    fn for_options_reject_unknown_name() {
+        assert_for_error_contains(
+            r#"(item in items; sep = ",") { item }"#,
+            "unknown $for option 'sep'; expected 'separator' or 'trailing'",
+        );
+    }
+
+    #[test]
+    fn for_options_reject_missing_equals() {
+        assert_for_error_contains(
+            r#"(item in items; separator ",") { item }"#,
+            "$for option 'separator' requires '='",
+        );
+    }
+
+    #[test]
+    fn for_options_reject_empty_value() {
+        assert_for_error_contains(
+            "(item in items; separator =) { item }",
+            "$for option 'separator' requires a value",
+        );
+    }
+
+    #[test]
+    fn for_options_reject_duplicate_separator() {
+        assert_for_error_contains(
+            r#"(item in items; separator = ",", separator = ";") { item }"#,
+            "duplicate $for option 'separator'",
+        );
+    }
+
+    #[test]
+    fn for_options_reject_duplicate_trailing() {
+        assert_for_error_contains(
+            r#"(item in items; separator = ",", trailing = true, trailing = false) { item }"#,
+            "duplicate $for option 'trailing'",
+        );
+    }
+
+    #[test]
+    fn for_options_reject_trailing_without_separator() {
+        assert_for_error_contains(
+            "(item in items; trailing = true) { item }",
+            "$for option 'trailing' requires separator = expr",
+        );
+    }
 }

@@ -277,6 +277,72 @@ fn test_inline_for_typescript_union_separator_exact() {
 }
 
 #[test]
+fn test_inline_for_typescript_union_after_pipe_continuation() {
+    let members = vec![TypeName::primitive("Dog"), TypeName::primitive("Fish")];
+
+    assert_quote!(TypeScript, {
+        export type Pet = Cat |
+          $for(member in &members; separator = "\n| ") { $T((*member).clone()) };
+    }, r#"export type Pet = Cat |
+  Dog
+| Fish;
+"#);
+}
+
+#[test]
+fn test_inline_if_after_assignment_continuation() {
+    let flag = true;
+
+    assert_quote!(TypeScript, {
+        const mode =
+          $if(flag) { "enabled" } $else { "disabled" };
+    }, "const mode = \"enabled\";\n");
+}
+
+#[test]
+fn test_meta_if_after_python_colon_header_stays_statement_level() {
+    let flag = true;
+
+    assert_quote!(Python, {
+        if x > 0:
+            $if(flag) { return True }
+            return False
+    }, r#"if x > 0:
+return True
+return False
+"#);
+}
+
+#[test]
+fn test_meta_if_after_swift_nullable_type_stays_statement_level() {
+    let flag = true;
+
+    assert_quote!(Swift, {
+        let value: String?
+        $if(flag) { let next = 1 }
+    }, r#"let value: String?
+let next = 1
+"#);
+}
+
+#[test]
+fn test_metafor_after_comma_stays_statement_level() {
+    let names = vec!["Dog", "Fish"];
+
+    assert_quote!(TypeScript, {
+        enum Pet {
+            Cat,
+            $for(name in &names) { $N(*name), }
+        }
+    }, r#"enum Pet {
+  Cat,
+  Dog,
+  Fish,
+}
+"#);
+}
+
+#[test]
 fn test_inline_for_typescript_union_tracks_imports() {
     let members = vec![
         TypeName::importable_type("./pets", "Cat"),
