@@ -193,8 +193,9 @@ pub(super) fn parse_one_statement(
                 // Don't split if next line starts with `.` (method chaining),
                 // or if an incomplete statement continues with inline `$for`/`$if`.
                 let starts_with_dot = matches!(tt, TokenTree::Punct(p) if p.as_char() == '.');
-                let continues_with_inline_meta = starts_with_inline_meta(tokens, pos)
-                    && can_continue_before_inline_meta(&collected);
+                let continues_with_inline_meta = (starts_with_inline_meta(tokens, pos)
+                    && can_continue_before_inline_meta(&collected))
+                    || (starts_with_inline_if_tail(tokens, pos) && contains_inline_if(&collected));
                 if !starts_with_dot && !continues_with_inline_meta {
                     let (format, args) = tokens_to_format(&collected, lang)?;
                     return Ok((Statement::Line { format, args }, pos));
@@ -223,6 +224,18 @@ fn starts_with_inline_meta(tokens: &[TokenTree], pos: usize) -> bool {
     pos + 1 < tokens.len()
         && matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$')
         && (is_ident(&tokens[pos + 1], "for") || is_ident(&tokens[pos + 1], "if"))
+}
+
+fn starts_with_inline_if_tail(tokens: &[TokenTree], pos: usize) -> bool {
+    pos + 1 < tokens.len()
+        && matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$')
+        && (is_ident(&tokens[pos + 1], "else_if") || is_ident(&tokens[pos + 1], "else"))
+}
+
+fn contains_inline_if(tokens: &[TokenTree]) -> bool {
+    tokens.windows(2).any(|pair| {
+        matches!(&pair[0], TokenTree::Punct(p) if p.as_char() == '$') && is_ident(&pair[1], "if")
+    })
 }
 
 fn can_continue_before_inline_meta(tokens: &[TokenTree]) -> bool {

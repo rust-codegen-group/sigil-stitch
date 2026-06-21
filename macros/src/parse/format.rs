@@ -62,7 +62,8 @@ fn tokens_to_format_inner(
                 format.push('\n');
                 state.prev = PrevTokenKind::None;
             }
-            if gap == 0 && tt_line > prev_line && starts_inline_for_at(tokens, pos) {
+            if gap == 0 && tt_line > prev_line && preserves_newline_before_inline_meta(tokens, pos)
+            {
                 format.push('\n');
                 for _ in 0..tt_start.column.saturating_sub(base_column) {
                     format.push(' ');
@@ -663,10 +664,24 @@ fn tokens_to_format_inner(
     Ok(())
 }
 
-fn starts_inline_for_at(tokens: &[TokenTree], pos: usize) -> bool {
-    pos + 1 < tokens.len()
-        && matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$')
-        && is_ident(&tokens[pos + 1], "for")
+fn preserves_newline_before_inline_meta(tokens: &[TokenTree], pos: usize) -> bool {
+    if pos + 1 >= tokens.len() || !matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$')
+    {
+        return false;
+    }
+
+    if is_ident(&tokens[pos + 1], "for") {
+        return true;
+    }
+
+    if is_ident(&tokens[pos + 1], "if") {
+        return !matches!(
+            pos.checked_sub(1).and_then(|prev| tokens.get(prev)),
+            Some(TokenTree::Punct(p)) if p.as_char() == '='
+        );
+    }
+
+    false
 }
 
 /// Split `$join(sep, iter)` arguments on the first top-level comma.

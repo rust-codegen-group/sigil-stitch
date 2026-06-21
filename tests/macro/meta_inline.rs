@@ -300,6 +300,57 @@ fn test_inline_if_after_assignment_continuation() {
 }
 
 #[test]
+fn test_inline_if_after_pipe_continuation() {
+    let include_dog = true;
+
+    assert_quote!(TypeScript, {
+        export type Pet = Cat |
+          $if(include_dog) { Dog } $else { Fish };
+    }, r#"export type Pet = Cat |
+  Dog;
+"#);
+}
+
+#[test]
+fn test_inline_if_multiline_siblings_preserve_newline() {
+    let first = true;
+    let second = true;
+
+    assert_quote!(TypeScript, {
+        const values = (
+          $if(first) { first }
+          $if(second) { second }
+        );
+    }, r#"const values = (
+first
+second
+);
+"#);
+}
+
+#[test]
+fn test_inline_if_else_on_next_line_stays_in_chain() {
+    let prod = false;
+
+    assert_quote!(TypeScript, {
+        const mode = $if(prod) { "prod" }
+          $else { "dev" };
+    }, "const mode = \"dev\";\n");
+}
+
+#[test]
+fn test_inline_if_else_if_on_next_line_stays_in_chain() {
+    let trace = false;
+    let debug = true;
+
+    assert_quote!(TypeScript, {
+        const label = $if(trace) { "trace" }
+          $else_if(debug) { "debug" }
+          $else { "info" };
+    }, "const label = \"debug\";\n");
+}
+
+#[test]
 fn test_meta_if_after_python_colon_header_stays_statement_level() {
     let flag = true;
 
@@ -339,6 +390,35 @@ fn test_metafor_after_comma_stays_statement_level() {
   Dog,
   Fish,
 }
+"#);
+}
+
+#[test]
+fn test_meta_if_after_comma_stays_statement_level() {
+    let include_dog = true;
+
+    assert_quote!(TypeScript, {
+        enum Pet {
+            Cat,
+            $if(include_dog) { Dog, }
+        }
+    }, r#"enum Pet {
+  Cat,
+  Dog,
+}
+"#);
+}
+
+#[test]
+fn test_inline_if_tracks_imports() {
+    let include_user = true;
+    let user = TypeName::importable_type("./models", "User");
+
+    assert_quote!(TypeScript, {
+        export type MaybeUser = $if(include_user) { $T(user.clone()) } $else { null };
+    }, r#"import type { User } from './models';
+
+export type MaybeUser = User;
 "#);
 }
 

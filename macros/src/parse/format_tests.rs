@@ -218,6 +218,23 @@ fn inline_if_emits_parsed_splice() {
 }
 
 #[test]
+fn inline_if_preserves_source_newline_before_next_inline_if() {
+    let (format, kinds) = fmt_with_args("($if(a) { a }\n$if(b) { b })");
+    assert_eq!(format, "(%L\n%L)");
+    assert_eq!(kinds.len(), 2);
+    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
+    assert!(matches!(kinds[1], InterpolationKind::ParsedSplice));
+}
+
+#[test]
+fn inline_if_after_assignment_continuation_collapses_newline() {
+    let (format, kinds) = fmt_with_args("value =\n  $if(flag) { enabled } $else { disabled }");
+    assert_eq!(format, "value = %L");
+    assert_eq!(kinds.len(), 1);
+    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
+}
+
+#[test]
 fn inline_else_if_standalone_rejected() {
     let ts: TokenStream = "$else_if(cond) { body }".parse().unwrap();
     let tokens: Vec<TokenTree> = ts.into_iter().collect();

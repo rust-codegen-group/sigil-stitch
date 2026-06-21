@@ -3,7 +3,7 @@
 //!
 //! Inline meta-directives work anywhere in a template, not just at column 0.
 //! `$for`/`$if` are meta-selection: true/false branches and loop bodies are
-//! evaluated at Rust compile time by the macro, then spliced into place.
+//! evaluated by the generated Rust builder code, then spliced into place.
 //! Each language gets correct delimiters: TypeScript keeps `{ }` for objects,
 //! Python keeps `{ }` for dicts (no stray `:`).
 //!
