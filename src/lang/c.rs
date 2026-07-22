@@ -1,8 +1,12 @@
 //! C language implementation.
 
+use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::spec::where_spec::TypeParamSpec;
+use crate::type_name::TypeName;
 
 /// C language implementation.
 ///
@@ -272,8 +276,14 @@ impl CodeLang for C {
         false
     }
 
-    fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
-        format!("typedef {inner} {name};")
+    fn emit_newtype_decl(
+        &self,
+        _visibility: &str,
+        name: &str,
+        _type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        CodeBlock::of(&format!("typedef %T {name};"), inner.clone())
     }
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {

@@ -42,6 +42,8 @@
 //! })
 //! ```
 
+use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, OptionalFieldStyle,
@@ -49,6 +51,8 @@ use crate::lang::config::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::spec::where_spec::TypeParamSpec;
+use crate::type_name::TypeName;
 use crate::type_name::{AssociatedTypeStyle, TypePresentation};
 
 /// PHP language implementation.
@@ -300,8 +304,19 @@ impl CodeLang for Php {
         }
     }
 
-    fn render_newtype_line(&self, vis: &str, name: &str, inner: &str) -> String {
-        format!("{vis}class {name} {{ public function __construct(private {inner} $value) {{}} }}")
+    fn emit_newtype_decl(
+        &self,
+        visibility: &str,
+        name: &str,
+        _type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        CodeBlock::of(
+            &format!(
+                "{visibility}class {name} {{ public function __construct(private %T $value) {{}} }}"
+            ),
+            inner.clone(),
+        )
     }
 }
 
@@ -582,9 +597,12 @@ mod tests {
     }
 
     #[test]
-    fn test_render_newtype_line() {
+    fn test_emit_newtype_decl() {
         let php = Php::new();
-        let line = php.render_newtype_line("", "Name", "string");
+        let declaration = php
+            .emit_newtype_decl("", "Name", &[], &TypeName::primitive("string"))
+            .unwrap();
+        let line = declaration.render_standalone(&php, 80).unwrap();
         assert!(line.contains("class Name"));
         assert!(line.contains("__construct"));
         assert!(line.contains("private string $value"));

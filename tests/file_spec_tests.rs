@@ -1,9 +1,13 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::error::SigilStitchError;
-use sigil_stitch::lang::CodeLang;
+use sigil_stitch::lang::{CodeLang, RendererLang};
 use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
+use sigil_stitch::spec::modifiers::TypeKind;
+use sigil_stitch::spec::parameter_spec::ParameterSpec;
+use sigil_stitch::spec::type_spec::TypeSpec;
+use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
 #[test]
@@ -312,6 +316,128 @@ fn test_spec_error_propagation() {
 
     let err = file.render(80).unwrap_err();
     assert!(err.to_string().contains("intentional test error"), "{err}");
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FailingHook {
+    Newtype,
+    Context,
+    Suffix,
+}
+
+#[derive(Debug)]
+struct FailingHookLang(FailingHook);
+
+impl RendererLang for FailingHookLang {
+    fn file_extension(&self) -> &str {
+        "fail"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+}
+
+impl CodeLang for FailingHookLang {
+    fn emit_newtype_decl(
+        &self,
+        _visibility: &str,
+        name: &str,
+        _type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        if matches!(self.0, FailingHook::Newtype) {
+            return CodeBlock::of("%T %T", inner.clone());
+        }
+        CodeBlock::of(&format!("struct {name}(%T);"), inner.clone())
+    }
+
+    fn emit_type_context(
+        &self,
+        _type_params: &[TypeParamSpec],
+    ) -> Result<Option<CodeBlock>, SigilStitchError> {
+        if matches!(self.0, FailingHook::Context) {
+            return Err(SigilStitchError::Render {
+                context: "emit_type_context".into(),
+                message: "intentional hook error".into(),
+            });
+        }
+        Ok(None)
+    }
+
+    fn emit_type_close_suffix(
+        &self,
+        _kind: TypeKind,
+        _impl_types: &[TypeName],
+    ) -> Result<Option<CodeBlock>, SigilStitchError> {
+        if matches!(self.0, FailingHook::Suffix) {
+            return Err(SigilStitchError::Render {
+                context: "emit_type_close_suffix".into(),
+                message: "intentional hook error".into(),
+            });
+        }
+        Ok(None)
+    }
+
+    fn function_syntax(&self) -> sigil_stitch::lang::config::FunctionSyntaxConfig<'_> {
+        sigil_stitch::lang::config::FunctionSyntaxConfig {
+            function_signature_style: sigil_stitch::spec::fun_spec::FunctionSignatureStyle::Split,
+            ..Default::default()
+        }
+    }
+}
+
+#[test]
+fn test_structured_hook_errors_propagate_from_file_render() {
+    let newtype = TypeSpec::builder("Wrapped", TypeKind::Newtype)
+        .extends(TypeName::primitive("String"))
+        .build()
+        .unwrap();
+    let newtype_error =
+        FileSpec::builder_with("wrapped.fail", FailingHookLang(FailingHook::Newtype))
+            .add_type(newtype)
+            .build()
+            .unwrap()
+            .render(80)
+            .unwrap_err();
+    assert!(
+        newtype_error
+            .to_string()
+            .contains("expects 2 args but got 1"),
+        "{newtype_error}"
+    );
+
+    let function = FunSpec::builder("display")
+        .add_type_param(TypeParamSpec::new("T"))
+        .add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap())
+        .returns(TypeName::primitive("String"))
+        .build()
+        .unwrap();
+    let context_error =
+        FileSpec::builder_with("display.fail", FailingHookLang(FailingHook::Context))
+            .add_function(function)
+            .build()
+            .unwrap()
+            .render(80)
+            .unwrap_err();
+    assert!(
+        context_error.to_string().contains("emit_type_context"),
+        "{context_error}"
+    );
+
+    let type_spec = TypeSpec::builder("Record", TypeKind::Struct)
+        .build()
+        .unwrap();
+    let suffix_error = FileSpec::builder_with("record.fail", FailingHookLang(FailingHook::Suffix))
+        .add_type(type_spec)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap_err();
+    assert!(
+        suffix_error.to_string().contains("emit_type_close_suffix"),
+        "{suffix_error}"
+    );
 }
 
 #[test]

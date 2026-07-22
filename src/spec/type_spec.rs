@@ -235,21 +235,7 @@ impl TypeSpec {
             cb.add("%L", body_suffix);
             cb.add_line();
         }
-        cb.add("%<", ());
-        let block_syn = lang.block_syntax();
-        let close = block_syn.block_close;
-        let type_close_suffix = self.render_impl_type_suffix(lang);
-        if !close.is_empty() {
-            let term = block_syn.type_close_terminator;
-            cb.add(&format!("{close}{term}"), ());
-            if !type_close_suffix.is_empty() {
-                cb.add("%L", type_close_suffix);
-            }
-            cb.add_line();
-        } else if !type_close_suffix.is_empty() {
-            cb.add("%L", type_close_suffix);
-            cb.add_line();
-        }
+        self.emit_type_close(&mut cb, lang)?;
 
         cb.build()
     }
@@ -304,21 +290,7 @@ impl TypeSpec {
             cb.add("%L", body_suffix);
             cb.add_line();
         }
-        cb.add("%<", ());
-        let block_syn = lang.block_syntax();
-        let close = block_syn.block_close;
-        let type_close_suffix = self.render_impl_type_suffix(lang);
-        if !close.is_empty() {
-            let term = block_syn.type_close_terminator;
-            cb.add(&format!("{close}{term}"), ());
-            if !type_close_suffix.is_empty() {
-                cb.add("%L", type_close_suffix);
-            }
-            cb.add_line();
-        } else if !type_close_suffix.is_empty() {
-            cb.add("%L", type_close_suffix);
-            cb.add_line();
-        }
+        self.emit_type_close(&mut cb, lang)?;
         blocks.push(cb.build()?);
 
         // Block 2: impl block (only if methods or properties are non-empty).
@@ -480,29 +452,16 @@ impl TypeSpec {
             .cloned()
             .unwrap_or_else(|| TypeName::primitive(""));
 
-        let resolve = |_module: &str, name: &str| name.to_string();
-        let inner_str = target.render(80, &resolve).unwrap_or_default();
-
-        let mut tp_args: Vec<Arg> = Vec::new();
-        let tp_str = render_type_params(&self.type_params, lang, &mut tp_args);
-        let name_with_params = format!("{}{tp_str}", self.name);
-
-        let line = lang.render_newtype_line(vis, &name_with_params, &inner_str);
-
-        // Build format string: the line is literal, but type param bounds need %T resolution.
-        if tp_args.is_empty() {
-            cb.add("%L", line);
-        } else {
-            // The line contains type param bound placeholders — pass args through.
-            cb.add(&line, tp_args);
-        }
+        let declaration = lang.emit_newtype_decl(vis, &self.name, &self.type_params, &target)?;
+        cb.add_code(declaration);
         cb.add_line();
 
-        let suffix = self.render_impl_type_suffix(lang);
-        if !suffix.is_empty() {
+        if let Some(suffix) = lang.emit_type_close_suffix(self.kind, &self.impl_types)? {
             cb.add("%>", ());
-            cb.add("%L", suffix);
+            cb.add("%>", ());
+            cb.add_code(suffix);
             cb.add_line();
+            cb.add("%<", ());
             cb.add("%<", ());
         }
 
@@ -528,19 +487,34 @@ impl TypeSpec {
         Ok(())
     }
 
-    /// Render impl_types to strings and pass them to `lang.render_type_close_suffix()`.
-    fn render_impl_type_suffix(&self, lang: &dyn CodeLang) -> String {
-        if self.impl_types.is_empty() {
-            let empty: Vec<String> = Vec::new();
-            return lang.render_type_close_suffix(self.kind, &empty);
+    fn emit_type_close(
+        &self,
+        cb: &mut CodeBlockBuilder,
+        lang: &dyn CodeLang,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        cb.add("%<", ());
+        let block_syntax = lang.block_syntax();
+        let close = block_syntax.block_close;
+        let suffix = lang.emit_type_close_suffix(self.kind, &self.impl_types)?;
+
+        if !close.is_empty() {
+            cb.add(
+                &format!("{close}{}", block_syntax.type_close_terminator),
+                (),
+            );
+            if let Some(suffix) = suffix {
+                cb.add(" ", ());
+                cb.add_code(suffix);
+            }
+            cb.add_line();
+        } else if let Some(suffix) = suffix {
+            cb.add("%>", ());
+            cb.add_code(suffix);
+            cb.add_line();
+            cb.add("%<", ());
         }
-        let resolve = |_module: &str, name: &str| name.to_string();
-        let impl_names: Vec<String> = self
-            .impl_types
-            .iter()
-            .filter_map(|t| t.render(80, &resolve).ok())
-            .collect();
-        lang.render_type_close_suffix(self.kind, &impl_names)
+
+        Ok(())
     }
 
     /// Emit annotations and doc comment.

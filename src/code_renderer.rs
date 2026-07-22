@@ -62,7 +62,7 @@ impl<'a> CodeRenderer<'a> {
                 .resolved_name(module, name)
                 .unwrap_or(name)
                 .to_string();
-            lang.qualify_import_name(module, &resolved)
+            lang.qualify_import_name(module, name, &resolved)
         };
         tn.to_doc_with_lang(&resolve, self.lang)
     }

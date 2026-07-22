@@ -1,6 +1,8 @@
 //! Go language implementation.
 
+use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::CodeNode;
+use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -8,7 +10,8 @@ use crate::lang::config::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
-use crate::type_name::{FunctionPresentation, TypePresentation, WildcardPresentation};
+use crate::spec::where_spec::{TypeParamSpec, render_type_params};
+use crate::type_name::{FunctionPresentation, TypeName, TypePresentation, WildcardPresentation};
 
 /// Go language implementation.
 ///
@@ -224,7 +227,7 @@ impl RendererLang for Go {
         "//"
     }
 
-    fn qualify_import_name(&self, module: &str, resolved_name: &str) -> String {
+    fn qualify_import_name(&self, module: &str, _name: &str, resolved_name: &str) -> String {
         let pkg = package_name(module);
         format!("{pkg}.{resolved_name}")
     }
@@ -408,8 +411,17 @@ impl CodeLang for Go {
         }
     }
 
-    fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
-        format!("type {name} {inner}")
+    fn emit_newtype_decl(
+        &self,
+        _visibility: &str,
+        name: &str,
+        type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let mut args = Vec::new();
+        let type_params = render_type_params(type_params, self, &mut args);
+        args.push(Arg::TypeName(inner.clone()));
+        CodeBlock::of(&format!("type {name}{type_params} %T"), args)
     }
 
     fn type_kind_suffix(&self, kind: TypeKind) -> &str {
@@ -553,10 +565,16 @@ mod tests {
     #[test]
     fn test_qualify_import_name() {
         let go = Go::new();
-        assert_eq!(go.qualify_import_name("net/http", "Server"), "http.Server");
-        assert_eq!(go.qualify_import_name("fmt", "Println"), "fmt.Println");
         assert_eq!(
-            go.qualify_import_name("encoding/json", "Marshal"),
+            go.qualify_import_name("net/http", "Server", "Server"),
+            "http.Server"
+        );
+        assert_eq!(
+            go.qualify_import_name("fmt", "Println", "Println"),
+            "fmt.Println"
+        );
+        assert_eq!(
+            go.qualify_import_name("encoding/json", "Marshal", "Marshal"),
             "json.Marshal"
         );
     }

@@ -2,7 +2,10 @@
 
 sigil-stitch supports new languages by implementing two traits: `RendererLang` (renderer-only methods) and `CodeLang` (spec-layer methods). `CodeLang` extends `RendererLang`, so implementing `CodeLang` requires both. If you only need `CodeBlock`-level rendering without specs, `RendererLang` alone is sufficient.
 
-The `RendererLang` trait has 14 methods covering rendering essentials. `CodeLang` adds the spec-layer methods: 4 required plus 6 config struct accessors and override methods — all with sensible defaults. You only need to override the defaults when your language diverges from the common patterns.
+`RendererLang` covers rendering essentials. `CodeLang` adds spec-layer behavior,
+six config struct accessors, and structured emission hooks, all with sensible
+defaults. You only need to override the defaults when your language diverges
+from the common patterns.
 
 This guide walks through the process using a hypothetical language, with references to real implementations you can study.
 
@@ -23,36 +26,39 @@ can't handle (e.g., shell flags, Go channel operators), you may also need to add
 
 These methods are used by the renderer (`code_renderer.rs`) and type rendering:
 
-### Core Methods (6 required)
+### Required Methods
 
-These are enough for CodeBlock-level code generation:
+Only two methods have no default:
 
 | Method | Example (TypeScript) | Purpose |
 |--------|---------------------|---------|
 | `file_extension()` | `"ts"` | File extension for output files |
-| `reserved_words()` | `&["async", "await", ...]` | Words that need escaping |
-| `render_imports()` | `import { Foo } from '...'` | Emit the import header |
-| `render_string_literal()` | `'hello'` | Language-specific string quoting |
-| `render_doc_comment()` | `/** ... */` | Doc comment block |
 | `line_comment_prefix()` | `"//"` | Single-line comment prefix |
 
-### Override Methods (with defaults)
+### Common Overrides
 
 | Method | Default | Purpose |
 |--------|---------|---------|
+| `reserved_words()` | Empty | Words that need escaping |
+| `render_string_literal()` | C-style double quotes | Language-specific string quoting |
 | `render_verbatim_string()` | Delegates to `render_string_literal()` | Minimal escaping for interpolated strings |
+| `block_syntax()` | Brace-delimited blocks | Delimiters, indentation, and terminators |
+| `type_presentation()` | TypeScript-like forms | Compound type rendering |
+| `generic_syntax()` | Angle brackets | Generic application and constraints |
 
 Override `render_verbatim_string()` if your language has string interpolation (e.g., Bash `"$x"`, TypeScript `` `${x}` ``, Python `f"{x}"`).
 
-`render_imports()` is the most complex. It receives an `ImportGroup` (deduplicated, with aliases resolved) and must emit the full import header string. Study `src/lang/typescript.rs` for ES module imports or `src/lang/rust.rs` for `use` paths.
+`rewrite_nodes()` is available for syntax corrections that require a tree-level
+view after macro expansion. Prefer declarative config for ordinary syntax.
 
 ## The CodeLang Trait
 
 Extends `RendererLang` with the additional methods needed by the spec layer.
 
-### Spec Support Methods (4 required)
+### Core Spec Support Methods
 
-These enable TypeSpec, FunSpec, and FieldSpec rendering:
+These methods enable useful TypeSpec, FunSpec, and FieldSpec rendering. Their
+defaults are intentionally minimal, so most language adapters override them:
 
 | Method | Example | Purpose |
 |--------|---------|---------|
@@ -159,10 +165,14 @@ Returns `TypePresentationConfig` controlling how semantic types (arrays, optiona
 These methods don't belong to a config struct but have sensible defaults you can override:
 
 - `escape_reserved()` -- how reserved words are escaped.
-- `qualify_import_name()` -- default passthrough. Go overrides to return `"http.Server"` (package-qualified names).
+- `qualify_import_name()` -- receives the module, original name, and resolved
+  name. The default returns the resolved name; Go prefixes its package and
+  Haskell uses a module-qualified original name when an alias was assigned,
+  paired with a `qualified` import for that symbol.
 - `module_separator()` -- returns `Option<&str>`. Default `None`. Override to `Some("::")` (Rust/C++) or `Some(".")` (Go/Python/Java/etc.) to enable `TypeName::qualified()` inline rendering.
 - `type_kind_suffix()` -- suffix after type close for specific type kinds.
-- `render_newtype_line()` -- default emits Rust tuple struct `struct Name(Inner);`. Go: `type Name Inner`, Kotlin: `value class Name(val value: Inner)`, Python: `Name = NewType("Name", Inner)`, C: `typedef Inner Name;`.
+- `emit_newtype_decl()` -- emits a structured `CodeBlock` for a newtype. The
+  default is the Rust tuple struct `struct Name(Inner);`.
 - `fun_block_open()` -- custom block opener for functions.
 - `type_header_block_open()` -- custom block opener for type headers.
 - `doc_comment_inside_body()` -- whether doc comments go inside the body (Python docstrings).
@@ -170,23 +180,46 @@ These methods don't belong to a config struct but have sensible defaults you can
 - `optional_field_style()` -- how optional fields are represented.
 - `property_style()` -- default `Accessor` (TS/JS: `get name()`). Swift/Kotlin: `Field` (inline get/set).
 - `property_getter_keyword()` -- default `"get"`. Kotlin: `"get()"`.
-- `render_type_context()` -- additional context for type rendering.
+- `emit_type_context()` -- optional structured context for split function
+  signatures.
 - `type_body_prefix()` -- content emitted before the type body.
 - `type_body_suffix()` -- content emitted after the type body.
-- `render_type_close_suffix()` -- suffix after type close brace.
+- `emit_type_close_suffix()` -- optional structured suffix after a type's close
+  delimiter, such as Haskell `deriving`.
 - `render_type_param_kind()` -- how type parameters are annotated with variance.
 - `line_comment_suffix()` -- suffix for line comments (default `""`).
+
+`render_imports()` receives a deduplicated, alias-resolved `ImportGroup` and
+emits the file's import header. `render_doc_comment()` emits spec-level doc
+comments. Study `src/lang/typescript.rs` for ES module imports or
+`src/lang/rust.rs` for `use` paths.
+
+The three `emit_*` type hooks return `Result` so construction failures reach
+`FileSpec::render()`. `emit_type_context()` and
+`emit_type_close_suffix()` return `Ok(None)` when the language has no fragment
+to add. Use `Arg::TypeName` or `%T` for every semantic type and compose child
+blocks structurally; do not render a `TypeName` to a string inside a hook.
 
 ## Step-by-Step Walkthrough
 
 ### 1. Create the language file
 
-Create `src/lang/your_lang.rs`:
+Create `src/lang/your_lang.rs`. Keep semantic types in `%T` slots and return
+blocks without a trailing newline; the spec caller owns surrounding whitespace,
+indentation, and line breaks. Hook errors should be returned unchanged.
 
 ```rust,ignore
-use crate::import::ImportGroup;
-use crate::lang::CodeLang;
-use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use sigil_stitch::code_block::{Arg, CodeBlock};
+use sigil_stitch::error::SigilStitchError;
+use sigil_stitch::import::ImportGroup;
+use sigil_stitch::lang::config::{
+    BlockSyntaxConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
+    TypeDeclSyntaxConfig,
+};
+use sigil_stitch::lang::{CodeLang, RendererLang};
+use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use sigil_stitch::spec::where_spec::{TypeParamSpec, render_type_params};
+use sigil_stitch::type_name::TypeName;
 
 #[derive(Debug, Clone, Default)]
 pub struct YourLang;
@@ -199,7 +232,7 @@ impl YourLang {
 
 const RESERVED: &[&str] = &["if", "else", "for", "while", /* ... */];
 
-impl CodeLang for YourLang {
+impl RendererLang for YourLang {
     fn file_extension(&self) -> &str { "yl" }
     fn reserved_words(&self) -> &[&str] { RESERVED }
     fn line_comment_prefix(&self) -> &str { "//" }
@@ -208,6 +241,25 @@ impl CodeLang for YourLang {
         format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
     }
 
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        BlockSyntaxConfig {
+            uses_semicolons: true,
+            indent_unit: "    ",
+            field_terminator: ";",
+            ..Default::default()
+        }
+    }
+
+    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
+        GenericSyntaxConfig {
+            constraint_keyword: " extends ",
+            constraint_separator: " & ",
+            ..Default::default()
+        }
+    }
+}
+
+impl CodeLang for YourLang {
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         let mut out = String::from("/**\n");
         for line in lines {
@@ -218,11 +270,13 @@ impl CodeLang for YourLang {
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
-        // Build your import statements from imports.by_module()
         let mut out = String::new();
-        for (module, entries) in imports.by_module() {
-            let names: Vec<&str> = entries.iter().map(|e| e.resolved_name.as_str()).collect();
-            out.push_str(&format!("import {{ {} }} from \"{}\";\n", names.join(", "), module));
+        for entry in imports.entries() {
+            out.push_str(&format!(
+                "import {{ {} }} from \"{}\";\n",
+                entry.resolved_name(),
+                entry.module,
+            ));
         }
         out
     }
@@ -250,26 +304,24 @@ impl CodeLang for YourLang {
     }
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool { true }
 
-    // Config struct overrides...
-    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
-        BlockSyntaxConfig {
-            uses_semicolons: true,
-            indent_unit: "    ",
-            field_terminator: ";",
-            ..Default::default()
-        }
+    fn emit_newtype_decl(
+        &self,
+        visibility: &str,
+        name: &str,
+        type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let mut args = Vec::new();
+        let params = render_type_params(type_params, self, &mut args);
+        args.push(Arg::TypeName(inner.clone()));
+        CodeBlock::of(&format!("{visibility}opaque {name}{params} = %T"), args)
     }
+
+    // Config struct overrides...
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             super_type_keyword: " extends ",
             implements_keyword: " implements ",
-            ..Default::default()
-        }
-    }
-    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
-        GenericSyntaxConfig {
-            constraint_keyword: " extends ",
-            constraint_separator: " & ",
             ..Default::default()
         }
     }
@@ -281,6 +333,9 @@ impl CodeLang for YourLang {
     }
 }
 ```
+
+The runnable `CodeLang` rustdoc example compiles as part of `cargo test --doc`.
+Use it as the contract reference when adding or changing structured hooks.
 
 ### 2. Register the module
 

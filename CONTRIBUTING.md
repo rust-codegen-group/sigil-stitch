@@ -15,13 +15,14 @@ sigil-stitch/
 │   ├── code_node.rs        # CodeNode IR (tree nodes for CodeBlock)
 │   ├── code_renderer.rs    # Three-pass rendering pipeline
 │   ├── code_template.rs    # Named-parameter templates
-│   ├── type_name.rs        # TypeName enum and TypePresentation rendering engine
+│   ├── type_name.rs        # TypeName enum and presentation data types
+│   ├── type_name_render.rs # Language-aware TypeName rendering engine
 │   ├── import.rs           # Import types and conflict resolution
 │   ├── import_collector.rs # Import extraction from CodeBlock trees
 │   ├── name_allocator.rs   # Alias generation for import conflicts
 │   ├── error.rs            # Error types (snafu)
 │   ├── lang/               # CodeLang trait + 6 config struct accessors + language implementations
-│   │   ├── mod.rs          # CodeLang trait (33 methods)
+│   │   ├── mod.rs          # RendererLang and CodeLang traits
 │   │   ├── config.rs       # Config structs (BlockSyntaxConfig, FunctionSyntaxConfig, etc.)
 │   │   ├── rewrite.rs      # Runtime node rewrite walker
 │   │   ├── typescript.rs   # One file per language: typescript, javascript,
@@ -82,7 +83,10 @@ CI runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo do
 - **No unnecessary abstractions.** Three similar lines are better than a premature helper. Don't add features, refactoring, or error handling beyond what the task requires.
 - **Builder pattern:** Spec builders (`TypeSpec`, `FunSpec`, `FieldSpec`, `FileSpec`, etc.) take `mut self` and return `Self` for every setter -- chain them fluently: `FunSpec::builder("f").returns(t).body(b).build()`. `CodeBlockBuilder` takes `&mut self` -- use a `let mut` binding and call methods on it.
 - **Trait objects for language:** Public types no longer carry a language generic. The language enters at render time as `&dyn CodeLang`. `FileSpec` stores the language internally; `CodeBlock`, `TypeName`, and all specs are language-agnostic.
-- **`BoxDoc` never appears in `CodeLang`:** Language implementations return pure data (`TypePresentation`, config structs). The rendering engine in `type_name.rs` and `code_renderer.rs` interprets the data into `BoxDoc`. This is a hard invariant.
+- **`BoxDoc` never appears in `CodeLang`:** Language implementations return
+  pure presentation data or structured `CodeBlock` fragments. The rendering
+  engines in `type_name_render.rs` and `code_renderer.rs` interpret them into
+  `BoxDoc`. This is a hard invariant.
 
 ## Testing
 

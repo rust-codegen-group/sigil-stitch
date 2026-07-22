@@ -429,25 +429,27 @@ impl FunSpec {
         mut cb: crate::code_block::CodeBlockBuilder,
         lang: &dyn CodeLang,
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let resolve = |_module: &str, name: &str| name.to_string();
-
         // Type context (e.g., "(Show a) => ").
-        let context = lang.render_type_context(&self.type_params);
+        let context = lang.emit_type_context(&self.type_params)?;
 
-        // Build type signature: name :: context param1_type -> param2_type -> return_type
-        let mut type_parts: Vec<String> = Vec::new();
-        for param in &self.params {
-            let t = param.param_type.render(80, &resolve).unwrap_or_default();
-            type_parts.push(t);
-        }
-        if let Some(ret) = &self.return_type {
-            let r = ret.render(80, &resolve).unwrap_or_default();
-            type_parts.push(r);
-        }
-
-        if !type_parts.is_empty() {
-            let type_sig = format!("{} :: {}{}", self.name, context, type_parts.join(" -> "));
-            cb.add("%L", type_sig);
+        // Keep every signature type structured for import collection and alias resolution.
+        if !self.params.is_empty() || self.return_type.is_some() {
+            cb.add(&format!("{} :: ", self.name), ());
+            if let Some(context) = context {
+                cb.add_code(context);
+            }
+            for (index, param) in self.params.iter().enumerate() {
+                if index > 0 {
+                    cb.add(" -> ", ());
+                }
+                cb.add("%T", param.param_type.clone());
+            }
+            if let Some(return_type) = &self.return_type {
+                if !self.params.is_empty() {
+                    cb.add(" -> ", ());
+                }
+                cb.add("%T", return_type.clone());
+            }
             cb.add_line();
         }
 

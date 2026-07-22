@@ -45,7 +45,12 @@ pub mod zsh;
 pub mod rewrite;
 pub(crate) mod shell_syntax;
 
+use crate::code_block::{Arg, CodeBlock};
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
+use crate::spec::modifiers::TypeKind;
+use crate::spec::where_spec::{TypeParamSpec, render_type_params};
+use crate::type_name::TypeName;
 
 /// Narrow trait for `CodeRenderer` and `TypeName` rendering.
 ///
@@ -154,7 +159,8 @@ pub trait RendererLang: std::fmt::Debug + 'static {
     ///
     /// Default: return the resolved name as-is.
     /// Go overrides this to prefix the package name (e.g., `"http.Server"`).
-    fn qualify_import_name(&self, _module: &str, resolved_name: &str) -> String {
+    /// Haskell uses the original name to render aliases as qualified references.
+    fn qualify_import_name(&self, _module: &str, _name: &str, resolved_name: &str) -> String {
         resolved_name.to_string()
     }
 
@@ -183,6 +189,67 @@ pub trait RendererLang: std::fmt::Debug + 'static {
 /// Implement this when you need full `FileSpec`-level generation including
 /// functions, types, fields, and imports. For basic `CodeBlock` rendering,
 /// only [`RendererLang`] is required.
+///
+/// # Implementing structured type hooks
+///
+/// ```
+/// use sigil_stitch::code_block::{Arg, CodeBlock};
+/// use sigil_stitch::error::SigilStitchError;
+/// use sigil_stitch::lang::{CodeLang, RendererLang};
+/// use sigil_stitch::spec::file_spec::FileSpec;
+/// use sigil_stitch::spec::modifiers::TypeKind;
+/// use sigil_stitch::spec::type_spec::TypeSpec;
+/// use sigil_stitch::spec::where_spec::{TypeParamSpec, render_type_params};
+/// use sigil_stitch::type_name::TypeName;
+///
+/// #[derive(Debug)]
+/// struct ExampleLang;
+///
+/// impl RendererLang for ExampleLang {
+///     fn file_extension(&self) -> &str { "example" }
+///     fn line_comment_prefix(&self) -> &str { "//" }
+/// }
+///
+/// impl CodeLang for ExampleLang {
+///     fn emit_newtype_decl(
+///         &self,
+///         visibility: &str,
+///         name: &str,
+///         type_params: &[TypeParamSpec],
+///         inner: &TypeName,
+///     ) -> Result<CodeBlock, SigilStitchError> {
+///         let mut args = Vec::new();
+///         let params = render_type_params(type_params, self, &mut args);
+///         args.push(Arg::TypeName(inner.clone()));
+///         CodeBlock::of(&format!("{visibility}type {name}{params} = %T"), args)
+///     }
+///
+///     fn emit_type_context(
+///         &self,
+///         _type_params: &[TypeParamSpec],
+///     ) -> Result<Option<CodeBlock>, SigilStitchError> {
+///         Ok(None)
+///     }
+///
+///     fn emit_type_close_suffix(
+///         &self,
+///         _kind: TypeKind,
+///         _impl_types: &[TypeName],
+///     ) -> Result<Option<CodeBlock>, SigilStitchError> {
+///         Ok(None)
+///     }
+/// }
+///
+/// let wrapped = TypeSpec::builder("Wrapped", TypeKind::Newtype)
+///     .extends(TypeName::primitive("String"))
+///     .build()?;
+/// let output = FileSpec::builder_with("wrapped.example", ExampleLang)
+///     .add_type(wrapped)
+///     .build()?
+///     .render(80)?;
+/// assert!(output.contains("type Wrapped = String"));
+/// # Ok::<(), SigilStitchError>(())
+/// ```
 pub trait CodeLang: RendererLang {
     // ── Spec-layer methods — used by FunSpec, TypeSpec, FieldSpec, etc. ───
 
@@ -265,11 +332,23 @@ pub trait CodeLang: RendererLang {
         ""
     }
 
-    /// Render a newtype declaration line from pre-rendered components.
+    /// Emit a newtype declaration while preserving semantic type references.
     ///
-    /// Default: Rust tuple-struct `{vis}struct {name}({inner});`.
-    fn render_newtype_line(&self, vis: &str, name: &str, inner: &str) -> String {
-        format!("{vis}struct {name}({inner});")
+    /// Default: Rust tuple-struct `{visibility}struct {name}<T>({inner});`.
+    fn emit_newtype_decl(
+        &self,
+        visibility: &str,
+        name: &str,
+        type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let mut args = Vec::new();
+        let type_params = render_type_params(type_params, self, &mut args);
+        args.push(Arg::TypeName(inner.clone()));
+        CodeBlock::of(
+            &format!("{visibility}struct {name}{type_params}(%T);"),
+            args,
+        )
     }
 
     /// Opening block delimiter for function bodies specifically.
@@ -322,14 +401,14 @@ pub trait CodeLang: RendererLang {
         "get"
     }
 
-    /// Render a type context / constraint prefix for split function signatures.
+    /// Emit a type context / constraint prefix for split function signatures.
     ///
-    /// Default: `""` (no context).
-    fn render_type_context(
+    /// Default: no context.
+    fn emit_type_context(
         &self,
-        _type_params: &[crate::spec::where_spec::TypeParamSpec],
-    ) -> String {
-        String::new()
+        _type_params: &[TypeParamSpec],
+    ) -> Result<Option<CodeBlock>, SigilStitchError> {
+        Ok(None)
     }
 
     /// Content emitted after `block_open` but before the first field in a type body.
@@ -346,15 +425,15 @@ pub trait CodeLang: RendererLang {
         String::new()
     }
 
-    /// Suffix rendered after the type's closing delimiter (e.g., Haskell `deriving`).
+    /// Emit a suffix after the type's closing delimiter (e.g., Haskell `deriving`).
     ///
-    /// Default: `""`.
-    fn render_type_close_suffix(
+    /// Default: no suffix.
+    fn emit_type_close_suffix(
         &self,
-        _kind: crate::spec::modifiers::TypeKind,
-        _impl_types: &[String],
-    ) -> String {
-        String::new()
+        _kind: TypeKind,
+        _impl_types: &[TypeName],
+    ) -> Result<Option<CodeBlock>, SigilStitchError> {
+        Ok(None)
     }
 
     /// Render a type parameter's kind annotation (for higher-kinded types).

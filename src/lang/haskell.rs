@@ -1,16 +1,21 @@
 //! Haskell language implementation.
 
+use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::CodeNode;
+use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::spec::where_spec::TypeParamSpec;
+use crate::type_name::TypeName;
 
 /// Haskell language implementation.
 ///
 /// Haskell-specific behaviors:
 /// - Prefix generic application (juxtaposition): `Maybe Int`, `Either String Int`
 /// - No function keyword (type signatures use `::`, definitions have no keyword)
-/// - `import Module (Name1, Name2)` for imports
+/// - `import Module (Name1, Name2)` for imports, with `qualified` imports for
+///   conflicting names
 /// - No semicolons (indentation-based)
 /// - `data` for structs/classes/enums, `class` for type classes, `type` for aliases,
 ///   `newtype` for newtypes
@@ -214,6 +219,14 @@ impl RendererLang for Haskell {
         Some(".")
     }
 
+    fn qualify_import_name(&self, module: &str, name: &str, resolved_name: &str) -> String {
+        if resolved_name == name {
+            resolved_name.to_string()
+        } else {
+            format!("{module}.{name}")
+        }
+    }
+
     fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
         crate::lang::config::BlockSyntaxConfig {
             block_open: " =",
@@ -269,19 +282,44 @@ impl CodeLang for Haskell {
 
         for (module, entries) in &by_module {
             let has_wildcard = entries.iter().any(|e| e.is_wildcard);
-            let line = if has_wildcard {
-                format!("import {module}")
+            let lines = if has_wildcard {
+                vec![format!("import {module}")]
             } else {
-                let mut names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
-                names.sort();
-                names.dedup();
-                format!("import {module} ({})", names.join(", "))
+                let mut unqualified: Vec<&str> = entries
+                    .iter()
+                    .filter(|e| e.alias.is_none())
+                    .map(|e| e.name.as_str())
+                    .collect();
+                unqualified.sort();
+                unqualified.dedup();
+
+                let mut qualified: Vec<&str> = entries
+                    .iter()
+                    .filter(|e| e.alias.is_some())
+                    .map(|e| e.name.as_str())
+                    .collect();
+                qualified.sort();
+                qualified.dedup();
+
+                let mut lines = Vec::new();
+                if !unqualified.is_empty() {
+                    lines.push(format!("import {module} ({})", unqualified.join(", ")));
+                }
+                if !qualified.is_empty() {
+                    lines.push(format!(
+                        "import qualified {module} ({})",
+                        qualified.join(", ")
+                    ));
+                }
+                lines
             };
 
-            match import_group_order(module) {
-                0 => base_imports.push(line),
-                1 => std_imports.push(line),
-                _ => other_imports.push(line),
+            for line in lines {
+                match import_group_order(module) {
+                    0 => base_imports.push(line),
+                    1 => std_imports.push(line),
+                    _ => other_imports.push(line),
+                }
             }
         }
 
@@ -352,30 +390,63 @@ impl CodeLang for Haskell {
         " ="
     }
 
-    fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
-        format!("newtype {name} = {name} {inner}")
+    fn emit_newtype_decl(
+        &self,
+        _visibility: &str,
+        name: &str,
+        type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let mut cb = CodeBlock::builder();
+        cb.add("newtype ", ());
+        if let Some(context) = self.emit_type_context(type_params)? {
+            cb.add_code(context);
+        }
+        cb.add(name, ());
+        for type_param in type_params {
+            cb.add(&format!(" {}", type_param.name), ());
+        }
+        if crate::type_name_render::is_compound_type(inner) {
+            cb.add(&format!(" = {name} (%T)"), inner.clone());
+        } else {
+            cb.add(&format!(" = {name} %T"), inner.clone());
+        }
+        cb.build()
     }
 
-    fn render_type_context(
+    fn emit_type_context(
         &self,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
-    ) -> String {
-        let resolve = |_module: &str, name: &str| name.to_string();
-        let mut constraints: Vec<String> = Vec::new();
+        type_params: &[TypeParamSpec],
+    ) -> Result<Option<CodeBlock>, SigilStitchError> {
+        let mut constraints = Vec::new();
         for tp in type_params {
             for bound in &tp.bounds {
-                let bound_str = bound.render(80, &resolve).unwrap_or_default();
-                constraints.push(format!("{bound_str} {}", tp.name));
+                constraints.push((bound.clone(), tp.name.as_str()));
             }
         }
         if constraints.is_empty() {
-            return String::new();
+            return Ok(None);
         }
-        if constraints.len() == 1 {
-            format!("{} => ", constraints[0])
-        } else {
-            format!("({}) => ", constraints.join(", "))
+
+        let mut format = String::new();
+        let mut args = Vec::with_capacity(constraints.len());
+        if constraints.len() > 1 {
+            format.push('(');
         }
+        for (index, (bound, param_name)) in constraints.into_iter().enumerate() {
+            if index > 0 {
+                format.push_str(", ");
+            }
+            format.push_str("%T ");
+            format.push_str(param_name);
+            args.push(Arg::TypeName(bound));
+        }
+        if args.len() > 1 {
+            format.push(')');
+        }
+        format.push_str(" => ");
+
+        CodeBlock::of(&format, args).map(Some)
     }
 
     fn type_body_prefix(&self, name: &str, kind: crate::spec::modifiers::TypeKind) -> String {
@@ -392,15 +463,26 @@ impl CodeLang for Haskell {
         }
     }
 
-    fn render_type_close_suffix(
+    fn emit_type_close_suffix(
         &self,
         _kind: crate::spec::modifiers::TypeKind,
-        impl_types: &[String],
-    ) -> String {
+        impl_types: &[TypeName],
+    ) -> Result<Option<CodeBlock>, SigilStitchError> {
         if impl_types.is_empty() {
-            return String::new();
+            return Ok(None);
         }
-        format!("  deriving ({})", impl_types.join(", "))
+
+        let mut format = String::from("deriving (");
+        let mut args = Vec::with_capacity(impl_types.len());
+        for (index, impl_type) in impl_types.iter().enumerate() {
+            if index > 0 {
+                format.push_str(", ");
+            }
+            format.push_str("%T");
+            args.push(Arg::TypeName(impl_type.clone()));
+        }
+        format.push(')');
+        CodeBlock::of(&format, args).map(Some)
     }
 
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
@@ -498,6 +580,36 @@ mod tests {
         assert_eq!(lines[0], "import Data.Map (Map, fromList)");
         assert_eq!(lines[1], "");
         assert_eq!(lines[2], "import MyApp.Types (User)");
+    }
+
+    #[test]
+    fn test_render_imports_uses_qualified_form_for_resolved_aliases() {
+        let hs = Haskell::new();
+        let imports = ImportGroup {
+            entries: vec![
+                ImportEntry {
+                    module: "Domain.Input".into(),
+                    name: "Value".into(),
+                    alias: None,
+                    is_type_only: false,
+                    is_side_effect: false,
+                    is_wildcard: false,
+                },
+                ImportEntry {
+                    module: "Domain.Output".into(),
+                    name: "Value".into(),
+                    alias: Some("OutputValue".into()),
+                    is_type_only: false,
+                    is_side_effect: false,
+                    is_wildcard: false,
+                },
+            ],
+        };
+
+        assert_eq!(
+            hs.render_imports(&imports),
+            "import Domain.Input (Value)\nimport qualified Domain.Output (Value)"
+        );
     }
 
     #[test]
@@ -606,31 +718,36 @@ mod tests {
     }
 
     #[test]
-    fn test_render_type_context_empty() {
+    fn test_emit_type_context_empty() {
         let hs = Haskell::new();
         let params: Vec<crate::spec::where_spec::TypeParamSpec> = vec![];
-        assert_eq!(hs.render_type_context(&params), "");
+        assert!(hs.emit_type_context(&params).unwrap().is_none());
     }
 
     #[test]
-    fn test_render_type_context_single() {
+    fn test_emit_type_context_single() {
         let hs = Haskell::new();
         let params = vec![
             crate::spec::where_spec::TypeParamSpec::new("a")
                 .with_bound(crate::type_name::TypeName::primitive("Show")),
         ];
-        assert_eq!(hs.render_type_context(&params), "Show a => ");
+        let context = hs.emit_type_context(&params).unwrap().unwrap();
+        assert_eq!(context.render_standalone(&hs, 80).unwrap(), "Show a => ");
     }
 
     #[test]
-    fn test_render_type_context_multiple() {
+    fn test_emit_type_context_multiple() {
         let hs = Haskell::new();
         let params = vec![
             crate::spec::where_spec::TypeParamSpec::new("a")
                 .with_bound(crate::type_name::TypeName::primitive("Show"))
                 .with_bound(crate::type_name::TypeName::primitive("Eq")),
         ];
-        assert_eq!(hs.render_type_context(&params), "(Show a, Eq a) => ");
+        let context = hs.emit_type_context(&params).unwrap().unwrap();
+        assert_eq!(
+            context.render_standalone(&hs, 80).unwrap(),
+            "(Show a, Eq a) => "
+        );
     }
 
     #[test]
@@ -652,27 +769,37 @@ mod tests {
     }
 
     #[test]
-    fn test_render_type_close_suffix_empty() {
+    fn test_emit_type_close_suffix_empty() {
         let hs = Haskell::new();
-        let empty: Vec<String> = vec![];
-        assert_eq!(hs.render_type_close_suffix(TypeKind::Enum, &empty), "");
-    }
-
-    #[test]
-    fn test_render_type_close_suffix_deriving() {
-        let hs = Haskell::new();
-        let types = vec!["Show".to_string(), "Eq".to_string()];
-        assert_eq!(
-            hs.render_type_close_suffix(TypeKind::Enum, &types),
-            "  deriving (Show, Eq)"
+        assert!(
+            hs.emit_type_close_suffix(TypeKind::Enum, &[])
+                .unwrap()
+                .is_none()
         );
     }
 
     #[test]
-    fn test_render_newtype_line() {
+    fn test_emit_type_close_suffix_deriving() {
         let hs = Haskell::new();
+        let types = vec![TypeName::primitive("Show"), TypeName::primitive("Eq")];
+        let suffix = hs
+            .emit_type_close_suffix(TypeKind::Enum, &types)
+            .unwrap()
+            .unwrap();
         assert_eq!(
-            hs.render_newtype_line("", "Meters", "f64"),
+            suffix.render_standalone(&hs, 80).unwrap(),
+            "deriving (Show, Eq)"
+        );
+    }
+
+    #[test]
+    fn test_emit_newtype_decl() {
+        let hs = Haskell::new();
+        let declaration = hs
+            .emit_newtype_decl("", "Meters", &[], &TypeName::primitive("f64"))
+            .unwrap();
+        assert_eq!(
+            declaration.render_standalone(&hs, 80).unwrap(),
             "newtype Meters = Meters f64"
         );
     }
@@ -690,6 +817,15 @@ mod tests {
     fn test_module_separator() {
         let hs = Haskell::new();
         assert_eq!(hs.module_separator(), Some("."));
+    }
+
+    #[test]
+    fn test_alias_uses_qualified_original_name() {
+        let hs = Haskell::new();
+        assert_eq!(
+            hs.qualify_import_name("Domain.Json", "ToJSON", "JsonToJSON"),
+            "Domain.Json.ToJSON"
+        );
     }
 
     #[test]
