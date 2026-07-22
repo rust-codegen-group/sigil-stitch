@@ -1,5 +1,7 @@
 //! Python language implementation.
 
+use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -7,7 +9,8 @@ use crate::lang::config::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
-use crate::type_name::{AssociatedTypeStyle, FunctionPresentation, TypePresentation};
+use crate::spec::where_spec::TypeParamSpec;
+use crate::type_name::{AssociatedTypeStyle, FunctionPresentation, TypeName, TypePresentation};
 
 /// Python language implementation.
 ///
@@ -375,8 +378,14 @@ impl CodeLang for Python {
         true
     }
 
-    fn render_newtype_line(&self, _vis: &str, name: &str, inner: &str) -> String {
-        format!("{name} = NewType(\"{name}\", {inner})")
+    fn emit_newtype_decl(
+        &self,
+        _visibility: &str,
+        name: &str,
+        _type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        CodeBlock::of(&format!("{name} = NewType(\"{name}\", %T)"), inner.clone())
     }
 
     fn doc_comment_inside_body(&self) -> bool {

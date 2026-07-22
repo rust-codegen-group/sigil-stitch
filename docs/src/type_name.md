@@ -4,6 +4,14 @@
 
 `TypeName` is language-agnostic — it carries no generic parameter. The same `TypeName` value can be rendered for any target language at `FileSpec::render()` time.
 
+Public type rendering is always language-aware. For normal generation, place a
+`TypeName` in a `CodeBlock` `%T` slot and let `FileSpec` collect imports, resolve
+aliases, and choose the target syntax. `TypeName::to_doc_with_lang()` is for
+custom final renderers that already have a target language and an alias
+resolver. Language-neutral `TypeName::render()` and `TypeName::to_doc()`
+shortcuts are not exposed because they encourage type references to be
+flattened before import resolution.
+
 ## Import tracking
 
 The two `Importable` constructors are the primary way to create types that generate import statements:
@@ -293,7 +301,7 @@ let t = TypeName::raw("keyof User");
 
 ## Cross-language rendering
 
-The same `TypeName` variant renders differently per language. This is powered by the `TypePresentation` system -- each language returns a rendering pattern (prefix, postfix, surround, delimited, generic-wrap, or infix) for each type construct, and the rendering engine in `type_name.rs` interprets the pattern into formatted output. Language implementations never build `BoxDoc` directly.
+The same `TypeName` variant renders differently per language. This is powered by the `TypePresentation` system -- each language returns a rendering pattern (prefix, postfix, surround, delimited, generic-wrap, or infix) for each type construct, and the rendering engine in `type_name_render.rs` interprets the pattern into formatted output. Language implementations never build `BoxDoc` directly.
 
 | TypeName | TypeScript | Rust | Go | C++ |
 |----------|-----------|------|-----|-----|

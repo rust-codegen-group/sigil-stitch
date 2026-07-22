@@ -122,9 +122,9 @@ impl TypeParamSpec {
 /// Render type parameters into `<T: Bound, U>` form, appending to a format
 /// string and args vec. Returns the format string fragment (empty string if
 /// no type params).
-pub fn render_type_params(
+pub fn render_type_params<L: CodeLang + ?Sized>(
     params: &[TypeParamSpec],
-    lang: &dyn CodeLang,
+    lang: &L,
     args: &mut Vec<Arg>,
 ) -> String {
     if params.is_empty() {

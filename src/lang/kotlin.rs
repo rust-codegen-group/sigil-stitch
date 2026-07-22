@@ -1,8 +1,12 @@
 //! Kotlin language implementation.
 
+use crate::code_block::{Arg, CodeBlock};
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::spec::where_spec::{TypeParamSpec, render_type_params};
+use crate::type_name::TypeName;
 
 /// Kotlin language implementation.
 ///
@@ -351,8 +355,20 @@ impl CodeLang for Kotlin {
         true
     }
 
-    fn render_newtype_line(&self, vis: &str, name: &str, inner: &str) -> String {
-        format!("{vis}value class {name}(val value: {inner})")
+    fn emit_newtype_decl(
+        &self,
+        visibility: &str,
+        name: &str,
+        type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let mut args = Vec::new();
+        let type_params = render_type_params(type_params, self, &mut args);
+        args.push(Arg::TypeName(inner.clone()));
+        CodeBlock::of(
+            &format!("{visibility}value class {name}{type_params}(val value: %T)"),
+            args,
+        )
     }
 
     fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {

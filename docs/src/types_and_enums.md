@@ -242,12 +242,21 @@ let type_spec = TypeSpec::builder("Meters", TypeKind::Newtype)
 # }
 ```
 
-Newtype syntax varies across languages and is controlled by `render_newtype_line()`:
+Newtype syntax varies across languages and is controlled by
+`CodeLang::emit_newtype_decl()`. The hook receives the raw declaration name,
+structured type parameters, and the inner `TypeName`, then returns a
+`CodeBlock`. Imports and aliases therefore work inside newtype declarations
+just as they do in ordinary `%T` slots:
+
 - Rust: `struct Meters(f64);` (tuple struct)
 - Go: `type Meters float64` (distinct type)
 - Kotlin: `value class Meters(val value: f64)` (inline class)
 - Python: `Meters = NewType("Meters", float)` (typing.NewType)
 - C: `typedef float Meters;` (typedef)
+
+Rust, Go, Haskell, Kotlin, and Scala adapters emit supported type parameters
+and bounds. C, PHP, and Python omit them because their native wrapper forms do
+not support declaration-site generic parameters.
 
 ### Enums with EnumVariantSpec
 

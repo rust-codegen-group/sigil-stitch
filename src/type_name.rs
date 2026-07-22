@@ -4,7 +4,7 @@ use crate::import::ImportRef;
 use crate::lang::RendererLang;
 ///
 /// Each variant describes a structural pattern for assembling already-rendered
-/// inner type docs into the output. The rendering engine in `type_name.rs`
+/// inner type docs into the output. The rendering engine in `type_name_render.rs`
 /// interprets these patterns — language implementations never build `BoxDoc`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypePresentation<'a> {
@@ -559,19 +559,8 @@ impl TypeName {
         crate::type_name_import::collect_imports(self, out)
     }
 
-    /// Render this type name to a `pretty::BoxDoc` for width-aware formatting.
-    ///
-    /// The `resolved_name` closure maps (module, name) -> display name,
-    /// accounting for import aliases.
-    pub fn to_doc<F>(&self, resolve: &F) -> BoxDoc<'static, ()>
-    where
-        F: Fn(&str, &str) -> String,
-    {
-        crate::type_name_render::to_doc(self, resolve)
-    }
-
-    /// Render this type to a string at a given width.
-    pub fn render<F>(
+    #[cfg(test)]
+    fn render_canonical<F>(
         &self,
         width: usize,
         resolve: &F,
@@ -579,11 +568,13 @@ impl TypeName {
     where
         F: Fn(&str, &str) -> String,
     {
-        crate::type_name_render::render(self, width, resolve)
+        crate::type_name_render::render_canonical(self, width, resolve)
     }
 
-    /// Language-aware variant of [`TypeName::to_doc`] that consults the lang for
-    /// syntax differences (e.g., generic delimiters `<>` vs `[]`).
+    /// Render this type name with the target language's syntax rules.
+    ///
+    /// The `resolve` closure maps `(module, name)` to the import-resolved display
+    /// name, including any alias selected by [`ImportGroup`](crate::import::ImportGroup).
     pub fn to_doc_with_lang<F>(&self, resolve: &F, lang: &dyn RendererLang) -> BoxDoc<'static, ()>
     where
         F: Fn(&str, &str) -> String,
@@ -654,13 +645,13 @@ mod tests {
     #[test]
     fn test_primitive() {
         let t = TypeName::primitive("number");
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "number");
+        assert_eq!(t.render_canonical(80, &identity_resolve).unwrap(), "number");
     }
 
     #[test]
     fn test_importable() {
         let t = TypeName::importable("./models", "User");
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "User");
+        assert_eq!(t.render_canonical(80, &identity_resolve).unwrap(), "User");
     }
 
     #[test]
@@ -673,13 +664,16 @@ mod tests {
                 name.to_string()
             }
         };
-        assert_eq!(t.render(80, &resolve).unwrap(), "OtherUser");
+        assert_eq!(t.render_canonical(80, &resolve).unwrap(), "OtherUser");
     }
 
     #[test]
     fn test_array() {
         let t = TypeName::array(TypeName::primitive("string"));
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "string[]");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "string[]"
+        );
     }
 
     #[test]
@@ -688,7 +682,10 @@ mod tests {
             TypeName::primitive("Promise"),
             vec![TypeName::importable("./models", "User")],
         );
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "Promise<User>");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "Promise<User>"
+        );
     }
 
     #[test]
@@ -701,7 +698,7 @@ mod tests {
             ],
         );
         // At width 20, should break
-        let output = t.render(20, &identity_resolve).unwrap();
+        let output = t.render_canonical(20, &identity_resolve).unwrap();
         assert!(output.contains('\n'));
         assert!(output.contains("VeryLongKeyTypeName"));
         assert!(output.contains("VeryLongValueTypeName"));
@@ -715,7 +712,7 @@ mod tests {
             TypeName::primitive("boolean"),
         ]);
         assert_eq!(
-            t.render(80, &identity_resolve).unwrap(),
+            t.render_canonical(80, &identity_resolve).unwrap(),
             "string | number | boolean"
         );
     }
@@ -727,32 +724,38 @@ mod tests {
             TypeName::primitive("VeryLongTypeName2"),
             TypeName::primitive("VeryLongTypeName3"),
         ]);
-        let output = t.render(30, &identity_resolve).unwrap();
+        let output = t.render_canonical(30, &identity_resolve).unwrap();
         assert!(output.contains('\n'));
     }
 
     #[test]
     fn test_pointer() {
         let t = TypeName::pointer(TypeName::primitive("User"));
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "*User");
+        assert_eq!(t.render_canonical(80, &identity_resolve).unwrap(), "*User");
     }
 
     #[test]
     fn test_slice() {
         let t = TypeName::slice(TypeName::primitive("User"));
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "[]User");
+        assert_eq!(t.render_canonical(80, &identity_resolve).unwrap(), "[]User");
     }
 
     #[test]
     fn test_map() {
         let t = TypeName::map(TypeName::primitive("string"), TypeName::primitive("User"));
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "map[string]User");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "map[string]User"
+        );
     }
 
     #[test]
     fn test_optional() {
         let t = TypeName::optional(TypeName::primitive("string"));
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "string | null");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "string | null"
+        );
     }
 
     #[test]
@@ -762,7 +765,7 @@ mod tests {
             TypeName::primitive("boolean"),
         );
         assert_eq!(
-            t.render(80, &identity_resolve).unwrap(),
+            t.render_canonical(80, &identity_resolve).unwrap(),
             "(string, number) => boolean"
         );
     }
@@ -775,7 +778,7 @@ mod tests {
         );
         let outer = TypeName::generic(TypeName::primitive("Promise"), vec![inner]);
         assert_eq!(
-            outer.render(80, &identity_resolve).unwrap(),
+            outer.render_canonical(80, &identity_resolve).unwrap(),
             "Promise<Array<User>>"
         );
     }
@@ -803,7 +806,7 @@ mod tests {
         let mut imports = Vec::new();
         t.collect_imports(&mut imports);
         assert!(imports.is_empty());
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "any");
+        assert_eq!(t.render_canonical(80, &identity_resolve).unwrap(), "any");
     }
 
     #[test]
@@ -831,7 +834,7 @@ mod tests {
     fn test_with_alias_noop_on_primitive() {
         // with_alias on a non-Importable variant should be a no-op.
         let t = TypeName::primitive("number").with_alias("MyNumber");
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "number");
+        assert_eq!(t.render_canonical(80, &identity_resolve).unwrap(), "number");
     }
 
     #[test]
@@ -839,7 +842,7 @@ mod tests {
         let t = TypeName::importable("./models", "User").with_alias("MyUser");
         // The resolve function should map to the alias.
         let resolve = |_module: &str, _name: &str| "MyUser".to_string();
-        assert_eq!(t.render(80, &resolve).unwrap(), "MyUser");
+        assert_eq!(t.render_canonical(80, &resolve).unwrap(), "MyUser");
     }
 
     #[test]
@@ -848,13 +851,16 @@ mod tests {
             TypeName::primitive("string"),
             TypeName::primitive("number"),
         ]);
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "(string, number)");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "(string, number)"
+        );
     }
 
     #[test]
     fn test_unit_tuple() {
         let t = TypeName::unit();
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "()");
+        assert_eq!(t.render_canonical(80, &identity_resolve).unwrap(), "()");
     }
 
     #[test]
@@ -939,13 +945,16 @@ mod tests {
     #[test]
     fn test_reference() {
         let t = TypeName::reference(TypeName::primitive("str"));
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "&str");
+        assert_eq!(t.render_canonical(80, &identity_resolve).unwrap(), "&str");
     }
 
     #[test]
     fn test_reference_mut() {
         let t = TypeName::reference_mut(TypeName::primitive("Vec<i32>"));
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "&mut Vec<i32>");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "&mut Vec<i32>"
+        );
     }
 
     #[test]
@@ -1133,6 +1142,9 @@ mod tests {
             TypeName::primitive("A"),
             TypeName::primitive("B"),
         ])));
+        assert!(is_compound_type(&TypeName::optional(TypeName::primitive(
+            "A"
+        ))));
         assert!(!is_compound_type(&TypeName::primitive("Int")));
         assert!(!is_compound_type(&TypeName::array(TypeName::primitive(
             "Int"
@@ -1367,7 +1379,7 @@ mod tests {
             "Item",
         );
         assert_eq!(
-            t.render(80, &identity_resolve).unwrap(),
+            t.render_canonical(80, &identity_resolve).unwrap(),
             "<T as Iter>::Item"
         );
     }
@@ -1375,13 +1387,19 @@ mod tests {
     #[test]
     fn test_member_type_default_rendering() {
         let t = TypeName::member_type(TypeName::primitive("Self"), "Output");
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "Self::Output");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "Self::Output"
+        );
     }
 
     #[test]
     fn test_impl_trait_default_rendering() {
         let t = TypeName::impl_trait(vec![TypeName::primitive("Display")]);
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "impl Display");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "impl Display"
+        );
     }
 
     #[test]
@@ -1390,24 +1408,29 @@ mod tests {
             TypeName::primitive("Error"),
             TypeName::primitive("Send"),
         ]);
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "dyn Error + Send");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "dyn Error + Send"
+        );
     }
 
     #[test]
     fn test_wildcard_default_rendering() {
         assert_eq!(
-            TypeName::wildcard().render(80, &identity_resolve).unwrap(),
+            TypeName::wildcard()
+                .render_canonical(80, &identity_resolve)
+                .unwrap(),
             "?"
         );
         assert_eq!(
             TypeName::wildcard_extends(TypeName::primitive("T"))
-                .render(80, &identity_resolve)
+                .render_canonical(80, &identity_resolve)
                 .unwrap(),
             "? extends T"
         );
         assert_eq!(
             TypeName::wildcard_super(TypeName::primitive("T"))
-                .render(80, &identity_resolve)
+                .render_canonical(80, &identity_resolve)
                 .unwrap(),
             "? super T"
         );
@@ -1440,7 +1463,10 @@ mod tests {
     #[test]
     fn test_reference_with_lifetime_default_rendering() {
         let t = TypeName::reference_with_lifetime(TypeName::primitive("str"), "'a");
-        assert_eq!(t.render(80, &identity_resolve).unwrap(), "&'a str");
+        assert_eq!(
+            t.render_canonical(80, &identity_resolve).unwrap(),
+            "&'a str"
+        );
     }
 
     #[test]

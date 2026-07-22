@@ -39,7 +39,11 @@ fn test_name_escapes_php_keywords() {
 #[test]
 fn test_newtype_line() {
     let php = Php::new();
-    let line = php.render_newtype_line("", "Name", "string");
+    let line = php
+        .emit_newtype_decl("", "Name", &[], &TypeName::primitive("string"))
+        .unwrap()
+        .render_standalone(&php, 80)
+        .unwrap();
     assert!(line.contains("class Name"));
     assert!(line.contains("__construct"));
     assert!(line.contains("private string $value"));

@@ -110,10 +110,11 @@ pub(crate) fn is_compound_type(t: &TypeName) -> bool {
             | TypeName::Intersection(_)
             | TypeName::Function { .. }
             | TypeName::Tuple(_)
+            | TypeName::Optional(_)
     )
 }
 
-pub fn to_doc<F>(tn: &TypeName, resolve: &F) -> BoxDoc<'static, ()>
+pub(crate) fn to_canonical_doc<F>(tn: &TypeName, resolve: &F) -> BoxDoc<'static, ()>
 where
     F: Fn(&str, &str) -> String,
 {
@@ -124,13 +125,16 @@ where
         }
         TypeName::Primitive(name) => BoxDoc::text(name.clone()),
         TypeName::Raw(s) => BoxDoc::text(s.clone()),
-        TypeName::Array(inner) => inner.to_doc(resolve).append(BoxDoc::text("[]")),
+        TypeName::Array(inner) => to_canonical_doc(inner, resolve).append(BoxDoc::text("[]")),
         TypeName::ReadonlyArray(inner) => BoxDoc::text("readonly ")
-            .append(inner.to_doc(resolve))
+            .append(to_canonical_doc(inner, resolve))
             .append(BoxDoc::text("[]")),
         TypeName::Generic { base, params } => {
-            let base_doc = base.to_doc(resolve);
-            let params_docs: Vec<_> = params.iter().map(|p| p.to_doc(resolve)).collect();
+            let base_doc = to_canonical_doc(base, resolve);
+            let params_docs: Vec<_> = params
+                .iter()
+                .map(|p| to_canonical_doc(p, resolve))
+                .collect();
             let sep = BoxDoc::text(",").append(BoxDoc::softline());
             let params_doc = BoxDoc::intersperse(params_docs, sep);
             base_doc
@@ -139,30 +143,39 @@ where
                 .append(BoxDoc::text(">"))
         }
         TypeName::Union(members) => {
-            let docs: Vec<_> = members.iter().map(|m| m.to_doc(resolve)).collect();
+            let docs: Vec<_> = members
+                .iter()
+                .map(|m| to_canonical_doc(m, resolve))
+                .collect();
             let sep = BoxDoc::softline().append(BoxDoc::text("| "));
             BoxDoc::intersperse(docs, sep).group()
         }
         TypeName::Intersection(members) => {
-            let docs: Vec<_> = members.iter().map(|m| m.to_doc(resolve)).collect();
+            let docs: Vec<_> = members
+                .iter()
+                .map(|m| to_canonical_doc(m, resolve))
+                .collect();
             let sep = BoxDoc::softline().append(BoxDoc::text("& "));
             BoxDoc::intersperse(docs, sep).group()
         }
-        TypeName::Pointer(inner) => BoxDoc::text("*").append(inner.to_doc(resolve)),
-        TypeName::Slice(inner) => BoxDoc::text("[]").append(inner.to_doc(resolve)),
+        TypeName::Pointer(inner) => BoxDoc::text("*").append(to_canonical_doc(inner, resolve)),
+        TypeName::Slice(inner) => BoxDoc::text("[]").append(to_canonical_doc(inner, resolve)),
         TypeName::Map { key, value } => BoxDoc::text("map[")
-            .append(key.to_doc(resolve))
+            .append(to_canonical_doc(key, resolve))
             .append(BoxDoc::text("]"))
-            .append(value.to_doc(resolve)),
+            .append(to_canonical_doc(value, resolve)),
         TypeName::Optional(inner) => {
-            let inner_doc = inner.to_doc(resolve);
+            let inner_doc = to_canonical_doc(inner, resolve);
             inner_doc
                 .append(BoxDoc::softline())
                 .append(BoxDoc::text("| null"))
                 .group()
         }
         TypeName::Tuple(elements) => {
-            let docs: Vec<_> = elements.iter().map(|e| e.to_doc(resolve)).collect();
+            let docs: Vec<_> = elements
+                .iter()
+                .map(|e| to_canonical_doc(e, resolve))
+                .collect();
             if docs.is_empty() {
                 return BoxDoc::text("()");
             }
@@ -184,19 +197,22 @@ where
             if *mutable {
                 prefix.push_str("mut ");
             }
-            BoxDoc::text(prefix).append(inner.to_doc(resolve))
+            BoxDoc::text(prefix).append(to_canonical_doc(inner, resolve))
         }
         TypeName::Function {
             params,
             return_type,
         } => {
-            let params_docs: Vec<_> = params.iter().map(|p| p.to_doc(resolve)).collect();
+            let params_docs: Vec<_> = params
+                .iter()
+                .map(|p| to_canonical_doc(p, resolve))
+                .collect();
             let sep = BoxDoc::text(",").append(BoxDoc::softline());
             let params_doc = BoxDoc::intersperse(params_docs, sep);
             BoxDoc::text("(")
                 .append(params_doc.nest(2).group())
                 .append(BoxDoc::text(") => "))
-                .append(return_type.to_doc(resolve))
+                .append(to_canonical_doc(return_type, resolve))
         }
         TypeName::AssociatedType {
             base,
@@ -205,24 +221,30 @@ where
         } => {
             if let Some(qual) = qualifier {
                 BoxDoc::text("<")
-                    .append(base.to_doc(resolve))
+                    .append(to_canonical_doc(base, resolve))
                     .append(BoxDoc::text(" as "))
-                    .append(qual.to_doc(resolve))
+                    .append(to_canonical_doc(qual, resolve))
                     .append(BoxDoc::text(">::"))
                     .append(BoxDoc::text(member.clone()))
             } else {
-                base.to_doc(resolve)
+                to_canonical_doc(base, resolve)
                     .append(BoxDoc::text("::"))
                     .append(BoxDoc::text(member.clone()))
             }
         }
         TypeName::ImplTrait { bounds } => {
-            let docs: Vec<_> = bounds.iter().map(|b| b.to_doc(resolve)).collect();
+            let docs: Vec<_> = bounds
+                .iter()
+                .map(|b| to_canonical_doc(b, resolve))
+                .collect();
             let sep = BoxDoc::text(" + ");
             BoxDoc::text("impl ").append(BoxDoc::intersperse(docs, sep))
         }
         TypeName::DynTrait { bounds } => {
-            let docs: Vec<_> = bounds.iter().map(|b| b.to_doc(resolve)).collect();
+            let docs: Vec<_> = bounds
+                .iter()
+                .map(|b| to_canonical_doc(b, resolve))
+                .collect();
             let sep = BoxDoc::text(" + ");
             BoxDoc::text("dyn ").append(BoxDoc::intersperse(docs, sep))
         }
@@ -235,9 +257,9 @@ where
                 "Wildcard cannot have both upper and lower bounds"
             );
             if let Some(ub) = upper_bound {
-                BoxDoc::text("? extends ").append(ub.to_doc(resolve))
+                BoxDoc::text("? extends ").append(to_canonical_doc(ub, resolve))
             } else if let Some(lb) = lower_bound {
-                BoxDoc::text("? super ").append(lb.to_doc(resolve))
+                BoxDoc::text("? super ").append(to_canonical_doc(lb, resolve))
             } else {
                 BoxDoc::text("?")
             }
@@ -245,20 +267,21 @@ where
     }
 }
 
-pub fn render(
+#[cfg(test)]
+pub(crate) fn render_canonical(
     tn: &TypeName,
     width: usize,
     resolve: &impl Fn(&str, &str) -> String,
 ) -> Result<String, crate::error::SigilStitchError> {
-    let doc = to_doc(tn, resolve);
+    let doc = to_canonical_doc(tn, resolve);
     let mut buf = Vec::new();
     doc.render(width, &mut buf)
         .map_err(|e| crate::error::SigilStitchError::Render {
-            context: "TypeName::render".to_string(),
+            context: "canonical TypeName rendering".to_string(),
             message: e.to_string(),
         })?;
     String::from_utf8(buf).map_err(|e| crate::error::SigilStitchError::Render {
-        context: "TypeName::render UTF-8 conversion".to_string(),
+        context: "canonical TypeName UTF-8 conversion".to_string(),
         message: e.to_string(),
     })
 }
@@ -498,6 +521,6 @@ where
                 BoxDoc::text(display)
             }
         }
-        _ => to_doc(tn, resolve),
+        _ => to_canonical_doc(tn, resolve),
     }
 }

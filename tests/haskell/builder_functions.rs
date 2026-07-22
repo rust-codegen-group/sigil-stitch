@@ -44,7 +44,130 @@ fn test_function_with_import() {
         .unwrap();
     let output = file.render(80).unwrap();
 
+    assert!(output.contains("import Data.Map (Map)"), "{output}");
     golden::assert_golden("haskell/function_with_import.hs", &output);
+}
+
+#[test]
+fn test_split_signature_preserves_compound_param_and_return_types() {
+    let text = TypeName::importable("Data.Text", "Text");
+    let user = TypeName::importable("Domain.User", "User");
+    let map = TypeName::importable("Data.Map", "Map");
+    let return_type = TypeName::generic(map, vec![text.clone(), TypeName::optional(user)]);
+    let fun = FunSpec::builder("transform")
+        .add_param(ParameterSpec::new("value", TypeName::optional(text)).unwrap())
+        .returns(return_type)
+        .body(CodeBlock::of("undefined", ()).unwrap())
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("Transform.hs", Haskell::new())
+        .add_function(fun)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap();
+
+    assert!(output.contains("import Data.Map (Map)"), "{output}");
+    assert!(output.contains("import Data.Text (Text)"), "{output}");
+    assert!(output.contains("import Domain.User (User)"), "{output}");
+    assert!(
+        output.contains("transform :: Maybe Text -> Map Text (Maybe User)"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_split_signature_handles_parameter_only_and_untyped_functions() {
+    let consume = FunSpec::builder("consume")
+        .add_param(
+            ParameterSpec::new("value", TypeName::importable("Domain.Input", "Input")).unwrap(),
+        )
+        .body(CodeBlock::of("undefined", ()).unwrap())
+        .build()
+        .unwrap();
+    let tick = FunSpec::builder("tick")
+        .body(CodeBlock::of("pure ()", ()).unwrap())
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("Consumer.hs", Haskell::new())
+        .add_function(consume)
+        .add_function(tick)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap();
+
+    assert!(output.contains("import Domain.Input (Input)"), "{output}");
+    assert!(output.contains("consume :: Input"), "{output}");
+    assert!(!output.contains("tick ::"), "{output}");
+}
+
+#[test]
+fn test_split_signature_qualifies_conflicting_import_names() {
+    let fun = FunSpec::builder("convert")
+        .add_param(
+            ParameterSpec::new("value", TypeName::importable("Domain.Input", "Value")).unwrap(),
+        )
+        .returns(TypeName::importable("Domain.Output", "Value"))
+        .body(CodeBlock::of("undefined", ()).unwrap())
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("Convert.hs", Haskell::new())
+        .add_function(fun)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap();
+
+    assert!(output.contains("import Domain.Input (Value)"), "{output}");
+    assert!(
+        output.contains("import qualified Domain.Output (Value)"),
+        "{output}"
+    );
+    assert!(
+        output.contains("convert :: Value -> Domain.Output.Value"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_split_signature_preserves_imported_context_bounds() {
+    let fun = FunSpec::builder("forceDisplay")
+        .add_type_param(
+            sigil_stitch::spec::where_spec::TypeParamSpec::new("a")
+                .with_bound(TypeName::importable("Control.DeepSeq", "NFData"))
+                .with_bound(
+                    TypeName::importable("Domain.DeepSeq", "NFData").with_alias("DomainNFData"),
+                ),
+        )
+        .add_param(ParameterSpec::new("value", TypeName::primitive("a")).unwrap())
+        .returns(TypeName::primitive("String"))
+        .body(CodeBlock::of("show value", ()).unwrap())
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("ForceDisplay.hs", Haskell::new())
+        .add_function(fun)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap();
+
+    assert!(
+        output.contains("import Control.DeepSeq (NFData)"),
+        "{output}"
+    );
+    assert!(
+        output.contains("import qualified Domain.DeepSeq (NFData)"),
+        "{output}"
+    );
+    assert!(
+        output.contains("(NFData a, Domain.DeepSeq.NFData a) => "),
+        "{output}"
+    );
 }
 
 #[test]

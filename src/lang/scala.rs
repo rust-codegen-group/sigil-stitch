@@ -1,8 +1,12 @@
 //! Scala language implementation.
 
+use crate::code_block::{Arg, CodeBlock};
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::spec::where_spec::{TypeParamSpec, render_type_params};
+use crate::type_name::TypeName;
 
 /// Scala language implementation.
 ///
@@ -296,8 +300,20 @@ impl CodeLang for Scala {
         }
     }
 
-    fn render_newtype_line(&self, vis: &str, name: &str, inner: &str) -> String {
-        format!("{vis}class {name}(val value: {inner})")
+    fn emit_newtype_decl(
+        &self,
+        visibility: &str,
+        name: &str,
+        type_params: &[TypeParamSpec],
+        inner: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let mut args = Vec::new();
+        let type_params = render_type_params(type_params, self, &mut args);
+        args.push(Arg::TypeName(inner.clone()));
+        CodeBlock::of(
+            &format!("{visibility}class {name}{type_params}(val value: %T)"),
+            args,
+        )
     }
 
     fn fun_block_open(&self) -> &str {
@@ -602,10 +618,13 @@ mod tests {
     }
 
     #[test]
-    fn test_render_newtype_line() {
+    fn test_emit_newtype_decl() {
         let sc = Scala::new();
+        let declaration = sc
+            .emit_newtype_decl("", "Meters", &[], &TypeName::primitive("Double"))
+            .unwrap();
         assert_eq!(
-            sc.render_newtype_line("", "Meters", "Double"),
+            declaration.render_standalone(&sc, 80).unwrap(),
             "class Meters(val value: Double)"
         );
     }

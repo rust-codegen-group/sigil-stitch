@@ -22,8 +22,16 @@ The library is organized in four layers, each building on the one below:
 
 `src/lang/mod.rs` defines two traits:
 
-- **`RendererLang`** (14 methods) — the renderer-only surface used by `code_renderer.rs` and `TypeName::to_doc_with_lang`. Covers file extension, string literals, verbatim strings, block syntax, type presentation, generic syntax, imports, and a few rendering helpers. If you only need `CodeBlock`-level rendering (no specs), implementing `RendererLang` is sufficient.
-- **`CodeLang: RendererLang`** — extends `RendererLang` with the additional methods needed by the spec layer (TypeSpec, FunSpec, FieldSpec). Covers visibility, keywords, function syntax, type-decl syntax, enum/annotation config, and structural decisions like `methods_inside_type_body`.
+- **`RendererLang`** — the renderer-only surface used by `code_renderer.rs`
+  and `TypeName::to_doc_with_lang`. Covers file extension, string literals,
+  verbatim strings, block syntax, type presentation, generic syntax, and
+  rendering helpers. If you only need `CodeBlock`-level rendering (no specs),
+  implementing `RendererLang` is sufficient.
+- **`CodeLang: RendererLang`** — extends `RendererLang` with the additional
+  methods needed by the spec layer (TypeSpec, FunSpec, FieldSpec) and FileSpec
+  imports. It also owns structured hooks for newtype declarations, split
+  signature contexts, and type-close suffixes. Those hooks return `CodeBlock`
+  values so semantic `TypeName` references survive until import resolution.
 
 Each supported language implements both traits in its own module (`src/lang/typescript.rs`, etc.). The 6 config struct accessors (`type_presentation()`, `generic_syntax()`, `block_syntax()`, `function_syntax()`, `type_decl_syntax()`, `enum_and_annotation()`) return data structs with sensible defaults. Languages can also implement `rewrite_nodes()` to transform the CodeNode tree after macro expansion for language-specific fixups (e.g., Go IIFE `}()` fusion, C++ lambda `};` semicolons).
 
@@ -61,7 +69,7 @@ TypeName also renders to `pretty::BoxDoc` for width-aware output of complex type
 `TypeName` variants are *semantic* — `Array(T)` means "array of T" regardless of language. Cross-language rendering is handled by a **data-driven presentation layer**:
 
 1. Each `TypeName` variant asks the language for a `TypePresentation` — a data enum describing the syntactic pattern (e.g., `GenericWrap`, `Prefix`, `Postfix`, `Surround`, `Delimited`, `Infix`).
-2. A single rendering engine in `type_name.rs` interprets the pattern into `BoxDoc` output.
+2. A single rendering engine in `type_name_render.rs` interprets the pattern into `BoxDoc` output.
 
 `BoxDoc` never appears in the `CodeLang` trait. Languages return pure data; the engine does all rendering. See [Type Presentation](type_presentation.md) for the full design.
 
@@ -75,7 +83,22 @@ CodeBlocks are immutable after construction. The builder (`CodeBlockBuilder`) va
 
 `src/spec/` contains structural builders that emit `Vec<CodeBlock>`. TypeSpec emits one or two blocks depending on `methods_inside_type_body()`. FunSpec emits one block. FileSpec orchestrates the full rendering pipeline.
 
-The key design decision: specs emit CodeBlocks, never raw strings. This means the renderer and import system never need to change when new spec types are added. A new `WidgetSpec` would just emit CodeBlocks with `%T` references, and imports would work automatically.
+The key design decision: specs and language hooks emit CodeBlocks, never
+type-bearing raw strings. This means the renderer and import system never need
+to change when new spec types are added. A new `WidgetSpec` would just emit
+CodeBlocks with `%T` references, and imports would work automatically.
+
+The structured type path is:
+
+```text
+TypeSpec / FunSpec
+        |
+        v
+CodeLang emit_* hook -> nested CodeBlock with TypeRef nodes
+        |
+        v
+collect imports -> resolve aliases -> CodeRenderer -> to_doc_with_lang
+```
 
 ## Three-Pass Rendering Pipeline
 
@@ -89,7 +112,10 @@ Specs are converted to CodeBlocks:
 - `FileMember::Code(CodeBlock)` passes through unchanged
 - `FileMember::RawContent(String)` passes through as-is
 
-After this phase, everything is either a CodeBlock or raw content.
+Spec emitters append structured hook results as nested CodeBlocks. Hook
+construction errors propagate from this pass; they are never converted to
+empty output. After this phase, everything is either a CodeBlock or raw
+content.
 
 ### Pass 1: Collect Imports
 
@@ -108,7 +134,11 @@ Nested CodeBlocks (`CodeNode::Nested`) are walked recursively. `RawContentWithIm
 
 The result is an `ImportGroup` that maps each module to its resolved names with aliases.
 
-Go's `qualify_import_name()` adds another layer: instead of importing `Server` directly, it renders as `http.Server` in code, with a package-level import of `"net/http"`.
+`qualify_import_name()` receives the module, original symbol, and resolved
+alias. Go uses it to render `http.Server` with a package-level import of
+`"net/http"`. Haskell uses the same hook to turn an assigned symbol alias into
+a module-qualified reference and renders the corresponding import as
+`qualified`.
 
 ### Pass 2: Render
 

@@ -97,6 +97,40 @@ fn test_data_with_deriving() {
 }
 
 #[test]
+fn test_data_with_imported_deriving() {
+    let ts = TypeSpec::builder("Payload", TypeKind::Struct)
+        .add_field(
+            FieldSpec::builder("value", TypeName::primitive("String"))
+                .build()
+                .unwrap(),
+        )
+        .implements(TypeName::importable("Data.Aeson.Types", "ToJSON"))
+        .implements(TypeName::importable("Domain.Json", "ToJSON"))
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("Payload.hs", Haskell::new())
+        .add_type(ts)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap();
+
+    assert!(
+        output.contains("import Data.Aeson.Types (ToJSON)"),
+        "{output}"
+    );
+    assert!(
+        output.contains("import qualified Domain.Json (ToJSON)"),
+        "{output}"
+    );
+    assert!(
+        output.contains("deriving (ToJSON, Domain.Json.ToJSON)"),
+        "{output}"
+    );
+}
+
+#[test]
 fn test_newtype() {
     let ts = TypeSpec::builder("Meters", TypeKind::Newtype)
         .extends(TypeName::primitive("Int"))

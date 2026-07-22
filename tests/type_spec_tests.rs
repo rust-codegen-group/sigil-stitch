@@ -1,10 +1,12 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::code_renderer::CodeRenderer;
 use sigil_stitch::import::ImportGroup;
+use sigil_stitch::lang::CodeLang;
 use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::field_spec::FieldSpec;
+use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
@@ -38,6 +40,38 @@ fn render_blocks_rs(blocks: &[CodeBlock]) -> String {
         output.push_str(&renderer.render(block).unwrap());
     }
     output
+}
+
+fn render_newtype_file(lang: impl CodeLang, filename: &str, inner: TypeName) -> String {
+    let newtype = TypeSpec::builder("Wrapper", TypeKind::Newtype)
+        .extends(inner)
+        .build()
+        .unwrap();
+    FileSpec::builder_with(filename, lang)
+        .add_type(newtype)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap()
+}
+
+fn render_generic_newtype_file(
+    lang: impl CodeLang,
+    filename: &str,
+    type_param: TypeParamSpec,
+    inner: TypeName,
+) -> String {
+    let newtype = TypeSpec::builder("Wrapper", TypeKind::Newtype)
+        .add_type_param(type_param)
+        .extends(inner)
+        .build()
+        .unwrap();
+    FileSpec::builder_with(filename, lang)
+        .add_type(newtype)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap()
 }
 
 #[test]
@@ -361,6 +395,228 @@ fn test_newtype_python() {
     let mut renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert_eq!(output.trim(), "UserId = NewType(\"UserId\", str)");
+}
+
+#[test]
+fn test_newtype_imports_survive_every_structured_hook() {
+    use sigil_stitch::lang::c::C;
+    use sigil_stitch::lang::go::Go;
+    use sigil_stitch::lang::haskell::Haskell;
+    use sigil_stitch::lang::kotlin::Kotlin;
+    use sigil_stitch::lang::php::Php;
+    use sigil_stitch::lang::python::Python;
+    use sigil_stitch::lang::scala::Scala;
+
+    let rust = render_newtype_file(
+        Rust::new(),
+        "wrapper.rs",
+        TypeName::optional(TypeName::importable("crate::models", "External")),
+    );
+    assert!(rust.contains("use crate::models::External;"), "{rust}");
+    assert!(rust.contains("struct Wrapper(Option<External>);"), "{rust}");
+
+    let c = render_newtype_file(
+        C::new(),
+        "wrapper.c",
+        TypeName::pointer(TypeName::importable("external.h", "External")),
+    );
+    assert!(c.contains("#include <external.h>"), "{c}");
+    assert!(c.contains("typedef External* Wrapper;"), "{c}");
+
+    let go = render_newtype_file(
+        Go::new(),
+        "wrapper.go",
+        TypeName::optional(TypeName::importable(
+            "example.com/project/external",
+            "External",
+        )),
+    );
+    assert!(go.contains("\"example.com/project/external\""), "{go}");
+    assert!(go.contains("type Wrapper *external.External"), "{go}");
+
+    let haskell = render_newtype_file(
+        Haskell::new(),
+        "Wrapper.hs",
+        TypeName::optional(TypeName::importable("External.Types", "External")),
+    );
+    assert!(
+        haskell.contains("import External.Types (External)"),
+        "{haskell}"
+    );
+    assert!(
+        haskell.contains("newtype Wrapper = Wrapper (Maybe External)"),
+        "{haskell}"
+    );
+
+    let kotlin = render_newtype_file(
+        Kotlin::new(),
+        "Wrapper.kt",
+        TypeName::optional(TypeName::importable("example.models", "External")),
+    );
+    assert!(
+        kotlin.contains("import example.models.External"),
+        "{kotlin}"
+    );
+    assert!(
+        kotlin.contains("value class Wrapper(val value: External?)"),
+        "{kotlin}"
+    );
+
+    let php = render_newtype_file(
+        Php::new(),
+        "Wrapper.php",
+        TypeName::optional(TypeName::importable("Example\\Models", "External")),
+    );
+    assert!(php.contains("use Example\\Models\\External;"), "{php}");
+    assert!(php.contains("private ?External $value"), "{php}");
+
+    let python = render_newtype_file(
+        Python::new(),
+        "wrapper.py",
+        TypeName::optional(TypeName::importable("example.models", "External")),
+    );
+    assert!(
+        python.contains("from example.models import External"),
+        "{python}"
+    );
+    assert!(
+        python.contains("Wrapper = NewType(\"Wrapper\", External | None)"),
+        "{python}"
+    );
+
+    let scala = render_newtype_file(
+        Scala::new(),
+        "Wrapper.scala",
+        TypeName::optional(TypeName::importable("example.models", "External")),
+    );
+    assert!(scala.contains("import example.models.External"), "{scala}");
+    assert!(
+        scala.contains("class Wrapper(val value: Option[External])"),
+        "{scala}"
+    );
+}
+
+#[test]
+fn test_newtype_type_params_are_owned_by_each_language() {
+    use sigil_stitch::lang::c::C;
+    use sigil_stitch::lang::go::Go;
+    use sigil_stitch::lang::haskell::Haskell;
+    use sigil_stitch::lang::kotlin::Kotlin;
+    use sigil_stitch::lang::php::Php;
+    use sigil_stitch::lang::python::Python;
+    use sigil_stitch::lang::scala::Scala;
+
+    let rust = render_generic_newtype_file(
+        Rust::new(),
+        "wrapper.rs",
+        TypeParamSpec::new("T").with_bound(TypeName::importable("crate::traits", "Bound")),
+        TypeName::primitive("T"),
+    );
+    assert!(rust.contains("use crate::traits::Bound;"), "{rust}");
+    assert!(rust.contains("struct Wrapper<T: Bound>(T);"), "{rust}");
+
+    let go = render_generic_newtype_file(
+        Go::new(),
+        "wrapper.go",
+        TypeParamSpec::new("T").with_bound(TypeName::importable(
+            "example.com/project/constraints",
+            "Bound",
+        )),
+        TypeName::primitive("T"),
+    );
+    assert!(go.contains("\"example.com/project/constraints\""), "{go}");
+    assert!(go.contains("type Wrapper[T constraints.Bound] T"), "{go}");
+
+    let haskell = render_generic_newtype_file(
+        Haskell::new(),
+        "Wrapper.hs",
+        TypeParamSpec::new("a").with_bound(TypeName::importable("Constraints", "Bound")),
+        TypeName::primitive("a"),
+    );
+    assert!(haskell.contains("import Constraints (Bound)"), "{haskell}");
+    assert!(
+        haskell.contains("newtype Bound a => Wrapper a = Wrapper a"),
+        "{haskell}"
+    );
+
+    let kotlin = render_generic_newtype_file(
+        Kotlin::new(),
+        "Wrapper.kt",
+        TypeParamSpec::new("T").with_bound(TypeName::importable("example.constraints", "Bound")),
+        TypeName::primitive("T"),
+    );
+    assert!(
+        kotlin.contains("import example.constraints.Bound"),
+        "{kotlin}"
+    );
+    assert!(
+        kotlin.contains("value class Wrapper<T : Bound>(val value: T)"),
+        "{kotlin}"
+    );
+
+    let scala = render_generic_newtype_file(
+        Scala::new(),
+        "Wrapper.scala",
+        TypeParamSpec::new("T").with_bound(TypeName::importable("example.constraints", "Bound")),
+        TypeName::primitive("T"),
+    );
+    assert!(
+        scala.contains("import example.constraints.Bound"),
+        "{scala}"
+    );
+    assert!(
+        scala.contains("class Wrapper[T <: Bound](val value: T)"),
+        "{scala}"
+    );
+
+    let c = render_generic_newtype_file(
+        C::new(),
+        "wrapper.c",
+        TypeParamSpec::new("T").with_bound(TypeName::importable("bound.h", "Bound")),
+        TypeName::primitive("int"),
+    );
+    assert!(!c.contains("bound.h"), "{c}");
+    assert!(c.contains("typedef int Wrapper;"), "{c}");
+
+    let php = render_generic_newtype_file(
+        Php::new(),
+        "Wrapper.php",
+        TypeParamSpec::new("T").with_bound(TypeName::importable("Example\\Constraints", "Bound")),
+        TypeName::primitive("int"),
+    );
+    assert!(!php.contains("Constraints"), "{php}");
+    assert!(php.contains("class Wrapper"), "{php}");
+
+    let python = render_generic_newtype_file(
+        Python::new(),
+        "wrapper.py",
+        TypeParamSpec::new("T").with_bound(TypeName::importable("example.constraints", "Bound")),
+        TypeName::primitive("int"),
+    );
+    assert!(!python.contains("example.constraints"), "{python}");
+    assert!(
+        python.contains("Wrapper = NewType(\"Wrapper\", int)"),
+        "{python}"
+    );
+}
+
+#[test]
+fn test_newtype_hook_uses_resolved_preferred_alias() {
+    use sigil_stitch::lang::php::Php;
+
+    let output = render_newtype_file(
+        Php::new(),
+        "Wrapper.php",
+        TypeName::optional(
+            TypeName::importable("Example\\Models", "External").with_alias("ModelExternal"),
+        ),
+    );
+
+    assert!(
+        output.contains("use Example\\Models\\External as ModelExternal;"),
+        "{output}"
+    );
+    assert!(output.contains("private ?ModelExternal $value"), "{output}");
 }
 
 #[test]
