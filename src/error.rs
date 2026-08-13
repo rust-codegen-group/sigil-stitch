@@ -26,6 +26,30 @@ pub enum SigilStitchError {
         actual_arg_kinds: Vec<String>,
     },
 
+    /// A format argument does not match the corresponding specifier.
+    #[snafu(display(
+        "format string {format:?} argument {index} expects {expected} but got {actual}"
+    ))]
+    FormatArgKind {
+        /// The format string that was passed.
+        format: String,
+        /// Zero-based argument index.
+        index: usize,
+        /// The expected specifier and argument kind.
+        expected: String,
+        /// The provided argument variant.
+        actual: String,
+    },
+
+    /// A format string ends with a bare `%` marker.
+    #[snafu(display("trailing format marker '%' at byte {offset} in format string {format:?}"))]
+    TrailingFormatMarker {
+        /// The format string that contained the marker.
+        format: String,
+        /// Byte offset of the trailing `%`.
+        offset: usize,
+    },
+
     /// A required name or filename field was empty.
     #[snafu(display("{builder}::build() failed: 'name' must not be empty"))]
     EmptyName {
@@ -33,13 +57,13 @@ pub enum SigilStitchError {
         builder: &'static str,
     },
 
-    /// Unbalanced begin_control_flow / end_control_flow calls.
+    /// Unbalanced structural indentation markers.
     #[snafu(display(
-        "unbalanced control flow: indent depth is {depth} (expected 0). \
-         Check begin_control_flow / end_control_flow calls."
+        "unbalanced structural indentation: depth is {depth} (expected 0). \
+         Check %> / %< markers and begin_control_flow / end_control_flow calls."
     ))]
     UnbalancedIndent {
-        /// The indent depth at build time.
+        /// The structural indent depth at validation time.
         depth: i32,
     },
 

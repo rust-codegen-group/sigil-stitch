@@ -14,8 +14,8 @@
 //! | Specifier | Name | Argument Type | Purpose |
 //! |-----------|------|---------------|---------|
 //! | `%T` | Type | `TypeName` | Emit type reference, track import |
-//! | `%N` | Name | `&str` or `Nameable` | Emit identifier name |
-//! | `%S` | String | `&str` | Emit escaped string literal |
+//! | `%N` | Name | `NameArg` | Emit identifier name |
+//! | `%S` | String | `StringLitArg` | Emit escaped string literal |
 //! | `%L` | Literal | `&str`, number, `CodeBlock` | Emit raw value or nested block |
 //! | `%W` | Wrap | (none) | Soft line break point |
 //! | `%>` | Indent | (none) | Increase indent level |
@@ -32,7 +32,10 @@
 //! let user_type = TypeName::importable_type("./models", "User");
 //!
 //! let mut cb = CodeBlock::builder();
-//! cb.add_statement("const user = await getUser(%S)", ("id",));
+//! cb.add_statement(
+//!     "const user = await getUser(%S)",
+//!     (StringLitArg("id".to_string()),),
+//! );
 //! cb.add_statement("return user as %T", (user_type.clone(),));
 //! let body = cb.build().unwrap();
 //!
