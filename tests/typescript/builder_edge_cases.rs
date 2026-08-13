@@ -15,7 +15,7 @@ fn test_long_params() {
     let override_type = TypeName::importable_type("./runtime", "InitOverrideFunction");
 
     let mut b = CodeBlock::builder();
-    b.add("export async function createUser(%Wname: string,%Wage: number,%Wconfig: %T,%Wrequest: %T,%Woverride: %T%W): Promise<void> {", (config_type, request_type, override_type));
+    b.add("export async function createUser(%>%Wname: string,%Wage: number,%Wconfig: %T,%Wrequest: %T,%Woverride: %T%<%W): Promise<void> {", (config_type, request_type, override_type));
     b.add_line();
     b.add("%>", ());
     b.add_statement("return undefined", ());
@@ -96,6 +96,12 @@ fn test_string_and_name() {
 fn test_column_width_40() {
     let file = build_width_test_file();
     let output = file.render(40).unwrap();
+    assert!(output.contains("\n  config: Configuration,"), "{output}");
+    assert!(output.contains("\n  request: RequestInit"), "{output}");
+    assert!(output.contains("\n  return undefined;"), "{output}");
+    assert!(!output.contains("\nconfig:"), "{output}");
+    assert!(!output.contains("\nrequest:"), "{output}");
+    assert!(!output.contains("\nreturn undefined;"), "{output}");
     golden::assert_golden("typescript/width_40.ts", &output);
 }
 
@@ -121,7 +127,7 @@ fn build_width_test_file() -> FileSpec {
 
     let mut b = CodeBlock::builder();
     b.add(
-        "export async function handleRequest(%Wconfig: %T,%Wrequest: %T,%Wlogger: %T%W): Promise<%T> {",
+        "export async function handleRequest(%>%Wconfig: %T,%Wrequest: %T,%Wlogger: %T%<%W): Promise<%T> {",
         (config, request, logger, response),
     );
     b.add_line();
@@ -146,7 +152,7 @@ fn test_divergence_regression() {
 
     let mut b = CodeBlock::builder();
     b.add(
-        "export function mergeConfigs(%Wapp: %T,%Wserver: %T,%Wdb: %T%W): %T {",
+        "export function mergeConfigs(%>%Wapp: %T,%Wserver: %T,%Wdb: %T%<%W): %T {",
         (config1.clone(), config2.clone(), config3.clone(), config1),
     );
     b.add_line();

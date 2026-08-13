@@ -6,6 +6,7 @@
 //! tree traversal for import collection, structural transformation, and rendering.
 
 use crate::code_block::{Arg, CodeBlock, FormatPart, Specifier};
+use crate::error::SigilStitchError;
 use crate::type_name::TypeName;
 
 /// A single node in the code generation tree.
@@ -37,8 +38,8 @@ pub enum CodeNode {
     /// An attribute / annotation line. Rendered with the language's annotation
     /// prefix and suffix (Rust: `#[text]`, Java/Python: `@text`, C++: `[[text]]`).
     Attribute(String),
-    /// Soft line break point (`%W`). In direct mode emits a space; in pretty
-    /// mode becomes `BoxDoc::softline()`.
+    /// Soft line break point (`%W`). Emits a space when the enclosing layout
+    /// group fits, otherwise a newline followed by the configured indentation.
     SoftBreak,
     /// Increase indent level (`%>`).
     Indent,
@@ -77,7 +78,28 @@ pub enum CodeNode {
 ///
 /// Used by `CodeBlockBuilder::add()` which still calls `parse_format()` to get
 /// `Vec<FormatPart>`, then zips with args into self-contained nodes.
-pub(crate) fn parts_args_to_nodes(parts: &[FormatPart], args: &[Arg]) -> Vec<CodeNode> {
+pub(crate) fn parts_args_to_nodes(
+    format: &str,
+    parts: &[FormatPart],
+    args: &[Arg],
+) -> Result<Vec<CodeNode>, SigilStitchError> {
+    let expected_specifiers: Vec<String> = parts
+        .iter()
+        .filter_map(|part| match part {
+            FormatPart::Arg(spec) => Some(format!("%{}", spec.format_char())),
+            _ => None,
+        })
+        .collect();
+    if expected_specifiers.len() != args.len() {
+        return Err(SigilStitchError::FormatArgCount {
+            format: format.to_string(),
+            expected: expected_specifiers.len(),
+            actual: args.len(),
+            expected_specifiers,
+            actual_arg_kinds: args.iter().map(|arg| arg.kind_name().to_string()).collect(),
+        });
+    }
+
     let mut nodes = Vec::with_capacity(parts.len());
     let mut arg_index = 0;
 
@@ -86,6 +108,14 @@ pub(crate) fn parts_args_to_nodes(parts: &[FormatPart], args: &[Arg]) -> Vec<Cod
             FormatPart::Literal(text) => CodeNode::Literal(text.clone()),
             FormatPart::Arg(spec) => {
                 let arg = &args[arg_index];
+                if !spec.matches_arg(arg) {
+                    return Err(SigilStitchError::FormatArgKind {
+                        format: format.to_string(),
+                        index: arg_index,
+                        expected: format!("%{} ({})", spec.format_char(), spec.expected_arg_kind()),
+                        actual: arg.kind_name().to_string(),
+                    });
+                }
                 arg_index += 1;
                 match (spec, arg) {
                     (Specifier::Type, Arg::TypeName(tn)) => CodeNode::TypeRef(tn.clone()),
@@ -97,7 +127,7 @@ pub(crate) fn parts_args_to_nodes(parts: &[FormatPart], args: &[Arg]) -> Vec<Cod
                     (Specifier::Literal, Arg::Literal(s)) => CodeNode::InlineLiteral(s.clone()),
                     (Specifier::Literal, Arg::Code(block)) => CodeNode::Nested(block.clone()),
                     (Specifier::Comment, Arg::Comment(s)) => CodeNode::Comment(s.clone()),
-                    _ => CodeNode::Literal(String::new()),
+                    _ => unreachable!("format argument compatibility checked above"),
                 }
             }
             FormatPart::Wrap => CodeNode::SoftBreak,
@@ -113,7 +143,7 @@ pub(crate) fn parts_args_to_nodes(parts: &[FormatPart], args: &[Arg]) -> Vec<Cod
         nodes.push(node);
     }
 
-    nodes
+    Ok(nodes)
 }
 
 #[cfg(test)]
@@ -126,7 +156,7 @@ mod tests {
     fn test_literal_conversion() {
         let parts = vec![FormatPart::Literal("hello".to_string())];
         let args = vec![];
-        let nodes = parts_args_to_nodes(&parts, &args);
+        let nodes = parts_args_to_nodes("hello", &parts, &args).unwrap();
         assert_eq!(nodes.len(), 1);
         assert!(matches!(&nodes[0], CodeNode::Literal(s) if s == "hello"));
     }
@@ -139,7 +169,7 @@ mod tests {
             FormatPart::Arg(Specifier::Type),
         ];
         let args = vec![Arg::TypeName(tn)];
-        let nodes = parts_args_to_nodes(&parts, &args);
+        let nodes = parts_args_to_nodes("x: %T", &parts, &args).unwrap();
         assert_eq!(nodes.len(), 2);
         assert!(matches!(&nodes[0], CodeNode::Literal(s) if s == "x: "));
         assert!(matches!(&nodes[1], CodeNode::TypeRef(_)));
@@ -150,7 +180,7 @@ mod tests {
         let inner = CodeBlock::of("inner()", ()).unwrap();
         let parts = vec![FormatPart::Arg(Specifier::Literal)];
         let args = vec![Arg::Code(inner)];
-        let nodes = parts_args_to_nodes(&parts, &args);
+        let nodes = parts_args_to_nodes("%L", &parts, &args).unwrap();
         assert_eq!(nodes.len(), 1);
         assert!(matches!(&nodes[0], CodeNode::Nested(_)));
     }
@@ -165,7 +195,7 @@ mod tests {
             FormatPart::Newline,
             FormatPart::Dedent,
         ];
-        let nodes = parts_args_to_nodes(&parts, &[]);
+        let nodes = parts_args_to_nodes("%>%[x%]\n%<", &parts, &[]).unwrap();
         assert_eq!(nodes.len(), 6);
         assert!(matches!(nodes[0], CodeNode::Indent));
         assert!(matches!(nodes[1], CodeNode::StatementBegin));
@@ -181,7 +211,7 @@ mod tests {
             FormatPart::Wrap,
             FormatPart::Literal("b".to_string()),
         ];
-        let nodes = parts_args_to_nodes(&parts, &[]);
+        let nodes = parts_args_to_nodes("a%Wb", &parts, &[]).unwrap();
         assert_eq!(nodes.len(), 3);
         assert!(matches!(nodes[1], CodeNode::SoftBreak));
     }
@@ -193,7 +223,7 @@ mod tests {
             FormatPart::BlockClose("if x".to_string()),
             FormatPart::BranchClose("if x".to_string()),
         ];
-        let nodes = parts_args_to_nodes(&parts, &[]);
+        let nodes = parts_args_to_nodes("block delimiters", &parts, &[]).unwrap();
         assert_eq!(nodes.len(), 3);
         assert!(matches!(&nodes[0], CodeNode::BlockOpen(s) if s == "if x"));
         assert!(matches!(&nodes[1], CodeNode::BlockClose(s) if s == "if x"));
@@ -216,10 +246,60 @@ mod tests {
             Arg::TypeName(tn),
             Arg::StringLit("hello".to_string()),
         ];
-        let nodes = parts_args_to_nodes(&parts, &args);
+        let nodes = parts_args_to_nodes("let %N: %T = %S", &parts, &args).unwrap();
         assert_eq!(nodes.len(), 6);
         assert!(matches!(&nodes[1], CodeNode::NameRef(s) if s == "x"));
         assert!(matches!(&nodes[3], CodeNode::TypeRef(_)));
         assert!(matches!(&nodes[5], CodeNode::StringLit(s) if s == "hello"));
+    }
+
+    #[test]
+    fn test_wrong_arg_kind_returns_error_instead_of_empty_literal() {
+        let parts = vec![FormatPart::Arg(Specifier::Name)];
+        let args = vec![Arg::Literal("wrong".to_string())];
+
+        let error = parts_args_to_nodes("%N", &parts, &args).unwrap_err();
+        assert!(matches!(
+            error,
+            SigilStitchError::FormatArgKind {
+                index: 0,
+                ref expected,
+                ref actual,
+                ..
+            } if expected == "%N (Name)" && actual == "Literal"
+        ));
+    }
+
+    #[test]
+    fn every_specifier_accepts_only_its_documented_argument_kinds() {
+        let args = vec![
+            Arg::TypeName(TypeName::primitive("Value")),
+            Arg::Name("value".to_string()),
+            Arg::StringLit("value".to_string()),
+            Arg::VerbatimStr("value".to_string()),
+            Arg::Literal("value".to_string()),
+            Arg::Code(CodeBlock::of("", ()).unwrap()),
+            Arg::Comment("value".to_string()),
+        ];
+
+        for &specifier in Specifier::all() {
+            let expected_kinds: &[&str] = match specifier {
+                Specifier::Type => &["TypeName"],
+                Specifier::Name => &["Name"],
+                Specifier::StringLit => &["StringLit"],
+                Specifier::VerbatimStr => &["VerbatimStr"],
+                Specifier::Literal => &["Literal", "Code"],
+                Specifier::Comment => &["Comment"],
+            };
+            let parts = [FormatPart::Arg(specifier)];
+            for arg in &args {
+                let result = parts_args_to_nodes(
+                    &format!("%{}", specifier.format_char()),
+                    &parts,
+                    std::slice::from_ref(arg),
+                );
+                assert_eq!(result.is_ok(), expected_kinds.contains(&arg.kind_name()));
+            }
+        }
     }
 }

@@ -71,6 +71,29 @@ impl Specifier {
             Self::Comment,
         ]
     }
+
+    pub(crate) fn matches_arg(self, arg: &Arg) -> bool {
+        matches!(
+            (self, arg),
+            (Self::Type, Arg::TypeName(_))
+                | (Self::Name, Arg::Name(_))
+                | (Self::StringLit, Arg::StringLit(_))
+                | (Self::VerbatimStr, Arg::VerbatimStr(_))
+                | (Self::Literal, Arg::Literal(_) | Arg::Code(_))
+                | (Self::Comment, Arg::Comment(_))
+        )
+    }
+
+    pub(crate) fn expected_arg_kind(self) -> &'static str {
+        match self {
+            Self::Type => "TypeName",
+            Self::Name => "Name",
+            Self::StringLit => "StringLit",
+            Self::VerbatimStr => "VerbatimStr",
+            Self::Literal => "Literal or Code",
+            Self::Comment => "Comment",
+        }
+    }
 }
 
 /// A parsed format specifier from a format string.
@@ -128,6 +151,20 @@ pub enum Arg {
     Comment(String),
 }
 
+impl Arg {
+    pub(crate) fn kind_name(&self) -> &'static str {
+        match self {
+            Self::TypeName(_) => "TypeName",
+            Self::Name(_) => "Name",
+            Self::StringLit(_) => "StringLit",
+            Self::VerbatimStr(_) => "VerbatimStr",
+            Self::Literal(_) => "Literal",
+            Self::Code(_) => "Code",
+            Self::Comment(_) => "Comment",
+        }
+    }
+}
+
 /// An immutable code fragment with embedded type references.
 ///
 /// `CodeBlock` is the core composition primitive in sigil-stitch. It stores a tree
@@ -176,7 +213,7 @@ impl CodeFragment {
     /// Parse a format string and arguments into a composable fragment.
     pub fn of(format: &str, args: impl IntoArgs) -> Result<Self, crate::error::SigilStitchError> {
         let nodes = format_to_nodes(format, args.into_args())?;
-        validate_balanced_indent_markers(&nodes)?;
+        validate_relative_indent_markers(&nodes)?;
         Ok(Self {
             block: CodeBlock { nodes },
         })
@@ -461,7 +498,7 @@ impl CodeBlockBuilder {
                 depth: self.indent_depth,
             });
         }
-        validate_balanced_indent_markers(&self.nodes)?;
+        validate_relative_indent_markers(&self.nodes)?;
         validate_no_unresolved_indent_markers(&self.nodes)?;
         Ok(CodeBlock { nodes: self.nodes })
     }
@@ -483,28 +520,7 @@ fn format_to_nodes(
     args: Vec<Arg>,
 ) -> Result<Vec<CodeNode>, crate::error::SigilStitchError> {
     let parsed = parse_format(format)?;
-    let consuming_specifiers: Vec<String> = parsed
-        .iter()
-        .filter_map(|p| match p {
-            FormatPart::Arg(s) => Some(format!("%{}", s.format_char())),
-            _ => None,
-        })
-        .collect();
-
-    let expected_args = consuming_specifiers.len();
-
-    if expected_args != args.len() {
-        let actual_arg_kinds: Vec<String> = args.iter().map(arg_kind_name).collect();
-        return Err(crate::error::SigilStitchError::FormatArgCount {
-            format: format.to_string(),
-            expected: expected_args,
-            actual: args.len(),
-            expected_specifiers: consuming_specifiers,
-            actual_arg_kinds,
-        });
-    }
-
-    let nodes = parts_args_to_nodes(&parsed, &args);
+    let nodes = parts_args_to_nodes(format, &parsed, &args)?;
     validate_no_unresolved_indent_markers(&nodes)?;
     Ok(nodes)
 }
@@ -512,13 +528,40 @@ fn format_to_nodes(
 pub(crate) fn validate_balanced_indent_markers(
     nodes: &[CodeNode],
 ) -> Result<(), crate::error::SigilStitchError> {
-    fn walk(nodes: &[CodeNode], depth: &mut i32) -> Result<(), crate::error::SigilStitchError> {
+    validate_indent_markers(nodes, true)
+}
+
+fn validate_relative_indent_markers(
+    nodes: &[CodeNode],
+) -> Result<(), crate::error::SigilStitchError> {
+    // A balanced CodeBlock may temporarily dedent into its containing block.
+    // Rendering validates the composed tree from its actual root and rejects a
+    // dedent that is still below zero in that context.
+    validate_indent_markers(nodes, false)
+}
+
+fn validate_indent_markers(
+    nodes: &[CodeNode],
+    reject_negative: bool,
+) -> Result<(), crate::error::SigilStitchError> {
+    fn walk(
+        nodes: &[CodeNode],
+        depth: &mut i32,
+        reject_negative: bool,
+    ) -> Result<(), crate::error::SigilStitchError> {
         for node in nodes {
             match node {
                 CodeNode::Indent => *depth += 1,
-                CodeNode::Dedent => *depth -= 1,
-                CodeNode::Nested(block) => walk(&block.nodes, depth)?,
-                CodeNode::Sequence(children) => walk(children, depth)?,
+                CodeNode::Dedent => {
+                    *depth -= 1;
+                    if reject_negative && *depth < 0 {
+                        return Err(crate::error::SigilStitchError::UnbalancedIndent {
+                            depth: *depth,
+                        });
+                    }
+                }
+                CodeNode::Nested(block) => walk(&block.nodes, depth, reject_negative)?,
+                CodeNode::Sequence(children) => walk(children, depth, reject_negative)?,
                 _ => {}
             }
         }
@@ -526,7 +569,7 @@ pub(crate) fn validate_balanced_indent_markers(
     }
 
     let mut depth = 0;
-    walk(nodes, &mut depth)?;
+    walk(nodes, &mut depth, reject_negative)?;
     if depth != 0 {
         return Err(crate::error::SigilStitchError::UnbalancedIndent { depth });
     }
@@ -560,18 +603,6 @@ pub(crate) fn validate_no_unresolved_indent_markers(
     Ok(())
 }
 
-fn arg_kind_name(arg: &Arg) -> String {
-    match arg {
-        Arg::TypeName(_) => "TypeName".to_string(),
-        Arg::Name(_) => "Name".to_string(),
-        Arg::StringLit(_) => "StringLit".to_string(),
-        Arg::VerbatimStr(_) => "VerbatimStr".to_string(),
-        Arg::Literal(_) => "Literal".to_string(),
-        Arg::Code(_) => "Code".to_string(),
-        Arg::Comment(_) => "Comment".to_string(),
-    }
-}
-
 /// Parse a format string into FormatParts.
 fn parse_format(format: &str) -> Result<Vec<FormatPart>, crate::error::SigilStitchError> {
     let mut parts = Vec::new();
@@ -580,6 +611,7 @@ fn parse_format(format: &str) -> Result<Vec<FormatPart>, crate::error::SigilStit
 
     while let Some(&(_, ch)) = chars.peek() {
         if ch == '%' {
+            let marker_offset = chars.peek().map(|(offset, _)| *offset).unwrap_or_default();
             chars.next();
             if let Some(&(_, spec)) = chars.peek() {
                 chars.next();
@@ -609,6 +641,11 @@ fn parse_format(format: &str) -> Result<Vec<FormatPart>, crate::error::SigilStit
                     }
                     parts.push(part);
                 }
+            } else {
+                return Err(crate::error::SigilStitchError::TrailingFormatMarker {
+                    format: format.to_string(),
+                    offset: marker_offset,
+                });
             }
         } else if ch == '\n' {
             chars.next();
@@ -956,6 +993,45 @@ mod tests {
     }
 
     #[test]
+    fn test_mismatched_arg_kind_fails_closed() {
+        let result = CodeBlock::of("value: %T", "not a type");
+
+        let error = result.unwrap_err();
+        assert!(matches!(
+            error,
+            crate::error::SigilStitchError::FormatArgKind {
+                index: 0,
+                ref expected,
+                ref actual,
+                ..
+            } if expected == "%T (TypeName)" && actual == "Literal"
+        ));
+    }
+
+    #[test]
+    fn test_trailing_format_marker_reports_byte_offset() {
+        for (format, offset) in [("%", 0), ("plain%", 5), ("é%", 2)] {
+            let error = CodeBlock::of(format, ()).unwrap_err();
+            assert!(matches!(
+                error,
+                crate::error::SigilStitchError::TrailingFormatMarker {
+                    offset: actual,
+                    ..
+                } if actual == offset
+            ));
+        }
+    }
+
+    #[test]
+    fn test_double_percent_remains_literal_percent() {
+        let block = CodeBlock::of("100%%", ()).unwrap();
+        let output = block
+            .render_standalone(&crate::lang::typescript::TypeScript::new(), 80)
+            .unwrap();
+        assert_eq!(output, "100%");
+    }
+
+    #[test]
     fn test_into_args_tuple() {
         let user = TypeName::importable("./models", "User");
         let args: Vec<Arg> = (user, "hello").into_args();
@@ -1010,13 +1086,27 @@ mod tests {
     }
 
     #[test]
+    fn test_fragment_can_borrow_parent_indent() {
+        let fragment = CodeFragment::of("%<private:\n%>", ()).unwrap();
+        let mut b = CodeBlock::builder();
+        b.add("class Example {\n%>", ());
+        b.add_fragment(fragment);
+        b.add_statement("int value", ());
+        b.add("%<}", ());
+        let block = b.build().unwrap();
+
+        let output = block.render_standalone(&TypeScript::new(), 80).unwrap();
+        assert_eq!(output, "class Example {\nprivate:\n  int value;\n}");
+    }
+
+    #[test]
     fn test_fragment_rejects_unbalanced_indent_marker() {
         let result = CodeFragment::of("%>nested", ());
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("unbalanced control flow"));
-        assert!(err_msg.contains("indent depth is 1"));
+        assert!(err_msg.contains("unbalanced structural indentation"));
+        assert!(err_msg.contains("depth is 1"));
     }
 
     #[test]
@@ -1025,8 +1115,8 @@ mod tests {
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("unbalanced control flow"));
-        assert!(err_msg.contains("indent depth is -1"));
+        assert!(err_msg.contains("unbalanced structural indentation"));
+        assert!(err_msg.contains("depth is -1"));
     }
 
     #[test]
@@ -1043,6 +1133,29 @@ mod tests {
     }
 
     #[test]
+    fn test_balanced_relative_block_can_borrow_parent_indent() {
+        let mut section = CodeBlock::builder();
+        section.add("%<private:\n%>", ());
+        let section = section.build().unwrap();
+
+        assert!(matches!(
+            section.render_standalone(&TypeScript::new(), 80),
+            Err(crate::error::SigilStitchError::UnbalancedIndent { depth: -1 })
+        ));
+
+        let mut outer = CodeBlock::builder();
+        outer.add("class Example {\n%>", ());
+        outer.add_code(section);
+        outer.add("member\n%<}", ());
+        let output = outer
+            .build()
+            .unwrap()
+            .render_standalone(&TypeScript::new(), 80)
+            .unwrap();
+        assert_eq!(output, "class Example {\nprivate:\n  member\n}");
+    }
+
+    #[test]
     fn test_builder_rejects_unbalanced_parsed_indent_marker_at_build() {
         let mut b = CodeBlock::builder();
         b.add("%>", ());
@@ -1050,8 +1163,8 @@ mod tests {
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("unbalanced control flow"));
-        assert!(err_msg.contains("indent depth is 1"));
+        assert!(err_msg.contains("unbalanced structural indentation"));
+        assert!(err_msg.contains("depth is 1"));
     }
 
     #[test]

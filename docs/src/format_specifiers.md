@@ -316,9 +316,11 @@ Raw literal strings are intentionally not reparsed as format strings. If a raw
 
 `CodeFragment` snippets must balance their own `%>` / `%<` markers. A fragment
 with `%>` and no matching `%<` is rejected because it would leak indentation into
-whatever code is rendered after it. If you need indentation to span multiple
-builder calls, use `CodeBlock::builder()` and balance the markers before
-`build()`.
+whatever code is rendered after it. A balanced fragment may temporarily borrow
+its caller's indentation, such as `%<private:\n%>` inside a class body; rendering
+that fragment by itself still fails because the complete tree would dedent below
+zero. If you need indentation to span multiple builder calls, use
+`CodeBlock::builder()` and balance the markers before `build()`.
 
 ## `%W` -- Soft Line Break
 
@@ -344,7 +346,13 @@ let block = cb.build().unwrap();
 # }
 ```
 
-Without any `%W` in a CodeBlock, the renderer does direct string concatenation with indent tracking. When `%W` is present, it builds a `pretty::BoxDoc` tree for width-aware layout. `BoxDoc` (not `RcDoc`) is used so rendered documents are `Send + Sync`.
+Without any `%W` in a CodeBlock tree, the renderer's semantic walker writes
+through a direct string adapter. When `%W` is present anywhere in the tree, the
+same walker writes the full tree through a `pretty::BoxDoc` adapter. A broken
+`%W` emits the exact indentation configured by the language; tabs and other
+indent strings are not converted to spaces. Width calculations use terminal
+display width, with ASCII control characters such as tabs counting as one
+column.
 
 ## `%>` and `%<` -- Indent / Dedent
 
@@ -479,9 +487,13 @@ let block = cb.build().unwrap();
 # }
 ```
 
-### Argument Count Validation
+### Format Validation
 
-The builder checks that the number of argument-consuming specifiers (`%T`, `%N`, `%S`, `%V`, `%L`) matches the number of arguments provided. A mismatch records a `FormatArgCount` error, surfaced when `build()` is called. The error carries the expected specifier list and the actual argument kinds so you can see exactly which slot is wrong.
+The builder checks that the number of argument-consuming specifiers (`%T`, `%N`,
+`%S`, `%V`, `%L`, `%R`) matches the number of arguments provided. A mismatch
+records a `FormatArgCount` error, surfaced when `build()` is called. The error
+carries the expected specifier list and the actual argument kinds so you can see
+exactly which slot is wrong.
 
 ```rust
 # extern crate sigil_stitch;
@@ -499,4 +511,11 @@ let result = cb.build();
 # }
 ```
 
-An unrecognised specifier character (anything after `%` that isn't `T`, `N`, `S`, `V`, `L`, `W`, `>`, `<`, `[`, `]`, or `%`) produces `Err(SigilStitchError::InvalidFormatSpecifier { format, specifier })` instead.
+If an argument has the wrong kind for its slot, conversion returns
+`FormatArgKind` with the zero-based argument index, expected specifier and kind,
+and actual argument kind. The mismatch never renders as empty text.
+
+A format string ending in a bare `%` returns `TrailingFormatMarker`, including
+the byte offset of that marker. An unrecognised specifier character (anything
+after `%` that isn't `T`, `N`, `S`, `V`, `L`, `R`, `W`, `>`, `<`, `[`, `]`, or
+`%`) returns `InvalidFormatSpecifier` instead.

@@ -163,7 +163,13 @@ a module-qualified reference and renders the corresponding import as
 | `BlockCloseTransition` | Close delimiter + space (for `} else {` chains) |
 | `Sequence(children)` | Recursively render a sub-sequence of nodes |
 
-**Width-aware rendering**: When a CodeBlock contains `SoftBreak` nodes, the renderer builds a `pretty::BoxDoc` tree (Send + Sync) via `nodes_to_doc` instead of doing direct string concatenation. The Wadler-Lindig algorithm then decides at each `SoftBreak` point whether to insert a line break or a space, based on the target width. CodeBlocks without `SoftBreak` use the simpler direct-concat path for efficiency.
+**Width-aware rendering**: One semantic walker interprets every rewritten
+`CodeNode`. CodeBlocks without `SoftBreak` use a direct string adapter. When a
+`SoftBreak` exists anywhere in the tree, the same walker uses a `pretty::BoxDoc`
+adapter for the whole tree so the Wadler-Lindig algorithm can choose between a
+space and an indented line break. `Nested` and `Sequence` nodes form layout
+groups without resetting renderer state. Both adapters preserve the language's
+configured indentation string exactly.
 
 ## Import Conflict Resolution
 

@@ -1,26 +1,29 @@
-use pretty::BoxDoc;
+mod direct;
+mod pretty;
+#[cfg(test)]
+mod tests;
 
-use crate::code_block::{CodeBlock, validate_no_unresolved_indent_markers};
+use ::pretty::BoxDoc;
+
+use crate::code_block::{
+    CodeBlock, validate_balanced_indent_markers, validate_no_unresolved_indent_markers,
+};
 use crate::code_node::CodeNode;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::RendererLang;
+use direct::DirectAdapter;
+use pretty::PrettyAdapter;
 
 /// Pass 2 of the three-pass rendering model.
 ///
-/// Renders CodeBlock content to a string with:
-/// - Resolved import names (final lengths known)
-/// - Column tracking for width-aware `%T` rendering
-/// - `%W` soft break support via `pretty` crate
-/// - Proper indentation via `%>` / `%<`
+/// The renderer owns only stable configuration. Each render call creates one
+/// call-local output adapter and interprets every rewritten node through the
+/// same semantic walker.
 pub struct CodeRenderer<'a> {
     lang: &'a dyn RendererLang,
     imports: &'a ImportGroup,
     width: usize,
-    output: String,
-    indent_level: usize,
-    current_column: usize,
-    at_line_start: bool,
 }
 
 impl<'a> CodeRenderer<'a> {
@@ -30,10 +33,6 @@ impl<'a> CodeRenderer<'a> {
             lang,
             imports,
             width,
-            output: String::new(),
-            indent_level: 0,
-            current_column: 0,
-            at_line_start: true,
         }
     }
 
@@ -41,16 +40,22 @@ impl<'a> CodeRenderer<'a> {
     pub fn render(&mut self, block: &CodeBlock) -> Result<String, SigilStitchError> {
         let mut nodes = block.nodes.clone();
         self.lang.rewrite_nodes(&mut nodes);
+        validate_balanced_indent_markers(&nodes)?;
         validate_no_unresolved_indent_markers(&nodes)?;
-        self.render_nodes(&nodes)?;
-        Ok(std::mem::take(&mut self.output))
-    }
 
-    fn render_nodes(&mut self, nodes: &[CodeNode]) -> Result<(), SigilStitchError> {
-        if contains_soft_break(nodes) {
-            self.render_nodes_pretty(nodes)
+        let indent_unit = self.lang.block_syntax().indent_unit;
+        if contains_soft_break(&nodes) {
+            let mut adapter = PrettyAdapter::new(indent_unit, self.width);
+            adapter.begin_group()?;
+            self.walk_nodes(&nodes, &mut adapter)?;
+            adapter.end_group()?;
+            adapter.finish()
         } else {
-            self.render_nodes_direct(nodes)
+            let mut adapter = DirectAdapter::new(indent_unit, self.width);
+            adapter.begin_group()?;
+            self.walk_nodes(&nodes, &mut adapter)?;
+            adapter.end_group()?;
+            Ok(adapter.finish())
         }
     }
 
@@ -92,450 +97,123 @@ impl<'a> CodeRenderer<'a> {
             .join("\n")
     }
 
-    /// Direct string rendering (no SoftBreak in this segment).
-    fn render_nodes_direct(&mut self, nodes: &[CodeNode]) -> Result<(), SigilStitchError> {
+    fn walk_nodes<A: RenderAdapter>(
+        &self,
+        nodes: &[CodeNode],
+        adapter: &mut A,
+    ) -> Result<(), SigilStitchError> {
         for node in nodes {
             match node {
-                CodeNode::Literal(text) => {
-                    self.emit_possibly_multiline(text);
-                }
-                CodeNode::TypeRef(tn) => {
-                    self.ensure_indent();
-                    let remaining_width = self.width.saturating_sub(self.current_column);
-                    let doc = self.resolve_type_doc(tn);
-                    let mut buf = Vec::new();
-                    doc.render(remaining_width, &mut buf).map_err(|e| {
-                        SigilStitchError::Render {
-                            context: "CodeRenderer::render_nodes_direct TypeRef".to_string(),
-                            message: e.to_string(),
-                        }
-                    })?;
-                    let rendered =
-                        String::from_utf8(buf).map_err(|e| SigilStitchError::Render {
-                            context: "CodeRenderer::render_nodes_direct TypeRef UTF-8".to_string(),
-                            message: e.to_string(),
-                        })?;
-                    let lines: Vec<&str> = rendered.split('\n').collect();
-                    for (i, line) in lines.iter().enumerate() {
-                        if i > 0 {
-                            self.emit_newline();
-                            self.ensure_indent();
-                            let padding = " ".repeat(self.current_column);
-                            self.emit(&padding);
-                        }
-                        self.emit(line);
-                    }
-                }
+                CodeNode::Literal(text) => adapter.structured_text(text)?,
+                CodeNode::TypeRef(tn) => adapter.type_doc(self.resolve_type_doc(tn))?,
                 CodeNode::NameRef(name) => {
-                    self.ensure_indent();
-                    let escaped = self.lang.escape_reserved(name);
-                    self.emit(&escaped);
+                    adapter.structured_text(&self.lang.escape_reserved(name))?;
                 }
-                CodeNode::StringLit(s) => {
-                    self.ensure_indent();
-                    let rendered = self.lang.render_string_literal(s);
-                    self.emit(&rendered);
+                CodeNode::StringLit(value) => {
+                    adapter.opaque_text(&self.lang.render_string_literal(value))?;
                 }
-                CodeNode::VerbatimStr(s) => {
-                    self.ensure_indent();
-                    let rendered = self.lang.render_verbatim_string(s);
-                    self.emit(&rendered);
+                CodeNode::VerbatimStr(value) => {
+                    adapter.opaque_text(&self.lang.render_verbatim_string(value))?;
                 }
-                CodeNode::InlineLiteral(s) => {
-                    self.emit_possibly_multiline(s);
-                }
+                CodeNode::InlineLiteral(text) => adapter.structured_text(text)?,
                 CodeNode::Nested(block) => {
-                    self.render_nodes(&block.nodes)?;
+                    adapter.begin_group()?;
+                    self.walk_nodes(&block.nodes, adapter)?;
+                    adapter.end_group()?;
                 }
                 CodeNode::Comment(text) => {
-                    self.ensure_indent();
-                    let comment = Self::resolve_comment(self.lang, text);
-                    self.emit(&comment);
+                    adapter.structured_text(&Self::resolve_comment(self.lang, text))?;
                 }
                 CodeNode::Attribute(text) => {
-                    self.ensure_indent();
-                    let attr = self.lang.render_attribute(text);
-                    self.emit(&attr);
+                    adapter.structured_text(&self.lang.render_attribute(text))?;
                 }
-                CodeNode::SoftBreak => {
-                    self.emit(" ");
-                }
-                CodeNode::Indent => {
-                    self.indent_level += 1;
-                }
-                CodeNode::Dedent => {
-                    self.indent_level = self.indent_level.saturating_sub(1);
-                }
-                CodeNode::StatementBegin => {
-                    self.ensure_indent();
-                }
+                CodeNode::SoftBreak => adapter.soft_break()?,
+                CodeNode::Indent => adapter.indent()?,
+                CodeNode::Dedent => adapter.dedent()?,
+                CodeNode::StatementBegin => adapter.ensure_indent()?,
                 CodeNode::StatementEnd => {
                     if self.lang.block_syntax().uses_semicolons {
-                        self.emit(";");
+                        adapter.structured_text(";")?;
                     }
                 }
-                CodeNode::Newline => {
-                    self.emit_newline();
-                }
-                CodeNode::BlockOpen(cond) => {
-                    let open = Self::resolve_block_open(self.lang, cond);
+                CodeNode::Newline => adapter.hard_break()?,
+                CodeNode::BlockOpen(condition) => {
+                    let open = Self::resolve_block_open(self.lang, condition);
                     if !open.is_empty() {
-                        self.emit(open);
+                        adapter.structured_text(open)?;
                     }
                 }
                 CodeNode::BlockClose(condition) => {
                     let close = Self::resolve_block_close(self.lang, condition);
                     if !close.is_empty() {
-                        self.ensure_indent();
-                        self.emit(close);
+                        adapter.structured_text(close)?;
                     }
                 }
-                CodeNode::BranchClose(cond) => {
+                CodeNode::BranchClose(condition) => {
                     if self.lang.block_syntax().close_on_transition {
-                        let close = Self::resolve_block_close(self.lang, cond);
+                        let close = Self::resolve_block_close(self.lang, condition);
                         if !close.is_empty() {
-                            self.ensure_indent();
-                            self.emit(close);
-                            self.emit(" ");
+                            adapter.structured_text(close)?;
+                            adapter.structured_text(" ")?;
                         }
                     }
                 }
                 CodeNode::Sequence(children) => {
-                    self.render_nodes(children)?;
+                    adapter.begin_group()?;
+                    self.walk_nodes(children, adapter)?;
+                    adapter.end_group()?;
                 }
             }
         }
         Ok(())
     }
+}
 
-    /// Render a segment containing SoftBreak using the pretty crate.
-    fn render_nodes_pretty(&mut self, nodes: &[CodeNode]) -> Result<(), SigilStitchError> {
-        let doc = self.nodes_to_doc(nodes);
-        let remaining_width = self.width.saturating_sub(self.current_column);
-        let mut buf = Vec::new();
-        doc.render(remaining_width, &mut buf)
-            .map_err(|e| SigilStitchError::Render {
-                context: "CodeRenderer::render_nodes_pretty".to_string(),
-                message: e.to_string(),
-            })?;
-        let rendered = String::from_utf8(buf).map_err(|e| SigilStitchError::Render {
-            context: "CodeRenderer::render_nodes_pretty UTF-8".to_string(),
-            message: e.to_string(),
-        })?;
+trait RenderAdapter {
+    fn raw_text(&mut self, text: &str) -> Result<(), SigilStitchError>;
+    fn ensure_indent(&mut self) -> Result<(), SigilStitchError>;
+    fn hard_break(&mut self) -> Result<(), SigilStitchError>;
+    fn soft_break(&mut self) -> Result<(), SigilStitchError>;
+    fn type_doc(&mut self, doc: BoxDoc<'static, ()>) -> Result<(), SigilStitchError>;
+    fn indent(&mut self) -> Result<(), SigilStitchError>;
+    fn dedent(&mut self) -> Result<(), SigilStitchError>;
+    fn begin_group(&mut self) -> Result<(), SigilStitchError>;
+    fn end_group(&mut self) -> Result<(), SigilStitchError>;
 
-        let lines: Vec<&str> = rendered.split('\n').collect();
-        for (i, line) in lines.iter().enumerate() {
-            if i > 0 {
-                self.emit_newline();
-                self.ensure_indent();
-            }
-            self.emit(line);
-        }
-        Ok(())
-    }
-
-    fn nodes_to_doc(&self, nodes: &[CodeNode]) -> BoxDoc<'static, ()> {
-        let mut doc = BoxDoc::nil();
-
-        for node in nodes {
-            let node_doc = match node {
-                CodeNode::Literal(text) => BoxDoc::text(text.clone()),
-                CodeNode::TypeRef(tn) => self.resolve_type_doc(tn),
-                CodeNode::NameRef(name) => BoxDoc::text(self.lang.escape_reserved(name)),
-                CodeNode::StringLit(s) => BoxDoc::text(self.lang.render_string_literal(s)),
-                CodeNode::VerbatimStr(s) => BoxDoc::text(self.lang.render_verbatim_string(s)),
-                CodeNode::InlineLiteral(s) => BoxDoc::text(s.clone()),
-                CodeNode::Nested(block) => self.nodes_to_doc(&block.nodes),
-                CodeNode::Comment(text) => BoxDoc::text(Self::resolve_comment(self.lang, text)),
-                CodeNode::Attribute(text) => BoxDoc::text(self.lang.render_attribute(text)),
-                CodeNode::SoftBreak => BoxDoc::softline(),
-                CodeNode::Indent | CodeNode::Dedent => BoxDoc::nil(),
-                CodeNode::StatementBegin => BoxDoc::nil(),
-                CodeNode::StatementEnd => {
-                    if self.lang.block_syntax().uses_semicolons {
-                        BoxDoc::text(";")
-                    } else {
-                        BoxDoc::nil()
-                    }
-                }
-                CodeNode::Newline => BoxDoc::hardline(),
-                CodeNode::BlockOpen(cond) => {
-                    let open = Self::resolve_block_open(self.lang, cond);
-                    if open.is_empty() {
-                        BoxDoc::nil()
-                    } else {
-                        BoxDoc::text(open.to_string())
-                    }
-                }
-                CodeNode::BlockClose(condition) => {
-                    let close = Self::resolve_block_close(self.lang, condition);
-                    if close.is_empty() {
-                        BoxDoc::nil()
-                    } else {
-                        BoxDoc::text(close.to_string())
-                    }
-                }
-                CodeNode::BranchClose(cond) => {
-                    if !self.lang.block_syntax().close_on_transition {
-                        BoxDoc::nil()
-                    } else {
-                        let close = Self::resolve_block_close(self.lang, cond);
-                        if close.is_empty() {
-                            BoxDoc::nil()
-                        } else {
-                            BoxDoc::text(format!("{close} "))
-                        }
-                    }
-                }
-                CodeNode::Sequence(children) => self.nodes_to_doc(children),
-            };
-            doc = doc.append(node_doc);
-        }
-
-        doc.group()
-    }
-
-    /// Emit a literal string, re-indenting each line when it spans multiple
-    /// lines. Single-line input follows the fast path identical to
-    /// `ensure_indent` + `emit`.
-    fn emit_possibly_multiline(&mut self, text: &str) {
-        if !text.contains('\n') {
-            self.ensure_indent();
-            self.emit(text);
-            return;
-        }
-        for (i, line) in text.split('\n').enumerate() {
-            if i > 0 {
-                self.emit_newline();
+    fn structured_text(&mut self, text: &str) -> Result<(), SigilStitchError> {
+        for (index, line) in text.split('\n').enumerate() {
+            if index > 0 {
+                self.hard_break()?;
             }
             if !line.is_empty() {
-                self.ensure_indent();
-                self.emit(line);
+                self.ensure_indent()?;
+                self.raw_text(line)?;
             }
         }
+        Ok(())
     }
 
-    fn ensure_indent(&mut self) {
-        if self.at_line_start {
-            let indent_str = self.lang.block_syntax().indent_unit;
-            for _ in 0..self.indent_level {
-                self.output.push_str(indent_str);
-                self.current_column += indent_str.len();
+    fn opaque_text(&mut self, text: &str) -> Result<(), SigilStitchError> {
+        for (index, line) in text.split('\n').enumerate() {
+            if index > 0 {
+                self.hard_break()?;
             }
-            self.at_line_start = false;
+            if !line.is_empty() {
+                if index == 0 {
+                    self.ensure_indent()?;
+                }
+                self.raw_text(line)?;
+            }
         }
-    }
-
-    fn emit(&mut self, text: &str) {
-        self.output.push_str(text);
-        if let Some(last_nl) = text.rfind('\n') {
-            self.current_column = text.len() - last_nl - 1;
-        } else {
-            self.current_column += text.len();
-        }
-    }
-
-    fn emit_newline(&mut self) {
-        self.output.push('\n');
-        self.current_column = 0;
-        self.at_line_start = true;
+        Ok(())
     }
 }
 
 fn contains_soft_break(nodes: &[CodeNode]) -> bool {
-    nodes.iter().any(|n| match n {
+    nodes.iter().any(|node| match node {
         CodeNode::SoftBreak => true,
+        CodeNode::Nested(block) => contains_soft_break(&block.nodes),
         CodeNode::Sequence(children) => contains_soft_break(children),
         _ => false,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::code_block::CodeBlock;
-    use crate::import::ImportGroup;
-    use crate::lang::typescript::TypeScript;
-    use crate::type_name::TypeName;
-
-    fn render_block(block: &CodeBlock, width: usize) -> String {
-        let ts = TypeScript::new();
-        let imports = ImportGroup::new();
-        let mut renderer = CodeRenderer::new(&ts, &imports, width);
-        renderer.render(block).unwrap()
-    }
-
-    #[test]
-    fn test_simple_statement() {
-        let mut b = CodeBlock::builder();
-        b.add_statement("const x = 42", ());
-        let block = b.build().unwrap();
-        let output = render_block(&block, 80);
-        assert_eq!(output.trim(), "const x = 42;");
-    }
-
-    #[test]
-    fn test_control_flow() {
-        let mut b = CodeBlock::builder();
-        b.begin_control_flow("if (x > 0)", ());
-        b.add_statement("return x", ());
-        b.end_control_flow();
-        let block = b.build().unwrap();
-        let output = render_block(&block, 80);
-        assert!(output.contains("if (x > 0) {"));
-        assert!(output.contains("  return x;"));
-        assert!(output.contains("}"));
-    }
-
-    #[test]
-    fn test_if_else() {
-        let mut b = CodeBlock::builder();
-        b.begin_control_flow("if (x > 0)", ());
-        b.add_statement("return x", ());
-        b.next_control_flow("else", ());
-        b.add_statement("return 0", ());
-        b.end_control_flow();
-        let block = b.build().unwrap();
-        let output = render_block(&block, 80);
-        assert!(output.contains("if (x > 0) {"));
-        assert!(output.contains("} else {"));
-        assert!(output.contains("  return 0;"));
-    }
-
-    #[test]
-    fn test_type_rendering() {
-        let user = TypeName::importable("./models", "User");
-        let imports = ImportGroup {
-            entries: vec![crate::import::ImportEntry {
-                module: "./models".to_string(),
-                name: "User".to_string(),
-                alias: None,
-                is_type_only: true,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
-
-        let mut b = CodeBlock::builder();
-        b.add_statement("const u: %T = getUser()", (user,));
-        let block = b.build().unwrap();
-
-        let ts = TypeScript::new();
-        let mut renderer = CodeRenderer::new(&ts, &imports, 80);
-        let output = renderer.render(&block).unwrap();
-        assert_eq!(output.trim(), "const u: User = getUser();");
-    }
-
-    #[test]
-    fn test_string_literal() {
-        let mut b = CodeBlock::builder();
-        b.add_statement(
-            "const x = %S",
-            (crate::code_block::StringLitArg("hello".to_string()),),
-        );
-        let block = b.build().unwrap();
-        let output = render_block(&block, 80);
-        assert_eq!(output.trim(), "const x = 'hello';");
-    }
-
-    #[test]
-    fn test_nested_indent() {
-        let mut b = CodeBlock::builder();
-        b.begin_control_flow("if (a)", ());
-        b.begin_control_flow("if (b)", ());
-        b.add_statement("return c", ());
-        b.end_control_flow();
-        b.end_control_flow();
-        let block = b.build().unwrap();
-        let output = render_block(&block, 80);
-        assert!(output.contains("    return c;"));
-    }
-
-    #[test]
-    fn test_comment() {
-        let mut b = CodeBlock::builder();
-        b.add_comment("This is a comment");
-        let block = b.build().unwrap();
-        let output = render_block(&block, 80);
-        assert!(output.contains("// This is a comment"));
-    }
-
-    #[test]
-    fn test_multiline_literal_via_percent_l_reindents_each_line() {
-        let mut b = CodeBlock::builder();
-        b.begin_control_flow("interface User", ());
-        b.add("%L", "/**\n * The user's name.\n */".to_string());
-        b.add_line();
-        b.add_statement("name: string", ());
-        b.end_control_flow();
-        let block = b.build().unwrap();
-        let output = render_block(&block, 80);
-
-        assert!(
-            output.contains("  /**"),
-            "first line of doc should be indented, got:\n{output}"
-        );
-        assert!(
-            output.contains("   * The user's name."),
-            "middle line of doc should be indented (indent + ' * ...'), got:\n{output}"
-        );
-        assert!(
-            output.contains("   */"),
-            "closing line of doc should be indented, got:\n{output}"
-        );
-        assert!(
-            !output.contains("\n * The user's name."),
-            "middle line must not be flush-left, got:\n{output}"
-        );
-        assert!(
-            !output.contains("\n */"),
-            "closing line must not be flush-left, got:\n{output}"
-        );
-    }
-
-    #[test]
-    fn test_multiline_literal_direct_reindents_each_line() {
-        let mut b = CodeBlock::builder();
-        b.begin_control_flow("function f()", ());
-        b.add("line1\nline2\nline3", ());
-        b.add_line();
-        b.end_control_flow();
-        let block = b.build().unwrap();
-        let output = render_block(&block, 80);
-
-        assert!(
-            output.contains("  line1"),
-            "first literal line should be indented, got:\n{output}"
-        );
-        assert!(
-            output.contains("  line2"),
-            "second literal line should be indented, got:\n{output}"
-        );
-        assert!(
-            output.contains("  line3"),
-            "third literal line should be indented, got:\n{output}"
-        );
-        assert!(
-            !output.contains("\nline2"),
-            "line2 must not be flush-left, got:\n{output}"
-        );
-    }
-
-    #[test]
-    fn test_block_open_for_override() {
-        use crate::lang::haskell::Haskell;
-        let hs = Haskell::new();
-        let imports = ImportGroup::new();
-        let mut b = CodeBlock::builder();
-        b.begin_control_flow("class Functor f", ());
-        b.add_statement("fmap :: a -> b", ());
-        b.end_control_flow();
-        let block = b.build().unwrap();
-        let mut renderer = CodeRenderer::new(&hs, &imports, 80);
-        let output = renderer.render(&block).unwrap();
-        assert!(
-            output.contains("class Functor f where"),
-            "Haskell backend should emit 'where' via block_open_for, got:\n{output}"
-        );
-    }
 }

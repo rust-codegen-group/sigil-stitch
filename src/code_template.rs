@@ -31,7 +31,7 @@
 
 use std::collections::HashMap;
 
-use crate::code_block::{Arg, CodeBlock};
+use crate::code_block::{Arg, CodeBlock, Specifier};
 
 /// The kind of a template parameter, matching the format specifier system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,13 +67,16 @@ impl ParamKind {
     }
 
     fn matches_arg(&self, arg: &Arg) -> bool {
-        matches!(
-            (self, arg),
-            (ParamKind::Type, Arg::TypeName(_))
-                | (ParamKind::Name, Arg::Name(_))
-                | (ParamKind::StringLit, Arg::StringLit(_))
-                | (ParamKind::Literal, Arg::Literal(_) | Arg::Code(_))
-        )
+        self.as_specifier().matches_arg(arg)
+    }
+
+    fn as_specifier(self) -> Specifier {
+        match self {
+            ParamKind::Type => Specifier::Type,
+            ParamKind::Name => Specifier::Name,
+            ParamKind::StringLit => Specifier::StringLit,
+            ParamKind::Literal => Specifier::Literal,
+        }
     }
 
     fn label(self) -> &'static str {
@@ -204,7 +207,7 @@ impl TemplateApply<'_> {
                         self.template.source,
                         param.name,
                         param.kind.label(),
-                        arg_kind_label(arg),
+                        arg.kind_name(),
                     ),
                 });
             }
@@ -213,18 +216,6 @@ impl TemplateApply<'_> {
         }
 
         CodeBlock::of(&self.template.positional_format, positional_args)
-    }
-}
-
-fn arg_kind_label(arg: &Arg) -> &'static str {
-    match arg {
-        Arg::TypeName(_) => "TypeName",
-        Arg::Name(_) => "Name",
-        Arg::StringLit(_) => "StringLit",
-        Arg::VerbatimStr(_) => "VerbatimStr",
-        Arg::Literal(_) => "Literal",
-        Arg::Code(_) => "Code",
-        Arg::Comment(_) => "Comment",
     }
 }
 

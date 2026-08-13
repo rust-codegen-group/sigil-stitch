@@ -346,12 +346,14 @@ impl FunSpec {
         lang: &dyn CodeLang,
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
         let mut pb = CodeBlock::builder();
+        pb.add("%>", ());
         for (i, param) in self.params.iter().enumerate() {
             if i > 0 {
                 pb.add(",%W", ());
             }
             param.emit_into(&mut pb, lang);
         }
+        pb.add("%<", ());
         pb.build()
     }
 
