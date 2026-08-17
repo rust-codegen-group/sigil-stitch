@@ -1,5 +1,6 @@
 use super::parse_one_statement;
-use crate::parse::types::{MacroLang, Statement};
+use crate::ir::{QuoteArg, Statement};
+use crate::parse::MacroLang;
 use proc_macro2::{TokenStream, TokenTree};
 
 fn parse_stmt(src: &str) -> Statement {
@@ -33,9 +34,9 @@ fn parse_all_stmts(src: &str) -> Vec<Statement> {
 fn semicolon_terminated_statement() {
     let stmt = parse_stmt("const x = 42;");
     match stmt {
-        Statement::Statement { format, args } => {
-            assert_eq!(format, "const x = 42");
-            assert!(args.is_empty());
+        Statement::Terminated(formatted) => {
+            assert_eq!(formatted.format(), "const x = 42");
+            assert!(formatted.args().is_empty());
         }
         _ => panic!("expected Statement, got {:?}", stmt_kind(&stmt)),
     }
@@ -46,9 +47,9 @@ fn line_without_semicolon_is_line() {
     let stmts = parse_all_stmts("return x");
     assert_eq!(stmts.len(), 1);
     match &stmts[0] {
-        Statement::Line { format, args } => {
-            assert_eq!(format, "return x");
-            assert!(args.is_empty());
+        Statement::Line(formatted) => {
+            assert_eq!(formatted.format(), "return x");
+            assert!(formatted.args().is_empty());
         }
         _ => panic!("expected Line, got {:?}", stmt_kind(&stmts[0])),
     }
@@ -59,11 +60,11 @@ fn multiple_statements() {
     let stmts = parse_all_stmts("let a = 1; let b = 2;");
     assert_eq!(stmts.len(), 2);
     match &stmts[0] {
-        Statement::Statement { format, .. } => assert_eq!(format, "let a = 1"),
+        Statement::Terminated(formatted) => assert_eq!(formatted.format(), "let a = 1"),
         _ => panic!("expected Statement"),
     }
     match &stmts[1] {
-        Statement::Statement { format, .. } => assert_eq!(format, "let b = 2"),
+        Statement::Terminated(formatted) => assert_eq!(formatted.format(), "let b = 2"),
         _ => panic!("expected Statement"),
     }
 }
@@ -74,7 +75,7 @@ fn control_flow_if_with_body() {
     match stmt {
         Statement::ControlFlow { branches, .. } => {
             assert_eq!(branches.len(), 1);
-            assert_eq!(branches[0].condition_format, "if (x > 0)");
+            assert_eq!(branches[0].condition.format(), "if (x > 0)");
             assert_eq!(branches[0].body.len(), 1);
         }
         _ => panic!("expected ControlFlow, got {:?}", stmt_kind(&stmt)),
@@ -87,8 +88,8 @@ fn control_flow_if_else() {
     match stmt {
         Statement::ControlFlow { branches, .. } => {
             assert_eq!(branches.len(), 2);
-            assert_eq!(branches[0].condition_format, "if (x)");
-            assert_eq!(branches[1].condition_format, "else");
+            assert_eq!(branches[0].condition.format(), "if (x)");
+            assert_eq!(branches[1].condition.format(), "else");
         }
         _ => panic!("expected ControlFlow, got {:?}", stmt_kind(&stmt)),
     }
@@ -139,19 +140,29 @@ fn dedent_directive() {
 fn statement_with_interpolation() {
     let stmt = parse_stmt("const u: $T(user_type) = getUser();");
     match stmt {
-        Statement::Statement { format, args } => {
-            assert_eq!(format, "const u: %T = getUser()");
-            assert_eq!(args.len(), 1);
+        Statement::Terminated(formatted) => {
+            assert_eq!(formatted.format(), "const u: %T = getUser()");
+            assert_eq!(formatted.args().len(), 1);
         }
         _ => panic!("expected Statement"),
     }
 }
 
 #[test]
+fn expression_block_with_meta_statements_is_a_typed_argument() {
+    let stmt = parse_stmt("const value = { $let(inner = 1); nested: $L(inner); };");
+    let Statement::Terminated(formatted) = stmt else {
+        panic!("expected terminated statement");
+    };
+    assert_eq!(formatted.args().len(), 1);
+    assert!(matches!(formatted.args()[0], QuoteArg::ParsedBlock(_)));
+}
+
+#[test]
 fn newline_before_metafor_without_continuation_still_splits() {
     let stmts = parse_all_stmts("const before = 1\n$for(item in items) { const x = $N(item); }");
     assert_eq!(stmts.len(), 2);
-    assert!(matches!(stmts[0], Statement::Line { .. }));
+    assert!(matches!(stmts[0], Statement::Line(_)));
     assert!(matches!(stmts[1], Statement::MetaFor { .. }));
 }
 
@@ -160,8 +171,8 @@ fn go_for_with_embedded_semicolons() {
     let stmt = parse_stmt_lang("for i := 0; i < n; i++ { body(); }", MacroLang::Go);
     match stmt {
         Statement::ControlFlow { branches, .. } => {
-            assert!(branches[0].condition_format.contains("for"));
-            assert!(branches[0].condition_format.contains(";"));
+            assert!(branches[0].condition.format().contains("for"));
+            assert!(branches[0].condition.format().contains(";"));
         }
         _ => panic!("expected ControlFlow, got {:?}", stmt_kind(&stmt)),
     }
@@ -171,13 +182,9 @@ fn go_for_with_embedded_semicolons() {
 fn go_const_paren_block() {
     let stmt = parse_stmt_lang("const ( x = 1 )", MacroLang::Go);
     match stmt {
-        Statement::ParenBlock {
-            header_format,
-            header_args,
-            body,
-        } => {
-            assert_eq!(header_format, "const (");
-            assert!(header_args.is_empty());
+        Statement::ParenBlock { header, body } => {
+            assert_eq!(header.format(), "const (");
+            assert!(header.args().is_empty());
             assert_eq!(body.len(), 1);
         }
         _ => panic!("expected ParenBlock, got {:?}", stmt_kind(&stmt)),
@@ -188,8 +195,8 @@ fn go_const_paren_block() {
 fn go_var_paren_block() {
     let stmt = parse_stmt_lang("var ( x int )", MacroLang::Go);
     match stmt {
-        Statement::ParenBlock { header_format, .. } => {
-            assert_eq!(header_format, "var (");
+        Statement::ParenBlock { header, .. } => {
+            assert_eq!(header.format(), "var (");
         }
         _ => panic!("expected ParenBlock, got {:?}", stmt_kind(&stmt)),
     }
@@ -199,8 +206,8 @@ fn go_var_paren_block() {
 fn go_import_paren_block() {
     let stmt = parse_stmt_lang("import ( \"fmt\" )", MacroLang::Go);
     match stmt {
-        Statement::ParenBlock { header_format, .. } => {
-            assert_eq!(header_format, "import (");
+        Statement::ParenBlock { header, .. } => {
+            assert_eq!(header.format(), "import (");
         }
         _ => panic!("expected ParenBlock, got {:?}", stmt_kind(&stmt)),
     }
@@ -210,8 +217,8 @@ fn go_import_paren_block() {
 fn go_type_paren_block() {
     let stmt = parse_stmt_lang("type ( A struct{} )", MacroLang::Go);
     match stmt {
-        Statement::ParenBlock { header_format, .. } => {
-            assert_eq!(header_format, "type (");
+        Statement::ParenBlock { header, .. } => {
+            assert_eq!(header.format(), "type (");
         }
         _ => panic!("expected ParenBlock, got {:?}", stmt_kind(&stmt)),
     }
@@ -235,9 +242,9 @@ fn non_go_paren_block_is_literal() {
     // Without MacroLang::Go, `const ( ... )` stays as a literal line.
     let stmt = parse_stmt_lang("const ( x = 1 )", MacroLang::Unaware);
     match stmt {
-        Statement::Line { format, .. } => {
-            assert!(format.contains("const"));
-            assert!(format.contains("("));
+        Statement::Line(formatted) => {
+            assert!(formatted.format().contains("const"));
+            assert!(formatted.format().contains("("));
         }
         _ => panic!("expected Line, got {:?}", stmt_kind(&stmt)),
     }
@@ -245,8 +252,8 @@ fn non_go_paren_block_is_literal() {
 
 fn stmt_kind(s: &Statement) -> &'static str {
     match s {
-        Statement::Statement { .. } => "Statement",
-        Statement::Line { .. } => "Line",
+        Statement::Terminated(_) => "Statement",
+        Statement::Line(_) => "Line",
         Statement::BlankLine => "BlankLine",
         Statement::Comment(_) => "Comment",
         Statement::Attr(_) => "Attr",

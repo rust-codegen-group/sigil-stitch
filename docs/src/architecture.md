@@ -35,9 +35,45 @@ The library is organized in four layers, each building on the one below:
 
 Each supported language implements both traits in its own module (`src/lang/typescript.rs`, etc.). The 6 config struct accessors (`type_presentation()`, `generic_syntax()`, `block_syntax()`, `function_syntax()`, `type_decl_syntax()`, `enum_and_annotation()`) return data structs with sensible defaults. Languages can also implement `rewrite_nodes()` to transform the CodeNode tree after macro expansion for language-specific fixups (e.g., Go IIFE `}()` fusion, C++ lambda `};` semicolons).
 
-At the macro level, the `MacroLang` enum (`macros/src/parse/types.rs`) provides compile-time language-aware tokenizer annotations. Languages like Bash, Zsh, Go, and Haskell get specialized spacing rules in `sigil_quote!` without runtime overhead. See [Language-Aware Tokenizer](macrolang.md).
+At the macro level, the `MacroLang` enum (`macros/src/parse/lang.rs`) provides compile-time language-aware tokenizer annotations. Languages like Bash, Zsh, Go, and Haskell get specialized spacing rules in `sigil_quote!` without runtime overhead. See [Language-Aware Tokenizer](macrolang.md).
 
 Public types are language-agnostic — no generic parameter. The language enters as `&dyn RendererLang` (for rendering) or `&dyn CodeLang` (for spec emission) at render time. `FileSpec` stores a `Box<dyn CodeLang>` internally; all other types (`CodeBlock`, `TypeName`, specs) are language-independent.
+
+#### Macro Front End
+
+`sigil_quote!` has a private typed pipeline before the public `CodeBlock` layer:
+
+```text
+macro tokens
+    -> parse::parse_input
+    -> FormattedCode / QuoteArg / Statement IR
+    -> infallible codegen
+    -> caller-scope CodeBlockBuilder calls
+```
+
+Rust-bearing values cross the parser boundary as `syn::Expr`, `syn::Pat`, or
+`syn::Local`; codegen quotes those nodes directly and never reparses token
+strings. A `FormattedCode` privately couples each target format string to its
+typed arguments, deriving the format specifier from the argument variant so
+the two cannot drift apart.
+
+Parsing returns `syn::Error`. Independent failures are combined while recovery
+can advance to a reliable sibling statement, interpolation group, or loop
+option boundary. No partial IR reaches codegen. Direct ordinary and raw string
+literals use `syn::LitStr` decoding. A single-pass lexical boundary scan skips
+Rust strings, characters, nested comments, and nested braces before each
+`@{...}` body is parsed once as a Rust expression; dynamic string expressions
+are not scanned.
+
+Generated parsed blocks and splices use nested builders. Their runtime failures
+flow into a local first-error slot rather than `unwrap`. Flat guarded lowering
+skips later work after a helper failure, introducing a scoped continuation only
+when a subsequent `$let` must remain visible to later statements. Caller `?`,
+`return`, `break`, and `continue` targets remain unchanged. A validation
+pass limits these guarded `$let` continuations to 128 levels so pathological
+input fails with a macro diagnostic instead of exhausting rustc while parsing
+the generated nesting. The public `CodeBlock`, error, and rendering contracts
+are unaffected.
 
 ### Layer 2: TypeName
 

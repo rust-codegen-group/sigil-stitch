@@ -1,0 +1,29 @@
+error: $V has invalid `@{...}` syntax at decoded byte offset 0: unexpected end of input, expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+ --> tests/ui/sigil_quote/literal_interpolation.rs:5:26
+  |
+5 |         const value = $V(r#"@{let} and @{also let}"#);
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: $V has invalid `@{...}` syntax at decoded byte offset 11: unexpected token
+ --> tests/ui/sigil_quote/literal_interpolation.rs:5:26
+  |
+5 |         const value = $V(r#"@{let} and @{also let}"#);
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: $L has an empty `@{}` at decoded byte offset 7
+ --> tests/ui/sigil_quote/literal_interpolation.rs:6:26
+  |
+6 |         const empty = $L("prefix @{}");
+  |                          ^^^^^^^^^^^^
+
+error: $V has an unclosed `@{` at decoded byte offset 7
+ --> tests/ui/sigil_quote/literal_interpolation.rs:7:29
+  |
+7 |         const unclosed = $V(r#"prefix @{value"#);
+  |                             ^^^^^^^^^^^^^^^^^^^
+
+error: $L has invalid `@{...}` syntax at decoded byte offset 0: expected an expression
+ --> tests/ui/sigil_quote/literal_interpolation.rs:8:24
+  |
+8 |         const raw = $L(r#"@{struct}"#);
+  |                        ^^^^^^^^^^^^^^

@@ -1,0 +1,17 @@
+error: invalid $if condition expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+ --> tests/ui/sigil_quote/conditional_tail_recovery.rs:5:12
+  |
+5 |         $if(let) {
+  |            ^^^^^
+
+error: invalid $N expression: expected an expression
+ --> tests/ui/sigil_quote/conditional_tail_recovery.rs:6:30
+  |
+6 |             const first = $N(struct);
+  |                              ^^^^^^
+
+error: $else_if requires a parenthesized condition: $else_if(condition) { ... }
+ --> tests/ui/sigil_quote/conditional_tail_recovery.rs:7:20
+  |
+7 |         } $else_if true {
+  |                    ^^^^

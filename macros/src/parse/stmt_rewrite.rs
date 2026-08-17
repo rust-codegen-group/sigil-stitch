@@ -1,4 +1,6 @@
-use super::types::{MacroLang, Statement};
+use crate::ir::Statement;
+
+use super::MacroLang;
 
 /// Post-parse rewrite pass that injects Indent/Dedent around language-specific
 /// structural patterns (guards, let-body continuations).
@@ -16,8 +18,8 @@ fn is_guard_format(format: &str) -> bool {
 
 fn is_guard(stmt: &Statement) -> bool {
     match stmt {
-        Statement::Line { format, .. } | Statement::Statement { format, .. } => {
-            is_guard_format(format)
+        Statement::Line(formatted) | Statement::Terminated(formatted) => {
+            is_guard_format(formatted.format())
         }
         _ => false,
     }
@@ -54,13 +56,13 @@ fn rewrite_haskell(stmts: Vec<Statement>) -> Vec<Statement> {
 
 fn is_let_opener(stmt: &Statement) -> bool {
     match stmt {
-        Statement::Line { format, .. } => format.ends_with(" ="),
+        Statement::Line(formatted) => formatted.format().ends_with(" ="),
         _ => false,
     }
 }
 
 fn is_content_stmt(stmt: &Statement) -> bool {
-    matches!(stmt, Statement::Line { .. } | Statement::Statement { .. })
+    matches!(stmt, Statement::Line(_) | Statement::Terminated(_))
 }
 
 /// OCaml: indent continuation lines under a `let ... =` opener.

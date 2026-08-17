@@ -1,0 +1,53 @@
+error: duplicate $for option 'separator'
+ --> tests/ui/sigil_quote/loop_options.rs:5:46
+  |
+5 |         $for(item in items; separator = ",", separator = ";", unknown = true) {
+  |                                              ^^^^^^^^^
+
+error: unknown $for option 'unknown'; expected 'separator' or 'trailing'
+ --> tests/ui/sigil_quote/loop_options.rs:5:63
+  |
+5 |         $for(item in items; separator = ",", separator = ";", unknown = true) {
+  |                                                               ^^^^^^^
+
+error: $for option 'trailing' requires separator = expr
+ --> tests/ui/sigil_quote/loop_options.rs:8:13
+  |
+8 |         $for(item in items; trailing = true) {
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid $for option 'separator' expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+  --> tests/ui/sigil_quote/loop_options.rs:11:29
+   |
+11 |         $for(item in items; separator = let, trailing = match) {
+   |                             ^^^^^^^^^
+
+error: invalid $for option 'trailing' expression: expected an expression
+  --> tests/ui/sigil_quote/loop_options.rs:11:46
+   |
+11 |         $for(item in items; separator = let, trailing = match) {
+   |                                              ^^^^^^^^
+
+error: invalid $for option 'separator' expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+  --> tests/ui/sigil_quote/loop_options.rs:14:29
+   |
+14 |         $for(item in items; separator = let, separator = ",") {
+   |                             ^^^^^^^^^
+
+error: duplicate $for option 'separator'
+  --> tests/ui/sigil_quote/loop_options.rs:14:46
+   |
+14 |         $for(item in items; separator = let, separator = ",") {
+   |                                              ^^^^^^^^^
+
+error: unknown $for option 'unknown'; expected 'separator' or 'trailing'
+  --> tests/ui/sigil_quote/loop_options.rs:17:29
+   |
+17 |         $for(item in items; unknown = let) {
+   |                             ^^^^^^^
+
+error: invalid $for option 'unknown' expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+  --> tests/ui/sigil_quote/loop_options.rs:17:29
+   |
+17 |         $for(item in items; unknown = let) {
+   |                             ^^^^^^^

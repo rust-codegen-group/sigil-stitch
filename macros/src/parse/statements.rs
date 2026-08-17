@@ -1,11 +1,14 @@
-use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Spacing, TokenTree};
 
+use super::MacroLang;
 use super::brace_classifier::{self, BraceKind};
 use super::directives::{parse_for_components, parse_if_components};
 use super::format::tokens_to_format;
 use super::parse_body;
-use super::types::{Branch, CompileError, InterpolationKind, MacroLang, Statement, TypedArg};
+use super::recovery::{LineBoundary, Recovered, line_boundary};
+use super::rust_interpolation::{parse_expr, parse_string_expr};
 use super::util::{is_ident, is_semicolon};
+use crate::ir::{Branch, QuoteArg, Statement};
 
 /// Parse a single statement starting at `pos`.
 /// Returns the statement and the position after the consumed tokens.
@@ -13,7 +16,7 @@ pub(super) fn parse_one_statement(
     tokens: &[TokenTree],
     start: usize,
     lang: MacroLang,
-) -> Result<(Statement, usize), CompileError> {
+) -> Result<(Statement, usize), StatementParseError> {
     // Check for $comment(...) at current position.
     if let Some((comment_text, next)) = try_parse_comment(tokens, start)? {
         return Ok((Statement::Comment(comment_text), next));
@@ -35,8 +38,11 @@ pub(super) fn parse_one_statement(
     }
 
     // Check for $if(cond) { ... } [$else_if(cond) { ... }] [$else { ... }]
-    if let Some((stmt, next)) = try_parse_meta_if(tokens, start, lang)? {
-        return Ok((stmt, next));
+    if let Some(recovered) = try_parse_meta_if(tokens, start, lang)? {
+        return recovered
+            .value
+            .map(|statement| (statement, recovered.next_pos))
+            .map_err(|error| StatementParseError::recovered(error, recovered.next_pos));
     }
 
     // Check for $for(pat in expr) { ... }
@@ -75,8 +81,8 @@ pub(super) fn parse_one_statement(
         // Check for `;` — statement terminator, unless inside a CF header.
         // (Any trailing `$+` in collected is handled by tokens_to_format_inner.)
         if is_semicolon(tt) && !in_cf_header {
-            let (format, args) = tokens_to_format(&collected, lang)?;
-            return Ok((Statement::Statement { format, args }, pos + 1));
+            let formatted = tokens_to_format(&collected, lang)?;
+            return Ok((Statement::Terminated(formatted), pos + 1));
         }
 
         // Check for brace group — potential control flow.
@@ -102,8 +108,8 @@ pub(super) fn parse_one_statement(
                     // Recursively parse the body and inline as %L + ParsedBlock.
                     // The `;` at pos+1 is the statement terminator (consumed below
                     // by the normal semicolon path — we skip it via pos+2).
-                    let (format, args) = handle_expression_brace_with_markers(&collected, g, lang)?;
-                    return Ok((Statement::Statement { format, args }, pos + 2));
+                    let formatted = handle_expression_brace_with_markers(&collected, g, lang)?;
+                    return Ok((Statement::Terminated(formatted), pos + 2));
                 } else {
                     // Part of a statement: `const x = { ... };`
                     collected.push(tt.clone());
@@ -178,28 +184,15 @@ pub(super) fn parse_one_statement(
         }
 
         // Line-break detection: split statement when tokens span multiple lines.
-        if !collected.is_empty()
-            && let Some(pel) = prev_end_line
-            && tt.span().start().line > pel
-        {
-            let n = collected.len();
-            if n >= 2
-                && matches!(&collected[n - 2], TokenTree::Punct(p) if p.as_char() == '$')
-                && matches!(&collected[n - 1], TokenTree::Punct(p) if p.as_char() == '+')
-            {
+        match line_boundary(tokens, pos, &collected, prev_end_line) {
+            LineBoundary::Continue => {}
+            LineBoundary::ContinueWithoutMarker => {
                 collected.pop();
                 collected.pop();
-            } else {
-                // Don't split if next line starts with `.` (method chaining),
-                // or if an incomplete statement continues with inline `$for`/`$if`.
-                let starts_with_dot = matches!(tt, TokenTree::Punct(p) if p.as_char() == '.');
-                let continues_with_inline_meta = (starts_with_inline_meta(tokens, pos)
-                    && can_continue_before_inline_meta(&collected))
-                    || (starts_with_inline_if_tail(tokens, pos) && contains_inline_if(&collected));
-                if !starts_with_dot && !continues_with_inline_meta {
-                    let (format, args) = tokens_to_format(&collected, lang)?;
-                    return Ok((Statement::Line { format, args }, pos));
-                }
+            }
+            LineBoundary::Split => {
+                let formatted = tokens_to_format(&collected, lang)?;
+                return Ok((Statement::Line(formatted), pos));
             }
         }
 
@@ -215,35 +208,33 @@ pub(super) fn parse_one_statement(
     if collected.is_empty() {
         Ok((Statement::BlankLine, pos))
     } else {
-        let (format, args) = tokens_to_format(&collected, lang)?;
-        Ok((Statement::Line { format, args }, pos))
+        let formatted = tokens_to_format(&collected, lang)?;
+        Ok((Statement::Line(formatted), pos))
     }
 }
 
-fn starts_with_inline_meta(tokens: &[TokenTree], pos: usize) -> bool {
-    pos + 1 < tokens.len()
-        && matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$')
-        && (is_ident(&tokens[pos + 1], "for") || is_ident(&tokens[pos + 1], "if"))
+#[derive(Debug)]
+pub(super) struct StatementParseError {
+    pub(super) error: syn::Error,
+    pub(super) next_pos: Option<usize>,
 }
 
-fn starts_with_inline_if_tail(tokens: &[TokenTree], pos: usize) -> bool {
-    pos + 1 < tokens.len()
-        && matches!(&tokens[pos], TokenTree::Punct(p) if p.as_char() == '$')
-        && (is_ident(&tokens[pos + 1], "else_if") || is_ident(&tokens[pos + 1], "else"))
+impl StatementParseError {
+    fn recovered(error: syn::Error, next_pos: usize) -> Self {
+        Self {
+            error,
+            next_pos: Some(next_pos),
+        }
+    }
 }
 
-fn contains_inline_if(tokens: &[TokenTree]) -> bool {
-    tokens.windows(2).any(|pair| {
-        matches!(&pair[0], TokenTree::Punct(p) if p.as_char() == '$') && is_ident(&pair[1], "if")
-    })
-}
-
-fn can_continue_before_inline_meta(tokens: &[TokenTree]) -> bool {
-    matches!(
-        tokens.last(),
-        Some(TokenTree::Punct(p))
-            if matches!(p.as_char(), '=' | '|')
-    )
+impl From<syn::Error> for StatementParseError {
+    fn from(error: syn::Error) -> Self {
+        Self {
+            error,
+            next_pos: None,
+        }
+    }
 }
 
 /// Parse a control flow chain starting from tokens that lead into a brace group.
@@ -253,16 +244,12 @@ fn parse_control_flow(
     first_brace: &proc_macro2::Group,
     brace_pos: usize,
     lang: MacroLang,
-) -> Result<(Statement, usize), CompileError> {
-    let (cond_format, cond_args) = tokens_to_format(condition_tokens, lang)?;
+) -> Result<(Statement, usize), syn::Error> {
+    let condition = tokens_to_format(condition_tokens, lang)?;
     let body_tokens: Vec<TokenTree> = first_brace.stream().into_iter().collect();
     let body = parse_body(&body_tokens, lang)?;
 
-    let mut branches = vec![Branch {
-        condition_format: cond_format,
-        condition_args: cond_args,
-        body,
-    }];
+    let mut branches = vec![Branch { condition, body }];
 
     let mut pos = brace_pos + 1;
 
@@ -292,24 +279,23 @@ fn parse_control_flow(
                     let body_toks: Vec<TokenTree> = g.stream().into_iter().collect();
                     let body = parse_body(&body_toks, lang)?;
 
-                    let (cond_format, cond_args) =
-                        if is_bare_else && else_condition_tokens.is_empty() {
-                            ("else".to_string(), Vec::new())
-                        } else if is_bare_else {
-                            let (fmt, args) = tokens_to_format(&else_condition_tokens, lang)?;
-                            (format!("else {fmt}"), args)
-                        } else if else_condition_tokens.is_empty() {
-                            (keyword.clone(), Vec::new())
-                        } else {
-                            let (fmt, args) = tokens_to_format(&else_condition_tokens, lang)?;
-                            (format!("{keyword} {fmt}"), args)
-                        };
+                    let mut condition = if else_condition_tokens.is_empty() {
+                        crate::ir::FormattedCode::new()
+                    } else {
+                        tokens_to_format(&else_condition_tokens, lang)?
+                    };
+                    let prefix = if is_bare_else {
+                        "else"
+                    } else {
+                        keyword.as_str()
+                    };
+                    if condition.format().is_empty() {
+                        condition.format_mut().push_str(prefix);
+                    } else {
+                        condition.format_mut().insert_str(0, &format!("{prefix} "));
+                    }
 
-                    branches.push(Branch {
-                        condition_format: cond_format,
-                        condition_args: cond_args,
-                        body,
-                    });
+                    branches.push(Branch { condition, body });
                     pos += 1;
                     found_brace = true;
                     break;
@@ -319,7 +305,7 @@ fn parse_control_flow(
             }
 
             if !found_brace {
-                return Err(CompileError::new(
+                return Err(syn::Error::new(
                     kw_span,
                     "expected `{` after `else`/`elseif`/`elif`",
                 ));
@@ -343,7 +329,7 @@ fn parse_control_flow(
 fn try_parse_splice_each(
     tokens: &[TokenTree],
     start: usize,
-) -> Result<Option<(Statement, usize)>, CompileError> {
+) -> Result<Option<(Statement, usize)>, syn::Error> {
     // Need at least 3 tokens: `$`, `C_each`, `(expr)`
     if start + 2 >= tokens.len() {
         return Ok(None);
@@ -361,7 +347,7 @@ fn try_parse_splice_each(
     let group = match &tokens[start + 2] {
         TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g,
         _ => {
-            return Err(CompileError::new(
+            return Err(syn::Error::new(
                 tokens[start + 2].span(),
                 "$C_each requires a parenthesized expression: $C_each(expr)",
             ));
@@ -376,7 +362,7 @@ fn try_parse_splice_each(
 
     Ok(Some((
         Statement::SpliceEach {
-            expr: group.stream(),
+            expr: parse_expr(group.stream(), "$C_each", group.span())?,
         },
         next,
     )))
@@ -389,7 +375,7 @@ fn try_parse_meta_if(
     tokens: &[TokenTree],
     start: usize,
     lang: MacroLang,
-) -> Result<Option<(Statement, usize)>, CompileError> {
+) -> Result<Option<Recovered<Statement>>, syn::Error> {
     // Need at least 4 tokens: `$`, `if`, `(cond)`, `{ body }`
     if start + 3 >= tokens.len() {
         return Ok(None);
@@ -404,9 +390,12 @@ fn try_parse_meta_if(
         return Ok(None);
     }
 
-    let (next_pos, branches) = parse_if_components(tokens, start + 2, lang)?;
+    let parts = parse_if_components(tokens, start + 2, lang)?;
 
-    Ok(Some((Statement::MetaIf { branches }, next_pos)))
+    Ok(Some(Recovered {
+        next_pos: parts.next_pos,
+        value: parts.value.map(Statement::MetaIf),
+    }))
 }
 
 /// Try to parse `$for(pat in expr) { ... }` at position `start`.
@@ -415,7 +404,7 @@ fn try_parse_meta_for(
     tokens: &[TokenTree],
     start: usize,
     lang: MacroLang,
-) -> Result<Option<(Statement, usize)>, CompileError> {
+) -> Result<Option<(Statement, usize)>, syn::Error> {
     // Need at least 4 tokens: `$`, `for`, `(pat in expr)`, `{ body }`
     if start + 3 >= tokens.len() {
         return Ok(None);
@@ -430,7 +419,7 @@ fn try_parse_meta_for(
         return Ok(None);
     }
 
-    let (next_pos, pat, iter_expr, separator, trailing, body) =
+    let (next_pos, pat, iter_expr, separator, body) =
         parse_for_components(tokens, start + 2, lang)?;
 
     Ok(Some((
@@ -438,7 +427,6 @@ fn try_parse_meta_for(
             pat,
             iter_expr,
             separator,
-            trailing,
             body,
         },
         next_pos, // helper returns paren_pos + 2 = start + 4
@@ -453,7 +441,7 @@ fn try_parse_meta_for(
 fn try_parse_meta_let(
     tokens: &[TokenTree],
     start: usize,
-) -> Result<Option<(Statement, usize)>, CompileError> {
+) -> Result<Option<(Statement, usize)>, syn::Error> {
     // Need at least 4 tokens: `$`, `let`, `(binding)`, `;`
     if start + 3 >= tokens.len() {
         return Ok(None);
@@ -471,7 +459,7 @@ fn try_parse_meta_let(
     let paren_group = match &tokens[start + 2] {
         TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g.clone(),
         _ => {
-            return Err(CompileError::new(
+            return Err(syn::Error::new(
                 tokens[start + 2].span(),
                 "$let requires a parenthesized binding: $let(var = expr);",
             ));
@@ -480,20 +468,39 @@ fn try_parse_meta_let(
 
     let binding = paren_group.stream();
     if binding.is_empty() {
-        return Err(CompileError::new(
+        return Err(syn::Error::new(
             paren_group.span(),
             "$let binding cannot be empty: $let(var = expr);",
         ));
     }
 
     if !is_semicolon(&tokens[start + 3]) {
-        return Err(CompileError::new(
+        return Err(syn::Error::new(
             tokens[start + 3].span(),
             "$let must be followed by `;`: $let(var = expr);",
         ));
     }
 
-    Ok(Some((Statement::MetaLet { binding }, start + 4)))
+    let block = syn::parse2::<syn::Block>(quote::quote! {{ let #binding; }})
+        .map_err(|error| syn::Error::new(error.span(), format!("invalid $let binding: {error}")))?;
+    let mut parsed = block.stmts.into_iter();
+    let local = match (parsed.next(), parsed.next()) {
+        (Some(syn::Stmt::Local(local)), None) => local,
+        _ => {
+            return Err(syn::Error::new(
+                paren_group.span(),
+                "$let must contain exactly one local binding",
+            ));
+        }
+    };
+
+    Ok(Some((
+        Statement::MetaLet {
+            local,
+            marker_span: tokens[start + 1].span(),
+        },
+        start + 4,
+    )))
 }
 
 /// Strip a trailing `$+` continuation marker from collected tokens.
@@ -531,7 +538,7 @@ fn try_parse_indent_directive(tokens: &[TokenTree], start: usize) -> Option<(Sta
 fn try_parse_comment(
     tokens: &[TokenTree],
     start: usize,
-) -> Result<Option<(TokenStream, usize)>, CompileError> {
+) -> syn::Result<Option<(crate::ir::StringValue, usize)>> {
     // Need at least 3 tokens: `$`, `comment`, `(...)`.
     if start + 2 >= tokens.len() {
         return Ok(None);
@@ -552,14 +559,14 @@ fn try_parse_comment(
     let group = match &tokens[start + 2] {
         TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g,
         _ => {
-            return Err(CompileError::new(
+            return Err(syn::Error::new(
                 tokens[start + 2].span(),
                 "$comment requires parenthesized expression: $comment(expr)",
             ));
         }
     };
 
-    let expr = group.stream();
+    let expr = parse_string_expr(group.stream(), "$comment", group.span())?;
 
     // Skip optional semicolon after $comment(expr);
     let mut next = start + 3;
@@ -574,7 +581,7 @@ fn try_parse_comment(
 fn try_parse_attr(
     tokens: &[TokenTree],
     start: usize,
-) -> Result<Option<(TokenStream, usize)>, CompileError> {
+) -> syn::Result<Option<(crate::ir::StringValue, usize)>> {
     // Need at least 3 tokens: `$`, `attr`, `(...)`.
     if start + 2 >= tokens.len() {
         return Ok(None);
@@ -595,14 +602,14 @@ fn try_parse_attr(
     let group = match &tokens[start + 2] {
         TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g,
         _ => {
-            return Err(CompileError::new(
+            return Err(syn::Error::new(
                 tokens[start + 2].span(),
                 "$attr requires a parenthesized expression: $attr(expr)",
             ));
         }
     };
 
-    let expr = group.stream();
+    let expr = parse_string_expr(group.stream(), "$attr", group.span())?;
 
     // Skip optional semicolon after $attr(expr);
     let mut next = start + 3;
@@ -622,25 +629,13 @@ fn handle_expression_brace_with_markers(
     prefix_tokens: &[TokenTree],
     brace_group: &proc_macro2::Group,
     lang: MacroLang,
-) -> Result<(String, Vec<TypedArg>), CompileError> {
+) -> syn::Result<crate::ir::FormattedCode> {
     let body_tokens: Vec<TokenTree> = brace_group.stream().into_iter().collect();
     let body_stmts = parse_body(&body_tokens, lang)?;
 
-    let (prefix_format, mut prefix_args) = tokens_to_format(prefix_tokens, lang)?;
-
-    let format = if prefix_format.is_empty() {
-        "%L".to_string()
-    } else {
-        format!("{prefix_format}%L")
-    };
-
-    prefix_args.push(TypedArg {
-        kind: InterpolationKind::ParsedBlock,
-        expr: TokenStream::new(),
-        parsed_body: Some(body_stmts),
-    });
-
-    Ok((format, prefix_args))
+    let mut formatted = tokens_to_format(prefix_tokens, lang)?;
+    formatted.push_argument(QuoteArg::ParsedBlock(body_stmts));
+    Ok(formatted)
 }
 
 /// Check whether the collected prefix tokens and language indicate a
@@ -664,21 +659,14 @@ fn parse_paren_block(
     paren_group: &proc_macro2::Group,
     _paren_pos: usize,
     lang: MacroLang,
-) -> Result<(Statement, usize), CompileError> {
-    let (header_format, header_args) = tokens_to_format(header_tokens, lang)?;
-    let header_format = format!("{header_format} (");
+) -> Result<(Statement, usize), syn::Error> {
+    let mut header = tokens_to_format(header_tokens, lang)?;
+    header.format_mut().push_str(" (");
 
     let body_tokens: Vec<TokenTree> = paren_group.stream().into_iter().collect();
     let body = parse_body(&body_tokens, lang)?;
 
-    Ok((
-        Statement::ParenBlock {
-            header_format,
-            header_args,
-            body,
-        },
-        _paren_pos + 1,
-    ))
+    Ok((Statement::ParenBlock { header, body }, _paren_pos + 1))
 }
 
 #[cfg(test)]

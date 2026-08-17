@@ -1,0 +1,23 @@
+error: invalid $if condition expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+ --> tests/ui/sigil_quote/malformed_directives.rs:5:12
+  |
+5 |         $if(let) {
+  |            ^^^^^
+
+error: invalid $for pattern: unexpected token
+ --> tests/ui/sigil_quote/malformed_directives.rs:8:19
+  |
+8 |         $for(item + 1 in items) {
+  |                   ^
+
+error: invalid $for iterator expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+  --> tests/ui/sigil_quote/malformed_directives.rs:11:13
+   |
+11 |         $for(item in let) {
+   |             ^^^^^^^^^^^^^
+
+error: invalid $let binding: expected `;`
+  --> tests/ui/sigil_quote/malformed_directives.rs:14:19
+   |
+14 |         $let(name + 1);
+   |                   ^

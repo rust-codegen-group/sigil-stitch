@@ -1,7 +1,7 @@
 use proc_macro2::Spacing;
 
+use super::MacroLang;
 use super::annotate::TokenAnnotation;
-use super::types::MacroLang;
 
 /// What kind of token was just emitted (for spacing decisions).
 #[derive(Clone, Copy, PartialEq)]

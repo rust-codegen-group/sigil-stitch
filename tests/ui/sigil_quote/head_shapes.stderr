@@ -1,0 +1,19 @@
+error: sigil_quote! requires a language type before the body: sigil_quote!(Type { ... })
+ --> tests/ui/sigil_quote/head_shapes.rs:4:13
+  |
+4 |     let _ = sigil_quote!({ const value = 1; });
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `sigil_quote` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: sigil_quote! body must be enclosed in braces: sigil_quote!(Type { ... })
+ --> tests/ui/sigil_quote/head_shapes.rs:5:26
+  |
+5 |     let _ = sigil_quote!(TypeScript);
+  |                          ^^^^^^^^^^
+
+error: unexpected token
+ --> tests/ui/sigil_quote/head_shapes.rs:6:37
+  |
+6 |     let _ = sigil_quote!(TypeScript + JavaScript {});
+  |                                     ^

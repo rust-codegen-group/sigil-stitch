@@ -1,0 +1,41 @@
+error: invalid $if condition expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+ --> tests/ui/sigil_quote/directive_recovery.rs:5:12
+  |
+5 |         $if(let) { value; } $for(item + 1 in items) {
+  |            ^^^^^
+
+error: invalid $for pattern: unexpected token
+ --> tests/ui/sigil_quote/directive_recovery.rs:5:39
+  |
+5 |         $if(let) { value; } $for(item + 1 in items) {
+  |                                       ^
+
+error: invalid $N expression: expected an expression
+ --> tests/ui/sigil_quote/directive_recovery.rs:6:31
+  |
+6 |             const nested = $N(struct);
+  |                               ^^^^^^
+
+error: invalid $for pattern: unexpected token
+ --> tests/ui/sigil_quote/directive_recovery.rs:8:36
+  |
+8 |         const inline = [$for(entry + 1 in entries) { $N(enum) }];
+  |                                    ^
+
+error: invalid $N expression: expected an expression
+ --> tests/ui/sigil_quote/directive_recovery.rs:8:57
+  |
+8 |         const inline = [$for(entry + 1 in entries) { $N(enum) }];
+  |                                                         ^^^^
+
+error: invalid $if condition expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+ --> tests/ui/sigil_quote/directive_recovery.rs:9:31
+  |
+9 |         const inline_if = [$if(let) { value } $N(struct)];
+  |                               ^^^^^
+
+error: invalid $N expression: expected an expression
+ --> tests/ui/sigil_quote/directive_recovery.rs:9:50
+  |
+9 |         const inline_if = [$if(let) { value } $N(struct)];
+  |                                                  ^^^^^^

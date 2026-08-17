@@ -1,6 +1,6 @@
 use proc_macro2::{Delimiter, Spacing, TokenTree};
 
-use super::types::MacroLang;
+use super::MacroLang;
 use super::util::is_ident;
 
 /// Annotations computed by pre-scanning the token stream.
