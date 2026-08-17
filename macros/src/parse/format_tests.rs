@@ -1,26 +1,62 @@
 use super::tokens_to_format;
-use crate::parse::types::{InterpolationKind, MacroLang};
+use crate::ir::QuoteArg;
+use crate::parse::MacroLang;
 use proc_macro2::{TokenStream, TokenTree};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ArgKind {
+    Type,
+    Name,
+    StringLit,
+    VerbatimStr,
+    Literal,
+    Code,
+    Join,
+    TypeJoin,
+    Comment,
+    ParsedBlock,
+    ParsedSplice,
+}
+
+fn arg_kind(arg: &QuoteArg) -> ArgKind {
+    match arg {
+        QuoteArg::Type(_) => ArgKind::Type,
+        QuoteArg::Name(_) => ArgKind::Name,
+        QuoteArg::StringLit(_) => ArgKind::StringLit,
+        QuoteArg::VerbatimStr(_) => ArgKind::VerbatimStr,
+        QuoteArg::Literal(_) => ArgKind::Literal,
+        QuoteArg::Code(_) => ArgKind::Code,
+        QuoteArg::Join { .. } => ArgKind::Join,
+        QuoteArg::TypeJoin { .. } => ArgKind::TypeJoin,
+        QuoteArg::Comment(_) => ArgKind::Comment,
+        QuoteArg::ParsedBlock(_) => ArgKind::ParsedBlock,
+        QuoteArg::ParsedSplice(_) => ArgKind::ParsedSplice,
+    }
+}
 
 fn fmt(src: &str) -> String {
     let ts: TokenStream = src.parse().unwrap();
     let tokens: Vec<TokenTree> = ts.into_iter().collect();
-    let (format, _args) = tokens_to_format(&tokens, MacroLang::Unaware).unwrap();
+    let (format, _args) = tokens_to_format(&tokens, MacroLang::Unaware)
+        .unwrap()
+        .into_parts();
     format
 }
 
 fn fmt_lang(src: &str, lang: MacroLang) -> String {
     let ts: TokenStream = src.parse().unwrap();
     let tokens: Vec<TokenTree> = ts.into_iter().collect();
-    let (format, _args) = tokens_to_format(&tokens, lang).unwrap();
+    let (format, _args) = tokens_to_format(&tokens, lang).unwrap().into_parts();
     format
 }
 
-fn fmt_with_args(src: &str) -> (String, Vec<InterpolationKind>) {
+fn fmt_with_args(src: &str) -> (String, Vec<ArgKind>) {
     let ts: TokenStream = src.parse().unwrap();
     let tokens: Vec<TokenTree> = ts.into_iter().collect();
-    let (format, args) = tokens_to_format(&tokens, MacroLang::Unaware).unwrap();
-    let kinds: Vec<InterpolationKind> = args.into_iter().map(|a| a.kind).collect();
+    let (format, args) = tokens_to_format(&tokens, MacroLang::Unaware)
+        .unwrap()
+        .into_parts();
+    let kinds: Vec<ArgKind> = args.iter().map(arg_kind).collect();
     (format, kinds)
 }
 
@@ -29,7 +65,16 @@ fn fmt_err(src: &str) -> String {
     let tokens: Vec<TokenTree> = ts.into_iter().collect();
     match tokens_to_format(&tokens, MacroLang::Unaware) {
         Ok(_) => panic!("expected error for {src}"),
-        Err(err) => err.message().to_string(),
+        Err(err) => err.to_string(),
+    }
+}
+
+fn fmt_errors(src: &str) -> Vec<String> {
+    let ts: TokenStream = src.parse().unwrap();
+    let tokens: Vec<TokenTree> = ts.into_iter().collect();
+    match tokens_to_format(&tokens, MacroLang::Unaware) {
+        Ok(_) => panic!("expected errors for {src}"),
+        Err(err) => err.into_iter().map(|error| error.to_string()).collect(),
     }
 }
 
@@ -73,35 +118,51 @@ fn interpolation_type() {
     let (format, kinds) = fmt_with_args("$T(user_type)");
     assert_eq!(format, "%T");
     assert_eq!(kinds.len(), 1);
-    assert!(matches!(kinds[0], InterpolationKind::Type));
+    assert!(matches!(kinds[0], ArgKind::Type));
 }
 
 #[test]
 fn interpolation_name() {
     let (format, kinds) = fmt_with_args("$N(field)");
     assert_eq!(format, "%N");
-    assert!(matches!(kinds[0], InterpolationKind::Name));
+    assert!(matches!(kinds[0], ArgKind::Name));
 }
 
 #[test]
 fn interpolation_string() {
     let (format, kinds) = fmt_with_args("$S(\"hello\")");
     assert_eq!(format, "%S");
-    assert!(matches!(kinds[0], InterpolationKind::StringLit));
+    assert!(matches!(kinds[0], ArgKind::StringLit));
 }
 
 #[test]
 fn interpolation_literal() {
     let (format, kinds) = fmt_with_args("$L(value)");
     assert_eq!(format, "%L");
-    assert!(matches!(kinds[0], InterpolationKind::Literal));
+    assert!(matches!(kinds[0], ArgKind::Literal));
 }
 
 #[test]
 fn interpolation_code() {
     let (format, kinds) = fmt_with_args("$C(block)");
     assert_eq!(format, "%L");
-    assert!(matches!(kinds[0], InterpolationKind::Code));
+    assert!(matches!(kinds[0], ArgKind::Code));
+}
+
+#[test]
+fn specialized_arguments_derive_their_format_specifiers() {
+    let (format, kinds) =
+        fmt_with_args("$V(text) $comment(note) $join(\",\", values) $T_join(\" | \", types)");
+    assert_eq!(format, "%V %R %L %L");
+    assert_eq!(
+        kinds,
+        [
+            ArgKind::VerbatimStr,
+            ArgKind::Comment,
+            ArgKind::Join,
+            ArgKind::TypeJoin,
+        ]
+    );
 }
 
 #[test]
@@ -121,8 +182,36 @@ fn mixed_interpolation_and_text() {
     let (format, kinds) = fmt_with_args("const x: $T(t) = $L(v)");
     assert_eq!(format, "const x: %T = %L");
     assert_eq!(kinds.len(), 2);
-    assert!(matches!(kinds[0], InterpolationKind::Type));
-    assert!(matches!(kinds[1], InterpolationKind::Literal));
+    assert!(matches!(kinds[0], ArgKind::Type));
+    assert!(matches!(kinds[1], ArgKind::Literal));
+}
+
+#[test]
+fn independent_interpolation_errors_are_combined() {
+    let errors = fmt_errors("pair($L(let), $N(struct))");
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert!(errors[0].contains("invalid $L expression"), "{errors:?}");
+    assert!(errors[1].contains("invalid $N expression"), "{errors:?}");
+}
+
+#[test]
+fn delimited_unknown_marker_recovers_to_the_next_interpolation() {
+    let errors = fmt_errors("$Bogus(value) $N(struct)");
+
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert!(
+        errors[0].contains("unknown interpolation kind"),
+        "{errors:?}"
+    );
+    assert!(errors[1].contains("invalid $N expression"), "{errors:?}");
+}
+
+#[test]
+fn join_argument_errors_are_combined() {
+    let errors = fmt_errors("$join(let, struct)");
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert!(errors[0].contains("$join separator"), "{errors:?}");
+    assert!(errors[1].contains("$join iterable"), "{errors:?}");
 }
 
 #[test]
@@ -197,7 +286,7 @@ fn inline_for_emits_parsed_splice() {
     let (format, kinds) = fmt_with_args("($for(x in items) { $N(*x) })");
     assert_eq!(format, "(%L)");
     assert_eq!(kinds.len(), 1);
-    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
+    assert!(matches!(kinds[0], ArgKind::ParsedSplice));
 }
 
 #[test]
@@ -206,7 +295,7 @@ fn inline_for_mixed_with_literals() {
     assert!(format.starts_with("prefix "));
     assert!(format.contains(" %L "));
     assert!(format.ends_with(" suffix"));
-    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
+    assert!(matches!(kinds[0], ArgKind::ParsedSplice));
 }
 
 #[test]
@@ -214,7 +303,7 @@ fn inline_if_emits_parsed_splice() {
     let (format, kinds) = fmt_with_args("($if(cond) { a } $else { b })");
     assert_eq!(format, "(%L)");
     assert_eq!(kinds.len(), 1);
-    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
+    assert!(matches!(kinds[0], ArgKind::ParsedSplice));
 }
 
 #[test]
@@ -222,8 +311,8 @@ fn inline_if_preserves_source_newline_before_next_inline_if() {
     let (format, kinds) = fmt_with_args("($if(a) { a }\n$if(b) { b })");
     assert_eq!(format, "(%L\n%L)");
     assert_eq!(kinds.len(), 2);
-    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
-    assert!(matches!(kinds[1], InterpolationKind::ParsedSplice));
+    assert!(matches!(kinds[0], ArgKind::ParsedSplice));
+    assert!(matches!(kinds[1], ArgKind::ParsedSplice));
 }
 
 #[test]
@@ -231,7 +320,7 @@ fn inline_if_after_assignment_continuation_collapses_newline() {
     let (format, kinds) = fmt_with_args("value =\n  $if(flag) { enabled } $else { disabled }");
     assert_eq!(format, "value = %L");
     assert_eq!(kinds.len(), 1);
-    assert!(matches!(kinds[0], InterpolationKind::ParsedSplice));
+    assert!(matches!(kinds[0], ArgKind::ParsedSplice));
 }
 
 #[test]
@@ -290,11 +379,13 @@ fn inline_for_adjacent_to_prev_specifier() {
     // $T(type)$for(x in items) { $N(*x) } — no space between specifiers
     let ts: TokenStream = "$T(my_type)$for(x in items) { $N(*x) }".parse().unwrap();
     let tokens: Vec<TokenTree> = ts.into_iter().collect();
-    let (format, args) = tokens_to_format(&tokens, MacroLang::Unaware).unwrap();
+    let (format, args) = tokens_to_format(&tokens, MacroLang::Unaware)
+        .unwrap()
+        .into_parts();
     assert_eq!(format, "%T%L");
     assert_eq!(args.len(), 2);
-    assert!(matches!(args[0].kind, InterpolationKind::Type));
-    assert!(matches!(args[1].kind, InterpolationKind::ParsedSplice));
+    assert_eq!(arg_kind(&args[0]), ArgKind::Type);
+    assert_eq!(arg_kind(&args[1]), ArgKind::ParsedSplice);
 }
 
 #[test]
@@ -303,7 +394,9 @@ fn blank_line_preserved_inside_parens() {
     let src = "(\nhello\n\nworld\n)";
     let ts: TokenStream = src.parse().unwrap();
     let tokens: Vec<TokenTree> = ts.into_iter().collect();
-    let (format, _) = tokens_to_format(&tokens, MacroLang::Unaware).unwrap();
+    let (format, _) = tokens_to_format(&tokens, MacroLang::Unaware)
+        .unwrap()
+        .into_parts();
     // At minimum, the format should separate hello and world
     assert!(format.contains("hello"), "format: {format:?}");
     assert!(format.contains("world"), "format: {format:?}");

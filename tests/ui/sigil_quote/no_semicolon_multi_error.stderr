@@ -1,0 +1,11 @@
+error: invalid $L expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+ --> tests/ui/sigil_quote/no_semicolon_multi_error.rs:5:25
+  |
+5 |         const first = $L(let)
+  |                         ^^^^^
+
+error: invalid $N expression: expected an expression
+ --> tests/ui/sigil_quote/no_semicolon_multi_error.rs:6:27
+  |
+6 |         const second = $N(struct)
+  |                           ^^^^^^

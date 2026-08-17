@@ -1,0 +1,5 @@
+error: sigil_quote! supports at most 128 guarded $let continuations; split this macro into smaller sigil_quote! blocks
+   --> tests/ui/sigil_quote/guarded_binding_depth.rs:263:10
+    |
+263 |         $let(value = "value");
+    |          ^^^

@@ -4,6 +4,8 @@
 //! inline with interpolation markers that expand to `CodeBlockBuilder` calls.
 
 mod codegen;
+mod guard_plan;
+mod ir;
 mod parse;
 
 use proc_macro::TokenStream;
@@ -21,7 +23,9 @@ use proc_macro::TokenStream;
 /// })
 /// ```
 ///
-/// Returns `Result<CodeBlock, SigilStitchError>`.
+/// Returns `Result<CodeBlock, SigilStitchError>`. Failures from generated
+/// nested builders are returned without panicking, and later generated
+/// expressions are not evaluated after the first such failure.
 ///
 /// ## Interpolation Markers
 ///
@@ -30,12 +34,23 @@ use proc_macro::TokenStream;
 /// | `$T(expr)` | `%T` | Type reference (tracks imports) |
 /// | `$N(expr)` | `%N` | Name identifier |
 /// | `$S(expr)` | `%S` | String literal |
+/// | `$V(expr)` | `%V` | Verbatim string |
 /// | `$L(expr)` | `%L` | Literal or nested code |
 /// | `$C(expr)` | `%L` | Nested `CodeBlock` |
 /// | `$W` | `%W` | Soft line-break point |
 /// | `$>` | `%>` | Increase indent |
 /// | `$<` | `%<` | Decrease indent |
 /// | `$$` | `$` | Literal dollar sign |
+///
+/// Direct ordinary and raw string literals passed to `$V`, `$L`, `$comment`,
+/// or `$attr` can embed Rust expressions as `@{expr}`. The macro decodes the
+/// literal and validates each expression at compile time. Use `@@` for one
+/// literal `@`. Non-literal expressions are evaluated normally at runtime and
+/// are never scanned for interpolation syntax.
+///
+/// Rust expressions, `$for` patterns, and `$let` bindings are parsed before
+/// code generation. Independent errors are reported together when recovery can
+/// reach a reliable sibling boundary.
 ///
 /// ## Statement Rules
 ///
@@ -135,7 +150,16 @@ use proc_macro::TokenStream;
 pub fn sigil_quote(input: TokenStream) -> TokenStream {
     let input2: proc_macro2::TokenStream = input.into();
     match parse::parse_input(input2) {
-        Ok(parsed) => codegen::generate(parsed).into(),
-        Err(err) => err.into_compile_error().into(),
+        Ok(parsed) => match guard_plan::validate(&parsed) {
+            Ok(()) => codegen::generate(parsed).into(),
+            Err(err) => {
+                let errors = err.into_compile_error();
+                quote::quote!({ #errors }).into()
+            }
+        },
+        Err(err) => {
+            let errors = err.into_compile_error();
+            quote::quote!({ #errors }).into()
+        }
     }
 }

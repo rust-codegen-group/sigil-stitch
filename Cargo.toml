@@ -41,3 +41,4 @@ unicode-width = "0.2"
 
 [dev-dependencies]
 serde_json = "1"
+trybuild = "1"

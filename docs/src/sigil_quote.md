@@ -185,7 +185,10 @@ let block = sigil_quote!(Bash {
 
 #### `@{expr}` interpolation
 
-Embed Rust expressions inside `$V` or `$L` string literals with `@{expr}`. These are resolved at compile time while the rest passes through for the target language's runtime:
+Embed Rust expressions inside direct ordinary or raw `$V` and `$L` string
+literals with `@{expr}`. The macro decodes the Rust literal, parses each embedded
+expression at compile time, and emits code that evaluates the expressions at
+runtime. The remaining text passes through for the target language:
 
 ```rust
 # extern crate sigil_stitch;
@@ -202,7 +205,29 @@ let block = sigil_quote!(Bash {
 
 Use `$V` when the output should be wrapped in the target language's string delimiter; use `$L` when you need plain unwrapped text (e.g., type expressions, switch headers).
 
-Use `@@` to emit a literal `@`. Bare `@` not followed by `{` passes through unchanged. Works with all languages.
+Raw literals are useful when an embedded expression itself contains strings or
+braces:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let value = 7;
+let block = sigil_quote!(TypeScript {
+    const rendered = $V(r#"@{format!("}} {}", { let x = value; x })}"#);
+}).unwrap();
+# }
+```
+
+Use `@@` to emit a literal `@`. Bare `@` not followed by `{` passes through
+unchanged. Empty, malformed, and unclosed interpolation groups are compile
+errors; diagnostics identify the marker and decoded-literal byte offset. When
+independent errors occur in one invocation, the macro reports all errors it can
+reach at reliable statement or interpolation boundaries.
+
+Only a directly authored string literal is scanned. A dynamic expression such
+as `$V(make_template())`, or a parenthesized literal expression, is evaluated
+normally and its resulting text is never parsed as Rust source by the macro.
 
 ### Literals (`$L`)
 
@@ -248,9 +273,11 @@ assert!(output.contains("if enabled:\n        return value"));
 # }
 ```
 
-Raw strings passed through `$L` are not reparsed. A raw string containing `%>` or
-`%<` fails with `UnresolvedIndentMarker`; wrap that snippet in `CodeFragment::of`
-when the markers are intended to control indentation.
+The value produced by `$L` is not reparsed as a target format string. A literal
+containing `%>` or `%<` therefore fails with `UnresolvedIndentMarker`; wrap that
+snippet in `CodeFragment::of` when the markers are intended to control
+indentation. Direct Rust string literals are still inspected for the distinct
+`@{expr}` syntax described above.
 
 `CodeFragment` must have balanced indentation markers. Write `%>...%<` inside the
 fragment, not `%>...` with the expectation that the caller will dedent later.

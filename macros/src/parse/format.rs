@@ -1,12 +1,15 @@
 use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
 
+use super::MacroLang;
 use super::annotate::{
     CONTROL_FLOW_KEYWORDS, DECLARATION_KEYWORDS, TokenAnnotation, annotate_tokens,
 };
 use super::directives::{parse_for_raw_components, parse_if_components};
+use super::recovery::combine;
+use super::rust_interpolation::{parse_expr, parse_string_expr};
 use super::spacing::{ColonContext, PrevTokenKind, SpacingState, maybe_space};
-use super::types::{CompileError, InterpolationKind, MacroLang, Statement, TypedArg};
 use super::util::is_ident;
+use crate::ir::{FormattedCode, NoArgMarker, QuoteArg, Statement};
 
 /// Convert a sequence of tokens into a format string and typed argument list.
 ///
@@ -15,33 +18,25 @@ use super::util::is_ident;
 pub(crate) fn tokens_to_format(
     tokens: &[TokenTree],
     lang: MacroLang,
-) -> Result<(String, Vec<TypedArg>), CompileError> {
-    let mut format = String::new();
-    let mut args: Vec<TypedArg> = Vec::new();
+) -> syn::Result<FormattedCode> {
+    let mut formatted = FormattedCode::new();
     let mut state = SpacingState::new(lang);
     let annotations = annotate_tokens(tokens, lang);
 
-    tokens_to_format_inner(
-        tokens,
-        &annotations,
-        &mut format,
-        &mut args,
-        &mut state,
-        lang,
-    )?;
+    tokens_to_format_inner(tokens, &annotations, &mut formatted, &mut state, lang)?;
 
-    Ok((format, args))
+    Ok(formatted)
 }
 
 fn tokens_to_format_inner(
     tokens: &[TokenTree],
     annotations: &[TokenAnnotation],
-    format: &mut String,
-    args: &mut Vec<TypedArg>,
+    formatted: &mut FormattedCode,
     state: &mut SpacingState,
     lang: MacroLang,
-) -> Result<(), CompileError> {
+) -> syn::Result<()> {
     let mut pos = 0;
+    let mut errors = None;
     let mut prev_end_line: Option<usize> = None;
     let base_column = tokens
         .first()
@@ -59,14 +54,14 @@ fn tokens_to_format_inner(
         if let Some(prev_line) = prev_end_line {
             let gap = tt_line.saturating_sub(prev_line).saturating_sub(1);
             for _ in 0..gap {
-                format.push('\n');
+                formatted.format_mut().push('\n');
                 state.prev = PrevTokenKind::None;
             }
             if gap == 0 && tt_line > prev_line && preserves_newline_before_inline_meta(tokens, pos)
             {
-                format.push('\n');
+                formatted.format_mut().push('\n');
                 for _ in 0..tt_start.column.saturating_sub(base_column) {
-                    format.push(' ');
+                    formatted.format_mut().push(' ');
                 }
                 state.prev = PrevTokenKind::None;
             }
@@ -85,10 +80,7 @@ fn tokens_to_format_inner(
 
             pos += 1;
             if pos >= tokens.len() {
-                return Err(CompileError::new(
-                    p.span(),
-                    "unexpected `$` at end of input",
-                ));
+                return Err(syn::Error::new(p.span(), "unexpected `$` at end of input"));
             }
 
             let next = &tokens[pos];
@@ -99,13 +91,13 @@ fn tokens_to_format_inner(
             {
                 if !adjacent_to_prev_specifier {
                     maybe_space(
-                        format,
+                        formatted.format_mut(),
                         state,
                         PrevTokenKind::DollarLiteral,
                         TokenAnnotation::Normal,
                     );
                 }
-                format.push('$');
+                formatted.format_mut().push('$');
                 // Haskell: `$` is an infix operator that needs space after it.
                 // Other languages (shell): `$` glues to the next token (`$VAR`).
                 state.prev = if lang == MacroLang::Haskell {
@@ -122,7 +114,7 @@ fn tokens_to_format_inner(
             if let TokenTree::Punct(p2) = next
                 && p2.as_char() == '>'
             {
-                format.push_str("%>");
+                formatted.push_marker(NoArgMarker::Indent);
                 state.prev = PrevTokenKind::Specifier;
                 state.prev_specifier_end = None;
                 pos += 1;
@@ -133,7 +125,7 @@ fn tokens_to_format_inner(
             if let TokenTree::Punct(p2) = next
                 && p2.as_char() == '<'
             {
-                format.push_str("%<");
+                formatted.push_marker(NoArgMarker::Dedent);
                 state.prev = PrevTokenKind::Specifier;
                 state.prev_specifier_end = None;
                 pos += 1;
@@ -151,7 +143,7 @@ fn tokens_to_format_inner(
 
             // `$W` -> `%W` (no arg, no parens)
             if is_ident(next, "W") {
-                format.push_str("%W");
+                formatted.push_marker(NoArgMarker::SoftBreak);
                 state.prev = PrevTokenKind::SoftBreak;
                 state.prev_specifier_end = None;
                 pos += 1;
@@ -163,7 +155,7 @@ fn tokens_to_format_inner(
 
             // `$C_each(...)` should have been caught earlier (statement-level).
             if is_ident(next, "C_each") {
-                return Err(CompileError::new(
+                return Err(syn::Error::new(
                     next.span(),
                     "$C_each() must appear at the start of a line",
                 ));
@@ -173,40 +165,48 @@ fn tokens_to_format_inner(
             if is_ident(next, "for") {
                 pos += 1;
                 if pos >= tokens.len() {
-                    return Err(CompileError::new(
+                    return Err(syn::Error::new(
                         next.span(),
                         "$for requires a parenthesized pattern: $for(pat in expr) { ... }",
                     ));
                 }
-                let (after_for, pat, iter_expr, separator, trailing, body_tokens) =
-                    parse_for_raw_components(tokens, pos)?;
-                let (body_format, body_args) = tokens_to_format(&body_tokens, lang)?;
+                let parts = parse_for_raw_components(tokens, pos)?;
+                let after_for = parts.next_pos;
+                let body = tokens_to_format(&parts.body_tokens, lang);
+                let (pat, iter_expr, separator, body) = match (parts.header, body) {
+                    (Ok((pat, iter_expr, separator)), Ok(body)) => {
+                        (pat, iter_expr, separator, body)
+                    }
+                    (header, body) => {
+                        if let Err(error) = header {
+                            combine(&mut errors, error);
+                        }
+                        if let Err(error) = body {
+                            combine(&mut errors, error);
+                        }
+                        pos = after_for;
+                        continue;
+                    }
+                };
 
                 if !adjacent_to_prev_specifier {
                     maybe_space(
-                        format,
+                        formatted.format_mut(),
                         state,
                         PrevTokenKind::Specifier,
                         TokenAnnotation::Normal,
                     );
                 }
-                format.push_str("%L");
                 state.prev = PrevTokenKind::ParsedSplice;
                 let end = tokens[after_for - 1].span().end();
                 state.prev_specifier_end = Some((end.line, end.column));
 
-                args.push(TypedArg {
-                    kind: InterpolationKind::ParsedSplice,
-                    expr: TokenStream::new(),
-                    parsed_body: Some(vec![Statement::InlineFor {
-                        pat,
-                        iter_expr,
-                        separator,
-                        trailing,
-                        body_format,
-                        body_args,
-                    }]),
-                });
+                formatted.push_argument(QuoteArg::ParsedSplice(vec![Statement::InlineFor {
+                    pat,
+                    iter_expr,
+                    separator,
+                    body,
+                }]));
                 pos = after_for;
                 continue;
             }
@@ -216,38 +216,42 @@ fn tokens_to_format_inner(
             if is_ident(next, "if") {
                 pos += 1;
                 if pos >= tokens.len() {
-                    return Err(CompileError::new(
+                    return Err(syn::Error::new(
                         next.span(),
                         "$if requires a parenthesized condition: $if(condition) { ... }",
                     ));
                 }
-                let (after_if, branches) = parse_if_components(tokens, pos, lang)?;
+                let parts = parse_if_components(tokens, pos, lang)?;
+                let after_if = parts.next_pos;
+                let meta_if = match parts.value {
+                    Ok(meta_if) => meta_if,
+                    Err(error) => {
+                        combine(&mut errors, error);
+                        pos = after_if;
+                        continue;
+                    }
+                };
 
                 if !adjacent_to_prev_specifier {
                     maybe_space(
-                        format,
+                        formatted.format_mut(),
                         state,
                         PrevTokenKind::Specifier,
                         TokenAnnotation::Normal,
                     );
                 }
-                format.push_str("%L");
                 state.prev = PrevTokenKind::ParsedSplice;
                 let end = tokens[after_if - 1].span().end();
                 state.prev_specifier_end = Some((end.line, end.column));
 
-                args.push(TypedArg {
-                    kind: InterpolationKind::ParsedSplice,
-                    expr: TokenStream::new(),
-                    parsed_body: Some(vec![Statement::MetaIf { branches }]),
-                });
+                formatted.push_argument(QuoteArg::ParsedSplice(vec![Statement::MetaIf(meta_if)]));
                 pos = after_if;
                 continue;
             }
 
             // `$else_if` / `$else` only valid as continuation of `$if`.
             if is_ident(next, "else_if") || is_ident(next, "else") {
-                return Err(CompileError::new(
+                return Err(syn::Error::new(
                     next.span(),
                     "$else_if/$else must immediately follow a $if(condition) { ... } branch",
                 ));
@@ -255,7 +259,7 @@ fn tokens_to_format_inner(
 
             // `$let` is a Rust-level binding, only meaningful at statement level.
             if is_ident(next, "let") {
-                return Err(CompileError::new(
+                return Err(syn::Error::new(
                     next.span(),
                     "$let must appear at the start of a line",
                 ));
@@ -265,7 +269,7 @@ fn tokens_to_format_inner(
             if is_ident(next, "T_join") {
                 pos += 1;
                 if pos >= tokens.len() {
-                    return Err(CompileError::new(
+                    return Err(syn::Error::new(
                         next.span(),
                         "$T_join requires parenthesized arguments: $T_join(sep, iter)",
                     ));
@@ -273,45 +277,36 @@ fn tokens_to_format_inner(
                 let group = match &tokens[pos] {
                     TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g,
                     _ => {
-                        return Err(CompileError::new(
+                        return Err(syn::Error::new(
                             tokens[pos].span(),
                             "$T_join requires parenthesized arguments: $T_join(sep, iter)",
                         ));
                     }
                 };
-                let (sep_expr, iter_expr) = split_join_args(group)?;
+                let (sep_expr, iter_expr) = match split_join_args(group) {
+                    Ok(args) => args,
+                    Err(error) => {
+                        combine(&mut errors, error);
+                        pos += 1;
+                        continue;
+                    }
+                };
 
                 if !adjacent_to_prev_specifier {
                     maybe_space(
-                        format,
+                        formatted.format_mut(),
                         state,
                         PrevTokenKind::Specifier,
                         TokenAnnotation::Normal,
                     );
                 }
-                format.push_str("%L");
                 state.prev = PrevTokenKind::Specifier;
                 let group_end = group.span().end();
                 state.prev_specifier_end = Some((group_end.line, group_end.column));
 
-                let join_expr: TokenStream = quote::quote! {
-                    {
-                        let mut __sigil_cb =
-                            ::sigil_stitch::code_block::CodeBlock::builder();
-                        for (__sigil_idx, __sigil_i) in (#iter_expr).into_iter().enumerate() {
-                            if __sigil_idx > 0 {
-                                __sigil_cb.add("%L", (#sep_expr).to_string());
-                            }
-                            __sigil_cb.add("%T", __sigil_i.clone());
-                        }
-                        __sigil_cb.build().unwrap()
-                    }
-                };
-
-                args.push(TypedArg {
-                    kind: InterpolationKind::TypeJoin,
-                    expr: join_expr,
-                    parsed_body: None,
+                formatted.push_argument(QuoteArg::TypeJoin {
+                    separator: sep_expr,
+                    iter: iter_expr,
                 });
 
                 pos += 1;
@@ -322,7 +317,7 @@ fn tokens_to_format_inner(
             if is_ident(next, "join") {
                 pos += 1;
                 if pos >= tokens.len() {
-                    return Err(CompileError::new(
+                    return Err(syn::Error::new(
                         next.span(),
                         "$join requires parenthesized arguments: $join(sep, iter)",
                     ));
@@ -330,42 +325,37 @@ fn tokens_to_format_inner(
                 let group = match &tokens[pos] {
                     TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g,
                     _ => {
-                        return Err(CompileError::new(
+                        return Err(syn::Error::new(
                             tokens[pos].span(),
                             "$join requires parenthesized arguments: $join(sep, iter)",
                         ));
                     }
                 };
 
-                let (sep_expr, iter_expr) = split_join_args(group)?;
+                let (sep_expr, iter_expr) = match split_join_args(group) {
+                    Ok(args) => args,
+                    Err(error) => {
+                        combine(&mut errors, error);
+                        pos += 1;
+                        continue;
+                    }
+                };
 
                 if !adjacent_to_prev_specifier {
                     maybe_space(
-                        format,
+                        formatted.format_mut(),
                         state,
                         PrevTokenKind::Specifier,
                         TokenAnnotation::Normal,
                     );
                 }
-                format.push_str("%L");
                 state.prev = PrevTokenKind::Specifier;
                 let group_end = group.span().end();
                 state.prev_specifier_end = Some((group_end.line, group_end.column));
 
-                let join_expr: TokenStream = quote::quote! {
-                    {
-                        let __sigil_items: ::std::vec::Vec<::std::string::String> = (#iter_expr)
-                            .into_iter()
-                            .map(|__sigil_i| ::std::string::ToString::to_string(&__sigil_i))
-                            .collect();
-                        __sigil_items.join(#sep_expr)
-                    }
-                };
-
-                args.push(TypedArg {
-                    kind: InterpolationKind::Literal,
-                    expr: join_expr,
-                    parsed_body: None,
+                formatted.push_argument(QuoteArg::Join {
+                    separator: sep_expr,
+                    iter: iter_expr,
                 });
 
                 pos += 1;
@@ -375,28 +365,36 @@ fn tokens_to_format_inner(
             // `$T(expr)`, `$N(expr)`, `$S(expr)`, `$V(expr)`, `$L(expr)`, `$C(expr)`
             if let TokenTree::Ident(id) = next {
                 let kind_str = id.to_string();
-                let kind = match kind_str.as_str() {
-                    "T" => InterpolationKind::Type,
-                    "N" => InterpolationKind::Name,
-                    "S" => InterpolationKind::StringLit,
-                    "V" => InterpolationKind::VerbatimStr,
-                    "L" => InterpolationKind::Literal,
-                    "C" => InterpolationKind::Code,
-                    "comment" => InterpolationKind::Comment,
-                    _ => {
-                        return Err(CompileError::new(
-                            id.span(),
-                            format!(
-                                "unknown interpolation kind `${kind_str}`. \
-                                     Expected $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $comment, $for, $if, or $C_each"
-                            ),
-                        ));
+                if !matches!(
+                    kind_str.as_str(),
+                    "T" | "N" | "S" | "V" | "L" | "C" | "comment"
+                ) {
+                    let error = syn::Error::new(
+                        id.span(),
+                        format!(
+                            "unknown interpolation kind `${kind_str}`. \
+                                 Expected $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $comment, $for, $if, or $C_each"
+                        ),
+                    );
+                    if let Some(TokenTree::Group(group)) = tokens.get(pos + 1)
+                        && group.delimiter() == Delimiter::Parenthesis
+                    {
+                        combine(&mut errors, error);
+                        let group_end = group.span().end();
+                        prev_end_line = Some(group_end.line);
+                        state.prev = PrevTokenKind::None;
+                        state.prev_specifier_end = None;
+                        pos += 2;
+                        continue;
                     }
-                };
+
+                    combine(&mut errors, error);
+                    return Err(errors.expect("the unknown marker error was just recorded"));
+                }
 
                 pos += 1;
                 if pos >= tokens.len() {
-                    return Err(CompileError::new(
+                    return Err(syn::Error::new(
                         id.span(),
                         format!(
                             "${kind_str} requires a parenthesized expression: ${kind_str}(expr)"
@@ -407,7 +405,7 @@ fn tokens_to_format_inner(
                 let group = match &tokens[pos] {
                     TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => g,
                     _ => {
-                        return Err(CompileError::new(
+                        return Err(syn::Error::new(
                             tokens[pos].span(),
                             format!(
                                 "${kind_str} requires a parenthesized expression: ${kind_str}(expr)"
@@ -416,43 +414,53 @@ fn tokens_to_format_inner(
                     }
                 };
 
-                let specifier = match kind {
-                    InterpolationKind::Type => "%T",
-                    InterpolationKind::Name => "%N",
-                    InterpolationKind::StringLit => "%S",
-                    InterpolationKind::VerbatimStr => "%V",
-                    InterpolationKind::Literal
-                    | InterpolationKind::Code
-                    | InterpolationKind::TypeJoin
-                    | InterpolationKind::ParsedBlock
-                    | InterpolationKind::ParsedSplice => "%L",
-                    InterpolationKind::Comment => "%R",
+                let expr_tokens = group.stream();
+                let expr_span = group.span();
+                let arg = match kind_str.as_str() {
+                    "T" => parse_expr(expr_tokens, "$T", expr_span).map(QuoteArg::Type),
+                    "N" => parse_expr(expr_tokens, "$N", expr_span).map(QuoteArg::Name),
+                    "S" => parse_expr(expr_tokens, "$S", expr_span).map(QuoteArg::StringLit),
+                    "V" => {
+                        parse_string_expr(expr_tokens, "$V", expr_span).map(QuoteArg::VerbatimStr)
+                    }
+                    "L" => parse_string_expr(expr_tokens, "$L", expr_span).map(QuoteArg::Literal),
+                    "C" => parse_expr(expr_tokens, "$C", expr_span).map(QuoteArg::Code),
+                    "comment" => {
+                        parse_string_expr(expr_tokens, "$comment", expr_span).map(QuoteArg::Comment)
+                    }
+                    _ => Err(syn::Error::new(
+                        id.span(),
+                        "internal interpolation classification error",
+                    )),
+                };
+                let arg = match arg {
+                    Ok(arg) => arg,
+                    Err(error) => {
+                        combine(&mut errors, error);
+                        pos += 1;
+                        continue;
+                    }
                 };
 
                 if !adjacent_to_prev_specifier {
                     maybe_space(
-                        format,
+                        formatted.format_mut(),
                         state,
                         PrevTokenKind::Specifier,
                         TokenAnnotation::Normal,
                     );
                 }
-                format.push_str(specifier);
                 state.prev = PrevTokenKind::Specifier;
                 let group_end = group.span().end();
                 state.prev_specifier_end = Some((group_end.line, group_end.column));
 
-                args.push(TypedArg {
-                    kind,
-                    expr: group.stream(),
-                    parsed_body: None,
-                });
+                formatted.push_argument(arg);
 
                 pos += 1;
                 continue;
             }
 
-            return Err(CompileError::new(
+            return Err(syn::Error::new(
                 next.span(),
                 "expected interpolation kind after `$`: $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $for, $if, or $$",
             ));
@@ -476,8 +484,8 @@ fn tokens_to_format_inner(
                 } else {
                     PrevTokenKind::Ident
                 };
-                maybe_space(format, state, kind, annotation);
-                format.push_str(&s.replace('%', "%%"));
+                maybe_space(formatted.format_mut(), state, kind, annotation);
+                formatted.format_mut().push_str(&s.replace('%', "%%"));
                 state.prev = kind;
             }
             TokenTree::Punct(p) => {
@@ -500,11 +508,11 @@ fn tokens_to_format_inner(
                     }
                 }
 
-                maybe_space(format, state, new_kind, annotation);
+                maybe_space(formatted.format_mut(), state, new_kind, annotation);
                 if ch == '%' {
-                    format.push_str("%%");
+                    formatted.format_mut().push_str("%%");
                 } else {
-                    format.push(ch);
+                    formatted.format_mut().push(ch);
                 }
                 // Context transitions after emitting the token.
                 match (ch, p.spacing()) {
@@ -557,9 +565,14 @@ fn tokens_to_format_inner(
                 };
             }
             TokenTree::Literal(lit) => {
-                maybe_space(format, state, PrevTokenKind::Literal, annotation);
+                maybe_space(
+                    formatted.format_mut(),
+                    state,
+                    PrevTokenKind::Literal,
+                    annotation,
+                );
                 let s = lit.to_string();
-                format.push_str(&s.replace('%', "%%"));
+                formatted.format_mut().push_str(&s.replace('%', "%%"));
                 state.prev = PrevTokenKind::Literal;
             }
             TokenTree::Group(g) => {
@@ -583,8 +596,8 @@ fn tokens_to_format_inner(
                     };
                 let add_bracket_spaces = shell_bracket && !is_double_bracket_outer;
                 let new_kind = PrevTokenKind::GroupOpen;
-                maybe_space(format, state, new_kind, annotation);
-                format.push_str(open);
+                maybe_space(formatted.format_mut(), state, new_kind, annotation);
+                formatted.format_mut().push_str(open);
 
                 let saved_ctx = state.colon_ctx;
                 if g.delimiter() == Delimiter::Brace {
@@ -614,12 +627,16 @@ fn tokens_to_format_inner(
                     let open_line = g.span().start().line;
                     let first_line = first.span().start().line;
                     if first_line > open_line {
-                        format.push('\n');
+                        formatted.format_mut().push('\n');
                         state.prev = PrevTokenKind::None;
                     }
                 }
                 let inner_annotations = annotate_tokens(&inner, lang);
-                tokens_to_format_inner(&inner, &inner_annotations, format, args, state, lang)?;
+                if let Err(error) =
+                    tokens_to_format_inner(&inner, &inner_annotations, formatted, state, lang)
+                {
+                    combine(&mut errors, error);
+                }
 
                 if g.delimiter() == Delimiter::Parenthesis
                     && let Some(last) = inner.last()
@@ -628,18 +645,18 @@ fn tokens_to_format_inner(
                     let close_line = g.span().end().line;
                     if close_line > last_line
                         && state.prev == PrevTokenKind::ParsedSplice
-                        && !format.ends_with('\n')
+                        && !formatted.format().ends_with('\n')
                     {
-                        format.push('\n');
+                        formatted.format_mut().push('\n');
                         state.prev = PrevTokenKind::None;
                     }
                 }
 
                 state.colon_ctx = saved_ctx;
                 if add_bracket_spaces {
-                    format.push(' ');
+                    formatted.format_mut().push(' ');
                 }
-                format.push_str(close);
+                formatted.format_mut().push_str(close);
 
                 // After a bracket group, check if the next token is span-adjacent.
                 // If so, suppress space (e.g., `[]byte` in Go — the ident is directly
@@ -661,7 +678,10 @@ fn tokens_to_format_inner(
         pos += 1;
     }
 
-    Ok(())
+    match errors {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
 }
 
 fn preserves_newline_before_inline_meta(tokens: &[TokenTree], pos: usize) -> bool {
@@ -685,9 +705,7 @@ fn preserves_newline_before_inline_meta(tokens: &[TokenTree], pos: usize) -> boo
 }
 
 /// Split `$join(sep, iter)` arguments on the first top-level comma.
-pub(super) fn split_join_args(
-    group: &proc_macro2::Group,
-) -> Result<(TokenStream, TokenStream), CompileError> {
+pub(super) fn split_join_args(group: &proc_macro2::Group) -> syn::Result<(syn::Expr, syn::Expr)> {
     let tokens: Vec<TokenTree> = group.stream().into_iter().collect();
     let mut split_pos = None;
 
@@ -703,7 +721,7 @@ pub(super) fn split_join_args(
     let split_pos = match split_pos {
         Some(p) => p,
         None => {
-            return Err(CompileError::new(
+            return Err(syn::Error::new(
                 group.span(),
                 "$join requires two arguments separated by comma: $join(sep, iter)",
             ));
@@ -714,19 +732,28 @@ pub(super) fn split_join_args(
     let iter_tokens: TokenStream = tokens[split_pos + 1..].iter().cloned().collect();
 
     if sep_tokens.is_empty() {
-        return Err(CompileError::new(
+        return Err(syn::Error::new(
             group.span(),
             "$join separator expression cannot be empty",
         ));
     }
     if iter_tokens.is_empty() {
-        return Err(CompileError::new(
+        return Err(syn::Error::new(
             group.span(),
             "$join iterable expression cannot be empty",
         ));
     }
 
-    Ok((sep_tokens, iter_tokens))
+    let separator = parse_expr(sep_tokens, "$join separator", group.span());
+    let iterable = parse_expr(iter_tokens, "$join iterable", group.span());
+    match (separator, iterable) {
+        (Ok(separator), Ok(iterable)) => Ok((separator, iterable)),
+        (Err(mut first), Err(second)) => {
+            first.combine(second);
+            Err(first)
+        }
+        (Err(error), Ok(_)) | (Ok(_), Err(error)) => Err(error),
+    }
 }
 
 #[cfg(test)]

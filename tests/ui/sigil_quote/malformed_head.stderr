@@ -1,0 +1,5 @@
+error: unexpected token
+ --> tests/ui/sigil_quote/malformed_head.rs:4:30
+  |
+4 |     let _ = sigil_quote!(not + a::Type {
+  |                              ^

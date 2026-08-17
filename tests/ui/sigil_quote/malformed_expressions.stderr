@@ -1,0 +1,23 @@
+error: invalid $L expression: expected one of: identifier, `::`, `<`, `_`, literal, `const`, `ref`, `mut`, `&`, parentheses, square brackets, `..`, `const`
+ --> tests/ui/sigil_quote/malformed_expressions.rs:5:25
+  |
+5 |         const first = $L(let);
+  |                         ^^^^^
+
+error: invalid $N expression: expected an expression
+ --> tests/ui/sigil_quote/malformed_expressions.rs:6:27
+  |
+6 |         const second = $N(struct);
+  |                           ^^^^^^
+
+error: invalid $L expression: expected an expression
+ --> tests/ui/sigil_quote/malformed_expressions.rs:7:25
+  |
+7 |         const empty = $L();
+  |                         ^^
+
+error: invalid $L expression: unexpected token after expression
+ --> tests/ui/sigil_quote/malformed_expressions.rs:8:39
+  |
+8 |         const comma_separated = $L("a", "b");
+  |                                       ^

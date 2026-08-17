@@ -1,0 +1,11 @@
+error: unknown interpolation kind `$Bogus`. Expected $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $comment, $for, $if, or $C_each
+ --> tests/ui/sigil_quote/marker_recovery.rs:5:24
+  |
+5 |         const value = $Bogus(foo) $N(struct);
+  |                        ^^^^^
+
+error: invalid $N expression: expected an expression
+ --> tests/ui/sigil_quote/marker_recovery.rs:5:38
+  |
+5 |         const value = $Bogus(foo) $N(struct);
+  |                                      ^^^^^^

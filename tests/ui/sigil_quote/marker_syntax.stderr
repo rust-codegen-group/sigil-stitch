@@ -1,0 +1,23 @@
+error: unknown interpolation kind `$Bogus`. Expected $T, $N, $S, $V, $L, $C, $W, $T_join, $join, $comment, $for, $if, or $C_each
+ --> tests/ui/sigil_quote/marker_syntax.rs:5:26
+  |
+5 |         const unknown = $Bogus(value);
+  |                          ^^^^^
+
+error: $L requires a parenthesized expression: $L(expr)
+ --> tests/ui/sigil_quote/marker_syntax.rs:6:28
+  |
+6 |         const missing = $L value;
+  |                            ^^^^^
+
+error: $else_if/$else must immediately follow a $if(condition) { ... } branch
+ --> tests/ui/sigil_quote/marker_syntax.rs:7:10
+  |
+7 |         $else_if(true) {
+  |          ^^^^^^^
+
+error: $else_if/$else must immediately follow a $if(condition) { ... } branch
+  --> tests/ui/sigil_quote/marker_syntax.rs:10:10
+   |
+10 |         $else {
+   |          ^^^^
