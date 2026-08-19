@@ -1,5 +1,6 @@
 //! OCaml language implementation.
 
+use crate::code_node::BlockIntent;
 use crate::import::ImportGroup;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -10,6 +11,26 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::type_name::{
     AssociatedTypeStyle, FunctionPresentation, GenericApplicationStyle, TypePresentation,
 };
+
+fn ocaml_block_open_for_intent(intent: BlockIntent) -> Option<&'static str> {
+    match intent {
+        BlockIntent::ModuleType => Some(" = sig"),
+        BlockIntent::Module => Some(" = struct"),
+        BlockIntent::Match | BlockIntent::Try => Some(""),
+        BlockIntent::If | BlockIntent::ElseIf => Some(" then"),
+        BlockIntent::Else => Some(""),
+        BlockIntent::For | BlockIntent::While => Some(" do"),
+        _ => None,
+    }
+}
+
+fn ocaml_block_close_for_intent(intent: BlockIntent) -> Option<&'static str> {
+    match intent {
+        BlockIntent::ModuleType | BlockIntent::Module => Some("end"),
+        BlockIntent::For | BlockIntent::While => Some("done"),
+        _ => None,
+    }
+}
 
 /// OCaml language implementation.
 ///
@@ -206,6 +227,7 @@ impl RendererLang for OCaml {
         }
     }
 
+    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         let t = condition.trim();
         if t.starts_with("module type ") {
@@ -225,6 +247,7 @@ impl RendererLang for OCaml {
         }
     }
 
+    #[allow(deprecated)]
     fn block_close_for(&self, condition: &str) -> Option<&str> {
         let t = condition.trim();
         if t.starts_with("module type ") || t.starts_with("module ") {
@@ -234,6 +257,14 @@ impl RendererLang for OCaml {
         } else {
             None
         }
+    }
+
+    fn block_open_for_intent(&self, intent: BlockIntent, _condition: &str) -> Option<&str> {
+        ocaml_block_open_for_intent(intent)
+    }
+
+    fn block_close_for_intent(&self, intent: BlockIntent, _condition: &str) -> Option<&str> {
+        ocaml_block_close_for_intent(intent)
     }
 }
 
@@ -487,5 +518,51 @@ mod tests {
     fn test_module_separator() {
         let ml = OCaml::new();
         assert_eq!(ml.module_separator(), Some("."));
+    }
+
+    #[test]
+    fn test_block_intent_delimiters() {
+        let ml = OCaml::new();
+        assert_eq!(
+            ml.block_open_for_intent(BlockIntent::ModuleType, "module type S"),
+            Some(" = sig")
+        );
+        assert_eq!(
+            ml.block_close_for_intent(BlockIntent::ModuleType, "module type S"),
+            Some("end")
+        );
+        assert_eq!(
+            ml.block_open_for_intent(BlockIntent::Module, "module Foo"),
+            Some(" = struct")
+        );
+        assert_eq!(
+            ml.block_open_for_intent(BlockIntent::Match, "let x = match v with"),
+            Some("")
+        );
+        assert_eq!(
+            ml.block_open_for_intent(BlockIntent::Try, "try f x"),
+            Some("")
+        );
+        assert_eq!(
+            ml.block_open_for_intent(BlockIntent::If, "if x > 0"),
+            Some(" then")
+        );
+        assert_eq!(
+            ml.block_close_for_intent(BlockIntent::For, "for i = 0 to 9"),
+            Some("done")
+        );
+    }
+
+    #[test]
+    fn block_intent_near_matches_do_not_select_module_policy() {
+        let ml = OCaml::new();
+        assert_eq!(
+            ml.block_open_for_intent(BlockIntent::Generic, "modular x y"),
+            None
+        );
+        assert_eq!(
+            ml.block_open_for_intent(BlockIntent::Generic, "matching x"),
+            None
+        );
     }
 }

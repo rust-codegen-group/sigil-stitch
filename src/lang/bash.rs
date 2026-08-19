@@ -1,5 +1,6 @@
 //! Bash shell language implementation.
 
+use crate::code_node::BlockIntent;
 use crate::import::ImportGroup;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -7,6 +8,95 @@ use crate::lang::config::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+
+fn bash_block_open_for_intent(intent: BlockIntent, condition: &str) -> Option<&'static str> {
+    let raw = condition.trim();
+    let t = raw.trim_end_matches(';').trim();
+    match intent {
+        BlockIntent::If | BlockIntent::ElseIf => {
+            if t.ends_with("; then") {
+                Some("")
+            } else if raw.ends_with(';') {
+                Some(" then")
+            } else {
+                Some("; then")
+            }
+        }
+        BlockIntent::For | BlockIntent::While | BlockIntent::Until => {
+            if t.ends_with("; do") {
+                Some("")
+            } else if raw.ends_with(';') {
+                Some(" do")
+            } else {
+                Some("; do")
+            }
+        }
+        BlockIntent::Case => {
+            if t.ends_with(" in") {
+                Some("")
+            } else {
+                Some(" in")
+            }
+        }
+        BlockIntent::Else => Some(""),
+        _ => None,
+    }
+}
+
+fn bash_block_close_for_intent(intent: BlockIntent) -> Option<&'static str> {
+    match intent {
+        BlockIntent::If | BlockIntent::ElseIf => Some("fi"),
+        BlockIntent::For | BlockIntent::While | BlockIntent::Until => Some("done"),
+        BlockIntent::Case => Some("esac"),
+        _ => None,
+    }
+}
+
+/// Legacy string-only opener classification for old serialized/external nodes.
+#[allow(deprecated)]
+fn bash_block_open_for_legacy(condition: &str) -> Option<&'static str> {
+    let raw = condition.trim();
+    let t = raw.trim_end_matches(';').trim();
+    if t.ends_with("; then")
+        || t.ends_with("; do")
+        || t.ends_with(" in")
+        || t == "else"
+        || t == "elif"
+    {
+        Some("")
+    } else if t.starts_with("if ") || t.starts_with("elif ") {
+        if raw.ends_with(';') {
+            Some(" then")
+        } else {
+            Some("; then")
+        }
+    } else if t.starts_with("for ") || t.starts_with("while ") || t.starts_with("until ") {
+        if raw.ends_with(';') {
+            Some(" do")
+        } else {
+            Some("; do")
+        }
+    } else if t.starts_with("case ") {
+        Some(" in")
+    } else {
+        None
+    }
+}
+
+/// Legacy string-only closer classification for old serialized/external nodes.
+#[allow(deprecated)]
+fn bash_block_close_for_legacy(condition: &str) -> Option<&'static str> {
+    let t = condition.trim().trim_end_matches(';').trim();
+    if t.starts_with("if ") || t.starts_with("elif ") || t == "else" {
+        Some("fi")
+    } else if t.starts_with("for ") || t.starts_with("while ") || t.starts_with("until ") {
+        Some("done")
+    } else if t.starts_with("case ") {
+        Some("esac")
+    } else {
+        None
+    }
+}
 
 /// Bash shell language implementation.
 ///
@@ -22,8 +112,8 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 /// # Control Flow
 ///
 /// Bash uses keyword-based block delimiters that vary per construct (`then`/`fi`,
-/// `do`/`done`, `in`/`esac`). The `block_open_for`/`block_close_for` methods
-/// automatically map conditions to the correct delimiters:
+/// `do`/`done`, `in`/`esac`). `block_open_for_intent`/`block_close_for_intent`
+/// map the language-neutral `BlockIntent` locally to the correct delimiters:
 ///
 /// ```text
 /// // Builder API — begin_control_flow/end_control_flow work directly:
@@ -146,12 +236,22 @@ impl RendererLang for Bash {
         }
     }
 
+    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
-        super::shell_syntax::shell_block_open_for(condition)
+        bash_block_open_for_legacy(condition)
     }
 
+    #[allow(deprecated)]
     fn block_close_for(&self, condition: &str) -> Option<&str> {
-        super::shell_syntax::shell_block_close_for(condition)
+        bash_block_close_for_legacy(condition)
+    }
+
+    fn block_open_for_intent(&self, intent: BlockIntent, condition: &str) -> Option<&str> {
+        bash_block_open_for_intent(intent, condition)
+    }
+
+    fn block_close_for_intent(&self, intent: BlockIntent, _condition: &str) -> Option<&str> {
+        bash_block_close_for_intent(intent)
     }
 }
 
@@ -407,5 +507,66 @@ mod tests {
     fn test_module_separator() {
         let bash = Bash::new();
         assert_eq!(bash.module_separator(), None);
+    }
+
+    #[test]
+    fn test_block_intent_delimiters() {
+        let bash = Bash::new();
+        assert_eq!(
+            bash.block_open_for_intent(BlockIntent::If, "if [ -f x ]"),
+            Some("; then")
+        );
+        assert_eq!(
+            bash.block_open_for_intent(BlockIntent::If, "if [ -f x ];"),
+            Some(" then")
+        );
+        assert_eq!(
+            bash.block_open_for_intent(BlockIntent::If, "if [ -f x ]; then"),
+            Some("")
+        );
+        assert_eq!(
+            bash.block_close_for_intent(BlockIntent::If, "if [ -f x ]"),
+            Some("fi")
+        );
+        assert_eq!(
+            bash.block_open_for_intent(BlockIntent::For, "for f in *.txt"),
+            Some("; do")
+        );
+        assert_eq!(
+            bash.block_close_for_intent(BlockIntent::For, "for f in *.txt"),
+            Some("done")
+        );
+        assert_eq!(
+            bash.block_open_for_intent(BlockIntent::Case, "case $x in"),
+            Some("")
+        );
+        assert_eq!(
+            bash.block_close_for_intent(BlockIntent::Case, "case $x in"),
+            Some("esac")
+        );
+        assert_eq!(
+            bash.block_open_for_intent(BlockIntent::Else, "else"),
+            Some("")
+        );
+    }
+
+    #[test]
+    fn block_intent_negative_near_matches_keep_the_if_closer() {
+        let bash = Bash::new();
+        for condition in ["if [ $x = in ]", "if [ $x = do ]", "if [ $x = in ];"] {
+            assert_eq!(
+                bash.block_close_for_intent(BlockIntent::If, condition),
+                Some("fi"),
+                "condition {condition:?} must keep If intent"
+            );
+            assert_ne!(
+                bash.block_close_for_intent(BlockIntent::If, condition),
+                Some("done")
+            );
+            assert_ne!(
+                bash.block_close_for_intent(BlockIntent::If, condition),
+                Some("esac")
+            );
+        }
     }
 }

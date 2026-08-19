@@ -1,5 +1,6 @@
 //! Zsh shell language implementation.
 
+use crate::code_node::BlockIntent;
 use crate::import::ImportGroup;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -7,6 +8,93 @@ use crate::lang::config::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+
+fn zsh_block_open_for_intent(intent: BlockIntent, condition: &str) -> Option<&'static str> {
+    let raw = condition.trim();
+    let t = raw.trim_end_matches(';').trim();
+    match intent {
+        BlockIntent::If | BlockIntent::ElseIf => {
+            if t.ends_with("; then") {
+                Some("")
+            } else if raw.ends_with(';') {
+                Some(" then")
+            } else {
+                Some("; then")
+            }
+        }
+        BlockIntent::For | BlockIntent::While | BlockIntent::Until => {
+            if t.ends_with("; do") {
+                Some("")
+            } else if raw.ends_with(';') {
+                Some(" do")
+            } else {
+                Some("; do")
+            }
+        }
+        BlockIntent::Case => {
+            if t.ends_with(" in") {
+                Some("")
+            } else {
+                Some(" in")
+            }
+        }
+        BlockIntent::Else => Some(""),
+        _ => None,
+    }
+}
+
+fn zsh_block_close_for_intent(intent: BlockIntent) -> Option<&'static str> {
+    match intent {
+        BlockIntent::If | BlockIntent::ElseIf => Some("fi"),
+        BlockIntent::For | BlockIntent::While | BlockIntent::Until => Some("done"),
+        BlockIntent::Case => Some("esac"),
+        _ => None,
+    }
+}
+
+/// Legacy string-only opener classification for old serialized/external nodes.
+fn zsh_block_open_for_legacy(condition: &str) -> Option<&'static str> {
+    let raw = condition.trim();
+    let t = raw.trim_end_matches(';').trim();
+    if t.ends_with("; then")
+        || t.ends_with("; do")
+        || t.ends_with(" in")
+        || t == "else"
+        || t == "elif"
+    {
+        Some("")
+    } else if t.starts_with("if ") || t.starts_with("elif ") {
+        if raw.ends_with(';') {
+            Some(" then")
+        } else {
+            Some("; then")
+        }
+    } else if t.starts_with("for ") || t.starts_with("while ") || t.starts_with("until ") {
+        if raw.ends_with(';') {
+            Some(" do")
+        } else {
+            Some("; do")
+        }
+    } else if t.starts_with("case ") {
+        Some(" in")
+    } else {
+        None
+    }
+}
+
+/// Legacy string-only closer classification for old serialized/external nodes.
+fn zsh_block_close_for_legacy(condition: &str) -> Option<&'static str> {
+    let t = condition.trim().trim_end_matches(';').trim();
+    if t.starts_with("if ") || t.starts_with("elif ") || t == "else" {
+        Some("fi")
+    } else if t.starts_with("for ") || t.starts_with("while ") || t.starts_with("until ") {
+        Some("done")
+    } else if t.starts_with("case ") {
+        Some("esac")
+    } else {
+        None
+    }
+}
 
 /// Zsh shell language implementation.
 ///
@@ -131,12 +219,22 @@ impl RendererLang for Zsh {
         }
     }
 
+    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
-        super::shell_syntax::shell_block_open_for(condition)
+        zsh_block_open_for_legacy(condition)
     }
 
+    #[allow(deprecated)]
     fn block_close_for(&self, condition: &str) -> Option<&str> {
-        super::shell_syntax::shell_block_close_for(condition)
+        zsh_block_close_for_legacy(condition)
+    }
+
+    fn block_open_for_intent(&self, intent: BlockIntent, condition: &str) -> Option<&str> {
+        zsh_block_open_for_intent(intent, condition)
+    }
+
+    fn block_close_for_intent(&self, intent: BlockIntent, _condition: &str) -> Option<&str> {
+        zsh_block_close_for_intent(intent)
     }
 }
 
@@ -340,5 +438,50 @@ mod tests {
     fn test_module_separator() {
         let zsh = Zsh::new();
         assert_eq!(zsh.module_separator(), None);
+    }
+
+    #[test]
+    fn test_block_intent_delimiters() {
+        let zsh = Zsh::new();
+        assert_eq!(
+            zsh.block_open_for_intent(BlockIntent::If, "if [[ -f $1 ]]"),
+            Some("; then")
+        );
+        assert_eq!(
+            zsh.block_open_for_intent(BlockIntent::If, "if [[ -f $1 ]];"),
+            Some(" then")
+        );
+        assert_eq!(
+            zsh.block_close_for_intent(BlockIntent::If, "if [[ -f $1 ]]"),
+            Some("fi")
+        );
+        assert_eq!(
+            zsh.block_open_for_intent(BlockIntent::For, "for f in *.txt"),
+            Some("; do")
+        );
+        assert_eq!(
+            zsh.block_close_for_intent(BlockIntent::For, "for f in *.txt"),
+            Some("done")
+        );
+        assert_eq!(
+            zsh.block_open_for_intent(BlockIntent::Until, "until ready"),
+            Some("; do")
+        );
+        assert_eq!(
+            zsh.block_close_for_intent(BlockIntent::Case, "case $x in"),
+            Some("esac")
+        );
+    }
+
+    #[test]
+    fn block_intent_negative_near_matches_keep_the_if_closer() {
+        let zsh = Zsh::new();
+        for condition in ["if [[ $x = in ]]", "if [[ $x = do ]]"] {
+            assert_eq!(
+                zsh.block_close_for_intent(BlockIntent::If, condition),
+                Some("fi"),
+                "condition {condition:?} must keep If intent"
+            );
+        }
     }
 }

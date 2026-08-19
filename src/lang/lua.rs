@@ -9,6 +9,7 @@
 //! - `require("module")` imports
 //! - 2-space indent by convention
 
+use crate::code_node::BlockIntent;
 use crate::import::ImportGroup;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -16,6 +17,28 @@ use crate::lang::config::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+
+fn lua_block_open_for_intent(intent: BlockIntent, condition: &str) -> Option<&'static str> {
+    let t = condition.trim();
+    match intent {
+        BlockIntent::If | BlockIntent::ElseIf => {
+            if t.ends_with(" then") {
+                Some("")
+            } else {
+                Some(" then")
+            }
+        }
+        BlockIntent::For | BlockIntent::While => {
+            if t.ends_with(" do") {
+                Some("")
+            } else {
+                Some(" do")
+            }
+        }
+        BlockIntent::Else => Some(""),
+        _ => None,
+    }
+}
 
 /// Lua language implementation.
 #[derive(Debug, Clone)]
@@ -33,6 +56,16 @@ impl Default for Lua {
             extension: "lua".to_string(),
         }
     }
+}
+
+fn lua_method_call_follows(chars: &[char], start: usize) -> bool {
+    let mut index = start;
+    while index < chars.len()
+        && (chars[index].is_alphanumeric() || chars[index] == '_' || chars[index] == '.')
+    {
+        index += 1;
+    }
+    matches!(chars.get(index), Some('(') | Some('{'))
 }
 
 impl Lua {
@@ -58,6 +91,7 @@ impl Lua {
                         && chars[i + 1] == ' '
                         && i + 2 < chars.len()
                         && (chars[i + 2].is_alphanumeric() || chars[i + 2] == '_')
+                        && lua_method_call_follows(&chars, i + 2)
                     {
                         // Skip the space after ':'
                         result.push(':');
@@ -121,6 +155,7 @@ impl RendererLang for Lua {
         }
     }
 
+    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         let t = condition.trim();
         if t.ends_with(" then") || t.ends_with(" do") || t == "else" {
@@ -132,6 +167,10 @@ impl RendererLang for Lua {
         } else {
             None
         }
+    }
+
+    fn block_open_for_intent(&self, intent: BlockIntent, condition: &str) -> Option<&str> {
+        lua_block_open_for_intent(intent, condition)
     }
 
     fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
@@ -326,6 +365,60 @@ mod tests {
         assert_eq!(
             lua.function_keyword(DeclarationContext::TopLevel),
             "function"
+        );
+    }
+
+    #[test]
+    fn test_block_intent_openers() {
+        let lua = Lua::new();
+        assert_eq!(
+            lua.block_open_for_intent(BlockIntent::If, "if x > 0"),
+            Some(" then")
+        );
+        assert_eq!(
+            lua.block_open_for_intent(BlockIntent::If, "if x > 0 then"),
+            Some("")
+        );
+        assert_eq!(
+            lua.block_open_for_intent(BlockIntent::ElseIf, "elseif x < 0 then"),
+            Some("")
+        );
+        assert_eq!(
+            lua.block_open_for_intent(BlockIntent::Else, "else"),
+            Some("")
+        );
+        assert_eq!(
+            lua.block_open_for_intent(BlockIntent::For, "for i = 1, 10"),
+            Some(" do")
+        );
+        assert_eq!(
+            lua.block_open_for_intent(BlockIntent::While, "while x > 0 do"),
+            Some("")
+        );
+        assert_eq!(
+            lua.block_open_for_intent(BlockIntent::Generic, "if_x > 0"),
+            None
+        );
+    }
+
+    #[test]
+    fn method_colon_rewrite_requires_a_call_shape() {
+        use crate::code_node::CodeNode;
+
+        let mut nodes = vec![
+            CodeNode::Literal("object: method()".to_string()),
+            CodeNode::Literal("local s = \"label: value\"".to_string()),
+            CodeNode::InlineLiteral("table.key: value".to_string()),
+        ];
+        Lua::rewrite_method_colon(&mut nodes);
+        assert!(matches!(&nodes[0], CodeNode::Literal(s) if s == "object:method()"));
+        assert!(
+            matches!(&nodes[1], CodeNode::Literal(s) if s == "local s = \"label: value\""),
+            "string literal content must not be rewritten"
+        );
+        assert!(
+            matches!(&nodes[2], CodeNode::InlineLiteral(s) if s == "table.key: value"),
+            "table-like key text must not be rewritten"
         );
     }
 }

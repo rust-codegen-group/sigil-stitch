@@ -8,7 +8,7 @@ use ::pretty::BoxDoc;
 use crate::code_block::{
     CodeBlock, validate_balanced_indent_markers, validate_no_unresolved_indent_markers,
 };
-use crate::code_node::CodeNode;
+use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::RendererLang;
@@ -72,13 +72,33 @@ impl<'a> CodeRenderer<'a> {
         tn.to_doc_with_lang(&resolve, self.lang)
     }
 
+    #[allow(deprecated)]
     fn resolve_block_open<'b>(lang: &'b dyn RendererLang, cond: &str) -> &'b str {
         lang.block_open_for(cond)
             .unwrap_or(lang.block_syntax().block_open)
     }
 
+    #[allow(deprecated)]
     fn resolve_block_close<'b>(lang: &'b dyn RendererLang, cond: &str) -> &'b str {
         lang.block_close_for(cond)
+            .unwrap_or(lang.block_syntax().block_close)
+    }
+
+    fn resolve_block_open_intent<'b>(
+        lang: &'b dyn RendererLang,
+        intent: BlockIntent,
+        cond: &str,
+    ) -> &'b str {
+        lang.block_open_for_intent(intent, cond)
+            .unwrap_or(lang.block_syntax().block_open)
+    }
+
+    fn resolve_block_close_intent<'b>(
+        lang: &'b dyn RendererLang,
+        intent: BlockIntent,
+        cond: &str,
+    ) -> &'b str {
+        lang.block_close_for_intent(intent, cond)
             .unwrap_or(lang.block_syntax().block_close)
     }
 
@@ -97,6 +117,7 @@ impl<'a> CodeRenderer<'a> {
             .join("\n")
     }
 
+    #[allow(deprecated)]
     fn walk_nodes<A: RenderAdapter>(
         &self,
         nodes: &[CodeNode],
@@ -152,6 +173,27 @@ impl<'a> CodeRenderer<'a> {
                 CodeNode::BranchClose(condition) => {
                     if self.lang.block_syntax().close_on_transition {
                         let close = Self::resolve_block_close(self.lang, condition);
+                        if !close.is_empty() {
+                            adapter.structured_text(close)?;
+                            adapter.structured_text(" ")?;
+                        }
+                    }
+                }
+                CodeNode::BlockOpenIntent { condition, intent } => {
+                    let open = Self::resolve_block_open_intent(self.lang, *intent, condition);
+                    if !open.is_empty() {
+                        adapter.structured_text(open)?;
+                    }
+                }
+                CodeNode::BlockCloseIntent { condition, intent } => {
+                    let close = Self::resolve_block_close_intent(self.lang, *intent, condition);
+                    if !close.is_empty() {
+                        adapter.structured_text(close)?;
+                    }
+                }
+                CodeNode::BranchCloseIntent { condition, intent } => {
+                    if self.lang.block_syntax().close_on_transition {
+                        let close = Self::resolve_block_close_intent(self.lang, *intent, condition);
                         if !close.is_empty() {
                             adapter.structured_text(close)?;
                             adapter.structured_text(" ")?;

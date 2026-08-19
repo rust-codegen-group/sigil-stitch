@@ -102,7 +102,7 @@ type string_list = string list
 
 ## Pattern match
 
-Pattern matching is built using `CodeBlock` control-flow methods. Use `begin_control_flow` for the outer binding and for the `match` expression — the OCaml backend's `block_open_for` automatically suppresses the block opener for `match ... with`.
+Pattern matching is built using `CodeBlock` control-flow methods. Use `begin_control_flow` for the outer binding and for the `match` expression — the OCaml backend's `Match` block intent automatically suppresses the block opener for `match ... with`.
 
 ```rust
 # extern crate sigil_stitch;

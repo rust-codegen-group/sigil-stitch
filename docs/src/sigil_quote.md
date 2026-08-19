@@ -340,7 +340,7 @@ Lines ending with `{ ... }` (without a trailing `;`) become control flow:
 # use sigil_stitch::prelude::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 sigil_quote!(TypeScript {
-    if (x > 0) {            // -> begin_control_flow("if(x > 0)", ())
+    if (x > 0) {            // -> begin_control_flow_with_intent(If, "if(x > 0)", ())
         return true;         // -> add_statement("return true", ())
     }                        // -> end_control_flow()
 })?;
@@ -618,11 +618,23 @@ sigil_quote!(TypeScript {
 
 This expands to:
 ```rust,ignore
-__sigil_builder.begin_control_flow("if(x > 0)", ());
+__sigil_builder.begin_control_flow_with_intent(
+    ::sigil_stitch::code_node::BlockIntent::If,
+    "if(x > 0)",
+    (),
+);
 __sigil_builder.add_statement("return 1", ());
-__sigil_builder.next_control_flow("else if(x < 0)", ());
+__sigil_builder.next_control_flow_with_intent(
+    ::sigil_stitch::code_node::BlockIntent::ElseIf,
+    "else if(x < 0)",
+    (),
+);
 __sigil_builder.add_statement("return - 1", ());
-__sigil_builder.next_control_flow("else", ());
+__sigil_builder.next_control_flow_with_intent(
+    ::sigil_stitch::code_node::BlockIntent::Else,
+    "else",
+    (),
+);
 __sigil_builder.add_statement("return 0", ());
 __sigil_builder.end_control_flow();
 ```
@@ -697,8 +709,9 @@ sigil_quote!(TypeScript {
 ## Context-Aware Block Delimiters
 
 By default, `{ ... }` in `sigil_quote!` uses the language's `block_syntax().block_open`.
-Language backends can override the opener and closer per condition via `block_open_for`
-and `block_close_for`. For example, Bash maps `if` → `then`/`fi` and `for` → `do`/`done`,
+The parser classifies each brace header into a language-neutral `BlockIntent`; language
+adapters override `block_open_for_intent` and `block_close_for_intent` to map that
+intent to local syntax. For example, Bash maps `if` → `then`/`fi` and `for` → `do`/`done`,
 while Haskell maps `class` → `where`:
 
 ```rust
@@ -706,7 +719,7 @@ while Haskell maps `class` → `where`:
 # use sigil_stitch::lang::haskell::Haskell;
 # use sigil_stitch::prelude::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-// Haskell type class — block_open_for returns " where" for "class ..."
+// Haskell type class — Class intent renders " where"
 sigil_quote!(Haskell {
     class Functor f {
         fmap :: (a -> b) -> f a -> f b;
@@ -723,7 +736,7 @@ sigil_quote!(Haskell {
 # use sigil_stitch::lang::ocaml::OCaml;
 # use sigil_stitch::prelude::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-// OCaml module — block_open_for returns " = struct" for "module ..."
+// OCaml module — Module intent renders " = struct"
 sigil_quote!(OCaml {
     module Foo {
         let x = 42;

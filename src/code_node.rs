@@ -9,6 +9,145 @@ use crate::code_block::{Arg, CodeBlock, FormatPart, Specifier};
 use crate::error::SigilStitchError;
 use crate::type_name::TypeName;
 
+/// Structural role of a control-flow block.
+///
+/// This is a language-neutral label only. It carries **what** a block is, not
+/// how any language renders it. Language adapters map the label to their own
+/// openers and closers locally.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum BlockIntent {
+    /// A block without a recognized language-specific role.
+    Generic,
+    /// An `if` block.
+    If,
+    /// An `elif` / `elseif` / `else if` branch.
+    ElseIf,
+    /// A bare `else` branch.
+    Else,
+    /// A `for` loop.
+    For,
+    /// A `while` loop.
+    While,
+    /// An `until` loop.
+    Until,
+    /// A `case` block.
+    Case,
+    /// A `match` expression/statement block.
+    Match,
+    /// A `try` block.
+    Try,
+    /// A `class` declaration body.
+    Class,
+    /// An `instance` declaration body.
+    Instance,
+    /// A `module` declaration body.
+    Module,
+    /// A `module type` / signature declaration body.
+    ModuleType,
+    /// A `do` block.
+    Do,
+    /// A function or method body.
+    Function,
+    /// A lambda expression body.
+    Lambda,
+}
+
+impl BlockIntent {
+    /// Classify a builder control-flow condition from its raw format string.
+    ///
+    /// This is deliberately language-neutral and policy-free. It recognizes
+    /// static leading tokens only; language adapters decide what to do with
+    /// the resulting label.
+    pub(crate) fn classify_condition(condition: &str) -> Self {
+        let trimmed = condition.trim();
+        if trimmed.is_empty() {
+            return Self::Generic;
+        }
+
+        let words: Vec<&str> = trimmed.split_whitespace().collect();
+        let first = words.first().copied().unwrap_or_default();
+        match first {
+            "if" => Self::If,
+            "elif" | "elseif" => Self::ElseIf,
+            "else" => {
+                if words.get(1) == Some(&"if") {
+                    Self::ElseIf
+                } else {
+                    Self::Else
+                }
+            }
+            "for" => Self::For,
+            "while" => Self::While,
+            "until" => Self::Until,
+            "case" => Self::Case,
+            "match" => Self::Match,
+            "try" => Self::Try,
+            "class" => Self::Class,
+            "instance" => Self::Instance,
+            "do" => Self::Do,
+            "module" => {
+                if words.get(1) == Some(&"type") {
+                    Self::ModuleType
+                } else {
+                    Self::Module
+                }
+            }
+            "go" => {
+                if words
+                    .get(1)
+                    .is_some_and(|word| *word == "func" || word.starts_with("func("))
+                {
+                    Self::Function
+                } else {
+                    Self::Generic
+                }
+            }
+            "function" | "func" | "fn" | "def" | "fun" => Self::Function,
+            _ => {
+                if trimmed.ends_with(" do") {
+                    Self::Do
+                } else if looks_like_lambda_condition(trimmed) {
+                    Self::Lambda
+                } else {
+                    Self::Generic
+                }
+            }
+        }
+    }
+}
+
+/// Returns true when a raw builder condition has a conservative C++-style
+/// lambda capture shape. Control keywords are classified before this probe.
+fn looks_like_lambda_condition(condition: &str) -> bool {
+    if condition.starts_with('[') {
+        return true;
+    }
+
+    let Some(rest) = condition.strip_prefix("return ") else {
+        let Some((_, after_eq)) = condition.split_once('=') else {
+            return false;
+        };
+        let after_eq = after_eq.trim_start();
+        if !after_eq.starts_with('[') {
+            return false;
+        }
+        return capture_followed_by_parens(after_eq);
+    };
+
+    if !rest.starts_with('[') {
+        return false;
+    }
+    capture_followed_by_parens(rest)
+}
+
+fn capture_followed_by_parens(after_capture_start: &str) -> bool {
+    let Some(close) = after_capture_start.find(']') else {
+        return false;
+    };
+    after_capture_start[close + 1..].contains('(')
+}
+
 /// A single node in the code generation tree.
 ///
 /// Each variant is self-contained: a type reference is `CodeNode::TypeRef(TypeName)`,
@@ -51,25 +190,58 @@ pub enum CodeNode {
     StatementEnd,
     /// Hard newline.
     Newline,
-    /// Block open delimiter. Carries the control-flow condition text (e.g.,
-    /// `"if x > 0"`, `"for i in range(10)"`). At render time the renderer calls
-    /// `lang.block_open_for(condition)` — if it returns `Some(s)`, emit `s`;
-    /// otherwise fall back to `lang.block_syntax().block_open`.
-    /// Empty string means no condition (e.g., a bare `{ }` block).
+    /// Legacy block open delimiter carrying only condition text.
+    ///
+    /// Kept for public serialization and external-adapter compatibility. New
+    /// code should use [`CodeNode::BlockOpenIntent`].
+    #[deprecated(note = "use CodeNode::BlockOpenIntent")]
     BlockOpen(String),
-    /// Terminal block close delimiter. Carries the condition from the matching
-    /// `begin_control_flow` call. At render time the renderer calls
-    /// `lang.block_close_for(condition)` — if it returns `Some(s)`, emit `s`;
-    /// otherwise fall back to `lang.block_syntax().block_close`.
+    /// Legacy terminal block close delimiter carrying only condition text.
+    ///
+    /// Kept for public serialization and external-adapter compatibility. New
+    /// code should use [`CodeNode::BlockCloseIntent`].
+    #[deprecated(note = "use CodeNode::BlockCloseIntent")]
+    BlockClose(String),
+    /// Legacy non-terminal block close before a branch keyword.
+    ///
+    /// Kept for public serialization and external-adapter compatibility. New
+    /// code should use [`CodeNode::BranchCloseIntent`].
+    #[deprecated(note = "use CodeNode::BranchCloseIntent")]
+    BranchClose(String),
+    /// Block open delimiter carrying the condition text and its structural
+    /// intent. At render time the renderer calls
+    /// `lang.block_open_for_intent(intent, condition)` — if it returns
+    /// `Some(s)`, emit `s`; otherwise fall back to
+    /// `lang.block_syntax().block_open`.
+    BlockOpenIntent {
+        /// Raw condition format text from the matching builder call.
+        condition: String,
+        /// Structural role of the block.
+        intent: BlockIntent,
+    },
+    /// Terminal block close delimiter carrying the condition text and its
+    /// structural intent.
+    ///
     /// Emits: the closer only (no semicolon, no newline — those come from
     /// `StatementEnd` and `Newline` nodes that follow).
-    BlockClose(String),
-    /// Non-terminal block close before a branch keyword (`else`, `elif`, `catch`).
-    /// Like `BlockClose` but emits closer + space (not newline) so the branch
-    /// keyword continues on the same line (e.g., `} else {`).
-    /// Suppressed when `block_syntax().close_on_transition` is `false`
-    /// (Lua, Bash — where `else`/`elif` sit between opener and closer).
-    BranchClose(String),
+    BlockCloseIntent {
+        /// Raw condition format text from the matching builder call.
+        condition: String,
+        /// Structural role of the block.
+        intent: BlockIntent,
+    },
+    /// Non-terminal block close before a branch keyword (`else`, `elif`,
+    /// `catch`), carrying structural intent.
+    ///
+    /// Like [`CodeNode::BlockCloseIntent`] but emits closer + space (not
+    /// newline) so the branch keyword continues on the same line. Suppressed
+    /// when `block_syntax().close_on_transition` is `false`.
+    BranchCloseIntent {
+        /// Raw condition format text from the matching builder call.
+        condition: String,
+        /// Structural role of the block being transitioned.
+        intent: BlockIntent,
+    },
     /// A sequence of nodes (for grouping, e.g. a statement or control flow block).
     Sequence(Vec<CodeNode>),
 }
@@ -78,6 +250,7 @@ pub enum CodeNode {
 ///
 /// Used by `CodeBlockBuilder::add()` which still calls `parse_format()` to get
 /// `Vec<FormatPart>`, then zips with args into self-contained nodes.
+#[allow(deprecated)]
 pub(crate) fn parts_args_to_nodes(
     format: &str,
     parts: &[FormatPart],
@@ -225,9 +398,96 @@ mod tests {
         ];
         let nodes = parts_args_to_nodes("block delimiters", &parts, &[]).unwrap();
         assert_eq!(nodes.len(), 3);
-        assert!(matches!(&nodes[0], CodeNode::BlockOpen(s) if s == "if x"));
-        assert!(matches!(&nodes[1], CodeNode::BlockClose(s) if s == "if x"));
-        assert!(matches!(&nodes[2], CodeNode::BranchClose(s) if s == "if x"));
+        #[allow(deprecated)]
+        {
+            assert!(matches!(&nodes[0], CodeNode::BlockOpen(s) if s == "if x"));
+            assert!(matches!(&nodes[1], CodeNode::BlockClose(s) if s == "if x"));
+            assert!(matches!(&nodes[2], CodeNode::BranchClose(s) if s == "if x"));
+        }
+    }
+
+    #[test]
+    fn classify_condition_uses_static_leading_tokens() {
+        let cases = [
+            ("if (x > 0)", BlockIntent::If),
+            ("if (matrix[0] > 0)", BlockIntent::If),
+            ("elif x", BlockIntent::ElseIf),
+            ("elseif x", BlockIntent::ElseIf),
+            ("else if x", BlockIntent::ElseIf),
+            ("else", BlockIntent::Else),
+            ("for i in x", BlockIntent::For),
+            ("while x", BlockIntent::While),
+            ("until x", BlockIntent::Until),
+            ("case $x in", BlockIntent::Case),
+            ("match x with", BlockIntent::Match),
+            ("try", BlockIntent::Try),
+            ("class Eq a", BlockIntent::Class),
+            ("instance Show T", BlockIntent::Instance),
+            ("module Foo", BlockIntent::Module),
+            ("module type S", BlockIntent::ModuleType),
+            ("do", BlockIntent::Do),
+            ("main = do", BlockIntent::Do),
+            ("go func()", BlockIntent::Function),
+            ("func f()", BlockIntent::Function),
+            ("function f()", BlockIntent::Function),
+            ("auto fn = [&](int x)", BlockIntent::Lambda),
+            ("return [&]()", BlockIntent::Lambda),
+            ("auto fn = arr[i](x)", BlockIntent::Generic),
+            ("interface User", BlockIntent::Generic),
+            ("", BlockIntent::Generic),
+        ];
+
+        for (condition, expected) in cases {
+            assert_eq!(
+                BlockIntent::classify_condition(condition),
+                expected,
+                "condition: {condition:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn block_intent_nodes_round_trip_through_serde() {
+        let nodes = vec![
+            CodeNode::BlockOpenIntent {
+                condition: "if x".to_string(),
+                intent: BlockIntent::If,
+            },
+            CodeNode::BlockCloseIntent {
+                condition: "if x".to_string(),
+                intent: BlockIntent::If,
+            },
+        ];
+        let json = serde_json::to_string(&nodes).unwrap();
+        let decoded: Vec<CodeNode> = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            &decoded[0],
+            CodeNode::BlockOpenIntent {
+                condition,
+                intent: BlockIntent::If,
+            } if condition == "if x"
+        ));
+        assert!(matches!(
+            &decoded[1],
+            CodeNode::BlockCloseIntent {
+                condition,
+                intent: BlockIntent::If,
+            } if condition == "if x"
+        ));
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn legacy_block_nodes_keep_their_serde_shape() {
+        let old = vec![CodeNode::BlockOpen("if x".to_string())];
+        assert_eq!(
+            serde_json::to_value(&old).unwrap(),
+            serde_json::json!([
+                {"BlockOpen": "if x"}
+            ])
+        );
+        let decoded: Vec<CodeNode> = serde_json::from_str(r#"[{"BlockOpen":"if x"}]"#).unwrap();
+        assert!(matches!(&decoded[0], CodeNode::BlockOpen(s) if s == "if x"));
     }
 
     #[test]

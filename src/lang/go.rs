@@ -1,7 +1,7 @@
 //! Go language implementation.
 
 use crate::code_block::{Arg, CodeBlock};
-use crate::code_node::CodeNode;
+use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::config::{
@@ -111,19 +111,31 @@ fn is_stdlib(module: &str) -> bool {
 }
 
 impl Go {
+    /// Returns true for function-body closes that may continue as an IIFE.
+    #[allow(deprecated)]
+    fn is_func_block_close(node: &CodeNode) -> bool {
+        match node {
+            CodeNode::BlockCloseIntent {
+                intent: BlockIntent::Function,
+                ..
+            } => true,
+            CodeNode::BlockClose(s) => s.contains("func"),
+            _ => false,
+        }
+    }
+
     /// Rewrite IIFE continuation: fuse `}` + `()` onto the same line.
     ///
     /// The pattern `go func() { ... }();` produces nodes:
-    ///   BlockClose("go func()"), StatementBegin, Literal("(...)"), StatementEnd, Newline
+    ///   BlockCloseIntent("go func()", Function), StatementBegin,
+    ///   Literal("(...)"), StatementEnd, Newline
     ///
     /// We fuse these into:
     ///   Literal("}"), Literal("(...)"), Newline
     fn rewrite_iife(nodes: &mut Vec<CodeNode>) {
         let mut i = 0;
         while i < nodes.len() {
-            let is_func_block_close =
-                matches!(&nodes[i], CodeNode::BlockClose(s) if s.contains("func"));
-            if !is_func_block_close {
+            if !Self::is_func_block_close(&nodes[i]) {
                 i += 1;
                 continue;
             }

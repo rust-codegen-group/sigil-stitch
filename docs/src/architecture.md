@@ -33,7 +33,7 @@ The library is organized in four layers, each building on the one below:
   signature contexts, and type-close suffixes. Those hooks return `CodeBlock`
   values so semantic `TypeName` references survive until import resolution.
 
-Each supported language implements both traits in its own module (`src/lang/typescript.rs`, etc.). The 6 config struct accessors (`type_presentation()`, `generic_syntax()`, `block_syntax()`, `function_syntax()`, `type_decl_syntax()`, `enum_and_annotation()`) return data structs with sensible defaults. Languages can also implement `rewrite_nodes()` to transform the CodeNode tree after macro expansion for language-specific fixups (e.g., Go IIFE `}()` fusion, C++ lambda `};` semicolons).
+Each supported language implements both traits in its own module (`src/lang/typescript.rs`, etc.). The 6 config struct accessors (`type_presentation()`, `generic_syntax()`, `block_syntax()`, `function_syntax()`, `type_decl_syntax()`, `enum_and_annotation()`) return data structs with sensible defaults. Control-flow nodes carry a language-neutral `BlockIntent`; each adapter maps that intent locally through `block_open_for_intent()` / `block_close_for_intent()`. Languages can still implement `rewrite_nodes()` for structural or literal fixups (e.g., Go IIFE `}()` fusion, C++ lambda `};` semicolons).
 
 At the macro level, the `MacroLang` enum (`macros/src/parse/lang.rs`) provides compile-time language-aware tokenizer annotations. Languages like Bash, Zsh, Go, and Haskell get specialized spacing rules in `sigil_quote!` without runtime overhead. See [Language-Aware Tokenizer](macrolang.md).
 
@@ -111,7 +111,7 @@ TypeName also renders to `pretty::BoxDoc` for width-aware output of complex type
 
 ### Layer 3: CodeBlock
 
-A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `NameRef`, `StringLit`, `Comment`, `Nested`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, with no separate arg-index lookup.
+A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `NameRef`, `StringLit`, `Comment`, `Nested`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, and control-flow nodes carry a language-neutral `BlockIntent` (`BlockOpenIntent`, `BlockCloseIntent`, `BranchCloseIntent`) with no per-language rendering policy.
 
 CodeBlocks are immutable after construction. The builder (`CodeBlockBuilder`) validates argument counts and indent balance before producing a block.
 
@@ -194,9 +194,9 @@ a module-qualified reference and renders the corresponding import as
 | `Indent` / `Dedent` | Adjust indent level |
 | `StatementBegin` / `StatementEnd` | Statement boundaries (`;` if applicable) |
 | `Newline` | Emit newline + indent |
-| `BlockOpen` / `BlockClose` | Block delimiters from `lang.block_syntax()` |
-| `BlockOpenOverride(s)` | Emit custom block opener (e.g. `" where"`) |
-| `BlockCloseTransition` | Close delimiter + space (for `} else {` chains) |
+| `BlockOpenIntent` / `BlockCloseIntent` | Map `BlockIntent` + condition through `lang.block_open_for_intent()` / `block_close_for_intent()` |
+| `BranchCloseIntent` | Transition close + space when `close_on_transition` is set |
+| `BlockOpen` / `BlockClose` / `BranchClose` | Deprecated legacy string-only nodes for old serialized blocks and external adapters |
 | `Sequence(children)` | Recursively render a sub-sequence of nodes |
 
 **Width-aware rendering**: One semantic walker interprets every rewritten

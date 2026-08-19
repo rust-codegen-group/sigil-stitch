@@ -157,18 +157,20 @@ These annotations fire regardless of `MacroLang`:
 
 ## Runtime Rewrite Passes
 
-Some language-specific fixups operate on the rendered `CodeNode` tree rather than the
-source token stream. These handle cases that the tokenizer can't reach — either because
-the pattern is structural (node-level, not token-level) or because it applies to the
-builder API (manually-constructed format strings, not `sigil_quote!`).
+Block semantics are carried as `BlockIntent` nodes from both builder and macro
+paths. Remaining runtime passes are local to each language:
 
 | Language | Pass | Purpose | Applies to |
 |---|---|---|---|
-| Go | `rewrite_iife` | Fuse `}()` for immediately-invoked functions | Builder API |
-| Go | `rewrite_receive_op` | `<- ch` → `<-ch` | Builder API only (tokenizer handles `sigil_quote!`) |
-| C++ | `rewrite_lambda_semicolon` | `}` → `};` for lambda block close | Builder API |
-| Lua | `rewrite_method_colon` | `obj: m()` → `obj:m()` | Builder API only (tokenizer handles `sigil_quote!`) |
-| Haskell | `rewrite_dollar_spacing` | `$word` → `$ word` | Builder API only (tokenizer handles `sigil_quote!`) |
+| Go | `rewrite_iife` | Fuse `}()` for closes with `BlockIntent::Function` | Builder API |
+| Go | `rewrite_receive_op` | `<- ch` → `<-ch` | Literal/InlineLiteral text; builder API only (tokenizer handles `sigil_quote!`) |
+| C++ | `rewrite_lambda_semicolon` | `}` → `};` for closes with `BlockIntent::Lambda` | Builder API |
+| Lua | `rewrite_method_colon` | `obj: method()` → `obj:method()` | Literal/InlineLiteral text; builder API only (tokenizer handles `sigil_quote!`) |
+| Haskell | `rewrite_dollar_spacing` | `$word` → `$ word` | Literal/InlineLiteral text; builder API only (tokenizer handles `sigil_quote!`) |
+
+Block delimiter selection no longer re-parses condition keywords at render
+time. Language adapters match the carried `BlockIntent` locally; Bash and Zsh
+own independent copies of their shell policy.
 
 For `sigil_quote!` users, the tokenizer-level fixes mean correct output without runtime
 patching. The runtime passes remain as safety nets for the builder API path.

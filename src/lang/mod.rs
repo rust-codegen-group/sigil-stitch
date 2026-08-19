@@ -43,9 +43,9 @@ pub mod zsh;
 
 /// Helpers for implementing language-specific node rewrite passes.
 pub mod rewrite;
-pub(crate) mod shell_syntax;
 
 use crate::code_block::{Arg, CodeBlock};
+use crate::code_node::BlockIntent;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::spec::modifiers::TypeKind;
@@ -137,18 +137,49 @@ pub trait RendererLang: std::fmt::Debug + 'static {
 
     /// Map a control-flow condition to its block-opening delimiter.
     ///
-    /// Called at render time with the condition text from `begin_control_flow`.
-    /// Return `Some("...")` to override the default `block_syntax().block_open`.
+    /// Legacy path used by old serialized/external string-only block nodes.
+    /// New nodes use [`RendererLang::block_open_for_intent`].
+    #[deprecated(note = "use block_open_for_intent")]
     fn block_open_for(&self, _condition: &str) -> Option<&str> {
         None
     }
 
     /// Map a control-flow condition to its block-closing delimiter.
     ///
-    /// Called at render time with the condition text from `begin_control_flow`.
-    /// Return `Some("...")` to override the default `block_syntax().block_close`.
+    /// Legacy path used by old serialized/external string-only block nodes.
+    /// New nodes use [`RendererLang::block_close_for_intent`].
+    #[deprecated(note = "use block_close_for_intent")]
     fn block_close_for(&self, _condition: &str) -> Option<&str> {
         None
+    }
+
+    /// Map a control-flow block intent and condition to its block-opening
+    /// delimiter.
+    ///
+    /// Called at render time for
+    /// [`crate::code_node::CodeNode::BlockOpenIntent`] nodes. Return
+    /// `Some("...")` to override the default `block_syntax().block_open`.
+    ///
+    /// The default delegates to the legacy [`RendererLang::block_open_for`]
+    /// so existing external adapters keep working for both node forms.
+    #[allow(deprecated)]
+    fn block_open_for_intent(&self, _intent: BlockIntent, condition: &str) -> Option<&str> {
+        self.block_open_for(condition)
+    }
+
+    /// Map a control-flow block intent and condition to its block-closing
+    /// delimiter.
+    ///
+    /// Called at render time for
+    /// [`crate::code_node::CodeNode::BlockCloseIntent`] and
+    /// [`crate::code_node::CodeNode::BranchCloseIntent`] nodes. Return
+    /// `Some("...")` to override the default `block_syntax().block_close`.
+    ///
+    /// The default delegates to the legacy [`RendererLang::block_close_for`]
+    /// so existing external adapters keep working for both node forms.
+    #[allow(deprecated)]
+    fn block_close_for_intent(&self, _intent: BlockIntent, condition: &str) -> Option<&str> {
+        self.block_close_for(condition)
     }
 
     /// Rewrite the node tree before rendering. Called automatically by the

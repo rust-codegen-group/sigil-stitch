@@ -7,6 +7,7 @@ mod annotate;
 mod brace_classifier;
 mod directives;
 mod format;
+mod intent;
 mod lang;
 mod recovery;
 mod rust_interpolation;

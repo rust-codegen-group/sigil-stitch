@@ -103,6 +103,7 @@ pub mod prelude {
         CodeBlock, CodeBlockBuilder, CodeFragment, CommentArg, NameArg, Specifier, StringLitArg,
         VerbatimStrArg,
     };
+    pub use crate::code_node::{BlockIntent, CodeNode};
     pub use crate::code_template::{CodeTemplate, ParamKind};
     pub use crate::error::SigilStitchError;
     pub use crate::lang::{CodeLang, RendererLang};
