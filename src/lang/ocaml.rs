@@ -565,4 +565,22 @@ mod tests {
             None
         );
     }
+
+    #[test]
+    fn builder_match_after_let_suppresses_default_opener() {
+        use crate::code_block::CodeBlock;
+
+        let ml = OCaml::new();
+        let mut block = CodeBlock::builder();
+        block.begin_control_flow("let describe x = match v with", ());
+        block.add_statement("Some(v) -> v", ());
+        block.end_control_flow();
+        let output = block.build().unwrap().render_standalone(&ml, 80).unwrap();
+
+        assert!(
+            output.starts_with("let describe x = match v with\n"),
+            "{output}"
+        );
+        assert!(!output.contains("match v with ="), "{output}");
+    }
 }
