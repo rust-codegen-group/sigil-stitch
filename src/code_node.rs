@@ -107,6 +107,8 @@ impl BlockIntent {
             _ => {
                 if trimmed.ends_with(" do") {
                     Self::Do
+                } else if let Some(intent) = embedded_control_intent(trimmed) {
+                    intent
                 } else if looks_like_lambda_condition(trimmed) {
                     Self::Lambda
                 } else {
@@ -114,6 +116,25 @@ impl BlockIntent {
                 }
             }
         }
+    }
+}
+
+/// Recognize control-flow roles embedded after a leading binding.
+///
+/// OCaml's idiomatic `let describe x = match v with` starts with `let`, so
+/// the leading-token classifier above cannot see the `match`. Keep this probe
+/// conservative: it only fires when the condition ends in the OCaml `with`
+/// marker and contains a standalone `match` or `try` word.
+fn embedded_control_intent(condition: &str) -> Option<BlockIntent> {
+    if !condition.ends_with(" with") {
+        return None;
+    }
+    if condition.contains(" match ") {
+        Some(BlockIntent::Match)
+    } else if condition.contains(" try ") {
+        Some(BlockIntent::Try)
+    } else {
+        None
     }
 }
 
@@ -421,6 +442,9 @@ mod tests {
             ("case $x in", BlockIntent::Case),
             ("match x with", BlockIntent::Match),
             ("try", BlockIntent::Try),
+            ("let describe x = match v with", BlockIntent::Match),
+            ("let x = try f x with", BlockIntent::Try),
+            ("let x = matching v with", BlockIntent::Generic),
             ("class Eq a", BlockIntent::Class),
             ("instance Show T", BlockIntent::Instance),
             ("module Foo", BlockIntent::Module),

@@ -315,3 +315,25 @@ fn test_equiv_block_intent_haskell_class() {
         top_level_block_intents(&macro_block)
     );
 }
+
+#[test]
+fn test_equiv_block_intent_ocaml_match_after_let() {
+    let mut manual = CodeBlock::builder();
+    manual.begin_control_flow_with_intent(BlockIntent::Match, "let describe x = match v with", ());
+    manual.add_statement("| Some(v) -> v", ());
+    manual.end_control_flow();
+    let manual = manual.build().unwrap();
+
+    let macro_block = sigil_quote!(OCaml {
+        let describe x = match v with {
+            | Some(v) -> v;
+        }
+    })
+    .unwrap();
+
+    assert_eq!(render_ml(&manual), render_ml(&macro_block));
+    assert_eq!(
+        top_level_block_intents(&manual),
+        top_level_block_intents(&macro_block)
+    );
+}
