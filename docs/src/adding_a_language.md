@@ -43,13 +43,21 @@ Only two methods have no default:
 | `render_string_literal()` | C-style double quotes | Language-specific string quoting |
 | `render_verbatim_string()` | Delegates to `render_string_literal()` | Minimal escaping for interpolated strings |
 | `block_syntax()` | Brace-delimited blocks | Delimiters, indentation, and terminators |
+| `block_open_for_intent()` | Delegates to legacy `block_open_for()` | Map a `BlockIntent` role to an opener |
+| `block_close_for_intent()` | Delegates to legacy `block_close_for()` | Map a `BlockIntent` role to a closer |
 | `type_presentation()` | TypeScript-like forms | Compound type rendering |
 | `generic_syntax()` | Angle brackets | Generic application and constraints |
 
 Override `render_verbatim_string()` if your language has string interpolation (e.g., Bash `"$x"`, TypeScript `` `${x}` ``, Python `f"{x}"`).
 
+For keyword-delimited languages, implement `block_open_for_intent()` and
+`block_close_for_intent()` as a local `match` over `BlockIntent`. The legacy
+string-based `block_open_for()` / `block_close_for()` methods remain supported
+only for old serialized nodes and external adapters.
+
 `rewrite_nodes()` is available for syntax corrections that require a tree-level
-view after macro expansion. Prefer declarative config for ordinary syntax.
+view after macro expansion. Prefer intent-keyed structural rewrites for blocks
+and declarative config for ordinary syntax.
 
 ## The CodeLang Trait
 

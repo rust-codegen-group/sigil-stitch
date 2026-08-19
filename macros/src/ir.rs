@@ -1,3 +1,5 @@
+use proc_macro2::TokenStream;
+use quote::quote;
 use syn::{Expr, Local, Pat};
 
 /// A parsed `sigil_quote!` invocation.
@@ -152,9 +154,62 @@ pub(crate) struct LoopSeparator {
     pub(crate) trailing: Option<Expr>,
 }
 
+/// Structural block role carried from parse time to builder lowering.
+///
+/// This intentionally mirrors `sigil_stitch::code_node::BlockIntent`. The
+/// proc-macro crate cannot import the runtime crate, so equivalence tests keep
+/// the two enums in sync.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BranchIntent {
+    Generic,
+    If,
+    ElseIf,
+    Else,
+    For,
+    While,
+    Until,
+    Case,
+    Match,
+    Try,
+    Class,
+    Instance,
+    Module,
+    ModuleType,
+    Do,
+    Function,
+    Lambda,
+}
+
+impl BranchIntent {
+    pub(crate) fn runtime_path(self) -> TokenStream {
+        let variant = match self {
+            Self::Generic => "Generic",
+            Self::If => "If",
+            Self::ElseIf => "ElseIf",
+            Self::Else => "Else",
+            Self::For => "For",
+            Self::While => "While",
+            Self::Until => "Until",
+            Self::Case => "Case",
+            Self::Match => "Match",
+            Self::Try => "Try",
+            Self::Class => "Class",
+            Self::Instance => "Instance",
+            Self::Module => "Module",
+            Self::ModuleType => "ModuleType",
+            Self::Do => "Do",
+            Self::Function => "Function",
+            Self::Lambda => "Lambda",
+        };
+        let ident = proc_macro2::Ident::new(variant, proc_macro2::Span::call_site());
+        quote!(::sigil_stitch::code_node::BlockIntent::#ident)
+    }
+}
+
 pub(crate) struct Branch {
     pub(crate) condition: FormattedCode,
     pub(crate) body: Vec<Statement>,
+    pub(crate) intent: BranchIntent,
 }
 
 pub(crate) struct MetaIf {

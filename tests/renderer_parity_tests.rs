@@ -1,4 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::code_node::BlockIntent;
 use sigil_stitch::lang::CodeLang;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -153,4 +154,68 @@ fn language_rewrites_run_before_the_pretty_adapter() {
         .render_standalone(&sigil_stitch::lang::lua::Lua::new(), 120)
         .unwrap();
     assert!(lua_output.contains("object:method() next"), "{lua_output}");
+}
+
+fn if_intent_block(soft_break: bool) -> CodeBlock {
+    let mut block = CodeBlock::builder();
+    block.begin_control_flow_with_intent(BlockIntent::If, "if (x > 0)", ());
+    if soft_break {
+        block.add_statement("call(alpha,%Wbeta)", ());
+    } else {
+        block.add_statement("call(alpha, beta)", ());
+    }
+    block.end_control_flow();
+    block.build().unwrap()
+}
+
+#[test]
+fn intent_blocks_match_across_direct_and_pretty_adapters() {
+    let direct = if_intent_block(false);
+    let pretty = if_intent_block(true);
+
+    for lang in languages() {
+        let wide_direct = direct.render_standalone(lang.as_ref(), 240).unwrap();
+        let wide_pretty = pretty.render_standalone(lang.as_ref(), 240).unwrap();
+        assert_eq!(
+            wide_pretty,
+            wide_direct,
+            "wide adapter parity failed for .{}",
+            lang.file_extension()
+        );
+
+        let narrow = pretty.render_standalone(lang.as_ref(), 8).unwrap();
+        let indent = lang.block_syntax().indent_unit;
+        assert!(
+            narrow.contains(&format!("\n{indent}beta)")),
+            "wrapped intent block body lost indentation for .{}:\n{narrow}",
+            lang.file_extension()
+        );
+    }
+}
+
+#[test]
+fn block_intent_negative_near_matches_pass_on_the_pretty_adapter() {
+    let mut cpp = CodeBlock::builder();
+    cpp.begin_control_flow("if (matrix[0] > 0)", ());
+    cpp.add_statement("return matrix[0]", ());
+    cpp.end_control_flow();
+    cpp.add("%Wnext", ());
+    let cpp = cpp.build().unwrap();
+    let cpp_output = cpp
+        .render_standalone(&sigil_stitch::lang::cpp::Cpp::new(), 120)
+        .unwrap();
+    assert!(!cpp_output.contains("};"), "{cpp_output}");
+    assert!(cpp_output.ends_with(" next"), "{cpp_output}");
+
+    let mut go = CodeBlock::builder();
+    go.begin_control_flow("if fn.String() != \"func\"", ());
+    go.end_control_flow();
+    go.add_statement("(\"ordinary\")", ());
+    go.add("%Wnext", ());
+    let go = go.build().unwrap();
+    let go_output = go
+        .render_standalone(&sigil_stitch::lang::go::Go::new(), 120)
+        .unwrap();
+    assert!(go_output.contains("}\n(\"ordinary\")"), "{go_output}");
+    assert!(!go_output.contains("}(\"ordinary\")"), "{go_output}");
 }

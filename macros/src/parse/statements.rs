@@ -4,11 +4,12 @@ use super::MacroLang;
 use super::brace_classifier::{self, BraceKind};
 use super::directives::{parse_for_components, parse_if_components};
 use super::format::tokens_to_format;
+use super::intent::classify_branch;
 use super::parse_body;
 use super::recovery::{LineBoundary, Recovered, line_boundary};
 use super::rust_interpolation::{parse_expr, parse_string_expr};
 use super::util::{is_ident, is_semicolon};
-use crate::ir::{Branch, QuoteArg, Statement};
+use crate::ir::{Branch, BranchIntent, QuoteArg, Statement};
 
 /// Parse a single statement starting at `pos`.
 /// Returns the statement and the position after the consumed tokens.
@@ -246,10 +247,15 @@ fn parse_control_flow(
     lang: MacroLang,
 ) -> Result<(Statement, usize), syn::Error> {
     let condition = tokens_to_format(condition_tokens, lang)?;
+    let intent = classify_branch(condition_tokens, lang);
     let body_tokens: Vec<TokenTree> = first_brace.stream().into_iter().collect();
     let body = parse_body(&body_tokens, lang)?;
 
-    let mut branches = vec![Branch { condition, body }];
+    let mut branches = vec![Branch {
+        condition,
+        body,
+        intent,
+    }];
 
     let mut pos = brace_pos + 1;
 
@@ -295,7 +301,22 @@ fn parse_control_flow(
                         condition.format_mut().insert_str(0, &format!("{prefix} "));
                     }
 
-                    branches.push(Branch { condition, body });
+                    let branch_intent = if is_elseif || is_elif {
+                        BranchIntent::ElseIf
+                    } else if else_condition_tokens.is_empty() {
+                        BranchIntent::Else
+                    } else {
+                        match classify_branch(&else_condition_tokens, lang) {
+                            BranchIntent::If => BranchIntent::ElseIf,
+                            other => other,
+                        }
+                    };
+
+                    branches.push(Branch {
+                        condition,
+                        body,
+                        intent: branch_intent,
+                    });
                     pos += 1;
                     found_brace = true;
                     break;

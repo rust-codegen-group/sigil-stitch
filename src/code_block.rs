@@ -1,4 +1,4 @@
-use crate::code_node::{CodeNode, parts_args_to_nodes};
+use crate::code_node::{BlockIntent, CodeNode, parts_args_to_nodes};
 use crate::import::ImportRef;
 use crate::lang::CodeLang;
 use crate::type_name::TypeName;
@@ -257,10 +257,12 @@ impl CodeBlock {
     }
 
     /// Check if this code block ends with a newline or block close.
+    #[allow(deprecated)]
     pub fn ends_with_newline_or_block_close(&self) -> bool {
         fn check_last(nodes: &[CodeNode]) -> bool {
             match nodes.last() {
                 Some(CodeNode::Newline | CodeNode::BlockClose(_)) => true,
+                Some(CodeNode::BlockCloseIntent { .. }) => true,
                 Some(CodeNode::Sequence(children)) => check_last(children),
                 Some(CodeNode::Nested(inner)) => check_last(&inner.nodes),
                 _ => false,
@@ -314,6 +316,21 @@ impl CodeBlock {
     }
 }
 
+#[derive(Debug, Clone)]
+struct BlockFrame {
+    condition: String,
+    intent: BlockIntent,
+}
+
+impl BlockFrame {
+    fn fallback() -> Self {
+        Self {
+            condition: String::new(),
+            intent: BlockIntent::Generic,
+        }
+    }
+}
+
 /// Builder for constructing [`CodeBlock`] instances.
 ///
 /// Provides methods for adding formatted code fragments, statements, control
@@ -339,7 +356,7 @@ impl CodeBlock {
 pub struct CodeBlockBuilder {
     nodes: Vec<CodeNode>,
     indent_depth: i32,
-    block_stack: Vec<String>,
+    block_stack: Vec<BlockFrame>,
     errors: Vec<crate::error::SigilStitchError>,
 }
 
@@ -378,20 +395,35 @@ impl CodeBlockBuilder {
 
     /// Begin a control flow block (e.g., "if foo" -> "if foo {\n" + indent).
     ///
-    /// The **raw format string** (not the interpolated result) is stored as
-    /// the condition text and passed to `block_open_for` / `block_close_for`
-    /// at render time, enabling language backends to emit context-aware
-    /// delimiters (e.g., Bash `then`/`fi` for `if`, `do`/`done` for `for`).
+    /// The raw format string is stored as the condition text, and its static
+    /// leading tokens are classified into a [`BlockIntent`] at build time.
+    /// Prefer [`CodeBlockBuilder::begin_control_flow_with_intent`] when the
+    /// caller already knows the structural block role.
     ///
-    /// Because backends pattern-match on the stored condition (e.g.,
-    /// `condition.starts_with("if ")`), avoid interpolating into the keyword
-    /// prefix — `begin_control_flow("if %L", expr)` works, but
-    /// `begin_control_flow("%L x", some_keyword)` would not be recognized.
+    /// The classifier recognizes static keyword prefixes such as
+    /// `"if "`, `"for "`, and `"go func"`. Avoid interpolating into the
+    /// keyword prefix — `begin_control_flow("if %L", expr)` works, but
+    /// `begin_control_flow("%L x", some_keyword)` cannot be recognized.
     pub fn begin_control_flow(&mut self, format: &str, args: impl IntoArgs) -> &mut Self {
+        let intent = BlockIntent::classify_condition(format);
+        self.begin_control_flow_with_intent(intent, format, args)
+    }
+
+    /// Begin a control flow block with an explicit structural intent.
+    pub fn begin_control_flow_with_intent(
+        &mut self,
+        intent: BlockIntent,
+        format: &str,
+        args: impl IntoArgs,
+    ) -> &mut Self {
         let condition = format.to_string();
-        self.block_stack.push(condition.clone());
+        self.block_stack.push(BlockFrame {
+            condition: condition.clone(),
+            intent,
+        });
         self.add(format, args);
-        self.nodes.push(CodeNode::BlockOpen(condition));
+        self.nodes
+            .push(CodeNode::BlockOpenIntent { condition, intent });
         self.nodes.push(CodeNode::Newline);
         self.nodes.push(CodeNode::Indent);
         self.indent_depth += 1;
@@ -400,13 +432,34 @@ impl CodeBlockBuilder {
 
     /// Add an else/else-if clause (e.g., "} else {" or "elif ...:" for Python).
     pub fn next_control_flow(&mut self, format: &str, args: impl IntoArgs) -> &mut Self {
-        let condition = self.block_stack.last().cloned().unwrap_or_default();
+        let intent = BlockIntent::classify_condition(format);
+        self.next_control_flow_with_intent(intent, format, args)
+    }
+
+    /// Add an else/else-if clause with an explicit structural intent.
+    pub fn next_control_flow_with_intent(
+        &mut self,
+        intent: BlockIntent,
+        format: &str,
+        args: impl IntoArgs,
+    ) -> &mut Self {
+        let frame = self
+            .block_stack
+            .last()
+            .cloned()
+            .unwrap_or_else(BlockFrame::fallback);
         self.nodes.push(CodeNode::Dedent);
         self.indent_depth -= 1;
-        self.nodes.push(CodeNode::BranchClose(condition));
+        self.nodes.push(CodeNode::BranchCloseIntent {
+            condition: frame.condition,
+            intent: frame.intent,
+        });
         self.add(format, args);
         let new_condition = format.to_string();
-        self.nodes.push(CodeNode::BlockOpen(new_condition));
+        self.nodes.push(CodeNode::BlockOpenIntent {
+            condition: new_condition,
+            intent,
+        });
         self.nodes.push(CodeNode::Newline);
         self.nodes.push(CodeNode::Indent);
         self.indent_depth += 1;
@@ -416,10 +469,13 @@ impl CodeBlockBuilder {
     /// End a control flow block (emits language-specific closer + newline,
     /// decreases indent).
     pub fn end_control_flow(&mut self) -> &mut Self {
-        let condition = self.block_stack.pop().unwrap_or_default();
+        let frame = self.block_stack.pop().unwrap_or_else(BlockFrame::fallback);
         self.nodes.push(CodeNode::Dedent);
         self.indent_depth -= 1;
-        self.nodes.push(CodeNode::BlockClose(condition));
+        self.nodes.push(CodeNode::BlockCloseIntent {
+            condition: frame.condition,
+            intent: frame.intent,
+        });
         self.nodes.push(CodeNode::Newline);
         self
     }
@@ -431,20 +487,26 @@ impl CodeBlockBuilder {
     /// `add_statement` provides both `;` via `StatementEnd` and `\n` via
     /// `Newline`.
     pub fn end_control_flow_no_newline(&mut self) -> &mut Self {
-        let condition = self.block_stack.pop().unwrap_or_default();
+        let frame = self.block_stack.pop().unwrap_or_else(BlockFrame::fallback);
         self.nodes.push(CodeNode::Dedent);
         self.indent_depth -= 1;
-        self.nodes.push(CodeNode::BlockClose(condition));
+        self.nodes.push(CodeNode::BlockCloseIntent {
+            condition: frame.condition,
+            intent: frame.intent,
+        });
         self
     }
 
     /// End a control flow block with a trailing semicolon (for expression-level
     /// control flow like `match` in PHP/Rust).
     pub fn end_control_flow_with_semicolon(&mut self) -> &mut Self {
-        let condition = self.block_stack.pop().unwrap_or_default();
+        let frame = self.block_stack.pop().unwrap_or_else(BlockFrame::fallback);
         self.nodes.push(CodeNode::Dedent);
         self.indent_depth -= 1;
-        self.nodes.push(CodeNode::BlockClose(condition));
+        self.nodes.push(CodeNode::BlockCloseIntent {
+            condition: frame.condition,
+            intent: frame.intent,
+        });
         self.nodes.push(CodeNode::StatementEnd);
         self.nodes.push(CodeNode::Newline);
         self
@@ -1300,22 +1362,32 @@ mod tests {
     }
 
     #[test]
-    fn test_begin_control_flow_stores_condition() {
+    fn test_begin_control_flow_stores_condition_and_intent() {
         let mut b = CodeBlock::builder();
         b.begin_control_flow("class Functor f", ());
         b.add_statement("fmap :: (a -> b) -> f a -> f b", ());
         b.end_control_flow();
         let block = b.build().unwrap();
-        let has_open = block
-            .nodes
-            .iter()
-            .any(|n| matches!(n, CodeNode::BlockOpen(s) if s == "class Functor f"));
-        assert!(has_open, "should contain BlockOpen with condition text");
-        let has_close = block
-            .nodes
-            .iter()
-            .any(|n| matches!(n, CodeNode::BlockClose(s) if s == "class Functor f"));
-        assert!(has_close, "should contain BlockClose with condition text");
+        let has_open = block.nodes.iter().any(|n| {
+            matches!(n, CodeNode::BlockOpenIntent {
+                condition,
+                intent: BlockIntent::Class,
+            } if condition == "class Functor f")
+        });
+        assert!(
+            has_open,
+            "should contain BlockOpenIntent with condition text and Class intent"
+        );
+        let has_close = block.nodes.iter().any(|n| {
+            matches!(n, CodeNode::BlockCloseIntent {
+                condition,
+                intent: BlockIntent::Class,
+            } if condition == "class Functor f")
+        });
+        assert!(
+            has_close,
+            "should contain BlockCloseIntent with condition text and Class intent"
+        );
     }
 
     #[test]
@@ -1326,10 +1398,20 @@ mod tests {
         b.add_line();
         b.end_control_flow();
         let block = b.build().unwrap();
-        let has_open = block
-            .nodes
-            .iter()
-            .any(|n| matches!(n, CodeNode::BlockOpen(s) if s == "match x with"));
-        assert!(has_open, "should contain BlockOpen(\"match x with\")");
+        let has_open = block.nodes.iter().any(|n| {
+            matches!(n, CodeNode::BlockOpenIntent {
+                condition,
+                intent: BlockIntent::Match,
+            } if condition == "match x with")
+        });
+        assert!(has_open, "should contain BlockOpenIntent with Match intent");
+    }
+
+    #[test]
+    fn ends_with_newline_or_block_close_recognizes_intent_nodes() {
+        let mut b = CodeBlock::builder();
+        b.begin_control_flow("if x", ());
+        b.end_control_flow_no_newline();
+        assert!(b.build().unwrap().ends_with_newline_or_block_close());
     }
 }

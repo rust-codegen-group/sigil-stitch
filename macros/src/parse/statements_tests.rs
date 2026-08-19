@@ -238,6 +238,65 @@ fn go_paren_block_with_metafor() {
 }
 
 #[test]
+fn control_flow_branches_carry_block_intent() {
+    use crate::ir::BranchIntent;
+
+    let stmt = parse_stmt("if (x) { a(); } else if (y) { b(); } else { c(); }");
+    let Statement::ControlFlow { branches, .. } = stmt else {
+        panic!("expected ControlFlow");
+    };
+    assert_eq!(branches[0].intent, BranchIntent::If);
+    assert_eq!(branches[1].intent, BranchIntent::ElseIf);
+    assert_eq!(branches[2].intent, BranchIntent::Else);
+}
+
+#[test]
+fn go_func_and_cpp_lambda_carry_function_intents() {
+    use crate::ir::BranchIntent;
+
+    let stmt = parse_stmt_lang("go func() { body(); }", MacroLang::Go);
+    let Statement::ControlFlow { branches, .. } = stmt else {
+        panic!("expected ControlFlow");
+    };
+    assert_eq!(branches[0].intent, BranchIntent::Function);
+
+    let stmt = parse_stmt_lang("auto fn = [&](int x) { return x; };", MacroLang::Cpp);
+    let Statement::ControlFlow { branches, .. } = stmt else {
+        panic!("expected ControlFlow");
+    };
+    assert_eq!(branches[0].intent, BranchIntent::Lambda);
+
+    let stmt = parse_stmt_lang("if (matrix[0] > 0) { body(); }", MacroLang::Cpp);
+    let Statement::ControlFlow { branches, .. } = stmt else {
+        panic!("expected ControlFlow");
+    };
+    assert_eq!(branches[0].intent, BranchIntent::If);
+
+    let stmt = parse_stmt_lang("if fn.String() != \"func\" { body(); }", MacroLang::Go);
+    let Statement::ControlFlow { branches, .. } = stmt else {
+        panic!("expected ControlFlow");
+    };
+    assert_eq!(branches[0].intent, BranchIntent::If);
+}
+
+#[test]
+fn haskell_and_ocaml_infix_headers_carry_block_intent() {
+    use crate::ir::BranchIntent;
+
+    let stmt = parse_stmt_lang("main = do { body(); }", MacroLang::Haskell);
+    let Statement::ControlFlow { branches, .. } = stmt else {
+        panic!("expected ControlFlow");
+    };
+    assert_eq!(branches[0].intent, BranchIntent::Do);
+
+    let stmt = parse_stmt_lang("let x = match v with { body(); }", MacroLang::OCaml);
+    let Statement::ControlFlow { branches, .. } = stmt else {
+        panic!("expected ControlFlow");
+    };
+    assert_eq!(branches[0].intent, BranchIntent::Match);
+}
+
+#[test]
 fn non_go_paren_block_is_literal() {
     // Without MacroLang::Go, `const ( ... )` stays as a literal line.
     let stmt = parse_stmt_lang("const ( x = 1 )", MacroLang::Unaware);

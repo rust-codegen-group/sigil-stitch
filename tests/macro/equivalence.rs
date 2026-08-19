@@ -228,3 +228,90 @@ fn test_name_and_type_combined() {
         "Expected 'pub r#type: String', got: {output}"
     );
 }
+
+fn top_level_block_intents(block: &CodeBlock) -> Vec<(String, BlockIntent)> {
+    let mut block = block.clone();
+    block
+        .nodes_mut()
+        .iter()
+        .filter_map(|node| match node {
+            CodeNode::BlockOpenIntent { condition, intent } => Some((condition.clone(), *intent)),
+            CodeNode::BlockCloseIntent { condition, intent } => Some((condition.clone(), *intent)),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn test_equiv_block_intent_bash() {
+    let mut manual = CodeBlock::builder();
+    manual.begin_control_flow_with_intent(BlockIntent::If, "if [ %L -gt 0 ]", "$x");
+    manual.add_statement("echo positive", ());
+    manual.next_control_flow_with_intent(BlockIntent::Else, "else", ());
+    manual.add_statement("echo negative", ());
+    manual.end_control_flow();
+    let manual = manual.build().unwrap();
+
+    let macro_block = sigil_quote!(Bash {
+        if [ $L("$x") -gt 0 ] {
+            echo positive;
+        } else {
+            echo negative;
+        }
+    })
+    .unwrap();
+
+    assert_eq!(render_bash(&manual), render_bash(&macro_block));
+    assert_eq!(
+        top_level_block_intents(&manual),
+        top_level_block_intents(&macro_block)
+    );
+}
+
+#[test]
+fn test_equiv_block_intent_lua() {
+    let mut manual = CodeBlock::builder();
+    manual.begin_control_flow_with_intent(BlockIntent::If, "if x > 0 then", ());
+    manual.add_statement("return \"positive\"", ());
+    manual.next_control_flow_with_intent(BlockIntent::Else, "else", ());
+    manual.add_statement("return \"negative\"", ());
+    manual.end_control_flow();
+    let manual = manual.build().unwrap();
+
+    let macro_block = sigil_quote!(Lua {
+        if x > 0 then {
+            return "positive";
+        } else {
+            return "negative";
+        }
+    })
+    .unwrap();
+
+    assert_eq!(render_lua(&manual), render_lua(&macro_block));
+    assert_eq!(
+        top_level_block_intents(&manual),
+        top_level_block_intents(&macro_block)
+    );
+}
+
+#[test]
+fn test_equiv_block_intent_haskell_class() {
+    let mut manual = CodeBlock::builder();
+    manual.begin_control_flow_with_intent(BlockIntent::Class, "class Functor f", ());
+    manual.add_statement("fmap :: (a -> b) -> f a -> f b", ());
+    manual.end_control_flow();
+    let manual = manual.build().unwrap();
+
+    let macro_block = sigil_quote!(Haskell {
+        class Functor f {
+            fmap :: (a -> b) -> f a -> f b;
+        }
+    })
+    .unwrap();
+
+    assert_eq!(render_hs(&manual), render_hs(&macro_block));
+    assert_eq!(
+        top_level_block_intents(&manual),
+        top_level_block_intents(&macro_block)
+    );
+}

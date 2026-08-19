@@ -1,13 +1,24 @@
 //! Haskell language implementation.
 
 use crate::code_block::{Arg, CodeBlock};
-use crate::code_node::CodeNode;
+use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::TypeParamSpec;
 use crate::type_name::TypeName;
+
+fn haskell_block_open_for_intent(intent: BlockIntent) -> Option<&'static str> {
+    match intent {
+        BlockIntent::Class | BlockIntent::Instance => Some(" where"),
+        BlockIntent::Do => Some(""),
+        BlockIntent::If | BlockIntent::ElseIf => Some(" then"),
+        BlockIntent::Else => Some(""),
+        BlockIntent::Case => Some(" of"),
+        _ => None,
+    }
+}
 
 /// Haskell language implementation.
 ///
@@ -47,7 +58,7 @@ use crate::type_name::TypeName;
 ///
 /// - `block_open` returns `" ="` which works for function definitions and type
 ///   aliases. Type class declarations automatically get `" where"` via
-///   `block_open_for("class ...")` / `block_open_for("instance ...")`.
+///   `block_open_for_intent(BlockIntent::Class | BlockIntent::Instance)`.
 /// - Complex multi-param type class constraints (e.g., `MonadReader Env m`) are not
 ///   directly modeled. Use `TypeName::primitive("(MonadIO m, MonadReader Env m) => m String")`
 ///   for complex constrained return types.
@@ -105,13 +116,19 @@ impl Haskell {
             }
             let mut result = String::with_capacity(text.len() + 4);
             let chars: Vec<char> = text.chars().collect();
+            let mut in_string = false;
             for (i, &ch) in chars.iter().enumerate() {
                 result.push(ch);
-                if ch == '$' && i + 1 < chars.len() {
-                    let after = chars[i + 1];
-                    if after.is_alphanumeric() || after == '_' || after == '(' {
-                        result.push(' ');
-                    }
+                if ch == '"' {
+                    in_string = !in_string;
+                    continue;
+                }
+                if in_string || ch != '$' || i + 1 >= chars.len() {
+                    continue;
+                }
+                let after = chars[i + 1];
+                if after.is_alphanumeric() || after == '_' || after == '(' {
+                    result.push(' ');
                 }
             }
             if result != *text {
@@ -238,6 +255,7 @@ impl RendererLang for Haskell {
         }
     }
 
+    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         let t = condition.trim();
         if t.starts_with("class ") || t.starts_with("instance ") {
@@ -253,6 +271,10 @@ impl RendererLang for Haskell {
         } else {
             None
         }
+    }
+
+    fn block_open_for_intent(&self, intent: BlockIntent, _condition: &str) -> Option<&str> {
+        haskell_block_open_for_intent(intent)
     }
 
     fn rewrite_nodes(&self, nodes: &mut Vec<CodeNode>) {
@@ -831,12 +853,44 @@ mod tests {
     #[test]
     fn test_block_open_for_if_else_case() {
         let hs = Haskell::new();
-        assert_eq!(hs.block_open_for("if x > 0"), Some(" then"));
-        assert_eq!(hs.block_open_for("else if x < 0"), Some(" then"));
-        assert_eq!(hs.block_open_for("else"), Some(""));
-        assert_eq!(hs.block_open_for("case x"), Some(" of"));
-        assert_eq!(hs.block_open_for("class Eq a"), Some(" where"));
-        assert_eq!(hs.block_open_for("do"), Some(""));
-        assert_eq!(hs.block_open_for("let x = 5"), None);
+        assert_eq!(
+            hs.block_open_for_intent(BlockIntent::If, "if x > 0"),
+            Some(" then")
+        );
+        assert_eq!(
+            hs.block_open_for_intent(BlockIntent::ElseIf, "else if x < 0"),
+            Some(" then")
+        );
+        assert_eq!(
+            hs.block_open_for_intent(BlockIntent::Else, "else"),
+            Some("")
+        );
+        assert_eq!(
+            hs.block_open_for_intent(BlockIntent::Case, "case x"),
+            Some(" of")
+        );
+        assert_eq!(
+            hs.block_open_for_intent(BlockIntent::Class, "class Eq a"),
+            Some(" where")
+        );
+        assert_eq!(hs.block_open_for_intent(BlockIntent::Do, "do"), Some(""));
+        assert_eq!(
+            hs.block_open_for_intent(BlockIntent::Generic, "let x = 5"),
+            None
+        );
+    }
+
+    #[test]
+    fn dollar_spacing_rewrites_code_but_not_string_contents() {
+        let mut nodes = vec![
+            CodeNode::Literal("apply $value".to_string()),
+            CodeNode::Literal("name = \"cost: $value\"".to_string()),
+        ];
+        Haskell::rewrite_dollar_spacing(&mut nodes);
+        assert!(matches!(&nodes[0], CodeNode::Literal(s) if s == "apply $ value"));
+        assert!(
+            matches!(&nodes[1], CodeNode::Literal(s) if s == "name = \"cost: $value\""),
+            "dollar signs inside string literals must not be rewritten"
+        );
     }
 }

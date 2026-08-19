@@ -158,7 +158,13 @@ fn generate_nested(
     };
     let body = generate_sequence(statements, context, &builder, &helper_error);
     let begin = match kind {
-        NestedKind::Block => quote! { #builder.begin_control_flow("", ()); },
+        NestedKind::Block => quote! {
+            #builder.begin_control_flow_with_intent(
+                ::sigil_stitch::code_node::BlockIntent::Generic,
+                "",
+                (),
+            );
+        },
         NestedKind::Splice => TokenStream::new(),
     };
     let on_success = match kind {

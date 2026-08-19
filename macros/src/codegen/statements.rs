@@ -210,11 +210,12 @@ fn generate_control_flow(
 
     for (index, branch) in branches.iter().enumerate() {
         let format = branch.condition.format();
+        let intent = branch.intent.runtime_path();
         let branch_start = generate_call(&branch.condition, context, helper_error, |args| {
             if index == 0 {
-                quote! { #builder.begin_control_flow(#format, #args); }
+                quote! { #builder.begin_control_flow_with_intent(#intent, #format, #args); }
             } else {
-                quote! { #builder.next_control_flow(#format, #args); }
+                quote! { #builder.next_control_flow_with_intent(#intent, #format, #args); }
             }
         });
         let body = generate_sequence(&branch.body, context, builder, helper_error);

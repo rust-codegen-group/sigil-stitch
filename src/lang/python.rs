@@ -1,6 +1,7 @@
 //! Python language implementation.
 
 use crate::code_block::CodeBlock;
+use crate::code_node::BlockIntent;
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::config::{
@@ -221,11 +222,20 @@ impl RendererLang for Python {
         "#"
     }
 
+    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         if condition.trim_end().ends_with(':') {
             Some("")
         } else {
             None
+        }
+    }
+
+    fn block_open_for_intent(&self, _intent: BlockIntent, condition: &str) -> Option<&str> {
+        if condition.trim_end().ends_with(':') {
+            Some("")
+        } else {
+            Some(":")
         }
     }
 
@@ -621,5 +631,22 @@ mod tests {
     fn test_module_separator() {
         let py = Python::new();
         assert_eq!(py.module_separator(), Some("."));
+    }
+
+    #[test]
+    fn test_block_open_intent_completes_colon_only() {
+        let py = Python::new();
+        assert_eq!(
+            py.block_open_for_intent(BlockIntent::If, "if x > 0"),
+            Some(":")
+        );
+        assert_eq!(
+            py.block_open_for_intent(BlockIntent::If, "if x > 0:"),
+            Some("")
+        );
+        assert_eq!(
+            py.block_open_for_intent(BlockIntent::Generic, "with open(path)"),
+            Some(":")
+        );
     }
 }
