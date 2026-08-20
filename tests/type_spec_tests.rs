@@ -936,3 +936,69 @@ fn test_enum_valued_variants_without_constructor_ok() {
         "assignment-style valued enums should not require a constructor"
     );
 }
+
+#[test]
+fn unsupported_builtin_type_kinds_fail_closed() {
+    let cases: &[(&dyn CodeLang, &str)] = &[
+        (&sigil_stitch::lang::bash::Bash::new(), "user.bash"),
+        (&sigil_stitch::lang::zsh::Zsh::new(), "user.zsh"),
+        (&sigil_stitch::lang::lua::Lua::new(), "user.lua"),
+    ];
+
+    for (lang, filename) in cases {
+        let spec = TypeSpec::builder("User", TypeKind::Class).build().unwrap();
+        let error = spec.emit(*lang).unwrap_err();
+        assert!(
+            matches!(
+                error,
+                sigil_stitch::error::SigilStitchError::UnsupportedTypeKind {
+                    kind: TypeKind::Class,
+                    ..
+                }
+            ),
+            "{filename}: {error}"
+        );
+    }
+}
+
+#[test]
+fn go_enum_fails_closed() {
+    let go = sigil_stitch::lang::go::Go::new();
+    let spec = TypeSpec::builder("Color", TypeKind::Enum).build().unwrap();
+    let error = spec.emit(&go).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            sigil_stitch::error::SigilStitchError::UnsupportedTypeKind {
+                kind: TypeKind::Enum,
+                ..
+            }
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn unsupported_spec_capability_fails_closed() {
+    let go = sigil_stitch::lang::go::Go::new();
+    let spec = TypeSpec::builder("Server", TypeKind::Struct)
+        .add_method(
+            FunSpec::builder("Start")
+                .body(CodeBlock::of("return", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let error = spec.emit(&go).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            sigil_stitch::error::SigilStitchError::UnsupportedSpecCapabilities {
+                ref capabilities,
+                ..
+            } if capabilities.iter().any(|c| c.as_str() == "Methods")
+        ),
+        "{error}"
+    );
+}

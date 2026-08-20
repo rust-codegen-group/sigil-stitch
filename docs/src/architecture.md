@@ -140,6 +140,11 @@ collect imports -> resolve aliases -> CodeRenderer -> to_doc_with_lang
 
 `FileSpec::render(width)` drives everything. It runs three passes over the file's members.
 
+Before materialization, `FileSpec::validate()` checks every `TypeSpec` against
+`CodeLang::capabilities()`. Unsupported type kinds and unsupported semantic
+capabilities return structured errors instead of rendering plausible wrong
+code. Unknown legacy adapters inherit the permissive `all()` matrix.
+
 ### Pass 0: Materialize
 
 Specs are converted to CodeBlocks:

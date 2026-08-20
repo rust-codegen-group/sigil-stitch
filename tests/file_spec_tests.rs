@@ -459,3 +459,37 @@ fn test_serde_rejects_spec_variant() {
     let err = serde_json::to_string(&file).unwrap_err();
     assert!(err.to_string().contains("cannot be serialized"), "{err}");
 }
+
+#[test]
+fn validate_reports_unsupported_type_before_render() {
+    let file = FileSpec::builder_with("user.bash", sigil_stitch::lang::bash::Bash::new())
+        .add_type(TypeSpec::builder("User", TypeKind::Class).build().unwrap())
+        .build()
+        .unwrap();
+
+    let validate_error = file.validate().unwrap_err();
+    let render_error = file.render(80).unwrap_err();
+    assert!(matches!(
+        validate_error,
+        SigilStitchError::UnsupportedTypeKind { .. }
+    ));
+    assert!(matches!(
+        render_error,
+        SigilStitchError::UnsupportedTypeKind { .. }
+    ));
+}
+
+#[test]
+fn legacy_adapter_defaults_to_permissive_capabilities() {
+    let file = FileSpec::builder_with("wrapped.fail", FailingHookLang(FailingHook::Newtype))
+        .add_type(
+            TypeSpec::builder("Wrapper", TypeKind::Newtype)
+                .extends(TypeName::primitive("String"))
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    assert!(file.validate().is_ok());
+}

@@ -106,6 +106,7 @@ pub mod prelude {
     pub use crate::code_node::{BlockIntent, CodeNode};
     pub use crate::code_template::{CodeTemplate, ParamKind};
     pub use crate::error::SigilStitchError;
+    pub use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
     pub use crate::lang::{CodeLang, RendererLang};
     pub use crate::spec::annotation_spec::AnnotationSpec;
     pub use crate::spec::emittable::Emittable;

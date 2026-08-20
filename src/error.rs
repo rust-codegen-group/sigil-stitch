@@ -2,6 +2,9 @@
 
 use snafu::prelude::*;
 
+use crate::lang::capability::SpecCapability;
+use crate::spec::modifiers::TypeKind;
+
 /// Errors returned by sigil-stitch operations.
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
@@ -138,6 +141,30 @@ pub enum SigilStitchError {
         type_name: String,
         /// The reason the declaration is invalid.
         reason: String,
+    },
+
+    /// A language does not support the requested type declaration kind.
+    #[snafu(display("language {language:?} does not support {kind:?} declaration {type_name:?}"))]
+    UnsupportedTypeKind {
+        /// The language file extension.
+        language: String,
+        /// The unsupported declaration kind.
+        kind: TypeKind,
+        /// The type being emitted.
+        type_name: String,
+    },
+
+    /// A language does not support one or more semantic spec capabilities.
+    #[snafu(display(
+        "language {language:?} does not support {capabilities:?} for type {type_name:?}"
+    ))]
+    UnsupportedSpecCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The type being emitted.
+        type_name: String,
+        /// The unsupported semantic capabilities.
+        capabilities: Vec<SpecCapability>,
     },
 
     /// Duplicate filename in a project specification.

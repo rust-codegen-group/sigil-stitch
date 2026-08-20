@@ -1,6 +1,7 @@
 //! Swift language implementation.
 
 use crate::import::ImportGroup;
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -233,7 +234,49 @@ impl RendererLang for Swift {
     }
 }
 
+const SWIFT_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = stored properties
+    SpecCapability::RecordFields,
+    // AccessorMethods = computed properties
+    SpecCapability::AccessorMethods,
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = superclass/protocol inheritance (`:`)
+    SpecCapability::NominalSubtyping,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic constraints
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = attributes
+    SpecCapability::Attributes,
+    // OptionalRecordFields = optional properties
+    SpecCapability::OptionalRecordFields,
+];
+const SWIFT_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Struct, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Interface, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // RecordFields = stored properties
+            SpecCapability::RecordFields,
+            // Methods = methods
+            SpecCapability::Methods,
+            // Attributes = attributes
+            SpecCapability::Attributes,
+            // Variants = enum cases
+            SpecCapability::Variants,
+        ],
+    ),
+];
+
 impl CodeLang for Swift {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(SWIFT_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

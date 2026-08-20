@@ -39,6 +39,7 @@ Only two methods have no default:
 
 | Method | Default | Purpose |
 |--------|---------|---------|
+| `capabilities()` | `LanguageCapabilities::all()` legacy default | Declare supported type kinds and semantic spec capabilities |
 | `reserved_words()` | Empty | Words that need escaping |
 | `render_string_literal()` | C-style double quotes | Language-specific string quoting |
 | `render_verbatim_string()` | Delegates to `render_string_literal()` | Minimal escaping for interpolated strings |
@@ -49,6 +50,11 @@ Only two methods have no default:
 | `generic_syntax()` | Angle brackets | Generic application and constraints |
 
 Override `render_verbatim_string()` if your language has string interpolation (e.g., Bash `"$x"`, TypeScript `` `${x}` ``, Python `f"{x}"`).
+
+Implement `capabilities()` for new adapters. Return a local
+`LanguageCapabilities` matrix that lists supported `TypeKind`s and the
+`SpecCapability`s each kind supports. Unknown legacy adapters inherit
+`LanguageCapabilities::all()`.
 
 For keyword-delimited languages, implement `block_open_for_intent()` and
 `block_close_for_intent()` as a local `match` over `BlockIntent`. The legacy

@@ -701,21 +701,26 @@ fn test_kotlin_primary_constructor_with_secondary() {
     assert!(output.contains("constructor(name: String) : this(name, 0) {"));
 }
 
-// ── Primary constructor ignored for non-supporting languages ──
+// ── Primary constructor rejected for non-supporting languages ──
 
 #[test]
-fn test_ts_ignores_primary_constructor() {
+fn test_ts_rejects_primary_constructor() {
     let ts = TypeScript::new();
-    let output = render_type(
-        &TypeSpec::builder("Foo", TypeKind::Class)
-            .add_primary_constructor_param(
-                ParameterSpec::new("x", TypeName::primitive("number")).unwrap(),
-            )
-            .build()
-            .unwrap(),
-        &ts,
+    let spec = TypeSpec::builder("Foo", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::new("x", TypeName::primitive("number")).unwrap(),
+        )
+        .build()
+        .unwrap();
+    let error = spec.emit(&ts).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            sigil_stitch::error::SigilStitchError::UnsupportedSpecCapabilities {
+                ref capabilities,
+                ..
+            } if capabilities.iter().any(|c| c.as_str() == "ConstructorParameters")
+        ),
+        "{error}"
     );
-    // TypeScript doesn't support primary constructors — params should be ignored
-    assert!(output.contains("class Foo {"));
-    assert!(!output.contains("(x: number)"));
 }

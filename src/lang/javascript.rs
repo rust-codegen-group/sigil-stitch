@@ -1,6 +1,7 @@
 //! JavaScript language implementation.
 
 use crate::import::{ImportEntry, ImportGroup};
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -188,7 +189,43 @@ impl RendererLang for JavaScript {
     }
 }
 
+const JS_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = class fields
+    SpecCapability::RecordFields,
+    // Methods = class methods
+    SpecCapability::Methods,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // Attributes = decorators
+    SpecCapability::Attributes,
+    // OptionalRecordFields = object fields that may be absent
+    SpecCapability::OptionalRecordFields,
+];
+const JS_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, JS_CLASS_CAPABILITIES),
+    // Struct/Interface/Trait are represented as JavaScript classes.
+    TypeCapabilities::new(TypeKind::Struct, JS_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Interface, JS_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, JS_CLASS_CAPABILITIES),
+    // Enum is represented as a class with static members.
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // RecordFields = class fields
+            SpecCapability::RecordFields,
+            // Methods = class methods
+            SpecCapability::Methods,
+            // Variants = enum-like static class members
+            SpecCapability::Variants,
+        ],
+    ),
+];
+
 impl CodeLang for JavaScript {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(JS_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         let mut lines = Vec::new();
         let quote = self.quote_style.char();

@@ -124,10 +124,32 @@ impl FileSpec {
         self
     }
 
+    /// Validate every spec member against the active language capabilities.
+    ///
+    /// Unknown external adapters inherit the permissive legacy capability
+    /// profile, so this is strict only when the adapter declares a matrix.
+    pub fn validate(&self) -> Result<(), SigilStitchError> {
+        let lang: &dyn CodeLang =
+            self.lang
+                .as_deref()
+                .ok_or_else(|| SigilStitchError::MissingLang {
+                    filename: self.filename.clone(),
+                })?;
+
+        for member in &self.members {
+            if let FileMember::Type(spec) = member {
+                spec.validate(lang)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Render the file to a string using the three-pass algorithm.
     ///
     /// `width` controls the target line width for pretty-printing.
     pub fn render(&self, width: usize) -> Result<String, SigilStitchError> {
+        self.validate()?;
+
         let lang: &dyn CodeLang =
             self.lang
                 .as_deref()
