@@ -1,5 +1,10 @@
+use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -181,65 +186,240 @@ impl RendererLang for CSharp {
     }
 }
 
-const CS_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const CS_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = base classes and interfaces (`:`)
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints (`where`)
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = `[Attribute]`
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = nullable fields
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const CS_STRUCT_CAPABILITIES: &[SpecCapability] = &[
+const CS_STRUCT_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // Attributes = `[Attribute]`
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = nullable fields
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const CS_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+const CS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = base classes and interfaces (`:`)
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints (`where`)
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = `[Attribute]`
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const CS_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, CS_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Struct, CS_STRUCT_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Interface, CS_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, CS_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(
+const CS_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, CS_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, CS_STRUCT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, CS_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, CS_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // Variants = enum members
-            SpecCapability::Variants,
+            TypeCapability::Variants,
             // Attributes = `[Attribute]`
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
 ];
 
+const CS_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AbstractMethod = abstract
+    FunctionCapability::AbstractMethod,
+    // AsyncEffect = async
+    FunctionCapability::AsyncEffect,
+    // Attributes = [...]
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = type parameter constraints
+    FunctionCapability::BoundedPolymorphism,
+    // DefaultParameters = default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = method result type
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = parameter declarations
+    FunctionCapability::TypedParameters,
+    // Override = override
+    FunctionCapability::Override,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+    // StaticMethod = static
+    FunctionCapability::StaticMethod,
+];
+const CS_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::AbstractMethod,
+    FunctionCapability::Attributes,
+    FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::StaticMethod,
+];
+const CS_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::Attributes,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::StaticConstructor,
+    FunctionCapability::TypedParameters,
+];
+const CS_REQUIRED_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+];
+const CS_MEMBER_INCOMPATIBILITIES: &[(FunctionCapability, FunctionCapability)] = &[
+    (
+        FunctionCapability::AbstractMethod,
+        FunctionCapability::AsyncEffect,
+    ),
+    (
+        FunctionCapability::AbstractMethod,
+        FunctionCapability::StaticMethod,
+    ),
+    (
+        FunctionCapability::StaticMethod,
+        FunctionCapability::Override,
+    ),
+];
+const CS_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        CS_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(CS_REQUIRED_FUNCTION_CAPABILITIES)
+    .with_body_policy(FunctionBodyPolicy::Required)
+    .with_incompatible_capabilities(CS_MEMBER_INCOMPATIBILITIES),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        CS_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        CS_INTERFACE_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(CS_REQUIRED_FUNCTION_CAPABILITIES),
+];
+
 impl CodeLang for CSharp {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(CS_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(CS_TYPES)
+            .with_functions(CS_FUNCTIONS)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::function_lowering::validate_constraints_target_declared_type_params(
+            self.file_extension(),
+            function_name,
+            type_params,
+            constraints,
+        )
+    }
+
+    fn constructor_name_matches(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        declaring_type.is_some_and(|declaring_type| name == declaring_type)
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        declaring_type.is_none_or(|declaring_type| name == declaring_type)
+    }
+
+    fn abstract_type_modifier_is_valid(&self, kind: TypeKind) -> bool {
+        kind == TypeKind::Class
+    }
+
+    fn function_body_policy(
+        &self,
+        context: FunctionContext,
+        form: FunctionForm,
+        is_static: bool,
+    ) -> FunctionBodyPolicy {
+        if context == FunctionContext::InterfaceMember
+            && form == FunctionForm::Function
+            && is_static
+        {
+            FunctionBodyPolicy::Required
+        } else {
+            self.capabilities().function_body_policy(context, form)
+        }
+    }
+
+    fn maximum_function_parameters(
+        &self,
+        context: FunctionContext,
+        form: FunctionForm,
+        is_static: bool,
+    ) -> Option<usize> {
+        if context == FunctionContext::Member && form == FunctionForm::Constructor && is_static {
+            Some(0)
+        } else {
+            self.capabilities()
+                .maximum_function_parameters(context, form)
+        }
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        form: FunctionForm,
+        is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        if context == FunctionContext::InterfaceMember {
+            return matches!(visibility, Visibility::Inherited | Visibility::Public);
+        }
+        if matches!(
+            visibility,
+            Visibility::PublicCrate | Visibility::PublicSuper
+        ) {
+            return false;
+        }
+        context != FunctionContext::Member
+            || form != FunctionForm::Constructor
+            || !is_static
+            || visibility == Visibility::Inherited
+    }
+
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::csharp_function_lowering::lower(self, function)
+    }
+
+    fn function_parameters_require_trailing_defaults(
+        &self,
+        _context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        true
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

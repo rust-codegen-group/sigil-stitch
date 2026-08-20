@@ -144,7 +144,7 @@ fn test_where_clause_rust_function() {
 }
 
 #[test]
-fn test_where_clause_ts_inline_ignored() {
+fn test_where_clause_ts_merges_into_inline_type_parameter() {
     let fun = FunSpec::builder("process")
         .add_type_param(TypeParamSpec::new("T"))
         .add_where_constraint(
@@ -159,7 +159,10 @@ fn test_where_clause_ts_inline_ignored() {
         !output.contains("where"),
         "TS should not emit where: {output}"
     );
-    assert!(output.contains("function process<T>("), "sig: {output}");
+    assert!(
+        output.contains("function process<T extends Serializable>("),
+        "sig: {output}"
+    );
 }
 
 #[test]
@@ -246,7 +249,10 @@ fn test_lifetime_params_before_type_params() {
 
 #[test]
 fn test_emittable_delegates_to_emit() {
-    let f = FunSpec::builder("greet").build().unwrap();
+    let f = FunSpec::builder("greet")
+        .body(CodeBlock::of("return", ()).unwrap())
+        .build()
+        .unwrap();
     let lang = TypeScript::new();
     let blocks = f.emit_members(&lang).unwrap();
     assert_eq!(blocks.len(), 1);
@@ -256,6 +262,7 @@ fn test_emittable_delegates_to_emit() {
 fn test_emittable_uses_top_level_context() {
     let f = FunSpec::builder("greet")
         .visibility(Visibility::Public)
+        .body(CodeBlock::of("return", ()).unwrap())
         .build()
         .unwrap();
     let lang = TypeScript::new();

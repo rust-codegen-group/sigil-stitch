@@ -86,7 +86,10 @@ The macro is a good fit when you're writing a block of target-language code with
 
 ## Building Structured Declarations
 
-For functions, types, and other declarations, use the Spec layer. Specs carry structural metadata (name, return type, visibility, modifiers) and emit `CodeBlock`s internally.
+For functions, types, and other declarations, use the spec layer. Specs carry
+declaration intent such as name, return type, visibility, and modifiers. The
+selected language validates that intent and lowers it to a structured
+`CodeBlock`.
 
 Here's a function declaration:
 
@@ -121,12 +124,16 @@ This produces a complete TypeScript file with the function declaration, includin
 
 Notice the builder pattern: spec builders like `FunSpec::builder()` and `FileSpec::builder()` use an owning chain pattern -- setter methods like `.returns()`, `.is_async()`, and `.body()` take `mut self` and return `Self`, so you chain them fluently. The `.build()` call at the end consumes the builder and returns `Result<FunSpec>`. (`CodeBlockBuilder` is different: it uses `&mut self`, so you keep it in a `let mut` binding.)
 
-## Specs Emit CodeBlocks
+## Specs Lower to CodeBlocks
 
-Every spec type follows the same pattern: you configure it with a builder, call `.build()`, and eventually `FileSpec` calls `.emit()` on it to get a `CodeBlock`. This means:
+Every spec type follows the same pattern: configure it with a builder and call
+`.build()`. During file rendering, its `.emit()` facade validates the intent and
+delegates concrete grammar to the selected language adapter. The result is a
+structured `CodeBlock`. This means:
 
 - You never write raw import statements. `%T` handles it.
-- You never manually format function signatures. `FunSpec` handles it.
+- You describe a function declaration once; the language adapter owns its
+  concrete grammar.
 - You can mix specs and raw CodeBlocks freely in a `FileSpec`.
 
 The renderer and import collector only see `CodeBlock` trees. They don't know or care whether a block came from a `FunSpec`, a `TypeSpec`, or a hand-written `CodeBlock::builder()` call.

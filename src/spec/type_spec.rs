@@ -3,7 +3,7 @@
 use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
-use crate::lang::capability::SpecCapability;
+use crate::lang::capability::{FunctionCapability, FunctionForm, TypeCapability};
 use crate::spec::annotation_spec::AnnotationSpec;
 use crate::spec::enum_variant_spec::EnumVariantSpec;
 use crate::spec::field_spec::FieldSpec;
@@ -108,12 +108,136 @@ impl TypeSpec {
     }
 
     /// Validate this type against the language capability matrix.
+    ///
+    /// Type-level validation and method validation are checked in declaration
+    /// order; the first error is returned. For file-level aggregation use the
+    /// crate-private collector instead.
     pub fn validate(&self, lang: &dyn CodeLang) -> Result<(), crate::error::SigilStitchError> {
+        let mut errors = Vec::new();
+        self.collect_validation_errors(lang, &mut errors);
+        match errors.into_iter().next() {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
+    }
+
+    /// Push every type-level and method validation error into `errors`.
+    pub(crate) fn collect_validation_errors(
+        &self,
+        lang: &dyn CodeLang,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        if let Err(error) = self.validate_type(lang) {
+            errors.push(error);
+        }
+
+        let declaration_context = lang.type_member_declaration_context(self.kind);
+        for method in &self.methods {
+            let method = self.method_for_context(method, lang, declaration_context);
+            let capabilities = lang.capabilities();
+            if !capabilities.function_validation_is_permissive() {
+                let form = lang.function_form(&method.name, method.modifiers.is_constructor);
+                if form == FunctionForm::Constructor
+                    && !lang.constructor_name_is_valid(&method.name, Some(&self.name))
+                {
+                    errors.push(SigilStitchError::InvalidConstructorName {
+                        language: lang.file_extension().to_string(),
+                        type_name: Some(self.name.clone()),
+                        constructor_name: method.name.clone(),
+                    });
+                    continue;
+                }
+                if form == FunctionForm::Destructor && method.name != format!("~{}", self.name) {
+                    errors.push(SigilStitchError::InvalidDestructorName {
+                        language: lang.file_extension().to_string(),
+                        type_name: self.name.clone(),
+                        destructor_name: method.name.clone(),
+                    });
+                    continue;
+                }
+                if !matches!(self.kind, TypeKind::Interface | TypeKind::Trait)
+                    && !self.modifiers.is_abstract
+                    && method.modifiers.is_abstract
+                    && lang.abstract_modifier_capability() == FunctionCapability::AbstractMethod
+                    && capabilities.supports_function_capability(
+                        crate::lang::capability::FunctionContext::Member,
+                        form,
+                        FunctionCapability::AbstractMethod,
+                    )
+                {
+                    errors.push(SigilStitchError::AbstractMethodInConcreteType {
+                        language: lang.file_extension().to_string(),
+                        type_name: self.name.clone(),
+                        function_name: method.name.clone(),
+                    });
+                    continue;
+                }
+            }
+            if let Err(error) = method.validate_in_type(lang, declaration_context) {
+                errors.push(error);
+            }
+        }
+    }
+
+    /// Preserve the pre-capability behavior for constructor-shaped members.
+    ///
+    /// Before strict validation, a Java/C#/C++ member whose name matched its
+    /// declaring type and omitted a return type naturally rendered as a
+    /// constructor. The capability matrix gives us enough information to
+    /// recognize exactly those profiles without weakening missing-return-type
+    /// validation for ordinary methods.
+    fn method_for_context<'a>(
+        &self,
+        method: &'a FunSpec,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+    ) -> std::borrow::Cow<'a, FunSpec> {
+        let capabilities = lang.capabilities();
+        let function_context = match declaration_context {
+            DeclarationContext::TopLevel => crate::lang::capability::FunctionContext::TopLevel,
+            DeclarationContext::Member => crate::lang::capability::FunctionContext::Member,
+            DeclarationContext::InterfaceMember => {
+                crate::lang::capability::FunctionContext::InterfaceMember
+            }
+        };
+        let infer_constructor = !capabilities.function_validation_is_permissive()
+            && !method.modifiers.is_constructor
+            && capabilities.supports_function_form(function_context, FunctionForm::Constructor)
+            && if method.modifiers.is_static {
+                lang.static_constructor_name_matches(&method.name, None)
+                    || ((method.return_type.is_none()
+                        || !lang.constructor_name_with_return_type_is_function())
+                        && lang.static_constructor_name_matches(&method.name, Some(&self.name)))
+            } else {
+                lang.constructor_name_matches(&method.name, None)
+                    || ((method.return_type.is_none()
+                        || !lang.constructor_name_with_return_type_is_function())
+                        && lang.constructor_name_matches(&method.name, Some(&self.name)))
+            };
+
+        if infer_constructor {
+            let mut method = method.clone();
+            method.modifiers.is_constructor = true;
+            std::borrow::Cow::Owned(method)
+        } else {
+            std::borrow::Cow::Borrowed(method)
+        }
+    }
+
+    fn validate_type(&self, lang: &dyn CodeLang) -> Result<(), crate::error::SigilStitchError> {
         let capabilities = lang.capabilities();
         let language = lang.file_extension().to_string();
 
         if !capabilities.supports_type_kind(self.kind) {
             return Err(SigilStitchError::UnsupportedTypeKind {
+                language,
+                kind: self.kind,
+                type_name: self.name.clone(),
+            });
+        }
+
+        if self.modifiers.is_abstract && !lang.abstract_type_modifier_is_valid(self.kind) {
+            return Err(SigilStitchError::InvalidAbstractType {
                 language,
                 kind: self.kind,
                 type_name: self.name.clone(),
@@ -127,69 +251,69 @@ impl TypeSpec {
         }
 
         let mut missing = Vec::new();
-        let require = |capability: SpecCapability, condition: bool, missing: &mut Vec<_>| {
-            if condition && !capabilities.supports_capability(self.kind, capability) {
+        let require = |capability: TypeCapability, condition: bool, missing: &mut Vec<_>| {
+            if condition && !capabilities.supports_type_capability(self.kind, capability) {
                 missing.push(capability);
             }
         };
 
         require(
-            SpecCapability::RecordFields,
+            TypeCapability::RecordFields,
             !self.fields.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::AccessorMethods,
+            TypeCapability::AccessorMethods,
             !self.properties.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             !self.methods.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::StructuralEmbedding,
+            TypeCapability::StructuralEmbedding,
             !self.embedded_types.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::NominalSubtyping,
+            TypeCapability::NominalSubtyping,
             !self.super_types.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::InterfaceImplementation,
+            TypeCapability::InterfaceImplementation,
             !self.impl_types.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
             !self.type_params.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::BoundedPolymorphism,
+            TypeCapability::BoundedPolymorphism,
             !self.where_constraints.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::ConstructorParameters,
+            TypeCapability::ConstructorParameters,
             !self.primary_constructor.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::Variants,
+            TypeCapability::Variants,
             !self.variants.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
             !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
             &mut missing,
         );
         require(
-            SpecCapability::OptionalRecordFields,
+            TypeCapability::OptionalRecordFields,
             self.fields.iter().any(|field| field.is_optional),
             &mut missing,
         );
@@ -197,7 +321,7 @@ impl TypeSpec {
         if missing.is_empty() {
             Ok(())
         } else {
-            Err(SigilStitchError::UnsupportedSpecCapabilities {
+            Err(SigilStitchError::UnsupportedTypeCapabilities {
                 language,
                 type_name: self.name.clone(),
                 capabilities: missing,
@@ -235,10 +359,7 @@ impl TypeSpec {
 
         // Use InterfaceMember context for interface/trait bodies so that
         // languages can suppress visibility modifiers and async keywords.
-        let member_ctx = match self.kind {
-            TypeKind::Interface | TypeKind::Trait => DeclarationContext::InterfaceMember,
-            _ => DeclarationContext::Member,
-        };
+        let member_ctx = lang.type_member_declaration_context(self.kind);
 
         self.emit_preamble(&mut cb, lang)?;
         self.emit_header(&mut cb, lang)?;
@@ -321,7 +442,10 @@ impl TypeSpec {
             if i > 0 {
                 cb.add_line();
             }
-            cb.add_code(method.emit(lang, member_ctx)?);
+            cb.add_code(
+                self.method_for_context(method, lang, member_ctx)
+                    .emit_in_type(lang, member_ctx)?,
+            );
         }
         for extra in &self.extra_members {
             cb.add_code(extra.clone());
@@ -465,7 +589,10 @@ impl TypeSpec {
                 if i > 0 {
                     impl_cb.add_line();
                 }
-                impl_cb.add_code(method.emit(lang, DeclarationContext::Member)?);
+                impl_cb.add_code(
+                    self.method_for_context(method, lang, DeclarationContext::Member)
+                        .emit_in_type(lang, DeclarationContext::Member)?,
+                );
             }
             impl_cb.add("%<", ());
             let close = lang.block_syntax().block_close;
@@ -1005,6 +1132,10 @@ impl TypeSpecBuilder {
 }
 
 impl crate::spec::emittable::Emittable for TypeSpec {
+    fn collect_validation_errors(&self, lang: &dyn CodeLang, errors: &mut Vec<SigilStitchError>) {
+        TypeSpec::collect_validation_errors(self, lang, errors);
+    }
+
     fn emit_members(&self, lang: &dyn CodeLang) -> Result<Vec<CodeBlock>, SigilStitchError> {
         self.emit(lang)
     }

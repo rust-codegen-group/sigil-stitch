@@ -3,7 +3,10 @@
 use crate::code_block::{Arg, CodeBlock};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::{TypeParamSpec, render_type_params};
@@ -186,83 +189,179 @@ impl RendererLang for Scala {
     }
 }
 
-const SCALA_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const SCALA_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // AccessorMethods = accessors
-    SpecCapability::AccessorMethods,
+    TypeCapability::AccessorMethods,
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // InterfaceImplementation = `with`
-    SpecCapability::InterfaceImplementation,
+    TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = context/view bounds and type bounds
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // ConstructorParameters = primary constructor parameters
-    SpecCapability::ConstructorParameters,
+    TypeCapability::ConstructorParameters,
     // Attributes = annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const SCALA_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+const SCALA_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = context/view bounds and type bounds
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const SCALA_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, SCALA_CLASS_CAPABILITIES),
+const SCALA_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, SCALA_CLASS_CAPABILITIES),
     // Struct is represented as a Scala case class.
-    TypeCapabilities::new(TypeKind::Struct, SCALA_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, SCALA_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, SCALA_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, SCALA_CONTRACT_CAPABILITIES),
     // Interface is represented as a Scala trait.
-    TypeCapabilities::new(TypeKind::Interface, SCALA_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Interface, SCALA_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // RecordFields = fields
-            SpecCapability::RecordFields,
+            TypeCapability::RecordFields,
             // AccessorMethods = accessors
-            SpecCapability::AccessorMethods,
+            TypeCapability::AccessorMethods,
             // Methods = methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // ParametricPolymorphism = type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
             // Attributes = annotations
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
             // Variants = enum cases
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
             // ParametricPolymorphism = type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Newtype,
         &[
             // ParametricPolymorphism = type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
             // Attributes = annotations
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
 ];
 
+const SCALA_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // Attributes = annotations
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = context/upper bounds
+    FunctionCapability::BoundedPolymorphism,
+    // DefaultParameters = default parameters
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = result annotation
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    // ParametricPolymorphism = type parameters
+    FunctionCapability::ParametricPolymorphism,
+];
+const SCALA_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AbstractMethod = abstract members
+    FunctionCapability::AbstractMethod,
+    // Attributes = annotations
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = context/upper bounds
+    FunctionCapability::BoundedPolymorphism,
+    // DefaultParameters = default parameters
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = result annotation
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    // Override = override
+    FunctionCapability::Override,
+    // ParametricPolymorphism = type parameters
+    FunctionCapability::ParametricPolymorphism,
+];
+const SCALA_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        SCALA_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        SCALA_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        SCALA_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters]),
+];
+
 impl CodeLang for Scala {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(SCALA_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(SCALA_TYPES)
+            .with_functions(SCALA_FUNCTIONS)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::function_lowering::validate_constraints_target_declared_type_params(
+            self.file_extension(),
+            function_name,
+            type_params,
+            constraints,
+        )
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::TopLevel => matches!(
+                visibility,
+                Visibility::Inherited | Visibility::Public | Visibility::Private
+            ),
+            FunctionContext::Member | FunctionContext::InterfaceMember => matches!(
+                visibility,
+                Visibility::Inherited
+                    | Visibility::Public
+                    | Visibility::Private
+                    | Visibility::Protected
+            ),
+            FunctionContext::ReceiverMethod => false,
+        }
+    }
+
+    fn abstract_type_modifier_is_valid(&self, kind: TypeKind) -> bool {
+        kind == TypeKind::Class
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

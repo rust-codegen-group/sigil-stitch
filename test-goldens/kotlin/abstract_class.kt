@@ -2,9 +2,9 @@
  * Abstract shape.
  */
 internal abstract class Shape {
-    internal fun describe(): String {
+    fun describe(): String {
         return this::class.simpleName ?: "Shape"
     }
 
-    internal abstract fun area(): Double
+    abstract fun area(): Double
 }

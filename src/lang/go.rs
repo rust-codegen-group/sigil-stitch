@@ -4,7 +4,10 @@ use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -311,42 +314,149 @@ impl RendererLang for Go {
 }
 
 // Go has no native Enum; TypeKind::Enum is intentionally unsupported.
-const GO_STRUCT_CAPABILITIES: &[SpecCapability] = &[
+const GO_STRUCT_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = struct fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // StructuralEmbedding = embedded fields / embedded interfaces
-    SpecCapability::StructuralEmbedding,
+    TypeCapability::StructuralEmbedding,
     // ParametricPolymorphism = type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // OptionalRecordFields = pointer-typed optional fields
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const GO_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+const GO_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = interface methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // StructuralEmbedding = embedded interfaces
-    SpecCapability::StructuralEmbedding,
+    TypeCapability::StructuralEmbedding,
 ];
-const GO_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Struct, GO_STRUCT_CAPABILITIES),
+const GO_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Struct, GO_STRUCT_CAPABILITIES),
     // Class is represented as a Go struct.
-    TypeCapabilities::new(TypeKind::Class, GO_STRUCT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Class, GO_STRUCT_CAPABILITIES),
     // Trait is represented as a Go interface.
-    TypeCapabilities::new(TypeKind::Interface, GO_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, GO_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Interface, GO_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, GO_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilityProfile::new(
         TypeKind::Newtype,
         &[
             // ParametricPolymorphism = type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
         ],
     ),
 ];
 
+const GO_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // BoundedPolymorphism = type constraints
+    FunctionCapability::BoundedPolymorphism,
+    // ExplicitReturnType = result type or tuple
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    // ParametricPolymorphism = type parameters
+    FunctionCapability::ParametricPolymorphism,
+];
+const GO_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        GO_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::ReceiverMethod,
+        FunctionForm::Function,
+        &[
+            FunctionCapability::ExplicitReturnType,
+            FunctionCapability::TypedParameters,
+        ],
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        &[
+            FunctionCapability::ExplicitReturnType,
+            FunctionCapability::TypedParameters,
+        ],
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Forbidden),
+];
+
 impl CodeLang for Go {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(GO_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(GO_TYPES)
+            .with_functions(GO_FUNCTIONS)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::function_lowering::validate_constraints_target_declared_type_params(
+            self.file_extension(),
+            function_name,
+            type_params,
+            constraints,
+        )
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        _context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        matches!(
+            visibility,
+            Visibility::Inherited | Visibility::Public | Visibility::Private
+        )
+    }
+
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        let exported = function
+            .name()
+            .chars()
+            .next()
+            .is_some_and(char::is_uppercase);
+        let valid = match function.modifiers().visibility {
+            Visibility::Inherited => true,
+            Visibility::Public => exported,
+            Visibility::Private => !exported,
+            Visibility::Protected | Visibility::PublicCrate | Visibility::PublicSuper => false,
+        };
+        if valid {
+            Ok(())
+        } else {
+            Err(SigilStitchError::InvalidFunctionVisibility {
+                language: self.file_extension().to_string(),
+                function_name: function.name().to_string(),
+                context: function.function_context(),
+                form: function.form(),
+                visibility: function.modifiers().visibility,
+            })
+        }
+    }
+
+    fn function_parameters_are_typed(
+        &self,
+        parameters: &[crate::spec::parameter_spec::ParameterSpec],
+        _context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        parameters
+            .last()
+            .is_none_or(|parameter| !parameter.param_type().is_empty())
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

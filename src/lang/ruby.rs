@@ -25,7 +25,10 @@
 //! `sigil_quote!` map to indent/dedent + `end` in the output.
 
 use crate::import::ImportGroup;
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, TypeDeclSyntaxConfig,
     TypePresentationConfig,
@@ -137,52 +140,106 @@ impl RendererLang for Ruby {
     }
 }
 
-const RUBY_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const RUBY_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = instance variables
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = `<`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // Attributes = annotations are not native; raw blocks remain available
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const RUBY_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, RUBY_CLASS_CAPABILITIES),
+const RUBY_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, RUBY_CLASS_CAPABILITIES),
     // Struct is represented as a Ruby class.
-    TypeCapabilities::new(TypeKind::Struct, RUBY_CLASS_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Struct, RUBY_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Interface,
         &[
             // Methods = methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // Attributes = annotations are not native; raw blocks remain available
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Trait,
         &[
             // Methods = methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // Attributes = annotations are not native; raw blocks remain available
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // Variants = constants on the class object
-            SpecCapability::Variants,
+            TypeCapability::Variants,
             // Attributes = annotations are not native; raw blocks remain available
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
 ];
 
+const RUBY_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // DefaultParameters = default parameters
+    FunctionCapability::DefaultParameters,
+];
+const RUBY_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        RUBY_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        RUBY_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        RUBY_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+];
+
 impl CodeLang for Ruby {
+    fn type_member_declaration_context(&self, _kind: TypeKind) -> DeclarationContext {
+        DeclarationContext::Member
+    }
+
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(RUBY_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(RUBY_TYPES)
+            .with_functions(RUBY_FUNCTIONS)
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::TopLevel => visibility == Visibility::Inherited,
+            FunctionContext::Member => matches!(
+                visibility,
+                Visibility::Inherited
+                    | Visibility::Public
+                    | Visibility::Private
+                    | Visibility::Protected
+            ),
+            FunctionContext::InterfaceMember => {
+                matches!(visibility, Visibility::Inherited | Visibility::Public)
+            }
+            FunctionContext::ReceiverMethod => false,
+        }
     }
 
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
@@ -192,7 +249,8 @@ impl CodeLang for Ruby {
                 Visibility::Public => "public\n",
                 Visibility::Private => "private\n",
                 Visibility::Protected => "protected\n",
-                _ => "public\n",
+                Visibility::Inherited => "public\n",
+                Visibility::PublicCrate | Visibility::PublicSuper => "public\n",
             },
             DeclarationContext::InterfaceMember => "",
         }

@@ -1,7 +1,10 @@
 //! JavaScript language implementation.
 
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -189,41 +192,130 @@ impl RendererLang for JavaScript {
     }
 }
 
-const JS_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const JS_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = class fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Methods = class methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // Attributes = decorators
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = object fields that may be absent
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const JS_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, JS_CLASS_CAPABILITIES),
+const JS_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, JS_CLASS_CAPABILITIES),
     // Struct/Interface/Trait are represented as JavaScript classes.
-    TypeCapabilities::new(TypeKind::Struct, JS_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Interface, JS_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, JS_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, JS_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, JS_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, JS_CLASS_CAPABILITIES),
     // Enum is represented as a class with static members.
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // RecordFields = class fields
-            SpecCapability::RecordFields,
+            TypeCapability::RecordFields,
             // Methods = class methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // Variants = enum-like static class members
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
 ];
 
+const JS_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = async
+    FunctionCapability::AsyncEffect,
+    // DefaultParameters = default parameters
+    FunctionCapability::DefaultParameters,
+    // VariadicParameters = rest parameters
+    FunctionCapability::VariadicParameters,
+];
+const JS_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = async
+    FunctionCapability::AsyncEffect,
+    // DefaultParameters = default parameters
+    FunctionCapability::DefaultParameters,
+    // StaticMethod = static
+    FunctionCapability::StaticMethod,
+    // VariadicParameters = rest parameters
+    FunctionCapability::VariadicParameters,
+];
+const JS_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::ConstructorDelegation,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::VariadicParameters,
+];
+const JS_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        JS_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        JS_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        JS_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        JS_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Constructor,
+        JS_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+];
+
 impl CodeLang for JavaScript {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(JS_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(JS_TYPES)
+            .with_functions(JS_FUNCTIONS)
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::TopLevel => matches!(
+                visibility,
+                Visibility::Inherited | Visibility::Public | Visibility::Private
+            ),
+            FunctionContext::Member | FunctionContext::InterfaceMember => {
+                matches!(visibility, Visibility::Inherited | Visibility::Public)
+            }
+            FunctionContext::ReceiverMethod => false,
+        }
+    }
+
+    fn constructor_name_matches(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "constructor"
+    }
+
+    fn static_constructor_name_matches(&self, _name: &str, _declaring_type: Option<&str>) -> bool {
+        false
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "constructor"
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

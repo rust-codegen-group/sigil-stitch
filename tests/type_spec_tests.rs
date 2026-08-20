@@ -2,6 +2,7 @@ use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::code_renderer::CodeRenderer;
 use sigil_stitch::import::ImportGroup;
 use sigil_stitch::lang::CodeLang;
+use sigil_stitch::lang::capability::TypeCapability;
 use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::emittable::Emittable;
@@ -707,7 +708,12 @@ fn test_emittable_delegates_to_emit() {
 #[test]
 fn test_emittable_returns_multiple_blocks_for_rust() {
     let ts = TypeSpec::builder("Greeter", TypeKind::Struct)
-        .add_method(FunSpec::builder("hello").build().unwrap())
+        .add_method(
+            FunSpec::builder("hello")
+                .body(CodeBlock::of("()", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
         .build()
         .unwrap();
     let lang = Rust::new();
@@ -994,10 +1000,10 @@ fn unsupported_spec_capability_fails_closed() {
     assert!(
         matches!(
             error,
-            sigil_stitch::error::SigilStitchError::UnsupportedSpecCapabilities {
+            sigil_stitch::error::SigilStitchError::UnsupportedTypeCapabilities {
                 ref capabilities,
                 ..
-            } if capabilities.iter().any(|c| c.as_str() == "Methods")
+            } if capabilities.contains(&TypeCapability::Methods)
         ),
         "{error}"
     );

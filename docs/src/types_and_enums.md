@@ -10,7 +10,7 @@ The largest spec. Models type declarations: struct, class, interface, trait, enu
 
 ### Single-block output (TypeScript class)
 
-When `lang.methods_inside_type_body(kind)` returns `true`, TypeSpec emits a single CodeBlock with fields and methods inside the body:
+The TypeScript adapter lowers a class and its members into one `CodeBlock`:
 
 ```rust
 # extern crate sigil_stitch;
@@ -51,7 +51,8 @@ let blocks = type_spec.emit(&TypeScript::new()).unwrap();
 
 ### Two-block output (Rust struct + impl)
 
-When `methods_inside_type_body(kind)` returns `false` (Rust structs and enums), TypeSpec emits two separate CodeBlocks: one for the data definition, one for the `impl` block:
+The Rust adapter lowers a struct with methods into two `CodeBlock`s: one for the
+data definition and one for the `impl` block:
 
 ```rust
 # extern crate sigil_stitch;
@@ -96,7 +97,9 @@ let blocks = type_spec.emit(&Rust::new()).unwrap();
 # }
 ```
 
-This split is the key structural decision. It is fully automatic -- you build one TypeSpec, and the language's `methods_inside_type_body()` determines whether the output is one block or two.
+The split is target grammar owned by the adapter. The `TypeSpec` records the
+same declaration intent without describing whether members are nested in the
+type or emitted in a separate implementation block.
 
 ### Extends and implements
 
@@ -190,10 +193,10 @@ let type_spec = TypeSpec::builder("Meters", TypeKind::TypeAlias)
 # }
 ```
 
-Per-language rendering is controlled by `type_keyword(TypeKind::TypeAlias)`:
+Each language adapter owns the complete type-alias form:
 - TypeScript/Rust: `type Foo = Bar;`
 - C++: `using Foo = Bar;`
-- C: `typedef Bar Foo;` (target-first, via `type_decl_syntax().type_alias_target_first`)
+- C: `typedef Bar Foo;`
 - Go: `type Foo = Bar`
 - Kotlin: `typealias Foo = Bar`
 - Python: `type Foo = Bar`
@@ -242,11 +245,10 @@ let type_spec = TypeSpec::builder("Meters", TypeKind::Newtype)
 # }
 ```
 
-Newtype syntax varies across languages and is controlled by
-`CodeLang::emit_newtype_decl()`. The hook receives the raw declaration name,
-structured type parameters, and the inner `TypeName`, then returns a
-`CodeBlock`. Imports and aliases therefore work inside newtype declarations
-just as they do in ordinary `%T` slots:
+Newtype syntax varies across languages and is owned by each adapter's
+declaration lowering. Lowering preserves the inner `TypeName` as a structured
+reference, so imports and aliases work inside newtype declarations just as they
+do in ordinary `%T` slots:
 
 - Rust: `struct Meters(f64);` (tuple struct)
 - Go: `type Meters float64` (distinct type)
@@ -454,4 +456,6 @@ let variant = EnumVariantSpec::builder("Move")
 # }
 ```
 
-Variants are added to a TypeSpec via `add_variant()`. The language controls separators (`enum_and_annotation().variant_separator`), trailing separators (`enum_and_annotation().variant_trailing_separator`), and prefixes (Swift's `case`).
+Variants are added to a `TypeSpec` via `add_variant()`. The language adapter
+owns their complete grammar, including separators, trailing punctuation, and
+prefixes such as Swift's `case`.

@@ -1,0 +1,186 @@
+# Declaration Specs and Language Lowering
+
+This chapter defines the ownership model for structured declarations. It is the
+accepted design direction for `spec/*` and `lang/*`; pre-0.6.8 compatibility
+paths that do not yet follow it are described under
+[Migration](#compatibility-and-migration).
+
+## Decision
+
+Declaration specs describe **what to declare**. A language adapter decides
+whether that intent is representable and owns **how to spell it**. Specs do not
+assemble a target-language grammar by interpreting a shared collection of
+keywords, separators, placement enums, or ordering flags.
+
+The complete pipeline is:
+
+```text
+builder
+  |
+  v
+declaration spec                 target-independent intent
+  |
+  +-- intrinsic validation      invariants of the intent itself
+  |
+  +-- capability validation     target-specific representability
+  |
+  v
+language-local lowering         exact grammar, spelling, and token order
+  |
+  v
+CodeBlock / CodeNode::TypeRef    structured target-language rendering IR
+  |
+  +-- import and alias resolution
+  +-- layout and indentation
+  |
+  v
+source text
+```
+
+This is a compiler pipeline, not a general declaration-formatting engine.
+
+## Ownership
+
+| Concern | Owner | Examples |
+|---------|-------|----------|
+| Declaration intent | `spec/*` | Name, parameters, result type, type parameters, bounds, members, visibility intent, modifiers, body |
+| Intrinsic coherence | `spec/*` | Non-empty names, internally consistent parameter lists, valid builder state |
+| Target representability | language capabilities and validation | Whether a context supports type parameters, requires typed parameters, permits a body, or accepts a constructor |
+| Target grammar | language adapter | Keywords, ordering, placement, punctuation, modifier spelling, constructor syntax |
+| Structured output | `CodeBlock` | Target literals plus semantic `TypeRef`, nesting, statement, and layout nodes |
+| Final text mechanics | renderer | Imports, aliases, indentation, width decisions, and string emission |
+
+The ownership test is deliberately simple:
+
+- A fact about the requested declaration belongs to the spec.
+- A statement that the target supports, requires, or forbids a semantic fact
+  belongs to capability validation.
+- A decision about which token appears, where it appears, or in what order it
+  appears belongs to language-local lowering.
+- A decision about import names, indentation, width, or document layout belongs
+  to the renderer.
+
+## Declaration Specs
+
+A declaration spec is a target-independent declaration model, not the syntax
+tree of a hypothetical universal language. It may be richer than any one
+target. A target adapter either lowers the requested semantics or returns a
+validation error; it must not silently discard unsupported intent.
+
+For example, one function declaration may contain:
+
+```text
+name: id
+type parameters: T
+parameters: x of type T
+result: T
+body: ...
+```
+
+That intent can become:
+
+```text
+Kotlin: fun <T> id(x: T): T
+Rust:   fn id<T>(x: T) -> T
+Java:   <T> T id(T x)
+```
+
+There is no semantic `type parameter placement` property in the declaration.
+Placement exists only after selecting a target grammar.
+
+Specs can contain target-specific `CodeBlock` payloads for bodies, raw
+annotations, suffixes, or other escape hatches. These payloads are explicitly
+opaque to generic specs and shared lowerers: their presence does not make the
+declaration shell or its grammar a shared syntax model. Lowering composes them
+structurally and preserves their `TypeRef` nodes, but does not reinterpret their
+literal syntax. A private Python validator recognizes the documented 0.6.8
+`is_static` plus decorator pattern as a frozen adapter-local compatibility
+exception; new behavior must use semantic intent instead of extending it.
+
+## Capabilities Are Semantic
+
+The shared capability vocabulary describes representability. For example,
+`ParametricPolymorphism` says that a declaration context can express type
+parameters; `TypedParameters` says that parameter types are supported or
+required; and `FunctionBodyPolicy` says whether a body is legal. None of these
+concepts describes the position or spelling of a token.
+
+Capabilities may be contextual. A target can support a bodyful top-level
+function while forbidding a body on an interface member, or support ordinary
+methods while rejecting constructors. Such differences remain semantic
+validation rules even though the rules are language-specific.
+
+If a proposed capability cannot be defined without mentioning a keyword,
+delimiter, token order, or formatting example, it is probably target grammar
+rather than a semantic capability.
+
+## Language-Local Lowering
+
+The external function seams first validate classified intent and then lower a
+complete validated declaration into a structured block:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::code_block::CodeBlock;
+# use sigil_stitch::error::SigilStitchError;
+# use sigil_stitch::lang::{FunctionIntent, ValidatedFunction};
+# trait Example {
+fn validate_function(
+    &self,
+    function: FunctionIntent<'_>,
+) -> Result<(), SigilStitchError>;
+fn lower_function(
+    &self,
+    function: ValidatedFunction<'_>,
+) -> Result<CodeBlock, SigilStitchError>;
+# }
+```
+
+`FunctionIntent` provides read-only access after context and form
+classification and crate-owned semantic validation against the selected
+adapter. `ValidatedFunction` can only be constructed by the crate after the
+adapter's additional validation succeeds. `FunSpec::emit()` remains the
+convenience facade: it delegates validation and lowering without interpreting
+target grammar switches itself.
+
+Each adapter owns the complete ordering and spelling of a declaration. Private
+leaf helpers may render structured fragments such as a parameter list or body,
+but do not choose their relative order. Related adapters may additionally share
+a genuinely family-specific lowering helper. An adapter can bypass either
+without adding a new variant to a shared grammar interface.
+
+A useful locality test is to add a language with a previously unseen syntax.
+The change should be confined to that adapter, its private helpers, and its
+tests. If the change requires a new shared placement enum and new branches in a
+generic spec emitter, target grammar has crossed the seam.
+
+## Compatibility and Migration
+
+Public syntax configuration that was already part of the 0.6.8 adapter
+interface cannot disappear without a deliberate compatibility decision.
+During migration it may remain behind a default compatibility lowerer for
+external adapters. The `function_syntax()`, `type_decl_syntax()`, and
+`enum_and_annotation()` accessors and their configuration types are deprecated
+to make this boundary visible to adapter authors at compile time.
+
+Compatibility is not permission to extend that design:
+
+- Do not add new shared declaration-placement enums, flags, or keyword fields.
+- Do not add new branches in specs to interpret target grammar.
+- New built-in behavior should enter through a complete language-owned lowering
+  seam.
+- Concepts introduced after 0.6.8 may be changed or removed instead of being
+  preserved as another compatibility layer.
+- Existing built-in adapters should migrate incrementally, with rendered-output
+  tests at the adapter seam and parity coverage across direct and pretty paths.
+
+This policy lets external adapters keep working while the built-in
+implementation moves toward the intended ownership model.
+
+## Scope of This Decision
+
+This decision governs declaration grammar interpreted by `spec/*`. It does not
+prohibit shared semantic data, structured rendering nodes, or private reusable
+helpers. It also does not by itself redesign lower-level seams such as
+`TypeName` presentation or block layout; those mechanisms have their own design
+documents and must be evaluated against their own callers and invariants.

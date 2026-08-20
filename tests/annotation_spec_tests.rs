@@ -66,10 +66,10 @@ fn test_ts_simple_annotation_on_fun() {
             .build()
             .unwrap(),
         &ts,
-        DeclarationContext::TopLevel,
+        DeclarationContext::Member,
     );
     assert!(output.contains("@deprecated\n"));
-    assert!(output.contains("function handleRequest(): void {"));
+    assert!(output.contains("handleRequest(): void {"));
 }
 
 #[test]
@@ -296,11 +296,12 @@ fn test_java_suppress_warnings() {
     let output = render_fun(
         &FunSpec::builder("process")
             .annotate(AnnotationSpec::new("SuppressWarnings").arg("\"unchecked\""))
+            .returns(TypeName::primitive("void"))
             .body(CodeBlock::of("// raw types", ()).unwrap())
             .build()
             .unwrap(),
         &java,
-        DeclarationContext::TopLevel,
+        DeclarationContext::Member,
     );
     assert!(output.contains("@SuppressWarnings(\"unchecked\")"));
 }
@@ -378,10 +379,17 @@ fn test_mixed_annotation_and_codeblock() {
 fn test_importable_annotation_ts() {
     let decorator_type = TypeName::importable("./decorators", "Component");
     let output = FileSpec::builder("app.ts")
-        .add_function(
-            FunSpec::builder("init")
-                .annotate(AnnotationSpec::importable(decorator_type).arg("{ selector: 'app' }"))
-                .body(CodeBlock::of("// init", ()).unwrap())
+        .add_type(
+            TypeSpec::builder("App", TypeKind::Class)
+                .add_method(
+                    FunSpec::builder("init")
+                        .annotate(
+                            AnnotationSpec::importable(decorator_type).arg("{ selector: 'app' }"),
+                        )
+                        .body(CodeBlock::of("// init", ()).unwrap())
+                        .build()
+                        .unwrap(),
+                )
                 .build()
                 .unwrap(),
         )
@@ -399,11 +407,16 @@ fn test_importable_annotation_ts() {
 fn test_importable_annotation_java() {
     let nullable = TypeName::importable("javax.annotation", "Nullable");
     let output = FileSpec::builder("App.java")
-        .add_function(
-            FunSpec::builder("getUser")
-                .annotate(AnnotationSpec::importable(nullable))
-                .returns(TypeName::primitive("User"))
-                .body(CodeBlock::of("return null;", ()).unwrap())
+        .add_type(
+            TypeSpec::builder("App", TypeKind::Class)
+                .add_method(
+                    FunSpec::builder("getUser")
+                        .annotate(AnnotationSpec::importable(nullable))
+                        .returns(TypeName::primitive("User"))
+                        .body(CodeBlock::of("return null;", ()).unwrap())
+                        .build()
+                        .unwrap(),
+                )
                 .build()
                 .unwrap(),
         )

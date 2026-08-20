@@ -38,6 +38,7 @@ fn test_class_with_methods() {
         )
         .add_method(
             FunSpec::builder("UserService")
+                .is_constructor()
                 .visibility(Visibility::Public)
                 .add_param(
                     ParameterSpec::new("repo", TypeName::primitive("UserRepository")).unwrap(),
@@ -229,6 +230,7 @@ fn test_enum_with_values() {
         )
         .add_method(
             FunSpec::builder("PetStatus")
+                .is_constructor()
                 .add_param(ParameterSpec::new("value", TypeName::primitive("String")).unwrap())
                 .body(CodeBlock::of("this.value = value;", ()).unwrap())
                 .build()

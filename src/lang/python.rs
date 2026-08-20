@@ -1,15 +1,19 @@
 //! Python language implementation.
 
 use crate::code_block::CodeBlock;
-use crate::code_node::BlockIntent;
+use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
+    LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
 };
-use crate::lang::{CodeLang, RendererLang};
+use crate::lang::{CodeLang, FunctionIntent, RendererLang};
+use crate::spec::annotation_spec::AnnotationNameRef;
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::TypeParamSpec;
 use crate::type_name::{AssociatedTypeStyle, FunctionPresentation, TypeName, TypePresentation};
@@ -297,51 +301,201 @@ impl RendererLang for Python {
     }
 }
 
-const PY_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const PY_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = class/instance fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Methods = methods
-    SpecCapability::Methods,
-    SpecCapability::StructuralEmbedding,
+    TypeCapability::Methods,
+    TypeCapability::StructuralEmbedding,
     // NominalSubtyping = base classes
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // InterfaceImplementation = additional bases
-    SpecCapability::InterfaceImplementation,
+    TypeCapability::InterfaceImplementation,
     // Attributes = decorators
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = optional instance fields
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const PY_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, PY_CLASS_CAPABILITIES),
+const PY_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, PY_CLASS_CAPABILITIES),
     // Struct/Interface/Trait are represented as Python classes.
-    TypeCapabilities::new(TypeKind::Struct, PY_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Interface, PY_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, PY_CLASS_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Struct, PY_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, PY_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, PY_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // Methods = methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // NominalSubtyping = base classes
-            SpecCapability::NominalSubtyping,
+            TypeCapability::NominalSubtyping,
             // Variants = enum members
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
             // ParametricPolymorphism = type parameters (`TypeVar`)
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
         ],
     ),
-    TypeCapabilities::new(TypeKind::Newtype, &[]),
+    TypeCapabilityProfile::new(TypeKind::Newtype, &[]),
 ];
+
+const PY_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = async def
+    FunctionCapability::AsyncEffect,
+    // Attributes = decorators
+    FunctionCapability::Attributes,
+    // default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = return annotation
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+];
+const PY_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = async def
+    FunctionCapability::AsyncEffect,
+    // Attributes = decorators
+    FunctionCapability::Attributes,
+    // default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = return annotation
+    FunctionCapability::ExplicitReturnType,
+    // StaticMethod = is_static paired with the frozen decorator recognizer
+    FunctionCapability::StaticMethod,
+    FunctionCapability::TypedParameters,
+];
+const PY_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::Attributes,
+    FunctionCapability::ConstructorDelegation,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+];
+const PY_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        PY_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    ),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        PY_MEMBER_FUNCTION_CAPABILITIES,
+    ),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        PY_CONSTRUCTOR_CAPABILITIES,
+    ),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        PY_MEMBER_FUNCTION_CAPABILITIES,
+    ),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Constructor,
+        PY_CONSTRUCTOR_CAPABILITIES,
+    ),
+];
+
+/// Recognize the exact decorator spellings used by the documented 0.6.8
+/// `is_static().annotation(...)` pattern. This is intentionally private and
+/// Python-local: raw annotation blocks remain opaque to generic specs and
+/// lowerers, and no shared syntax hook grows from this compatibility case.
+fn has_legacy_static_decorator(function: FunctionIntent<'_>) -> bool {
+    function.annotation_specs().iter().any(|annotation| {
+        let name = match annotation.name() {
+            AnnotationNameRef::Simple(name) => Some(name),
+            AnnotationNameRef::Importable(type_name) => type_name.simple_name(),
+        };
+        matches!(name, Some("staticmethod" | "classmethod"))
+    }) || function
+        .annotations()
+        .iter()
+        .filter_map(python_plain_decorator_name)
+        .any(|name| matches!(name.as_str(), "staticmethod" | "classmethod"))
+}
+
+fn python_plain_decorator_name(block: &CodeBlock) -> Option<String> {
+    if let [CodeNode::Attribute(name)] = block.nodes.as_slice() {
+        return Some(name.trim().to_string());
+    }
+
+    fn append_plain_text(nodes: &[CodeNode], text: &mut String) -> bool {
+        for node in nodes {
+            match node {
+                CodeNode::Literal(part) | CodeNode::InlineLiteral(part) => text.push_str(part),
+                CodeNode::Nested(block) if append_plain_text(&block.nodes, text) => {}
+                _ => return false,
+            }
+        }
+        true
+    }
+
+    let mut text = String::new();
+    if !append_plain_text(&block.nodes, &mut text) {
+        return None;
+    }
+    text.trim()
+        .strip_prefix('@')
+        .map(|name| name.trim().to_string())
+}
 
 impl CodeLang for Python {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(PY_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(PY_TYPES)
+            .with_functions(PY_FUNCTIONS)
+    }
+
+    fn constructor_name_matches(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "__init__"
+    }
+
+    fn static_constructor_name_matches(&self, _name: &str, _declaring_type: Option<&str>) -> bool {
+        false
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "__init__"
+    }
+
+    fn validate_function(&self, function: FunctionIntent<'_>) -> Result<(), SigilStitchError> {
+        let legacy_static_decorator = matches!(
+            function.function_context(),
+            FunctionContext::Member | FunctionContext::InterfaceMember
+        ) && !function.modifiers().is_constructor
+            && function.modifiers().is_static
+            && has_legacy_static_decorator(function);
+        if function.modifiers().is_static
+            && !function.modifiers().is_constructor
+            && !legacy_static_decorator
+        {
+            return Err(SigilStitchError::UnsupportedFunctionCapabilities {
+                language: self.file_extension().to_string(),
+                function_name: function.name().to_string(),
+                context: function.function_context(),
+                form: function.form(),
+                capabilities: vec![FunctionCapability::StaticMethod],
+            });
+        }
+        Ok(())
+    }
+
+    fn function_parameters_require_trailing_defaults(
+        &self,
+        _context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        true
+    }
+
+    fn constructor_return_type_is_valid(&self, return_type: &crate::type_name::TypeName) -> bool {
+        return_type.simple_name() == Some("None")
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

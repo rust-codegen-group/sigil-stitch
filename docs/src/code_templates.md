@@ -1,6 +1,9 @@
 # Code Templates
 
-`CodeTemplate` provides named parameters on top of `CodeBlock`'s positional format strings. Templates are language-agnostic: you define the pattern once, then apply it with concrete arguments for any target language.
+`CodeTemplate` provides named parameters on top of `CodeBlock`'s positional
+format strings. The template type has no language parameter, but literal text
+in its pattern is target syntax. Reuse a template across targets only when that
+syntax is genuinely shared.
 
 ## Syntax
 
@@ -39,7 +42,9 @@ let block = tmpl.apply()
 # }
 ```
 
-The template is parsed once by `CodeTemplate::new()`. Arguments are supplied via `.apply().set(...).build()`, producing a language-agnostic `CodeBlock`.
+The template is parsed once by `CodeTemplate::new()`. Arguments are supplied
+via `.apply().set(...).build()`, producing a structured `CodeBlock` that retains
+typed placeholders alongside the pattern's target-language literals.
 
 ## Reuse Across Types
 
@@ -67,9 +72,12 @@ let number_field = field_tmpl.apply()
 # }
 ```
 
-## Reuse Across Languages
+## Reuse Where Syntax Is Shared
 
-Since templates are language-agnostic, the same template can target different languages:
+The same template can be reused when multiple targets share that particular
+fragment grammar. In this example, both TypeScript and Rust accept the
+`name: type = value` fragment, while their surrounding declaration keywords
+would require separate templates:
 
 ```rust
 # extern crate sigil_stitch;

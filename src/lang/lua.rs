@@ -11,7 +11,10 @@
 
 use crate::code_node::BlockIntent;
 use crate::import::ImportGroup;
-use crate::lang::capability::LanguageCapabilities;
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapabilityProfile, FunctionContext, FunctionForm,
+    LanguageCapabilities,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -194,11 +197,17 @@ impl RendererLang for Lua {
     }
 }
 
+const LUA_FUNCTIONS: &[FunctionCapabilityProfile] =
+    &[
+        FunctionCapabilityProfile::new(FunctionContext::TopLevel, FunctionForm::Function, &[])
+            .with_body_policy(FunctionBodyPolicy::Required),
+    ];
+
 impl CodeLang for Lua {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         // Lua has no named type declaration system; tables and metatables
         // are constructed through CodeBlock instead.
-        LanguageCapabilities::new(&[])
+        LanguageCapabilities::strict().with_functions(LUA_FUNCTIONS)
     }
 
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {

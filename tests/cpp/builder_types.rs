@@ -51,7 +51,11 @@ fn test_class_with_methods() {
     // Constructor
     let ctor_body = CodeBlock::of("count_ = 0;", ()).unwrap();
     pub_section.add_code(emit_fun(
-        &FunSpec::builder("Counter").body(ctor_body).build().unwrap(),
+        &FunSpec::builder("Counter")
+            .is_constructor()
+            .body(ctor_body)
+            .build()
+            .unwrap(),
     ));
 
     // increment method

@@ -33,9 +33,11 @@ Most of the time you do not need `ImportSpec` -- imports driven by `%T` and `Typ
 
 ## FileSpec
 
-The top-level file orchestrator. Combines code blocks, type declarations, and functions, then drives the three-pass render pipeline:
+The top-level file orchestrator. It combines code blocks and declaration specs,
+then drives the three-pass render pipeline:
 
-1. **Materialize** -- Specs (`TypeSpec`, `FunSpec`) emit CodeBlocks
+1. **Materialize** -- Validate declaration specs and ask the language adapter to
+   lower them to `CodeBlock`s
 2. **Collect imports** -- Walk all blocks, extract import references from `%T` types
 3. **Render** -- Emit the import header, then the body with resolved names and pretty printing
 

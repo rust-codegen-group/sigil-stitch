@@ -18,6 +18,18 @@ pub struct WhereConstraint {
     pub(crate) bounds: Vec<TypeName>,
 }
 
+impl WhereConstraint {
+    /// Return the constrained type or type parameter.
+    pub fn subject(&self) -> &TypeName {
+        &self.subject
+    }
+
+    /// Return the declared bounds.
+    pub fn bounds(&self) -> &[TypeName] {
+        &self.bounds
+    }
+}
+
 /// How where-clause constraints are rendered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum WhereClauseStyle {
@@ -117,6 +129,31 @@ impl TypeParamSpec {
         self.context_bounds.push(bound);
         self
     }
+
+    /// Return the declared parameter name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Return the direct bounds on this parameter.
+    pub fn bounds(&self) -> &[TypeName] {
+        &self.bounds
+    }
+
+    /// Return the higher-kinded parameter shape, when present.
+    pub fn kind(&self) -> Option<&TypeParamKind> {
+        self.kind.as_ref()
+    }
+
+    /// Whether this parameter represents a lifetime.
+    pub fn is_lifetime(&self) -> bool {
+        self.is_lifetime
+    }
+
+    /// Return context bounds such as Scala context parameters.
+    pub fn context_bounds(&self) -> &[TypeName] {
+        &self.context_bounds
+    }
 }
 
 /// Render type parameters into `<T: Bound, U>` form, appending to a format
@@ -195,11 +232,11 @@ pub fn render_type_params<L: CodeLang + ?Sized>(
 /// ```text
 /// \nwhere\n    T: Clone + Send,\n    U: Debug,
 /// ```
-pub(crate) fn emit_where_block(
+pub(crate) fn emit_where_block<L: CodeLang + ?Sized>(
     fmt: &mut String,
     args: &mut Vec<Arg>,
     constraints: &[WhereConstraint],
-    lang: &dyn CodeLang,
+    lang: &L,
 ) {
     let generic = lang.generic_syntax();
     let constraint_sep = generic.constraint_separator;
@@ -230,11 +267,11 @@ pub(crate) fn emit_where_block(
 /// ```text
 /// \n    where T : IComparable\n    where U : ISerializable
 /// ```
-pub(crate) fn emit_separate_where_block(
+pub(crate) fn emit_separate_where_block<L: CodeLang + ?Sized>(
     fmt: &mut String,
     args: &mut Vec<Arg>,
     constraints: &[WhereConstraint],
-    lang: &dyn CodeLang,
+    lang: &L,
 ) {
     let generic = lang.generic_syntax();
     let indent = lang.block_syntax().indent_unit;

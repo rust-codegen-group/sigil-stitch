@@ -1,5 +1,8 @@
 use sigil_stitch::lang::CodeLang;
-use sigil_stitch::lang::capability::SpecCapability;
+use sigil_stitch::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use sigil_stitch::spec::modifiers::TypeKind;
 
 const ALL_KINDS: [TypeKind; 7] = [
@@ -12,22 +15,22 @@ const ALL_KINDS: [TypeKind; 7] = [
     TypeKind::Newtype,
 ];
 
-const ALL_CAPABILITIES: [SpecCapability; 12] = [
-    SpecCapability::RecordFields,
-    SpecCapability::AccessorMethods,
-    SpecCapability::Methods,
-    SpecCapability::StructuralEmbedding,
-    SpecCapability::NominalSubtyping,
-    SpecCapability::InterfaceImplementation,
-    SpecCapability::ParametricPolymorphism,
-    SpecCapability::BoundedPolymorphism,
-    SpecCapability::ConstructorParameters,
-    SpecCapability::Variants,
-    SpecCapability::Attributes,
-    SpecCapability::OptionalRecordFields,
+const ALL_CAPABILITIES: [TypeCapability; 12] = [
+    TypeCapability::RecordFields,
+    TypeCapability::AccessorMethods,
+    TypeCapability::Methods,
+    TypeCapability::StructuralEmbedding,
+    TypeCapability::NominalSubtyping,
+    TypeCapability::InterfaceImplementation,
+    TypeCapability::ParametricPolymorphism,
+    TypeCapability::BoundedPolymorphism,
+    TypeCapability::ConstructorParameters,
+    TypeCapability::Variants,
+    TypeCapability::Attributes,
+    TypeCapability::OptionalRecordFields,
 ];
 
-fn assert_matrix(lang: &dyn CodeLang, expected: &[(TypeKind, &[SpecCapability])]) {
+fn assert_matrix(lang: &dyn CodeLang, expected: &[(TypeKind, &[TypeCapability])]) {
     let actual = lang.capabilities();
     for kind in ALL_KINDS {
         let expected_supported = expected.iter().any(|(candidate, _)| *candidate == kind);
@@ -45,12 +48,11 @@ fn assert_matrix(lang: &dyn CodeLang, expected: &[(TypeKind, &[SpecCapability])]
             .unwrap_or(&[]);
         for capability in ALL_CAPABILITIES {
             assert_eq!(
-                actual.supports_capability(kind, capability),
+                actual.supports_type_capability(kind, capability),
                 expected_caps.contains(&capability),
-                "{}.{} {:?}",
+                "{}.{} {capability:?}",
                 lang.file_extension(),
-                kind_name(kind),
-                capability.as_str()
+                kind_name(kind)
             );
         }
     }
@@ -69,6 +71,59 @@ fn kind_name(kind: TypeKind) -> &'static str {
 }
 
 #[test]
+fn capability_profile_builders_preserve_semantic_policy() {
+    // Production matrices construct these profiles in constants. Keep the
+    // inputs opaque so this test also exercises their runtime API contract.
+    let type_kind = std::hint::black_box(TypeKind::Class);
+    let type_capabilities = std::hint::black_box(&[TypeCapability::Methods][..]);
+    let type_profile = TypeCapabilityProfile::new(type_kind, type_capabilities);
+    assert_eq!(type_profile.kind(), TypeKind::Class);
+    assert!(type_profile.supports(TypeCapability::Methods));
+
+    let context = std::hint::black_box(FunctionContext::Member);
+    let capabilities = std::hint::black_box(
+        &[
+            FunctionCapability::ExplicitReturnType,
+            FunctionCapability::TypedParameters,
+        ][..],
+    );
+    let required = std::hint::black_box(&[FunctionCapability::ExplicitReturnType][..]);
+    let incompatible = [(
+        FunctionCapability::AsyncEffect,
+        FunctionCapability::StaticMethod,
+    )];
+    let incompatible = std::hint::black_box(&incompatible[..]);
+    let profile = FunctionCapabilityProfile::new(context, FunctionForm::Function, capabilities)
+        .with_required_capabilities(required)
+        .with_incompatible_capabilities(incompatible)
+        .with_body_policy(FunctionBodyPolicy::Required)
+        .with_maximum_parameters(2);
+
+    assert_eq!(profile.context(), FunctionContext::Member);
+    assert_eq!(profile.form(), FunctionForm::Function);
+    assert!(profile.supports(FunctionCapability::TypedParameters));
+    assert_eq!(profile.required_capabilities(), required);
+    assert_eq!(profile.incompatible_capabilities(), incompatible);
+    assert_eq!(profile.body_policy(), FunctionBodyPolicy::Required);
+    assert_eq!(profile.maximum_parameters(), Some(2));
+
+    let permissive = LanguageCapabilities::permissive();
+    assert_eq!(
+        permissive.function_body_policy(FunctionContext::TopLevel, FunctionForm::Function),
+        FunctionBodyPolicy::Optional
+    );
+    assert!(
+        permissive
+            .incompatible_function_capabilities(FunctionContext::TopLevel, FunctionForm::Function,)
+            .is_empty()
+    );
+    assert_eq!(
+        permissive.maximum_function_parameters(FunctionContext::TopLevel, FunctionForm::Function,),
+        None
+    );
+}
+
+#[test]
 fn empty_matrices_for_shell_and_lua() {
     assert_matrix(&sigil_stitch::lang::bash::Bash::new(), &[]);
     assert_matrix(&sigil_stitch::lang::zsh::Zsh::new(), &[]);
@@ -78,11 +133,11 @@ fn empty_matrices_for_shell_and_lua() {
 #[test]
 fn c_matrix() {
     let record = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
-    let enum_caps = &[SpecCapability::Variants, SpecCapability::Attributes];
+    let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
     assert_matrix(
         &sigil_stitch::lang::c::C::new(),
         &[
@@ -100,19 +155,19 @@ fn c_matrix() {
 #[test]
 fn cpp_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let record_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
-    let enum_caps = &[SpecCapability::Variants, SpecCapability::Attributes];
+    let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
     assert_matrix(
         &sigil_stitch::lang::cpp::Cpp::new(),
         &[
@@ -123,7 +178,7 @@ fn cpp_matrix() {
             (TypeKind::Enum, enum_caps),
             (
                 TypeKind::TypeAlias,
-                &[SpecCapability::ParametricPolymorphism],
+                &[TypeCapability::ParametricPolymorphism],
             ),
         ],
     );
@@ -132,29 +187,29 @@ fn cpp_matrix() {
 #[test]
 fn csharp_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let struct_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let contract_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
     ];
-    let enum_caps = &[SpecCapability::Variants, SpecCapability::Attributes];
+    let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
     assert_matrix(
         &sigil_stitch::lang::csharp::CSharp::new(),
         &[
@@ -170,20 +225,20 @@ fn csharp_matrix() {
 #[test]
 fn dart_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::InterfaceImplementation,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::InterfaceImplementation,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let contract_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::InterfaceImplementation,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::Attributes,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::InterfaceImplementation,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::Attributes,
     ];
     assert_matrix(
         &sigil_stitch::lang::dart::Dart::new(),
@@ -192,10 +247,10 @@ fn dart_matrix() {
             (TypeKind::Struct, class_caps),
             (TypeKind::Interface, contract_caps),
             (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, &[SpecCapability::Variants]),
+            (TypeKind::Enum, &[TypeCapability::Variants]),
             (
                 TypeKind::TypeAlias,
-                &[SpecCapability::ParametricPolymorphism],
+                &[TypeCapability::ParametricPolymorphism],
             ),
         ],
     );
@@ -204,12 +259,12 @@ fn dart_matrix() {
 #[test]
 fn go_matrix() {
     let struct_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::StructuralEmbedding,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::StructuralEmbedding,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::OptionalRecordFields,
     ];
-    let contract_caps = &[SpecCapability::Methods, SpecCapability::StructuralEmbedding];
+    let contract_caps = &[TypeCapability::Methods, TypeCapability::StructuralEmbedding];
     assert_matrix(
         &sigil_stitch::lang::go::Go::new(),
         &[
@@ -218,7 +273,7 @@ fn go_matrix() {
             (TypeKind::Interface, contract_caps),
             (TypeKind::Trait, contract_caps),
             (TypeKind::TypeAlias, &[]),
-            (TypeKind::Newtype, &[SpecCapability::ParametricPolymorphism]),
+            (TypeKind::Newtype, &[TypeCapability::ParametricPolymorphism]),
         ],
     );
 }
@@ -226,29 +281,29 @@ fn go_matrix() {
 #[test]
 fn haskell_matrix() {
     let data_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::ConstructorParameters,
-        SpecCapability::Variants,
-        SpecCapability::InterfaceImplementation,
+        TypeCapability::RecordFields,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::ConstructorParameters,
+        TypeCapability::Variants,
+        TypeCapability::InterfaceImplementation,
     ];
     let contract_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
+        TypeCapability::Methods,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
     ];
     let enum_caps = &[
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::ConstructorParameters,
-        SpecCapability::Variants,
-        SpecCapability::InterfaceImplementation,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::ConstructorParameters,
+        TypeCapability::Variants,
+        TypeCapability::InterfaceImplementation,
     ];
     let newtype_caps = &[
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::InterfaceImplementation,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::InterfaceImplementation,
     ];
     assert_matrix(
         &sigil_stitch::lang::haskell::Haskell::new(),
@@ -260,7 +315,7 @@ fn haskell_matrix() {
             (TypeKind::Enum, enum_caps),
             (
                 TypeKind::TypeAlias,
-                &[SpecCapability::ParametricPolymorphism],
+                &[TypeCapability::ParametricPolymorphism],
             ),
             (TypeKind::Newtype, newtype_caps),
         ],
@@ -270,28 +325,28 @@ fn haskell_matrix() {
 #[test]
 fn java_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::InterfaceImplementation,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::InterfaceImplementation,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let contract_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
     ];
     let enum_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::InterfaceImplementation,
-        SpecCapability::Attributes,
-        SpecCapability::Variants,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::InterfaceImplementation,
+        TypeCapability::Attributes,
+        TypeCapability::Variants,
     ];
     assert_matrix(
         &sigil_stitch::lang::java::Java::new(),
@@ -308,16 +363,16 @@ fn java_matrix() {
 #[test]
 fn javascript_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let enum_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::Variants,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::Variants,
     ];
     assert_matrix(
         &sigil_stitch::lang::javascript::JavaScript::new(),
@@ -334,35 +389,35 @@ fn javascript_matrix() {
 #[test]
 fn kotlin_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::ConstructorParameters,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::ConstructorParameters,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let contract_caps = &[
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
     ];
     let enum_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::ConstructorParameters,
-        SpecCapability::Attributes,
-        SpecCapability::Variants,
+        TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::ConstructorParameters,
+        TypeCapability::Attributes,
+        TypeCapability::Variants,
     ];
     let newtype_caps = &[
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::Attributes,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::Attributes,
     ];
     assert_matrix(
         &sigil_stitch::lang::kotlin::Kotlin::new(),
@@ -374,7 +429,7 @@ fn kotlin_matrix() {
             (TypeKind::Enum, enum_caps),
             (
                 TypeKind::TypeAlias,
-                &[SpecCapability::ParametricPolymorphism],
+                &[TypeCapability::ParametricPolymorphism],
             ),
             (TypeKind::Newtype, newtype_caps),
         ],
@@ -384,13 +439,13 @@ fn kotlin_matrix() {
 #[test]
 fn ocaml_matrix() {
     let record_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::ParametricPolymorphism,
+        TypeCapability::RecordFields,
+        TypeCapability::ParametricPolymorphism,
     ];
     let variant_caps = &[
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::ConstructorParameters,
-        SpecCapability::Variants,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::ConstructorParameters,
+        TypeCapability::Variants,
     ];
     assert_matrix(
         &sigil_stitch::lang::ocaml::OCaml::new(),
@@ -400,7 +455,7 @@ fn ocaml_matrix() {
             (TypeKind::Enum, variant_caps),
             (
                 TypeKind::TypeAlias,
-                &[SpecCapability::ParametricPolymorphism],
+                &[TypeCapability::ParametricPolymorphism],
             ),
         ],
     );
@@ -409,30 +464,30 @@ fn ocaml_matrix() {
 #[test]
 fn php_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::InterfaceImplementation,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::InterfaceImplementation,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let interface_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::Attributes,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::Attributes,
     ];
     let trait_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::Attributes,
+        TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::Attributes,
     ];
     let enum_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::InterfaceImplementation,
-        SpecCapability::Attributes,
-        SpecCapability::Variants,
+        TypeCapability::Methods,
+        TypeCapability::InterfaceImplementation,
+        TypeCapability::Attributes,
+        TypeCapability::Variants,
     ];
     assert_matrix(
         &sigil_stitch::lang::php::Php::new(),
@@ -442,7 +497,7 @@ fn php_matrix() {
             (TypeKind::Interface, interface_caps),
             (TypeKind::Trait, trait_caps),
             (TypeKind::Enum, enum_caps),
-            (TypeKind::Newtype, &[SpecCapability::Attributes]),
+            (TypeKind::Newtype, &[TypeCapability::Attributes]),
         ],
     );
 }
@@ -450,18 +505,18 @@ fn php_matrix() {
 #[test]
 fn python_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::StructuralEmbedding,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::InterfaceImplementation,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::StructuralEmbedding,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::InterfaceImplementation,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let enum_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::Variants,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::Variants,
     ];
     assert_matrix(
         &sigil_stitch::lang::python::Python::new(),
@@ -473,7 +528,7 @@ fn python_matrix() {
             (TypeKind::Enum, enum_caps),
             (
                 TypeKind::TypeAlias,
-                &[SpecCapability::ParametricPolymorphism],
+                &[TypeCapability::ParametricPolymorphism],
             ),
             (TypeKind::Newtype, &[]),
         ],
@@ -483,13 +538,13 @@ fn python_matrix() {
 #[test]
 fn ruby_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::Attributes,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::Attributes,
     ];
-    let contract_caps = &[SpecCapability::Methods, SpecCapability::Attributes];
-    let enum_caps = &[SpecCapability::Variants, SpecCapability::Attributes];
+    let contract_caps = &[TypeCapability::Methods, TypeCapability::Attributes];
+    let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
     assert_matrix(
         &sigil_stitch::lang::ruby::Ruby::new(),
         &[
@@ -505,35 +560,35 @@ fn ruby_matrix() {
 #[test]
 fn rust_matrix() {
     let record_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::StructuralEmbedding,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::StructuralEmbedding,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let contract_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
+        TypeCapability::Methods,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
     ];
     let enum_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::Variants,
+        TypeCapability::Methods,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::Variants,
     ];
     let alias_caps = &[
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
     ];
     let newtype_caps = &[
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
     ];
     assert_matrix(
         &sigil_stitch::lang::rust::Rust::new(),
@@ -552,34 +607,34 @@ fn rust_matrix() {
 #[test]
 fn scala_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::InterfaceImplementation,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::ConstructorParameters,
-        SpecCapability::Attributes,
+        TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::InterfaceImplementation,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::ConstructorParameters,
+        TypeCapability::Attributes,
     ];
     let contract_caps = &[
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
     ];
     let enum_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::Variants,
+        TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::Variants,
     ];
     let newtype_caps = &[
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::Attributes,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::Attributes,
     ];
     assert_matrix(
         &sigil_stitch::lang::scala::Scala::new(),
@@ -591,7 +646,7 @@ fn scala_matrix() {
             (TypeKind::Enum, enum_caps),
             (
                 TypeKind::TypeAlias,
-                &[SpecCapability::ParametricPolymorphism],
+                &[TypeCapability::ParametricPolymorphism],
             ),
             (TypeKind::Newtype, newtype_caps),
         ],
@@ -601,20 +656,20 @@ fn scala_matrix() {
 #[test]
 fn swift_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let enum_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::Methods,
-        SpecCapability::Attributes,
-        SpecCapability::Variants,
+        TypeCapability::RecordFields,
+        TypeCapability::Methods,
+        TypeCapability::Attributes,
+        TypeCapability::Variants,
     ];
     assert_matrix(
         &sigil_stitch::lang::swift::Swift::new(),
@@ -631,27 +686,27 @@ fn swift_matrix() {
 #[test]
 fn typescript_matrix() {
     let class_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::StructuralEmbedding,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::InterfaceImplementation,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::StructuralEmbedding,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::InterfaceImplementation,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     let contract_caps = &[
-        SpecCapability::RecordFields,
-        SpecCapability::AccessorMethods,
-        SpecCapability::Methods,
-        SpecCapability::StructuralEmbedding,
-        SpecCapability::NominalSubtyping,
-        SpecCapability::ParametricPolymorphism,
-        SpecCapability::BoundedPolymorphism,
-        SpecCapability::Attributes,
-        SpecCapability::OptionalRecordFields,
+        TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
+        TypeCapability::Methods,
+        TypeCapability::StructuralEmbedding,
+        TypeCapability::NominalSubtyping,
+        TypeCapability::ParametricPolymorphism,
+        TypeCapability::BoundedPolymorphism,
+        TypeCapability::Attributes,
+        TypeCapability::OptionalRecordFields,
     ];
     assert_matrix(
         &sigil_stitch::lang::typescript::TypeScript::new(),
@@ -660,10 +715,10 @@ fn typescript_matrix() {
             (TypeKind::Struct, class_caps),
             (TypeKind::Interface, contract_caps),
             (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, &[SpecCapability::Variants]),
+            (TypeKind::Enum, &[TypeCapability::Variants]),
             (
                 TypeKind::TypeAlias,
-                &[SpecCapability::ParametricPolymorphism],
+                &[TypeCapability::ParametricPolymorphism],
             ),
         ],
     );

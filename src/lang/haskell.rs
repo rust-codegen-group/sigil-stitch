@@ -4,7 +4,10 @@ use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::TypeParamSpec;
@@ -283,71 +286,128 @@ impl RendererLang for Haskell {
     }
 }
 
-const HASKELL_DATA_CAPABILITIES: &[SpecCapability] = &[
+const HASKELL_DATA_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = record fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // ParametricPolymorphism = type variables
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = class contexts / constraints
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // ConstructorParameters = data constructor arguments
-    SpecCapability::ConstructorParameters,
+    TypeCapability::ConstructorParameters,
     // Variants = data constructors
-    SpecCapability::Variants,
+    TypeCapability::Variants,
     // impl_types render as `deriving (...)`.
-    SpecCapability::InterfaceImplementation,
+    TypeCapability::InterfaceImplementation,
 ];
-const HASKELL_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+const HASKELL_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = class methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // ParametricPolymorphism = type variables
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = class contexts / constraints
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
 ];
-const HASKELL_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Struct, HASKELL_DATA_CAPABILITIES),
+const HASKELL_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Struct, HASKELL_DATA_CAPABILITIES),
     // Class is represented as a Haskell data declaration.
-    TypeCapabilities::new(TypeKind::Class, HASKELL_DATA_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, HASKELL_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Class, HASKELL_DATA_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, HASKELL_CONTRACT_CAPABILITIES),
     // Interface is represented as a Haskell class.
-    TypeCapabilities::new(TypeKind::Interface, HASKELL_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Interface, HASKELL_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // ParametricPolymorphism = type variables
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
             // BoundedPolymorphism = class contexts / constraints
-            SpecCapability::BoundedPolymorphism,
+            TypeCapability::BoundedPolymorphism,
             // ConstructorParameters = data constructor arguments
-            SpecCapability::ConstructorParameters,
+            TypeCapability::ConstructorParameters,
             // Variants = data constructors
-            SpecCapability::Variants,
-            SpecCapability::InterfaceImplementation,
+            TypeCapability::Variants,
+            TypeCapability::InterfaceImplementation,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
             // ParametricPolymorphism = type variables
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Newtype,
         &[
             // ParametricPolymorphism = type variables
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
             // BoundedPolymorphism = class contexts / constraints
-            SpecCapability::BoundedPolymorphism,
-            SpecCapability::InterfaceImplementation,
+            TypeCapability::BoundedPolymorphism,
+            TypeCapability::InterfaceImplementation,
         ],
     ),
 ];
 
+const HASKELL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // BoundedPolymorphism = class constraints
+    FunctionCapability::BoundedPolymorphism,
+    // ExplicitReturnType = result in the type signature
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    // ParametricPolymorphism = type variables
+    FunctionCapability::ParametricPolymorphism,
+];
+const HASKELL_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        HASKELL_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        HASKELL_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        HASKELL_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[
+        FunctionCapability::ExplicitReturnType,
+        FunctionCapability::TypedParameters,
+    ]),
+];
+
 impl CodeLang for Haskell {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(HASKELL_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(HASKELL_TYPES)
+            .with_functions(HASKELL_FUNCTIONS)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::function_lowering::validate_constraints_target_declared_type_params(
+            self.file_extension(),
+            function_name,
+            type_params,
+            constraints,
+        )
+    }
+
+    fn requires_complete_function_type_information(
+        &self,
+        _context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        true
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

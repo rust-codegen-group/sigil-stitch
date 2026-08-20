@@ -101,7 +101,11 @@ let output = file.render(80).unwrap();
 
 ## `%S` -- String Literal
 
-Emits a language-aware quoted string. The `CodeLang::render_string_literal()` method on each language controls the quoting style and escape rules. TypeScript and JavaScript default to single quotes; Rust, Java, Go, C, C++, Swift, and Kotlin use double quotes; Dart uses single quotes; Python uses single quotes.
+Emits a language-aware quoted string. The
+`RendererLang::render_string_literal()` method on each language controls the
+quoting style and escape rules. TypeScript and JavaScript default to single
+quotes; Rust, Java, Go, C, C++, Swift, and Kotlin use double quotes; Dart uses
+single quotes; Python uses single quotes.
 
 Requires the `StringLitArg` wrapper.
 

@@ -1,8 +1,13 @@
 //! C++ language implementation.
 
+use crate::code_block::CodeBlock;
 use crate::code_node::{BlockIntent, CodeNode};
+use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
+    LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -52,7 +57,7 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 ///
 /// # Virtual / pure virtual
 ///
-/// Use `is_abstract()` for `virtual` prefix, and `suffix("= 0")` for pure virtual:
+/// Use `is_abstract()` for `virtual` and an explicit suffix for pure virtual:
 /// ```text
 /// fb.is_abstract();        // emits "virtual"
 /// fb.suffix("= 0");       // emits "= 0" after params
@@ -251,53 +256,215 @@ impl RendererLang for Cpp {
     }
 }
 
-const CPP_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const CPP_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = data members
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Methods = member functions
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = public inheritance
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = templates
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // Attributes = [[attribute]]
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = std::optional members
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const CPP_RECORD_CAPABILITIES: &[SpecCapability] = &[
+const CPP_RECORD_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = data members
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Attributes = [[attribute]]
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = std::optional members
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const CPP_ENUM_CAPABILITIES: &[SpecCapability] = &[
+const CPP_ENUM_CAPABILITIES: &[TypeCapability] = &[
     // Variants = enumerators
-    SpecCapability::Variants,
+    TypeCapability::Variants,
     // Attributes = [[attribute]]
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const CPP_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, CPP_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Struct, CPP_RECORD_CAPABILITIES),
+const CPP_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, CPP_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, CPP_RECORD_CAPABILITIES),
     // Interface/Trait are represented as C++ classes.
-    TypeCapabilities::new(TypeKind::Interface, CPP_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, CPP_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Enum, CPP_ENUM_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Interface, CPP_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, CPP_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Enum, CPP_ENUM_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
             // ParametricPolymorphism = templates
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
         ],
     ),
 ];
 
+const CPP_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // Attributes = [[...]]
+    FunctionCapability::Attributes,
+    // DefaultParameters = default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = function result type
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = parameter declarations
+    FunctionCapability::TypedParameters,
+    // StaticFunction = internal-linkage function
+    FunctionCapability::StaticFunction,
+];
+const CPP_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // VirtualMethod = virtual dispatch; pure virtual remains an explicit suffix
+    FunctionCapability::VirtualMethod,
+    // Attributes = [[...]]
+    FunctionCapability::Attributes,
+    // DefaultParameters = default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = method result type
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = parameter declarations
+    FunctionCapability::TypedParameters,
+    // Override = override
+    FunctionCapability::Override,
+    // StaticMethod = static
+    FunctionCapability::StaticMethod,
+];
+const CPP_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::Attributes,
+    FunctionCapability::ConstructorDelegation,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::TypedParameters,
+];
+const CPP_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::VirtualMethod,
+    FunctionCapability::Attributes,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    FunctionCapability::Override,
+    FunctionCapability::StaticMethod,
+];
+const CPP_DESTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::Attributes,
+    FunctionCapability::Override,
+    FunctionCapability::VirtualMethod,
+];
+const CPP_REQUIRED_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+];
+const CPP_MEMBER_INCOMPATIBILITIES: &[(FunctionCapability, FunctionCapability)] = &[
+    (
+        FunctionCapability::StaticMethod,
+        FunctionCapability::VirtualMethod,
+    ),
+    (
+        FunctionCapability::StaticMethod,
+        FunctionCapability::Override,
+    ),
+];
+const CPP_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        CPP_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(CPP_REQUIRED_FUNCTION_CAPABILITIES),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        CPP_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(CPP_REQUIRED_FUNCTION_CAPABILITIES)
+    .with_incompatible_capabilities(CPP_MEMBER_INCOMPATIBILITIES),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        CPP_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters]),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        CPP_INTERFACE_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(CPP_REQUIRED_FUNCTION_CAPABILITIES)
+    .with_incompatible_capabilities(CPP_MEMBER_INCOMPATIBILITIES),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Constructor,
+        CPP_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters]),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Destructor,
+        CPP_DESTRUCTOR_CAPABILITIES,
+    )
+    .with_maximum_parameters(0),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Destructor,
+        CPP_DESTRUCTOR_CAPABILITIES,
+    )
+    .with_maximum_parameters(0),
+];
+
 impl CodeLang for Cpp {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(CPP_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(CPP_TYPES)
+            .with_functions(CPP_FUNCTIONS)
+    }
+
+    fn constructor_name_matches(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        declaring_type.is_some_and(|declaring_type| name == declaring_type)
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        declaring_type.is_none_or(|declaring_type| name == declaring_type)
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::TopLevel => match visibility {
+                Visibility::Inherited => true,
+                Visibility::Public => !is_static,
+                Visibility::Private => is_static,
+                Visibility::Protected | Visibility::PublicCrate | Visibility::PublicSuper => false,
+            },
+            FunctionContext::Member | FunctionContext::InterfaceMember => {
+                visibility == Visibility::Inherited
+            }
+            FunctionContext::ReceiverMethod => false,
+        }
+    }
+
+    fn function_parameters_require_trailing_defaults(
+        &self,
+        _context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        true
+    }
+
+    fn abstract_modifier_capability(&self) -> FunctionCapability {
+        FunctionCapability::VirtualMethod
+    }
+
+    fn function_form(&self, name: &str, is_constructor: bool) -> FunctionForm {
+        if name.starts_with('~') {
+            FunctionForm::Destructor
+        } else if is_constructor {
+            FunctionForm::Constructor
+        } else {
+            FunctionForm::Function
+        }
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
@@ -403,8 +570,18 @@ impl CodeLang for Cpp {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " ",
             abstract_keyword: "virtual ",
+            override_keyword: "",
+            constructor_delegation_style:
+                crate::spec::modifiers::ConstructorDelegationStyle::Signature,
             ..Default::default()
         }
+    }
+
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::cpp_function_lowering::lower(self, function)
     }
 
     fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {

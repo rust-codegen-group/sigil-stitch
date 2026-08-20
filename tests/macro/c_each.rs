@@ -359,6 +359,7 @@ fn test_c_each_no_trailing_blank_line_in_fun_spec_body() {
 
     let mut cls = TypeSpec::builder("TestClass", TypeKind::Struct).visibility(Visibility::Public);
     let mut ctor = FunSpec::builder("TestClass");
+    ctor = ctor.is_constructor();
     ctor = ctor.visibility(Visibility::Public);
     ctor = ctor.body(ctor_body);
     cls = cls.add_method(ctor.build().unwrap());

@@ -4,5 +4,5 @@ abstract class Shape {
     return runtimeType.toString();
   }
 
-  abstract double area();
+  double area();
 }

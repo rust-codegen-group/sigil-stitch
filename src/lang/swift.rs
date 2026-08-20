@@ -1,7 +1,11 @@
 //! Swift language implementation.
 
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -234,47 +238,200 @@ impl RendererLang for Swift {
     }
 }
 
-const SWIFT_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const SWIFT_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = stored properties
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // AccessorMethods = computed properties
-    SpecCapability::AccessorMethods,
+    TypeCapability::AccessorMethods,
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = superclass/protocol inheritance (`:`)
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = attributes
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = optional properties
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const SWIFT_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, SWIFT_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Struct, SWIFT_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Interface, SWIFT_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, SWIFT_CLASS_CAPABILITIES),
-    TypeCapabilities::new(
+const SWIFT_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // RecordFields = stored properties
-            SpecCapability::RecordFields,
+            TypeCapability::RecordFields,
             // Methods = methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // Attributes = attributes
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
             // Variants = enum cases
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
 ];
 
+const SWIFT_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = async
+    FunctionCapability::AsyncEffect,
+    // Attributes = attributes
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = generic constraints
+    FunctionCapability::BoundedPolymorphism,
+    // DefaultParameters = default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = function result type
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = parameter annotations
+    FunctionCapability::TypedParameters,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+];
+const SWIFT_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = async
+    FunctionCapability::AsyncEffect,
+    // Attributes = attributes
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = generic constraints
+    FunctionCapability::BoundedPolymorphism,
+    // DefaultParameters = default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = method result type
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = parameter annotations
+    FunctionCapability::TypedParameters,
+    // Override = override
+    FunctionCapability::Override,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+    // StaticMethod = static
+    FunctionCapability::StaticMethod,
+];
+const SWIFT_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::AsyncEffect,
+    FunctionCapability::Attributes,
+    FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::TypedParameters,
+    FunctionCapability::StaticMethod,
+];
+const SWIFT_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::AsyncEffect,
+    FunctionCapability::Attributes,
+    FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::ConstructorDelegation,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::Override,
+    FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::TypedParameters,
+];
+const SWIFT_INTERFACE_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::AsyncEffect,
+    FunctionCapability::Attributes,
+    FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::TypedParameters,
+];
+const SWIFT_MEMBER_INCOMPATIBILITIES: &[(FunctionCapability, FunctionCapability)] = &[(
+    FunctionCapability::StaticMethod,
+    FunctionCapability::Override,
+)];
+const SWIFT_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        SWIFT_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        SWIFT_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_incompatible_capabilities(SWIFT_MEMBER_INCOMPATIBILITIES)
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        SWIFT_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        SWIFT_INTERFACE_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Forbidden),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Constructor,
+        SWIFT_INTERFACE_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Forbidden),
+];
+
 impl CodeLang for Swift {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(SWIFT_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(SWIFT_TYPES)
+            .with_functions(SWIFT_FUNCTIONS)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::function_lowering::validate_constraints_target_declared_type_params(
+            self.file_extension(),
+            function_name,
+            type_params,
+            constraints,
+        )
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::TopLevel | FunctionContext::Member => {
+                matches!(
+                    visibility,
+                    Visibility::Inherited
+                        | Visibility::Public
+                        | Visibility::Private
+                        | Visibility::PublicCrate
+                )
+            }
+            FunctionContext::InterfaceMember => {
+                matches!(visibility, Visibility::Inherited | Visibility::Public)
+            }
+            FunctionContext::ReceiverMethod => false,
+        }
+    }
+
+    fn constructor_name_matches(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        matches!(name, "init" | "init?" | "init!")
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        matches!(name, "init" | "init?" | "init!")
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
@@ -336,7 +493,10 @@ impl CodeLang for Swift {
         result
     }
 
-    fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
+    fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
+        if ctx == DeclarationContext::InterfaceMember {
+            return "";
+        }
         match vis {
             Visibility::Public => "public ",
             Visibility::Private => "private ",

@@ -2,7 +2,10 @@
 
 use crate::code_node::BlockIntent;
 use crate::import::ImportGroup;
-use crate::lang::capability::LanguageCapabilities;
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapabilityProfile, FunctionContext, FunctionForm,
+    LanguageCapabilities,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -239,11 +242,18 @@ impl RendererLang for Zsh {
     }
 }
 
+const ZSH_FUNCTIONS: &[FunctionCapabilityProfile] =
+    &[
+        FunctionCapabilityProfile::new(FunctionContext::TopLevel, FunctionForm::Function, &[])
+            .with_body_policy(FunctionBodyPolicy::Required)
+            .with_maximum_parameters(0),
+    ];
+
 impl CodeLang for Zsh {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         // Zsh has no type declaration system; use CodeBlock for shell
         // functions and control flow instead.
-        LanguageCapabilities::new(&[])
+        LanguageCapabilities::strict().with_functions(ZSH_FUNCTIONS)
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

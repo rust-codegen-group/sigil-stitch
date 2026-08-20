@@ -3,7 +3,10 @@
 use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
+    LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::TypeParamSpec;
@@ -188,35 +191,73 @@ impl RendererLang for C {
     }
 }
 
-const C_RECORD_CAPABILITIES: &[SpecCapability] = &[
+const C_RECORD_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = struct members
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Attributes = __attribute__ annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = pointer-typed fields
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const C_ENUM_CAPABILITIES: &[SpecCapability] = &[
+const C_ENUM_CAPABILITIES: &[TypeCapability] = &[
     // Variants = enumerators
-    SpecCapability::Variants,
+    TypeCapability::Variants,
     // Attributes = __attribute__ annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const C_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Struct, C_RECORD_CAPABILITIES),
+const C_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Struct, C_RECORD_CAPABILITIES),
     // Class is represented as a C struct.
-    TypeCapabilities::new(TypeKind::Class, C_RECORD_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Class, C_RECORD_CAPABILITIES),
     // Interface/Trait are represented as C structs.
-    TypeCapabilities::new(TypeKind::Interface, C_RECORD_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, C_RECORD_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Enum, C_ENUM_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
-    TypeCapabilities::new(TypeKind::Newtype, &[]),
+    TypeCapabilityProfile::new(TypeKind::Interface, C_RECORD_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, C_RECORD_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Enum, C_ENUM_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilityProfile::new(TypeKind::Newtype, &[]),
 ];
+
+const C_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // Attributes = __attribute__((...))
+    FunctionCapability::Attributes,
+    // ExplicitReturnType = C result type
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = C parameter declarations
+    FunctionCapability::TypedParameters,
+    // StaticFunction = internal-linkage function
+    FunctionCapability::StaticFunction,
+];
+const C_FUNCTIONS: &[FunctionCapabilityProfile] = &[FunctionCapabilityProfile::new(
+    FunctionContext::TopLevel,
+    FunctionForm::Function,
+    C_TOP_LEVEL_FUNCTION_CAPABILITIES,
+)
+.with_required_capabilities(&[
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+])];
 
 impl CodeLang for C {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(C_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(C_TYPES)
+            .with_functions(C_FUNCTIONS)
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        context == FunctionContext::TopLevel
+            && match visibility {
+                Visibility::Inherited => true,
+                Visibility::Public => !is_static,
+                Visibility::Private => is_static,
+                Visibility::Protected | Visibility::PublicCrate | Visibility::PublicSuper => false,
+            }
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

@@ -1,16 +1,15 @@
 //! Function/method specification.
 
-use crate::code_block::{Arg, CodeBlock};
+use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionContext, FunctionForm,
+};
 use crate::spec::annotation_spec::AnnotationSpec;
-use crate::spec::modifiers::{
-    ConstructorDelegationStyle, DeclarationContext, Modifiers, Visibility,
-};
+use crate::spec::modifiers::{DeclarationContext, Modifiers, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
-use crate::spec::where_spec::{
-    TypeParamSpec, WhereClauseStyle, WhereConstraint, emit_separate_where_block, emit_where_block,
-    render_type_params,
-};
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
 use crate::type_name::TypeName;
 
 /// How function parameter lists are formatted.
@@ -76,14 +75,147 @@ pub struct FunSpec {
     pub(crate) suffixes: Vec<String>,
     /// Constructor delegation call (e.g., `super(arg1, arg2)` or `this(arg1)`).
     ///
-    /// For body-style languages (TS, Java, Dart, Swift): emitted as the first
+    /// For body-style languages (TS, Java, Swift): emitted as the first
     /// statement in the constructor body.
-    /// For signature-style languages (Kotlin): emitted after the parameter list
+    /// For signature-style languages (Kotlin, Dart, C++): emitted after the parameter list
     /// as ` : super(...)` / ` : this(...)`.
     pub(crate) delegation: Option<CodeBlock>,
     /// Where-clause constraints (e.g., Rust `where T: Clone + Send`).
     #[serde(default)]
     pub(crate) where_constraints: Vec<WhereConstraint>,
+}
+
+/// Read-only semantic function intent passed to a language for validation.
+///
+/// Values of this type can only be constructed by `FunSpec` after declaration
+/// context and form classification. Language adapters validate whether the
+/// complete intent is representable without requiring generic specs to inspect
+/// target syntax.
+#[derive(Debug, Clone, Copy)]
+pub struct FunctionIntent<'a> {
+    pub(crate) spec: &'a FunSpec,
+    declaration_context: DeclarationContext,
+    function_context: FunctionContext,
+    form: FunctionForm,
+}
+
+impl<'a> FunctionIntent<'a> {
+    fn new(
+        spec: &'a FunSpec,
+        declaration_context: DeclarationContext,
+        function_context: FunctionContext,
+        form: FunctionForm,
+    ) -> Self {
+        Self {
+            spec,
+            declaration_context,
+            function_context,
+            form,
+        }
+    }
+
+    /// Declaration name.
+    pub fn name(self) -> &'a str {
+        &self.spec.name
+    }
+
+    /// Declared parameters, excluding an optional receiver.
+    pub fn parameters(self) -> &'a [ParameterSpec] {
+        &self.spec.params
+    }
+
+    /// Explicit return type, when present.
+    pub fn return_type(self) -> Option<&'a TypeName> {
+        self.spec.return_type.as_ref()
+    }
+
+    /// Function body, when present.
+    pub fn body(self) -> Option<&'a CodeBlock> {
+        self.spec.body.as_ref()
+    }
+
+    /// Semantic declaration modifiers.
+    pub fn modifiers(self) -> &'a Modifiers {
+        &self.spec.modifiers
+    }
+
+    /// Documentation lines supplied by the caller.
+    pub fn doc(self) -> &'a [String] {
+        &self.spec.doc
+    }
+
+    /// Declared type parameters.
+    pub fn type_params(self) -> &'a [TypeParamSpec] {
+        &self.spec.type_params
+    }
+
+    /// Opaque annotation blocks supplied through the escape hatch.
+    pub fn annotations(self) -> &'a [CodeBlock] {
+        &self.spec.annotations
+    }
+
+    /// Structured annotation declarations.
+    pub fn annotation_specs(self) -> &'a [AnnotationSpec] {
+        &self.spec.annotation_specs
+    }
+
+    /// Explicit receiver, when the declaration uses receiver-method syntax.
+    pub fn receiver(self) -> Option<&'a ParameterSpec> {
+        self.spec.receiver.as_ref()
+    }
+
+    /// Opaque suffix escape hatches supplied by the caller.
+    pub fn suffixes(self) -> &'a [String] {
+        &self.spec.suffixes
+    }
+
+    /// Constructor delegation expression, when present.
+    pub fn delegation(self) -> Option<&'a CodeBlock> {
+        self.spec.delegation.as_ref()
+    }
+
+    /// Semantic where constraints.
+    pub fn where_constraints(self) -> &'a [WhereConstraint] {
+        &self.spec.where_constraints
+    }
+
+    /// Declaration location selected by the owning spec.
+    pub fn declaration_context(self) -> DeclarationContext {
+        self.declaration_context
+    }
+
+    /// Capability-validation context selected for this declaration.
+    pub fn function_context(self) -> FunctionContext {
+        self.function_context
+    }
+
+    /// Validated semantic function form.
+    pub fn form(self) -> FunctionForm {
+        self.form
+    }
+}
+
+/// Function intent whose intrinsic and target-specific validation succeeded.
+///
+/// Only sigil-stitch constructs this wrapper. Language lowerers therefore
+/// receive the complete declaration through a valid-by-construction interface.
+#[derive(Debug, Clone, Copy)]
+pub struct ValidatedFunction<'a> {
+    intent: FunctionIntent<'a>,
+}
+
+impl<'a> ValidatedFunction<'a> {
+    pub(crate) fn new(intent: FunctionIntent<'a>) -> Self {
+        Self { intent }
+    }
+}
+
+impl<'a> std::ops::Deref for ValidatedFunction<'a> {
+    type Target = FunctionIntent<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.intent
+    }
 }
 
 impl FunSpec {
@@ -111,396 +243,570 @@ impl FunSpec {
         &self.name
     }
 
+    /// Validate this function against the language function-capability matrix.
+    pub fn validate(
+        &self,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+    ) -> Result<(), SigilStitchError> {
+        self.validate_with_legacy_constructor(lang, declaration_context, true)
+    }
+
+    pub(crate) fn validate_in_type(
+        &self,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+    ) -> Result<(), SigilStitchError> {
+        self.validate_with_legacy_constructor(lang, declaration_context, false)
+    }
+
+    fn validate_with_legacy_constructor(
+        &self,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+        allow_legacy_constructor: bool,
+    ) -> Result<(), SigilStitchError> {
+        if allow_legacy_constructor
+            && (self.is_implicit_direct_constructor(lang, declaration_context)
+                || self.is_legacy_direct_constructor(lang, declaration_context))
+        {
+            let mut constructor = self.clone();
+            constructor.modifiers.is_constructor = true;
+            return constructor
+                .validate_classified(lang, declaration_context)
+                .map(|_| ());
+        }
+        self.validate_classified(lang, declaration_context)
+            .map(|_| ())
+    }
+
+    fn validate_classified(
+        &self,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+    ) -> Result<ValidatedFunction<'_>, SigilStitchError> {
+        let intent = self.classify_intent(lang, declaration_context)?;
+        self.validate_intent_default(lang, intent)?;
+        lang.validate_function(intent)?;
+        Ok(ValidatedFunction::new(intent))
+    }
+
+    fn classify_intent(
+        &self,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+    ) -> Result<FunctionIntent<'_>, SigilStitchError> {
+        let capabilities = lang.capabilities();
+        let permissive_validation = capabilities.function_validation_is_permissive();
+
+        let context = match (declaration_context, self.receiver.is_some()) {
+            (DeclarationContext::TopLevel, false) => FunctionContext::TopLevel,
+            (DeclarationContext::TopLevel, true) => FunctionContext::ReceiverMethod,
+            (DeclarationContext::Member, _) if permissive_validation => FunctionContext::Member,
+            (DeclarationContext::InterfaceMember, _) if permissive_validation => {
+                FunctionContext::InterfaceMember
+            }
+            (DeclarationContext::Member, false) => FunctionContext::Member,
+            (DeclarationContext::InterfaceMember, false) => FunctionContext::InterfaceMember,
+            (DeclarationContext::Member | DeclarationContext::InterfaceMember, true) => {
+                return Err(SigilStitchError::InvalidFunctionPlacement {
+                    function_name: self.name.clone(),
+                    context: declaration_context,
+                });
+            }
+        };
+
+        Ok(FunctionIntent::new(
+            self,
+            declaration_context,
+            context,
+            lang.function_form(&self.name, self.modifiers.is_constructor),
+        ))
+    }
+
+    pub(crate) fn validate_intent_default<L: CodeLang + ?Sized>(
+        &self,
+        lang: &L,
+        intent: FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        let capabilities = lang.capabilities();
+        let permissive_validation = capabilities.function_validation_is_permissive();
+        let context = intent.function_context();
+        let form = intent.form();
+        if !permissive_validation
+            && context == FunctionContext::ReceiverMethod
+            && let Some(receiver) = &self.receiver
+        {
+            let mut invalid = Vec::new();
+            if receiver.param_type.is_empty() {
+                invalid.push(FunctionCapability::TypedParameters);
+            }
+            if receiver.default_value.is_some() {
+                invalid.push(FunctionCapability::DefaultParameters);
+            }
+            if receiver.is_variadic {
+                invalid.push(FunctionCapability::VariadicParameters);
+            }
+            if receiver.is_property || receiver.is_mutable_property {
+                invalid.push(FunctionCapability::ConstructorProperties);
+            }
+            if !invalid.is_empty() {
+                return Err(SigilStitchError::InvalidReceiverCapabilities {
+                    function_name: self.name.clone(),
+                    receiver_name: receiver.name.clone(),
+                    capabilities: invalid,
+                });
+            }
+        }
+        let language = lang.file_extension().to_string();
+
+        if !permissive_validation
+            && form == FunctionForm::Constructor
+            && !lang.constructor_name_is_valid(&self.name, None)
+        {
+            return Err(SigilStitchError::InvalidConstructorName {
+                language: language.clone(),
+                type_name: None,
+                constructor_name: self.name.clone(),
+            });
+        }
+
+        if !capabilities.supports_function_context(context) {
+            return Err(SigilStitchError::UnsupportedFunctionContext {
+                language: language.clone(),
+                function_name: self.name.clone(),
+                context,
+            });
+        }
+
+        if !capabilities.supports_function_form(context, form) {
+            return Err(SigilStitchError::UnsupportedFunctionForm {
+                language: language.clone(),
+                function_name: self.name.clone(),
+                context,
+                form,
+            });
+        }
+
+        if !permissive_validation
+            && !lang.function_visibility_is_valid(
+                context,
+                form,
+                self.modifiers.is_static,
+                self.modifiers.visibility,
+            )
+        {
+            return Err(SigilStitchError::InvalidFunctionVisibility {
+                language: language.clone(),
+                function_name: self.name.clone(),
+                context,
+                form,
+                visibility: self.modifiers.visibility,
+            });
+        }
+
+        if !permissive_validation
+            && let Some(maximum) =
+                lang.maximum_function_parameters(context, form, self.modifiers.is_static)
+            && self.params.len() > maximum
+        {
+            return Err(SigilStitchError::TooManyFunctionParameters {
+                language: language.clone(),
+                function_name: self.name.clone(),
+                context,
+                form,
+                maximum,
+                actual: self.params.len(),
+            });
+        }
+
+        if !permissive_validation && !self.modifiers.is_constructor {
+            let mut invalid = Vec::new();
+            if self.delegation.is_some() {
+                invalid.push(FunctionCapability::ConstructorDelegation);
+            }
+            if self
+                .params
+                .iter()
+                .any(|param| param.is_property || param.is_mutable_property)
+            {
+                invalid.push(FunctionCapability::ConstructorProperties);
+            }
+            if !invalid.is_empty() {
+                return Err(SigilStitchError::InvalidConstructorFeaturePlacement {
+                    function_name: self.name.clone(),
+                    capabilities: invalid,
+                });
+            }
+        }
+
+        if !permissive_validation
+            && form == FunctionForm::Constructor
+            && let Some(parameter) = self
+                .params
+                .iter()
+                .find(|param| param.is_property && param.is_mutable_property)
+        {
+            return Err(SigilStitchError::ConflictingConstructorPropertyMutability {
+                function_name: self.name.clone(),
+                parameter_name: parameter.name.clone(),
+            });
+        }
+
+        if !permissive_validation
+            && let Some(parameter) = self
+                .params
+                .iter()
+                .find(|param| param.is_variadic && param.default_value.is_some())
+        {
+            return Err(SigilStitchError::IncompatibleParameterCapabilities {
+                function_name: self.name.clone(),
+                parameter_name: parameter.name.clone(),
+                capabilities: vec![
+                    FunctionCapability::VariadicParameters,
+                    FunctionCapability::DefaultParameters,
+                ],
+            });
+        }
+
+        if !permissive_validation
+            && let Some(parameter) = self
+                .params
+                .iter()
+                .find(|param| param.is_variadic && (param.is_property || param.is_mutable_property))
+        {
+            return Err(SigilStitchError::IncompatibleParameterCapabilities {
+                function_name: self.name.clone(),
+                parameter_name: parameter.name.clone(),
+                capabilities: vec![
+                    FunctionCapability::VariadicParameters,
+                    FunctionCapability::ConstructorProperties,
+                ],
+            });
+        }
+
+        if !permissive_validation {
+            let variadic_parameters: Vec<_> = self
+                .params
+                .iter()
+                .enumerate()
+                .filter(|(_, parameter)| parameter.is_variadic)
+                .collect();
+            if variadic_parameters.len() > 1 {
+                return Err(SigilStitchError::MultipleVariadicParameters {
+                    function_name: self.name.clone(),
+                });
+            }
+            if let Some((index, parameter)) = variadic_parameters.first()
+                && *index + 1 != self.params.len()
+            {
+                return Err(SigilStitchError::VariadicParameterNotLast {
+                    function_name: self.name.clone(),
+                    parameter_name: parameter.name.clone(),
+                });
+            }
+        }
+
+        if !permissive_validation
+            && lang.function_parameters_require_trailing_defaults(context, form)
+        {
+            let mut saw_default = false;
+            for parameter in &self.params {
+                if parameter.default_value.is_some() {
+                    saw_default = true;
+                } else if saw_default {
+                    return Err(SigilStitchError::RequiredParameterAfterDefault {
+                        function_name: self.name.clone(),
+                        parameter_name: parameter.name.clone(),
+                    });
+                }
+            }
+        }
+
+        let abstract_capability = lang.abstract_modifier_capability();
+        if self.modifiers.is_abstract
+            && abstract_capability == FunctionCapability::AbstractMethod
+            && self.body.is_some()
+            && !permissive_validation
+        {
+            return Err(SigilStitchError::AbstractFunctionWithBody {
+                function_name: self.name.clone(),
+            });
+        }
+
+        let mut requested = Vec::new();
+        let mut request = |capability: FunctionCapability, condition: bool| {
+            if condition && !requested.contains(&capability) {
+                requested.push(capability);
+            }
+        };
+
+        request(
+            FunctionCapability::ParametricPolymorphism,
+            !self.type_params.is_empty(),
+        );
+        request(
+            FunctionCapability::BoundedPolymorphism,
+            !self.where_constraints.is_empty()
+                || self
+                    .type_params
+                    .iter()
+                    .any(|param| !param.bounds.is_empty() || !param.context_bounds.is_empty()),
+        );
+        request(
+            FunctionCapability::Attributes,
+            !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
+        );
+        request(
+            FunctionCapability::ExplicitReturnType,
+            self.return_type.is_some(),
+        );
+        request(
+            FunctionCapability::TypedParameters,
+            self.params.iter().any(|param| !param.param_type.is_empty())
+                || self
+                    .receiver
+                    .as_ref()
+                    .is_some_and(|receiver| !receiver.param_type.is_empty()),
+        );
+        request(FunctionCapability::AsyncEffect, self.modifiers.is_async);
+        request(
+            if self.modifiers.is_constructor {
+                FunctionCapability::StaticConstructor
+            } else {
+                match context {
+                    FunctionContext::TopLevel => FunctionCapability::StaticFunction,
+                    FunctionContext::ReceiverMethod
+                    | FunctionContext::Member
+                    | FunctionContext::InterfaceMember => FunctionCapability::StaticMethod,
+                }
+            },
+            self.modifiers.is_static,
+        );
+        request(abstract_capability, self.modifiers.is_abstract);
+        request(FunctionCapability::Override, self.modifiers.is_override);
+        request(
+            FunctionCapability::ConstructorDelegation,
+            self.delegation.is_some(),
+        );
+        request(
+            FunctionCapability::DefaultParameters,
+            self.params
+                .iter()
+                .any(|param| param.default_value.is_some()),
+        );
+        request(
+            FunctionCapability::VariadicParameters,
+            self.params.iter().any(|param| param.is_variadic),
+        );
+        request(
+            FunctionCapability::ConstructorProperties,
+            self.params
+                .iter()
+                .any(|param| param.is_property || param.is_mutable_property),
+        );
+
+        let missing: Vec<_> = requested
+            .iter()
+            .copied()
+            .filter(|capability| {
+                !capabilities.supports_function_capability(context, form, *capability)
+            })
+            .collect();
+        if !missing.is_empty() {
+            return Err(SigilStitchError::UnsupportedFunctionCapabilities {
+                language: language.clone(),
+                function_name: self.name.clone(),
+                context,
+                form,
+                capabilities: missing,
+            });
+        }
+
+        if let Some((first, second)) =
+            capabilities.first_incompatible_function_capabilities(context, form, &requested)
+        {
+            return Err(SigilStitchError::IncompatibleFunctionCapabilities {
+                language: language.clone(),
+                function_name: self.name.clone(),
+                context,
+                form,
+                capabilities: vec![first, second],
+            });
+        }
+
+        let mut missing_required: Vec<_> = capabilities
+            .required_function_capabilities(context, form)
+            .iter()
+            .copied()
+            .filter(|capability| match capability {
+                FunctionCapability::ExplicitReturnType => self.return_type.is_none(),
+                FunctionCapability::TypedParameters => {
+                    !lang.function_parameters_are_typed(&self.params, context, form)
+                }
+                capability => !requested.contains(capability),
+            })
+            .collect();
+
+        if !permissive_validation && lang.requires_complete_function_type_information(context, form)
+        {
+            let has_signature_metadata = self
+                .params
+                .iter()
+                .any(|parameter| !parameter.param_type.is_empty())
+                || !self.type_params.is_empty()
+                || !self.where_constraints.is_empty();
+
+            if self.return_type.is_none() && has_signature_metadata {
+                if !missing_required.contains(&FunctionCapability::ExplicitReturnType) {
+                    missing_required.push(FunctionCapability::ExplicitReturnType);
+                }
+            } else if self.return_type.is_some()
+                && !lang.function_parameters_are_typed(&self.params, context, form)
+                && !missing_required.contains(&FunctionCapability::TypedParameters)
+            {
+                missing_required.push(FunctionCapability::TypedParameters);
+            }
+        }
+
+        if !missing_required.is_empty() {
+            return Err(SigilStitchError::MissingRequiredFunctionCapabilities {
+                language: language.clone(),
+                function_name: self.name.clone(),
+                context,
+                form,
+                capabilities: missing_required,
+            });
+        }
+
+        if !permissive_validation
+            && self.modifiers.is_constructor
+            && let Some(return_type) = &self.return_type
+            && !lang.constructor_return_type_is_valid(return_type)
+        {
+            return Err(SigilStitchError::InvalidConstructorReturnType {
+                language,
+                function_name: self.name.clone(),
+                return_type: format!("{return_type:?}"),
+            });
+        }
+
+        if !permissive_validation {
+            lang.validate_function_type_constraints(
+                &self.name,
+                &self.type_params,
+                &self.where_constraints,
+            )?;
+            match lang.function_body_policy(context, form, self.modifiers.is_static) {
+                FunctionBodyPolicy::Optional => {}
+                FunctionBodyPolicy::Required
+                    if self.body.is_none() && !self.modifiers.is_abstract =>
+                {
+                    return Err(SigilStitchError::FunctionBodyRequired {
+                        language: language.clone(),
+                        function_name: self.name.clone(),
+                        context,
+                        form,
+                    });
+                }
+                FunctionBodyPolicy::Forbidden if self.body.is_some() => {
+                    return Err(SigilStitchError::FunctionBodyForbidden {
+                        language: language.clone(),
+                        function_name: self.name.clone(),
+                        context,
+                        form,
+                    });
+                }
+                FunctionBodyPolicy::Required | FunctionBodyPolicy::Forbidden => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn is_legacy_direct_constructor(
+        &self,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+    ) -> bool {
+        let capabilities = lang.capabilities();
+        declaration_context == DeclarationContext::Member
+            && !capabilities.function_validation_is_permissive()
+            && !self.modifiers.is_constructor
+            && self.return_type.is_none()
+            && lang.function_form(&self.name, false) == FunctionForm::Function
+            && capabilities
+                .supports_function_form(FunctionContext::Member, FunctionForm::Constructor)
+            && capabilities
+                .required_function_capabilities(FunctionContext::Member, FunctionForm::Function)
+                .contains(&FunctionCapability::ExplicitReturnType)
+            && !capabilities
+                .required_function_capabilities(FunctionContext::Member, FunctionForm::Constructor)
+                .contains(&FunctionCapability::ExplicitReturnType)
+    }
+
+    fn is_implicit_direct_constructor(
+        &self,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+    ) -> bool {
+        let context = match declaration_context {
+            DeclarationContext::Member => FunctionContext::Member,
+            DeclarationContext::InterfaceMember => FunctionContext::InterfaceMember,
+            DeclarationContext::TopLevel => return false,
+        };
+        lang.capabilities()
+            .supports_function_form(context, FunctionForm::Constructor)
+            && !self.modifiers.is_constructor
+            && if self.modifiers.is_static {
+                lang.static_constructor_name_matches(&self.name, None)
+            } else {
+                lang.constructor_name_matches(&self.name, None)
+            }
+    }
+
     /// Emit this function as a CodeBlock.
     pub fn emit(
         &self,
         lang: &dyn CodeLang,
         ctx: DeclarationContext,
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let mut cb = CodeBlock::builder();
-
-        let emit_doc = || -> Option<String> {
-            if self.doc.is_empty() || lang.doc_comment_inside_body() {
-                return None;
-            }
-            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-            Some(lang.render_doc_comment(&doc_lines))
-        };
-
-        if lang.doc_before_annotations()
-            && let Some(doc_str) = emit_doc()
-        {
-            cb.add("%L", doc_str);
-            cb.add_line();
-        }
-
-        for spec in &self.annotation_specs {
-            cb.add_code(spec.emit(lang)?);
-            cb.add_line();
-        }
-        for ann in &self.annotations {
-            cb.add_code(ann.clone());
-            cb.add_line();
-        }
-
-        // Override annotation (e.g., Java `@Override`) -- emitted as an annotation line
-        // rather than an inline keyword when the language uses annotation style.
-        if self.modifiers.is_override {
-            let override_ann = lang.function_syntax().override_annotation;
-            if !override_ann.is_empty() {
-                cb.add("%L", override_ann.to_string());
-                cb.add_line();
-            }
-        }
-
-        if !lang.doc_before_annotations()
-            && let Some(doc_str) = emit_doc()
-        {
-            cb.add("%L", doc_str);
-            cb.add_line();
-        }
-
-        // Build signature.
-        if lang.function_syntax().function_signature_style == FunctionSignatureStyle::Split {
-            return self.emit_split_signature(cb, lang);
-        }
-        let vis = lang.render_visibility(self.modifiers.visibility, ctx);
-        let fn_kw = if self.modifiers.is_constructor {
-            lang.function_syntax().constructor_keyword
-        } else {
-            lang.function_keyword(ctx)
-        };
-
-        let mut sig = String::new();
-        let mut sig_args: Vec<Arg> = Vec::new();
-
-        sig.push_str(vis);
-        if self.modifiers.is_abstract {
-            let kw = lang.function_syntax().abstract_keyword;
-            if !kw.is_empty() {
-                sig.push_str(kw);
-            }
-        }
-        if self.modifiers.is_static {
-            let kw = lang.function_syntax().static_keyword;
-            if !kw.is_empty() {
-                sig.push_str(kw);
-            }
-        }
-        if self.modifiers.is_override {
-            let kw = lang.function_syntax().override_keyword;
-            if !kw.is_empty() {
-                sig.push_str(kw);
-            }
-        }
-        // Some languages (C#) suppress `async` for interface members because
-        // interfaces declare the contract (return type), not the implementation.
-        let suppress_async = ctx == DeclarationContext::InterfaceMember
-            && lang.function_syntax().suppress_async_in_interface;
-        if self.modifiers.is_async && !suppress_async {
-            sig.push_str(lang.function_syntax().async_keyword);
-        }
-
-        // Type parameters before return type (Java-style: `public static <T> List<T> sort(...)`).
-        if lang.function_syntax().type_params_before_return_type {
-            let tp_str = render_type_params(&self.type_params, lang, &mut sig_args);
-            if !tp_str.is_empty() {
-                sig.push_str(&tp_str);
-                sig.push(' ');
-            }
-        }
-
-        // Return type as prefix (C-style: `int add(...)`).
-        if lang.type_decl_syntax().return_type_is_prefix
-            && let Some(ret) = &self.return_type
-        {
-            sig.push_str("%T");
-            sig_args.push(Arg::TypeName(ret.clone()));
-            sig.push(' ');
-        }
-
-        if !fn_kw.is_empty() {
-            sig.push_str(fn_kw);
-            sig.push(' ');
-        }
-
-        // Receiver (e.g., Go: `func (s *Server) Handle()`).
-        if let Some(recv) = &self.receiver {
-            sig.push('(');
-            sig.push_str(lang.variable_prefix());
-            sig.push_str(&lang.escape_reserved(&recv.name));
-            sig.push_str(lang.type_decl_syntax().type_annotation_separator);
-            sig.push_str("%T");
-            sig_args.push(Arg::TypeName(recv.param_type.clone()));
-            sig.push_str(") ");
-        }
-
-        sig.push_str(&self.name);
-
-        // Type parameters after name (most languages: `fn sort<T>(...)`).
-        if !lang.function_syntax().type_params_before_return_type {
-            let tp_str = render_type_params(&self.type_params, lang, &mut sig_args);
-            sig.push_str(&tp_str);
-        }
-
-        // Parameters — build as a sub-block for %W support.
-        if lang.function_syntax().param_list_style == ParamListStyle::Curried {
-            if !self.params.is_empty() {
-                sig.push(' ');
-                sig.push_str("%L");
-                let params_block = self.build_curried_params_block(lang)?;
-                sig_args.push(Arg::Code(params_block));
-            }
-        } else {
-            sig.push('(');
-            sig.push_str("%L");
-            let params_block = self.build_params_block(lang)?;
-            sig_args.push(Arg::Code(params_block));
-            sig.push(')');
-        }
-
-        // Method suffixes (C++: const, override, noexcept, = 0).
-        for s in &self.suffixes {
-            sig.push(' ');
-            sig.push_str(s);
-        }
-
-        // Async suffix before return type (Swift: `func f() async -> T`).
-        if self.modifiers.is_async
-            && !suppress_async
-            && lang.function_syntax().async_suffix_before_return
-        {
-            sig.push_str(lang.function_syntax().async_suffix);
-        }
-
-        // Return type as suffix (TS/Rust/Go-style: `fn add(...) -> int`).
-        // Skip when separator is empty (e.g. Lua) — nothing to separate.
-        if !lang.type_decl_syntax().return_type_is_prefix
-            && let Some(ret) = &self.return_type
-        {
-            let sep = lang.function_syntax().return_type_separator;
-            if !sep.is_empty() {
-                sig.push_str(sep);
-                sig.push_str("%T");
-                sig_args.push(Arg::TypeName(ret.clone()));
-            }
-        }
-
-        // Constructor delegation — signature style (Kotlin: `constructor(x: Int) : this(x, 0)`).
-        let delegation_in_body = if let Some(deleg) = &self.delegation {
-            if lang.function_syntax().constructor_delegation_style
-                == ConstructorDelegationStyle::Signature
-            {
-                sig.push_str(" : %L");
-                sig_args.push(Arg::Code(deleg.clone()));
-                false
-            } else {
-                true
-            }
-        } else {
-            false
-        };
-
-        // Async suffix after return type (Dart: `Future<T> foo() async { ... }`).
-        if self.modifiers.is_async
-            && !suppress_async
-            && !lang.function_syntax().async_suffix_before_return
-        {
-            sig.push_str(lang.function_syntax().async_suffix);
-        }
-
-        // Body or abstract.
-        if let Some(body) = &self.body {
-            self.emit_where_and_open(&mut sig, &mut sig_args, lang);
-            cb.add(&sig, sig_args);
-            cb.add_line();
-            self.emit_body_interior(&mut cb, lang, delegation_in_body, |cb| {
-                cb.add_code(body.clone());
-                if !body.ends_with_newline_or_block_close() {
-                    cb.add_line();
-                }
-            });
-        } else {
-            let empty = lang.function_syntax().empty_body;
-            if !empty.is_empty() {
-                self.emit_where_and_open(&mut sig, &mut sig_args, lang);
-                cb.add(&sig, sig_args);
-                cb.add_line();
-                self.emit_body_interior(&mut cb, lang, delegation_in_body, |cb| {
-                    cb.add_statement(empty, ());
-                });
-            } else {
-                if lang.block_syntax().uses_semicolons {
-                    sig.push(';');
-                }
-                cb.add(&sig, sig_args);
-                cb.add_line();
-            }
-        }
-
-        cb.build()
+        self.emit_with_legacy_constructor(lang, ctx, true)
     }
 
-    fn build_params_block(
+    pub(crate) fn emit_in_type(
         &self,
         lang: &dyn CodeLang,
+        ctx: DeclarationContext,
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let mut pb = CodeBlock::builder();
-        pb.add("%>", ());
-        for (i, param) in self.params.iter().enumerate() {
-            if i > 0 {
-                pb.add(",%W", ());
-            }
-            param.emit_into(&mut pb, lang);
-        }
-        pb.add("%<", ());
-        pb.build()
+        self.emit_with_legacy_constructor(lang, ctx, false)
     }
 
-    fn build_curried_params_block(
+    fn emit_with_legacy_constructor(
         &self,
         lang: &dyn CodeLang,
+        ctx: DeclarationContext,
+        allow_legacy_constructor: bool,
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let mut pb = CodeBlock::builder();
-        for (i, param) in self.params.iter().enumerate() {
-            if i > 0 {
-                pb.add(" ", ());
-            }
-            pb.add("(", ());
-            param.emit_into(&mut pb, lang);
-            pb.add(")", ());
+        if allow_legacy_constructor
+            && (self.is_implicit_direct_constructor(lang, ctx)
+                || self.is_legacy_direct_constructor(lang, ctx))
+        {
+            let mut constructor = self.clone();
+            constructor.modifiers.is_constructor = true;
+            return constructor.emit_classified(lang, ctx);
         }
-        pb.build()
+        self.emit_classified(lang, ctx)
     }
 
-    fn emit_where_and_open(&self, sig: &mut String, sig_args: &mut Vec<Arg>, lang: &dyn CodeLang) {
-        let style = lang.function_syntax().where_clause_style;
-        let has_where = !self.where_constraints.is_empty() && style != WhereClauseStyle::Inline;
-        if has_where {
-            match style {
-                WhereClauseStyle::WhereBlock => {
-                    emit_where_block(sig, sig_args, &self.where_constraints, lang);
-                }
-                WhereClauseStyle::SeparateWhere => {
-                    emit_separate_where_block(sig, sig_args, &self.where_constraints, lang);
-                }
-                WhereClauseStyle::Inline => unreachable!(),
-            }
-            sig.push_str("\n{");
-        } else {
-            sig.push_str(lang.fun_block_open());
-        }
-    }
-
-    fn emit_body_interior(
+    fn emit_classified(
         &self,
-        cb: &mut crate::code_block::CodeBlockBuilder,
         lang: &dyn CodeLang,
-        delegation_in_body: bool,
-        emit_content: impl FnOnce(&mut crate::code_block::CodeBlockBuilder),
-    ) {
-        cb.add("%>", ());
-        if !self.doc.is_empty() && lang.doc_comment_inside_body() {
-            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-            let doc_str = lang.render_doc_comment(&doc_lines);
-            cb.add("%L", doc_str);
-            cb.add_line();
-        }
-        if delegation_in_body && let Some(deleg) = &self.delegation {
-            cb.add_statement("%L", deleg.clone());
-        }
-        emit_content(cb);
-        cb.add("%<", ());
-        let close = lang.block_syntax().block_close;
-        if !close.is_empty() {
-            cb.add(close, ());
-            cb.add_line();
-        }
-    }
-
-    /// Emit a function with separate type signature and definition (Haskell style).
-    ///
-    /// Renders:
-    /// ```text
-    /// add :: Int -> Int -> Int
-    /// add x y =
-    ///   body
-    /// ```
-    fn emit_split_signature(
-        &self,
-        mut cb: crate::code_block::CodeBlockBuilder,
-        lang: &dyn CodeLang,
-    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        // Type context (e.g., "(Show a) => ").
-        let context = lang.emit_type_context(&self.type_params)?;
-
-        // Keep every signature type structured for import collection and alias resolution.
-        if !self.params.is_empty() || self.return_type.is_some() {
-            cb.add(&format!("{} :: ", self.name), ());
-            if let Some(context) = context {
-                cb.add_code(context);
-            }
-            for (index, param) in self.params.iter().enumerate() {
-                if index > 0 {
-                    cb.add(" -> ", ());
-                }
-                cb.add("%T", param.param_type.clone());
-            }
-            if let Some(return_type) = &self.return_type {
-                if !self.params.is_empty() {
-                    cb.add(" -> ", ());
-                }
-                cb.add("%T", return_type.clone());
-            }
-            cb.add_line();
-        }
-
-        // Build definition: name param1_name param2_name block_open
-        let mut def = String::new();
-        def.push_str(&self.name);
-        for param in &self.params {
-            def.push(' ');
-            def.push_str(lang.variable_prefix());
-            def.push_str(&lang.escape_reserved(&param.name));
-        }
-        def.push_str(lang.block_syntax().block_open);
-
-        if let Some(body) = &self.body {
-            cb.add(&def, ());
-            cb.add_line();
-            cb.add("%>", ());
-            cb.add_code(body.clone());
-            if !body.ends_with_newline_or_block_close() {
-                cb.add_line();
-            }
-            cb.add("%<", ());
-            let close = lang.block_syntax().block_close;
-            if !close.is_empty() {
-                cb.add(close, ());
-                cb.add_line();
-            }
-        } else {
-            let empty = lang.function_syntax().empty_body;
-            if !empty.is_empty() {
-                cb.add(&def, ());
-                cb.add_line();
-                cb.add("%>", ());
-                cb.add_statement(empty, ());
-                cb.add("%<", ());
-                let close = lang.block_syntax().block_close;
-                if !close.is_empty() {
-                    cb.add(close, ());
-                    cb.add_line();
-                }
-            } else {
-                // No body and no empty_body placeholder: emit only the type signature.
-            }
-        }
-
-        cb.build()
+        declaration_context: DeclarationContext,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let function = self.validate_classified(lang, declaration_context)?;
+        lang.lower_function(function)
     }
 }
-
 /// Builder for [`FunSpec`].
 #[derive(Debug)]
 pub struct FunSpecBuilder {
@@ -612,9 +918,9 @@ impl FunSpecBuilder {
 
     /// Set a constructor delegation call (e.g., `super(arg1, arg2)` or `this(arg1)`).
     ///
-    /// For body-style languages (TS, JS, Java, Dart, Swift), this is emitted as
+    /// For body-style languages (TS, JS, Java, Swift), this is emitted as
     /// the first statement in the constructor body.
-    /// For signature-style languages (Kotlin), this appears after the parameter
+    /// For signature-style languages (Kotlin, Dart, C++), this appears after the parameter
     /// list: `constructor(x: Int) : this(x, 0) { ... }`.
     pub fn delegation(mut self, call: CodeBlock) -> Self {
         self.delegation = Some(call);
@@ -650,7 +956,7 @@ impl FunSpecBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`SigilStitchError::EmptyName`](crate::error::SigilStitchError::EmptyName) if `name` is empty.
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
     pub fn build(self) -> Result<FunSpec, crate::error::SigilStitchError> {
         snafu::ensure!(
             !self.name.is_empty(),
@@ -677,6 +983,16 @@ impl FunSpecBuilder {
 }
 
 impl crate::spec::emittable::Emittable for FunSpec {
+    fn collect_validation_errors(
+        &self,
+        lang: &dyn CodeLang,
+        errors: &mut Vec<crate::error::SigilStitchError>,
+    ) {
+        if let Err(error) = self.validate(lang, DeclarationContext::TopLevel) {
+            errors.push(error);
+        }
+    }
+
     fn emit_members(
         &self,
         lang: &dyn CodeLang,

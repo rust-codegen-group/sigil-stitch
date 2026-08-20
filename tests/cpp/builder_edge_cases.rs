@@ -84,6 +84,7 @@ fn test_full_header() {
     let ctor_body = CodeBlock::of("name_ = name;", ()).unwrap();
     pub_section.add_code(emit_fun(
         &FunSpec::builder("Logger")
+            .is_constructor()
             .add_param(
                 ParameterSpec::new("name", TypeName::primitive("const std::string&")).unwrap(),
             )

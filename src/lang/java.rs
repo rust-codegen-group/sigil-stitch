@@ -1,7 +1,11 @@
 //! Java language implementation.
 
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -146,63 +150,211 @@ impl RendererLang for Java {
     }
 }
 
-const JAVA_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const JAVA_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // InterfaceImplementation = `implements`
-    SpecCapability::InterfaceImplementation,
+    TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic bounds (`extends`)
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = Optional members
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const JAVA_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+const JAVA_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic bounds (`extends`)
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const JAVA_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, JAVA_CLASS_CAPABILITIES),
+const JAVA_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, JAVA_CLASS_CAPABILITIES),
     // Struct is represented as a Java class.
-    TypeCapabilities::new(TypeKind::Struct, JAVA_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Interface, JAVA_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, JAVA_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, JAVA_CONTRACT_CAPABILITIES),
     // Trait is represented as a Java interface.
-    TypeCapabilities::new(TypeKind::Trait, JAVA_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Trait, JAVA_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // RecordFields = fields
-            SpecCapability::RecordFields,
+            TypeCapability::RecordFields,
             // Methods = methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // InterfaceImplementation = `implements`
-            SpecCapability::InterfaceImplementation,
+            TypeCapability::InterfaceImplementation,
             // Attributes = annotations
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
             // Variants = enum constants
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
 ];
 
+const JAVA_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AbstractMethod = abstract
+    FunctionCapability::AbstractMethod,
+    // Attributes = annotations
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = bounded type parameters
+    FunctionCapability::BoundedPolymorphism,
+    // ExplicitReturnType = method result type
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = parameter declarations
+    FunctionCapability::TypedParameters,
+    // Override = @Override
+    FunctionCapability::Override,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+    // StaticMethod = static
+    FunctionCapability::StaticMethod,
+];
+const JAVA_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::AbstractMethod,
+    FunctionCapability::Attributes,
+    FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    FunctionCapability::Override,
+    FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::StaticMethod,
+];
+const JAVA_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::Attributes,
+    FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::ConstructorDelegation,
+    FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::TypedParameters,
+];
+const JAVA_REQUIRED_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+];
+const JAVA_MEMBER_INCOMPATIBILITIES: &[(FunctionCapability, FunctionCapability)] = &[
+    (
+        FunctionCapability::AbstractMethod,
+        FunctionCapability::StaticMethod,
+    ),
+    (
+        FunctionCapability::StaticMethod,
+        FunctionCapability::Override,
+    ),
+];
+const JAVA_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        JAVA_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(JAVA_REQUIRED_FUNCTION_CAPABILITIES)
+    .with_body_policy(FunctionBodyPolicy::Required)
+    .with_incompatible_capabilities(JAVA_MEMBER_INCOMPATIBILITIES),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        JAVA_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        JAVA_INTERFACE_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(JAVA_REQUIRED_FUNCTION_CAPABILITIES)
+    .with_incompatible_capabilities(JAVA_MEMBER_INCOMPATIBILITIES),
+];
+
 impl CodeLang for Java {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(JAVA_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(JAVA_TYPES)
+            .with_functions(JAVA_FUNCTIONS)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::function_lowering::validate_constraints_target_declared_type_params(
+            self.file_extension(),
+            function_name,
+            type_params,
+            constraints,
+        )
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::Member => matches!(
+                visibility,
+                Visibility::Inherited
+                    | Visibility::Public
+                    | Visibility::Private
+                    | Visibility::Protected
+            ),
+            FunctionContext::InterfaceMember => {
+                matches!(visibility, Visibility::Inherited | Visibility::Public)
+            }
+            FunctionContext::TopLevel | FunctionContext::ReceiverMethod => false,
+        }
+    }
+
+    fn constructor_name_matches(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        declaring_type.is_some_and(|declaring_type| name == declaring_type)
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        declaring_type.is_none_or(|declaring_type| name == declaring_type)
+    }
+
+    fn constructor_name_with_return_type_is_function(&self) -> bool {
+        true
+    }
+
+    fn abstract_type_modifier_is_valid(&self, kind: TypeKind) -> bool {
+        matches!(
+            kind,
+            TypeKind::Class | TypeKind::Struct | TypeKind::Interface | TypeKind::Trait
+        )
+    }
+
+    fn function_body_policy(
+        &self,
+        context: FunctionContext,
+        form: FunctionForm,
+        is_static: bool,
+    ) -> FunctionBodyPolicy {
+        if context == FunctionContext::InterfaceMember && form == FunctionForm::Function {
+            if is_static {
+                FunctionBodyPolicy::Required
+            } else {
+                FunctionBodyPolicy::Forbidden
+            }
+        } else {
+            self.capabilities().function_body_policy(context, form)
+        }
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

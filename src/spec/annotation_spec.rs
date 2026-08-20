@@ -54,6 +54,15 @@ pub(crate) enum AnnotationName {
     Importable(TypeName),
 }
 
+/// Borrowed semantic name of a structured annotation.
+#[derive(Debug, Clone, Copy)]
+pub enum AnnotationNameRef<'a> {
+    /// A simple unqualified annotation name.
+    Simple(&'a str),
+    /// An import-tracked annotation type.
+    Importable(&'a TypeName),
+}
+
 impl AnnotationSpec {
     /// Create an annotation with a simple (non-imported) name.
     ///
@@ -84,6 +93,19 @@ impl AnnotationSpec {
             name: AnnotationName::Importable(type_name),
             arguments: Vec::new(),
         }
+    }
+
+    /// Return the annotation name without exposing mutable representation.
+    pub fn name(&self) -> AnnotationNameRef<'_> {
+        match &self.name {
+            AnnotationName::Simple(name) => AnnotationNameRef::Simple(name),
+            AnnotationName::Importable(type_name) => AnnotationNameRef::Importable(type_name),
+        }
+    }
+
+    /// Return the annotation's opaque argument strings.
+    pub fn arguments(&self) -> &[String] {
+        &self.arguments
     }
 
     /// Add a pre-formatted argument string.
@@ -123,9 +145,23 @@ impl AnnotationSpec {
     ///
     /// Called during spec `emit()` methods which have access to `&L`.
     pub fn emit(&self, lang: &dyn CodeLang) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let ea = lang.enum_and_annotation();
-        let (prefix, suffix) = (ea.annotation_prefix, ea.annotation_suffix);
+        self.emit_with(lang)
+    }
 
+    pub(crate) fn emit_with<L: CodeLang + ?Sized>(
+        &self,
+        lang: &L,
+    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
+        let ea = lang.enum_and_annotation();
+        self.emit_with_syntax(ea.annotation_prefix, ea.annotation_suffix)
+    }
+
+    /// Emit with syntax selected by one complete language-local lowerer.
+    pub(crate) fn emit_with_syntax(
+        &self,
+        prefix: &str,
+        suffix: &str,
+    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
         // Build the argument list portion: "(arg1, arg2)" or empty.
         let args_str = if self.arguments.is_empty() {
             String::new()

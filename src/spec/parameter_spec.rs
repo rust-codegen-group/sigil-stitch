@@ -73,6 +73,26 @@ impl ParameterSpec {
         &self.param_type
     }
 
+    /// Return the default-value expression, when present.
+    pub fn default_value(&self) -> Option<&crate::code_block::CodeBlock> {
+        self.default_value.as_ref()
+    }
+
+    /// Whether this is a variadic parameter.
+    pub fn is_variadic(&self) -> bool {
+        self.is_variadic
+    }
+
+    /// Whether this parameter promotes an immutable constructor property.
+    pub fn is_property(&self) -> bool {
+        self.is_property
+    }
+
+    /// Whether this parameter promotes a mutable constructor property.
+    pub fn is_mutable_property(&self) -> bool {
+        self.is_mutable_property
+    }
+
     /// Emit this parameter into a CodeBlockBuilder (appends format parts + args).
     pub fn emit_into(&self, cb: &mut CodeBlockBuilder, lang: &dyn CodeLang) {
         let mut fmt = String::new();
@@ -155,8 +175,11 @@ impl ParameterSpecBuilder {
 
     /// Mark this parameter as a readonly property declaration.
     ///
-    /// When emitting, prepends the language's readonly keyword (e.g., `val` in Kotlin).
-    /// Used for primary constructor parameters that declare properties.
+    /// When emitting, prepends the language's readonly constructor-property
+    /// keyword (for example, `val` in Kotlin). Used for constructor parameters
+    /// that declare properties. This marker is mutually exclusive with
+    /// [`Self::is_mutable_property`]; strict built-in adapters reject both on
+    /// the same parameter.
     pub fn is_property(mut self) -> Self {
         self.is_property = true;
         self
@@ -164,8 +187,11 @@ impl ParameterSpecBuilder {
 
     /// Mark this parameter as a mutable property declaration.
     ///
-    /// When emitting, prepends the language's mutable field keyword (e.g., `var` in Kotlin).
-    /// Used for primary constructor parameters that declare mutable properties.
+    /// When emitting, prepends the language's mutable constructor-property
+    /// keyword (for example, `var` in Kotlin or `public` in TypeScript). Used
+    /// for constructor parameters that declare mutable properties. This
+    /// marker is mutually exclusive with [`Self::is_property`]; strict
+    /// built-in adapters reject both on the same parameter.
     pub fn is_mutable_property(mut self) -> Self {
         self.is_mutable_property = true;
         self

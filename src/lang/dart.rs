@@ -1,7 +1,11 @@
 //! Dart language implementation.
 
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -187,60 +191,207 @@ impl RendererLang for Dart {
     }
 }
 
-const DART_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const DART_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = instance fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // InterfaceImplementation = `implements`
-    SpecCapability::InterfaceImplementation,
+    TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // Attributes = metadata annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = nullable fields
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const DART_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+const DART_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // InterfaceImplementation = `implements`
-    SpecCapability::InterfaceImplementation,
+    TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // Attributes = metadata annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const DART_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, DART_CLASS_CAPABILITIES),
+const DART_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, DART_CLASS_CAPABILITIES),
     // Struct is represented as a Dart class.
-    TypeCapabilities::new(TypeKind::Struct, DART_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Interface, DART_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, DART_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, DART_CONTRACT_CAPABILITIES),
     // Trait is represented as a Dart abstract class.
-    TypeCapabilities::new(TypeKind::Trait, DART_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Trait, DART_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // Variants = enum values
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
             // ParametricPolymorphism = generic type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
         ],
+    ),
+];
+
+const DART_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = async
+    FunctionCapability::AsyncEffect,
+    // Attributes = metadata annotations
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = generic bounds
+    FunctionCapability::BoundedPolymorphism,
+    // ExplicitReturnType = function result type
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+];
+const DART_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AbstractMethod = abstract
+    FunctionCapability::AbstractMethod,
+    // AsyncEffect = async
+    FunctionCapability::AsyncEffect,
+    // Attributes = metadata annotations
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = generic bounds
+    FunctionCapability::BoundedPolymorphism,
+    // ExplicitReturnType = method result type
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+    // StaticMethod = static
+    FunctionCapability::StaticMethod,
+];
+const DART_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::AbstractMethod,
+    FunctionCapability::AsyncEffect,
+    FunctionCapability::Attributes,
+    FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::StaticMethod,
+];
+const DART_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::Attributes,
+    FunctionCapability::ConstructorDelegation,
+    FunctionCapability::TypedParameters,
+];
+const DART_MEMBER_INCOMPATIBILITIES: &[(FunctionCapability, FunctionCapability)] = &[
+    (
+        FunctionCapability::AbstractMethod,
+        FunctionCapability::AsyncEffect,
+    ),
+    (
+        FunctionCapability::AbstractMethod,
+        FunctionCapability::StaticMethod,
+    ),
+];
+const DART_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        DART_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        DART_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_incompatible_capabilities(DART_MEMBER_INCOMPATIBILITIES)
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        DART_CONSTRUCTOR_CAPABILITIES,
+    ),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        DART_INTERFACE_FUNCTION_CAPABILITIES,
+    )
+    .with_incompatible_capabilities(DART_MEMBER_INCOMPATIBILITIES),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Constructor,
+        DART_CONSTRUCTOR_CAPABILITIES,
     ),
 ];
 
 impl CodeLang for Dart {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(DART_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(DART_TYPES)
+            .with_functions(DART_FUNCTIONS)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::function_lowering::validate_constraints_target_declared_type_params(
+            self.file_extension(),
+            function_name,
+            type_params,
+            constraints,
+        )
+    }
+
+    fn constructor_name_matches(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        declaring_type.is_some_and(|declaring_type| {
+            name == declaring_type
+                || name
+                    .strip_prefix(declaring_type)
+                    .and_then(|suffix| suffix.strip_prefix('.'))
+                    .is_some_and(|constructor| {
+                        !constructor.is_empty() && !constructor.contains('.')
+                    })
+        })
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        match declaring_type {
+            Some(declaring_type) => self.constructor_name_matches(name, Some(declaring_type)),
+            None => {
+                let mut parts = name.split('.');
+                parts.next().is_some_and(|part| !part.is_empty())
+                    && parts.next().is_none_or(|part| !part.is_empty())
+                    && parts.next().is_none()
+            }
+        }
+    }
+
+    fn abstract_type_modifier_is_valid(&self, kind: TypeKind) -> bool {
+        matches!(kind, TypeKind::Class | TypeKind::Struct)
+    }
+
+    fn function_body_policy(
+        &self,
+        context: FunctionContext,
+        form: FunctionForm,
+        is_static: bool,
+    ) -> FunctionBodyPolicy {
+        if context == FunctionContext::InterfaceMember
+            && form == FunctionForm::Function
+            && is_static
+        {
+            FunctionBodyPolicy::Required
+        } else {
+            self.capabilities().function_body_policy(context, form)
+        }
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
@@ -335,8 +486,11 @@ impl CodeLang for Dart {
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " ",
+            abstract_keyword: "",
             async_keyword: "",
             async_suffix: " async",
+            constructor_delegation_style:
+                crate::spec::modifiers::ConstructorDelegationStyle::Signature,
             ..Default::default()
         }
     }

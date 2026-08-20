@@ -66,10 +66,10 @@ pub enum PropertyStyle {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ConstructorDelegationStyle {
     /// Delegation is the first statement in the constructor body.
-    /// Used by TS, JS, Java, Dart, Swift, Python, C++.
+    /// Used by TS, JS, Java, Swift, and Python.
     Body,
     /// Delegation appears between the parameter list and the body.
-    /// Used by Kotlin: `constructor(x: Int) : this(x, 0) { ... }`.
+    /// Used by Kotlin, Dart, and C++: `constructor(x: Int) : this(x, 0) { ... }`.
     Signature,
 }
 

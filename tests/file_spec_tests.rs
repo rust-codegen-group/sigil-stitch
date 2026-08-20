@@ -251,7 +251,12 @@ fn test_custom_emittable_via_add_spec() {
     let file = FileSpec::builder("test.ts")
         .add_code(code_cb.build().unwrap())
         .add_spec(CommentSpec("AUTO-GENERATED"))
-        .add_function(FunSpec::builder("foo").build().unwrap())
+        .add_function(
+            FunSpec::builder("foo")
+                .body(CodeBlock::of("return", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
         .build()
         .unwrap();
 
@@ -379,6 +384,7 @@ impl CodeLang for FailingHookLang {
         Ok(None)
     }
 
+    #[allow(deprecated)] // Exercises the frozen 0.6.8 compatibility lowerer.
     fn function_syntax(&self) -> sigil_stitch::lang::config::FunctionSyntaxConfig<'_> {
         sigil_stitch::lang::config::FunctionSyntaxConfig {
             function_signature_style: sigil_stitch::spec::fun_spec::FunctionSignatureStyle::Split,
@@ -530,6 +536,36 @@ fn validate_aggregates_multiple_unsupported_types() {
 }
 
 #[test]
+fn add_spec_cannot_bypass_builtin_aggregate_validation() {
+    let invalid_fun = FunSpec::builder("work").is_async().build().unwrap();
+    let file = FileSpec::builder_with("mixed.bash", sigil_stitch::lang::bash::Bash::new())
+        .add_spec(TypeSpec::builder("User", TypeKind::Class).build().unwrap())
+        .add_spec(invalid_fun.clone())
+        .add_function(invalid_fun)
+        .build()
+        .unwrap();
+
+    let SigilStitchError::FileSpecValidation {
+        error_count,
+        errors,
+        ..
+    } = file.validate().unwrap_err()
+    else {
+        panic!("expected FileSpecValidation");
+    };
+
+    assert_eq!(error_count, 3);
+    assert!(matches!(
+        errors[0],
+        SigilStitchError::UnsupportedTypeKind { .. }
+    ));
+    assert!(errors[1..].iter().all(|error| matches!(
+        error,
+        SigilStitchError::UnsupportedFunctionCapabilities { .. }
+    )));
+}
+
+#[test]
 fn validate_missing_lang_stays_direct() {
     let file = FileSpec::builder("empty.ts").build().unwrap();
     let json = serde_json::to_string(&file).unwrap();
@@ -551,6 +587,21 @@ fn legacy_adapter_defaults_to_permissive_capabilities() {
                 .build()
                 .unwrap(),
         )
+        .build()
+        .unwrap();
+
+    assert!(file.validate().is_ok());
+}
+
+#[test]
+fn legacy_adapter_defaults_to_permissive_function_capabilities() {
+    let fun = FunSpec::builder("work")
+        .is_async()
+        .body(CodeBlock::of("return 1", ()).unwrap())
+        .build()
+        .unwrap();
+    let file = FileSpec::builder_with("work.fail", FailingHookLang(FailingHook::Newtype))
+        .add_function(fun)
         .build()
         .unwrap();
 

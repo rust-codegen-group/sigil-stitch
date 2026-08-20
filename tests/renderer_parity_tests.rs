@@ -74,6 +74,7 @@ fn function_parameter_builder_indents_wrapped_continuations() {
             "requestContext",
             TypeName::primitive("RequestContext"),
         ))
+        .body(CodeBlock::of("return", ()).unwrap())
         .build()
         .unwrap();
     let output = FileSpec::builder_with(

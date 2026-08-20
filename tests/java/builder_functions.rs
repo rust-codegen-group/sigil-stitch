@@ -22,8 +22,13 @@ fn test_function_with_doc() {
         .build()
         .unwrap();
 
+    let greet = TypeSpec::builder("Greet", TypeKind::Class)
+        .visibility(Visibility::Public)
+        .add_method(fun)
+        .build()
+        .unwrap();
     let file = FileSpec::builder_with("Greet.java", Java::new())
-        .add_function(fun)
+        .add_type(greet)
         .build()
         .unwrap();
     let output = file.render(80).unwrap();
@@ -47,8 +52,13 @@ fn test_generic_type_params_before_return_type() {
         .build()
         .unwrap();
 
+    let sort = TypeSpec::builder("Sort", TypeKind::Class)
+        .visibility(Visibility::Public)
+        .add_method(fun)
+        .build()
+        .unwrap();
     let file = FileSpec::builder_with("Sort.java", Java::new())
-        .add_function(fun)
+        .add_type(sort)
         .build()
         .unwrap();
     let output = file.render(80).unwrap();

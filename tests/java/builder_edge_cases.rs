@@ -126,6 +126,7 @@ fn test_full_module() {
         )
         .add_method(
             FunSpec::builder("InMemoryUserRepository")
+                .is_constructor()
                 .visibility(Visibility::Public)
                 .body(ctor_body)
                 .build()
