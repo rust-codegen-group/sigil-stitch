@@ -243,14 +243,17 @@ const SCALA_TYPES: &[TypeCapabilities] = &[
         ],
     ),
     TypeCapabilities::new(
+        TypeKind::TypeAlias,
+        &[
+            // ParametricPolymorphism = type parameters
+            SpecCapability::ParametricPolymorphism,
+        ],
+    ),
+    TypeCapabilities::new(
         TypeKind::Newtype,
         &[
-            // RecordFields = fields
-            SpecCapability::RecordFields,
-            // AccessorMethods = accessors
-            SpecCapability::AccessorMethods,
-            // Methods = methods
-            SpecCapability::Methods,
+            // ParametricPolymorphism = type parameters
+            SpecCapability::ParametricPolymorphism,
             // Attributes = annotations
             SpecCapability::Attributes,
         ],

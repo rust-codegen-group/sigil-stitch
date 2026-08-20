@@ -326,7 +326,13 @@ const HASKELL_TYPES: &[TypeCapabilities] = &[
             SpecCapability::InterfaceImplementation,
         ],
     ),
-    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilities::new(
+        TypeKind::TypeAlias,
+        &[
+            // ParametricPolymorphism = type variables
+            SpecCapability::ParametricPolymorphism,
+        ],
+    ),
     TypeCapabilities::new(
         TypeKind::Newtype,
         &[
@@ -334,8 +340,6 @@ const HASKELL_TYPES: &[TypeCapabilities] = &[
             SpecCapability::ParametricPolymorphism,
             // BoundedPolymorphism = class contexts / constraints
             SpecCapability::BoundedPolymorphism,
-            // ConstructorParameters = data constructor arguments
-            SpecCapability::ConstructorParameters,
             SpecCapability::InterfaceImplementation,
         ],
     ),

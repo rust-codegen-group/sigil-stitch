@@ -286,7 +286,13 @@ const CPP_TYPES: &[TypeCapabilities] = &[
     TypeCapabilities::new(TypeKind::Interface, CPP_CLASS_CAPABILITIES),
     TypeCapabilities::new(TypeKind::Trait, CPP_CLASS_CAPABILITIES),
     TypeCapabilities::new(TypeKind::Enum, CPP_ENUM_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilities::new(
+        TypeKind::TypeAlias,
+        &[
+            // ParametricPolymorphism = templates
+            SpecCapability::ParametricPolymorphism,
+        ],
+    ),
 ];
 
 impl CodeLang for Cpp {

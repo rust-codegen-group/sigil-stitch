@@ -290,16 +290,18 @@ const KOTLIN_TYPES: &[TypeCapabilities] = &[
             SpecCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilities::new(
+        TypeKind::TypeAlias,
+        &[
+            // ParametricPolymorphism = generic type parameters
+            SpecCapability::ParametricPolymorphism,
+        ],
+    ),
     TypeCapabilities::new(
         TypeKind::Newtype,
         &[
-            // RecordFields = properties and backing fields
-            SpecCapability::RecordFields,
-            // AccessorMethods = get/set accessors
-            SpecCapability::AccessorMethods,
-            // Methods = member functions
-            SpecCapability::Methods,
+            // ParametricPolymorphism = generic type parameters
+            SpecCapability::ParametricPolymorphism,
             // Attributes = annotations
             SpecCapability::Attributes,
         ],

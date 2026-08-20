@@ -295,7 +295,6 @@ const TS_TYPES: &[TypeCapabilities] = &[
             SpecCapability::ParametricPolymorphism,
         ],
     ),
-    TypeCapabilities::new(TypeKind::Newtype, &[]),
 ];
 
 impl CodeLang for TypeScript {
