@@ -329,7 +329,13 @@ const PY_TYPES: &[TypeCapabilities] = &[
             SpecCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilities::new(
+        TypeKind::TypeAlias,
+        &[
+            // ParametricPolymorphism = type parameters (`TypeVar`)
+            SpecCapability::ParametricPolymorphism,
+        ],
+    ),
     TypeCapabilities::new(TypeKind::Newtype, &[]),
 ];
 

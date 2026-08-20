@@ -237,7 +237,13 @@ const PHP_TYPES: &[TypeCapabilities] = &[
             SpecCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(TypeKind::Newtype, &[]),
+    TypeCapabilities::new(
+        TypeKind::Newtype,
+        &[
+            // Attributes = PHP attributes
+            SpecCapability::Attributes,
+        ],
+    ),
 ];
 
 impl CodeLang for Php {
