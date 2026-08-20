@@ -1,4 +1,5 @@
 use crate::import::{ImportEntry, ImportGroup};
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -233,7 +234,75 @@ impl RendererLang for TypeScript {
     }
 }
 
+const TS_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = properties/fields
+    SpecCapability::RecordFields,
+    // AccessorMethods = get/set accessors
+    SpecCapability::AccessorMethods,
+    // Methods = methods
+    SpecCapability::Methods,
+    SpecCapability::StructuralEmbedding,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // InterfaceImplementation = `implements`
+    SpecCapability::InterfaceImplementation,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic constraints
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = decorators
+    SpecCapability::Attributes,
+    // OptionalRecordFields = optional properties
+    SpecCapability::OptionalRecordFields,
+];
+const TS_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = properties/fields
+    SpecCapability::RecordFields,
+    // AccessorMethods = get/set accessors
+    SpecCapability::AccessorMethods,
+    // Methods = methods
+    SpecCapability::Methods,
+    SpecCapability::StructuralEmbedding,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic constraints
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = decorators
+    SpecCapability::Attributes,
+    // OptionalRecordFields = optional properties
+    SpecCapability::OptionalRecordFields,
+];
+const TS_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, TS_CLASS_CAPABILITIES),
+    // Struct is represented as a TypeScript class.
+    TypeCapabilities::new(TypeKind::Struct, TS_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Interface, TS_CONTRACT_CAPABILITIES),
+    // Trait is represented as a TypeScript interface.
+    TypeCapabilities::new(TypeKind::Trait, TS_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // Variants = enum members
+            SpecCapability::Variants,
+        ],
+    ),
+    TypeCapabilities::new(
+        TypeKind::TypeAlias,
+        &[
+            // ParametricPolymorphism = generic type parameters
+            SpecCapability::ParametricPolymorphism,
+        ],
+    ),
+    TypeCapabilities::new(TypeKind::Newtype, &[]),
+];
+
 impl CodeLang for TypeScript {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(TS_TYPES)
+    }
+
     fn escape_field_name(&self, name: &str) -> String {
         name.to_string()
     }

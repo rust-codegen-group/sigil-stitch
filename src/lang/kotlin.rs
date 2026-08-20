@@ -3,6 +3,7 @@
 use crate::code_block::{Arg, CodeBlock};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::{TypeParamSpec, render_type_params};
@@ -231,7 +232,85 @@ impl RendererLang for Kotlin {
     }
 }
 
+const KOTLIN_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = properties and backing fields
+    SpecCapability::RecordFields,
+    // AccessorMethods = get/set accessors
+    SpecCapability::AccessorMethods,
+    // Methods = member functions
+    SpecCapability::Methods,
+    // NominalSubtyping = supertypes (`:`)
+    SpecCapability::NominalSubtyping,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic constraints
+    SpecCapability::BoundedPolymorphism,
+    // ConstructorParameters = primary constructor parameters
+    SpecCapability::ConstructorParameters,
+    // Attributes = annotations
+    SpecCapability::Attributes,
+    // OptionalRecordFields = nullable properties
+    SpecCapability::OptionalRecordFields,
+];
+const KOTLIN_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+    // AccessorMethods = get/set accessors
+    SpecCapability::AccessorMethods,
+    // Methods = member functions
+    SpecCapability::Methods,
+    // NominalSubtyping = supertypes (`:`)
+    SpecCapability::NominalSubtyping,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic constraints
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = annotations
+    SpecCapability::Attributes,
+];
+const KOTLIN_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, KOTLIN_CLASS_CAPABILITIES),
+    // Struct is represented as a Kotlin data class.
+    TypeCapabilities::new(TypeKind::Struct, KOTLIN_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Interface, KOTLIN_CONTRACT_CAPABILITIES),
+    // Trait is represented as a Kotlin interface.
+    TypeCapabilities::new(TypeKind::Trait, KOTLIN_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // RecordFields = properties and backing fields
+            SpecCapability::RecordFields,
+            // AccessorMethods = get/set accessors
+            SpecCapability::AccessorMethods,
+            // Methods = member functions
+            SpecCapability::Methods,
+            // ConstructorParameters = primary constructor parameters
+            SpecCapability::ConstructorParameters,
+            // Attributes = annotations
+            SpecCapability::Attributes,
+            // Variants = enum entries
+            SpecCapability::Variants,
+        ],
+    ),
+    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilities::new(
+        TypeKind::Newtype,
+        &[
+            // RecordFields = properties and backing fields
+            SpecCapability::RecordFields,
+            // AccessorMethods = get/set accessors
+            SpecCapability::AccessorMethods,
+            // Methods = member functions
+            SpecCapability::Methods,
+            // Attributes = annotations
+            SpecCapability::Attributes,
+        ],
+    ),
+];
+
 impl CodeLang for Kotlin {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(KOTLIN_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

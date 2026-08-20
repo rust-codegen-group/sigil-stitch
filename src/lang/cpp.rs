@@ -2,6 +2,7 @@
 
 use crate::code_node::{BlockIntent, CodeNode};
 use crate::import::{ImportEntry, ImportGroup};
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -250,7 +251,49 @@ impl RendererLang for Cpp {
     }
 }
 
+const CPP_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = data members
+    SpecCapability::RecordFields,
+    // Methods = member functions
+    SpecCapability::Methods,
+    // NominalSubtyping = public inheritance
+    SpecCapability::NominalSubtyping,
+    // ParametricPolymorphism = templates
+    SpecCapability::ParametricPolymorphism,
+    // Attributes = [[attribute]]
+    SpecCapability::Attributes,
+    // OptionalRecordFields = std::optional members
+    SpecCapability::OptionalRecordFields,
+];
+const CPP_RECORD_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = data members
+    SpecCapability::RecordFields,
+    // Attributes = [[attribute]]
+    SpecCapability::Attributes,
+    // OptionalRecordFields = std::optional members
+    SpecCapability::OptionalRecordFields,
+];
+const CPP_ENUM_CAPABILITIES: &[SpecCapability] = &[
+    // Variants = enumerators
+    SpecCapability::Variants,
+    // Attributes = [[attribute]]
+    SpecCapability::Attributes,
+];
+const CPP_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, CPP_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Struct, CPP_RECORD_CAPABILITIES),
+    // Interface/Trait are represented as C++ classes.
+    TypeCapabilities::new(TypeKind::Interface, CPP_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, CPP_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Enum, CPP_ENUM_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+];
+
 impl CodeLang for Cpp {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(CPP_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

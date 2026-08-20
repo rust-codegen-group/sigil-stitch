@@ -2,6 +2,7 @@
 
 use crate::code_node::BlockIntent;
 use crate::import::ImportGroup;
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -268,7 +269,39 @@ impl RendererLang for OCaml {
     }
 }
 
+const OCAML_RECORD_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = record labels
+    SpecCapability::RecordFields,
+    // ParametricPolymorphism = type parameters
+    SpecCapability::ParametricPolymorphism,
+];
+const OCAML_VARIANT_CAPABILITIES: &[SpecCapability] = &[
+    // ParametricPolymorphism = type parameters
+    SpecCapability::ParametricPolymorphism,
+    // ConstructorParameters = constructor arguments
+    SpecCapability::ConstructorParameters,
+    // Variants = constructors
+    SpecCapability::Variants,
+];
+const OCAML_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Struct, OCAML_RECORD_CAPABILITIES),
+    // Class is represented as an OCaml record type.
+    TypeCapabilities::new(TypeKind::Class, OCAML_RECORD_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Enum, OCAML_VARIANT_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::TypeAlias,
+        &[
+            // ParametricPolymorphism = type parameters
+            SpecCapability::ParametricPolymorphism,
+        ],
+    ),
+];
+
 impl CodeLang for OCaml {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(OCAML_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

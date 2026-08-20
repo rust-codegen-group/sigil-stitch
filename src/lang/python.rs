@@ -4,6 +4,7 @@ use crate::code_block::CodeBlock;
 use crate::code_node::BlockIntent;
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -296,7 +297,47 @@ impl RendererLang for Python {
     }
 }
 
+const PY_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = class/instance fields
+    SpecCapability::RecordFields,
+    // Methods = methods
+    SpecCapability::Methods,
+    SpecCapability::StructuralEmbedding,
+    // NominalSubtyping = base classes
+    SpecCapability::NominalSubtyping,
+    // InterfaceImplementation = additional bases
+    SpecCapability::InterfaceImplementation,
+    // Attributes = decorators
+    SpecCapability::Attributes,
+    // OptionalRecordFields = optional instance fields
+    SpecCapability::OptionalRecordFields,
+];
+const PY_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, PY_CLASS_CAPABILITIES),
+    // Struct/Interface/Trait are represented as Python classes.
+    TypeCapabilities::new(TypeKind::Struct, PY_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Interface, PY_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, PY_CLASS_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // Methods = methods
+            SpecCapability::Methods,
+            // NominalSubtyping = base classes
+            SpecCapability::NominalSubtyping,
+            // Variants = enum members
+            SpecCapability::Variants,
+        ],
+    ),
+    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilities::new(TypeKind::Newtype, &[]),
+];
+
 impl CodeLang for Python {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(PY_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

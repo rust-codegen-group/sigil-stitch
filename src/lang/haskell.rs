@@ -4,6 +4,7 @@ use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::TypeParamSpec;
@@ -282,7 +283,69 @@ impl RendererLang for Haskell {
     }
 }
 
+const HASKELL_DATA_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = record fields
+    SpecCapability::RecordFields,
+    // ParametricPolymorphism = type variables
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = class contexts / constraints
+    SpecCapability::BoundedPolymorphism,
+    // ConstructorParameters = data constructor arguments
+    SpecCapability::ConstructorParameters,
+    // Variants = data constructors
+    SpecCapability::Variants,
+    // impl_types render as `deriving (...)`.
+    SpecCapability::InterfaceImplementation,
+];
+const HASKELL_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+    // Methods = class methods
+    SpecCapability::Methods,
+    // ParametricPolymorphism = type variables
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = class contexts / constraints
+    SpecCapability::BoundedPolymorphism,
+];
+const HASKELL_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Struct, HASKELL_DATA_CAPABILITIES),
+    // Class is represented as a Haskell data declaration.
+    TypeCapabilities::new(TypeKind::Class, HASKELL_DATA_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, HASKELL_CONTRACT_CAPABILITIES),
+    // Interface is represented as a Haskell class.
+    TypeCapabilities::new(TypeKind::Interface, HASKELL_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // ParametricPolymorphism = type variables
+            SpecCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = class contexts / constraints
+            SpecCapability::BoundedPolymorphism,
+            // ConstructorParameters = data constructor arguments
+            SpecCapability::ConstructorParameters,
+            // Variants = data constructors
+            SpecCapability::Variants,
+            SpecCapability::InterfaceImplementation,
+        ],
+    ),
+    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilities::new(
+        TypeKind::Newtype,
+        &[
+            // ParametricPolymorphism = type variables
+            SpecCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = class contexts / constraints
+            SpecCapability::BoundedPolymorphism,
+            // ConstructorParameters = data constructor arguments
+            SpecCapability::ConstructorParameters,
+            SpecCapability::InterfaceImplementation,
+        ],
+    ),
+];
+
 impl CodeLang for Haskell {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(HASKELL_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

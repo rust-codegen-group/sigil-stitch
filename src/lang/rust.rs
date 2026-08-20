@@ -1,4 +1,5 @@
 use crate::import::{ImportEntry, ImportGroup};
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -138,7 +139,79 @@ impl RendererLang for Rust {
     }
 }
 
+const RUST_RECORD_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = struct fields
+    SpecCapability::RecordFields,
+    // Methods = impl methods
+    SpecCapability::Methods,
+    SpecCapability::StructuralEmbedding,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = trait bounds
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = `#[attr]`
+    SpecCapability::Attributes,
+    SpecCapability::OptionalRecordFields,
+];
+const RUST_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+    // Methods = impl methods
+    SpecCapability::Methods,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = trait bounds
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = `#[attr]`
+    SpecCapability::Attributes,
+];
+const RUST_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Struct, RUST_RECORD_CAPABILITIES),
+    // Class is represented as a Rust struct plus an impl block.
+    TypeCapabilities::new(TypeKind::Class, RUST_RECORD_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, RUST_CONTRACT_CAPABILITIES),
+    // Interface is represented as a Rust trait.
+    TypeCapabilities::new(TypeKind::Interface, RUST_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // Methods = impl methods
+            SpecCapability::Methods,
+            // ParametricPolymorphism = generic type parameters
+            SpecCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = trait bounds
+            SpecCapability::BoundedPolymorphism,
+            // Attributes = `#[attr]`
+            SpecCapability::Attributes,
+            // Variants = enum variants
+            SpecCapability::Variants,
+        ],
+    ),
+    TypeCapabilities::new(
+        TypeKind::TypeAlias,
+        &[
+            // ParametricPolymorphism = generic type parameters
+            SpecCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = trait bounds
+            SpecCapability::BoundedPolymorphism,
+        ],
+    ),
+    TypeCapabilities::new(
+        TypeKind::Newtype,
+        &[
+            // ParametricPolymorphism = generic type parameters
+            SpecCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = trait bounds
+            SpecCapability::BoundedPolymorphism,
+            // Attributes = `#[attr]`
+            SpecCapability::Attributes,
+        ],
+    ),
+];
+
 impl CodeLang for Rust {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(RUST_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

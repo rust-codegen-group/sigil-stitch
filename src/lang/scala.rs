@@ -3,6 +3,7 @@
 use crate::code_block::{Arg, CodeBlock};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::{TypeParamSpec, render_type_params};
@@ -185,7 +186,82 @@ impl RendererLang for Scala {
     }
 }
 
+const SCALA_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = fields
+    SpecCapability::RecordFields,
+    // AccessorMethods = accessors
+    SpecCapability::AccessorMethods,
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // InterfaceImplementation = `with`
+    SpecCapability::InterfaceImplementation,
+    // ParametricPolymorphism = type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = context/view bounds and type bounds
+    SpecCapability::BoundedPolymorphism,
+    // ConstructorParameters = primary constructor parameters
+    SpecCapability::ConstructorParameters,
+    // Attributes = annotations
+    SpecCapability::Attributes,
+];
+const SCALA_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // ParametricPolymorphism = type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = context/view bounds and type bounds
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = annotations
+    SpecCapability::Attributes,
+];
+const SCALA_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, SCALA_CLASS_CAPABILITIES),
+    // Struct is represented as a Scala case class.
+    TypeCapabilities::new(TypeKind::Struct, SCALA_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, SCALA_CONTRACT_CAPABILITIES),
+    // Interface is represented as a Scala trait.
+    TypeCapabilities::new(TypeKind::Interface, SCALA_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // RecordFields = fields
+            SpecCapability::RecordFields,
+            // AccessorMethods = accessors
+            SpecCapability::AccessorMethods,
+            // Methods = methods
+            SpecCapability::Methods,
+            // ParametricPolymorphism = type parameters
+            SpecCapability::ParametricPolymorphism,
+            // Attributes = annotations
+            SpecCapability::Attributes,
+            // Variants = enum cases
+            SpecCapability::Variants,
+        ],
+    ),
+    TypeCapabilities::new(
+        TypeKind::Newtype,
+        &[
+            // RecordFields = fields
+            SpecCapability::RecordFields,
+            // AccessorMethods = accessors
+            SpecCapability::AccessorMethods,
+            // Methods = methods
+            SpecCapability::Methods,
+            // Attributes = annotations
+            SpecCapability::Attributes,
+        ],
+    ),
+];
+
 impl CodeLang for Scala {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(SCALA_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

@@ -4,6 +4,7 @@ use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -309,7 +310,45 @@ impl RendererLang for Go {
     }
 }
 
+// Go has no native Enum; TypeKind::Enum is intentionally unsupported.
+const GO_STRUCT_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = struct fields
+    SpecCapability::RecordFields,
+    // StructuralEmbedding = embedded fields / embedded interfaces
+    SpecCapability::StructuralEmbedding,
+    // ParametricPolymorphism = type parameters
+    SpecCapability::ParametricPolymorphism,
+    // OptionalRecordFields = pointer-typed optional fields
+    SpecCapability::OptionalRecordFields,
+];
+const GO_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+    // Methods = interface methods
+    SpecCapability::Methods,
+    // StructuralEmbedding = embedded interfaces
+    SpecCapability::StructuralEmbedding,
+];
+const GO_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Struct, GO_STRUCT_CAPABILITIES),
+    // Class is represented as a Go struct.
+    TypeCapabilities::new(TypeKind::Class, GO_STRUCT_CAPABILITIES),
+    // Trait is represented as a Go interface.
+    TypeCapabilities::new(TypeKind::Interface, GO_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, GO_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilities::new(
+        TypeKind::Newtype,
+        &[
+            // ParametricPolymorphism = type parameters
+            SpecCapability::ParametricPolymorphism,
+        ],
+    ),
+];
+
 impl CodeLang for Go {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(GO_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

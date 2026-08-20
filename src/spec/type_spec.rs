@@ -3,6 +3,7 @@
 use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
+use crate::lang::capability::SpecCapability;
 use crate::spec::annotation_spec::AnnotationSpec;
 use crate::spec::enum_variant_spec::EnumVariantSpec;
 use crate::spec::field_spec::FieldSpec;
@@ -106,6 +107,104 @@ impl TypeSpec {
         self.kind
     }
 
+    /// Validate this type against the language capability matrix.
+    pub fn validate(&self, lang: &dyn CodeLang) -> Result<(), crate::error::SigilStitchError> {
+        let capabilities = lang.capabilities();
+        let language = lang.file_extension().to_string();
+
+        if !capabilities.supports_type_kind(self.kind) {
+            return Err(SigilStitchError::UnsupportedTypeKind {
+                language,
+                kind: self.kind,
+                type_name: self.name.clone(),
+            });
+        }
+
+        // TypeAlias/Newtype shape is already validated by the builder; their
+        // `super_types` field is the target type, not nominal subtyping.
+        if matches!(self.kind, TypeKind::TypeAlias | TypeKind::Newtype) {
+            return Ok(());
+        }
+
+        let mut missing = Vec::new();
+        let require = |capability: SpecCapability, condition: bool, missing: &mut Vec<_>| {
+            if condition && !capabilities.supports_capability(self.kind, capability) {
+                missing.push(capability);
+            }
+        };
+
+        require(
+            SpecCapability::RecordFields,
+            !self.fields.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::AccessorMethods,
+            !self.properties.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::Methods,
+            !self.methods.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::StructuralEmbedding,
+            !self.embedded_types.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::NominalSubtyping,
+            !self.super_types.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::InterfaceImplementation,
+            !self.impl_types.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::ParametricPolymorphism,
+            !self.type_params.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::BoundedPolymorphism,
+            !self.where_constraints.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::ConstructorParameters,
+            !self.primary_constructor.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::Variants,
+            !self.variants.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::Attributes,
+            !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
+            &mut missing,
+        );
+        require(
+            SpecCapability::OptionalRecordFields,
+            self.fields.iter().any(|field| field.is_optional),
+            &mut missing,
+        );
+
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(SigilStitchError::UnsupportedSpecCapabilities {
+                language,
+                type_name: self.name.clone(),
+                capabilities: missing,
+            })
+        }
+    }
+
     /// Emit this type as one or more CodeBlocks.
     ///
     /// Returns a `Vec` because Rust struct + impl = two separate blocks,
@@ -114,6 +213,7 @@ impl TypeSpec {
         &self,
         lang: &dyn CodeLang,
     ) -> Result<Vec<CodeBlock>, crate::error::SigilStitchError> {
+        self.validate(lang)?;
         match self.kind {
             TypeKind::TypeAlias => return Ok(vec![self.emit_type_alias(lang)?]),
             TypeKind::Newtype => return Ok(vec![self.emit_newtype(lang)?]),

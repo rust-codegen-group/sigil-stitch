@@ -25,6 +25,7 @@
 //! `sigil_quote!` map to indent/dedent + `end` in the output.
 
 use crate::import::ImportGroup;
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, TypeDeclSyntaxConfig,
     TypePresentationConfig,
@@ -136,7 +137,54 @@ impl RendererLang for Ruby {
     }
 }
 
+const RUBY_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = instance variables
+    SpecCapability::RecordFields,
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = `<`
+    SpecCapability::NominalSubtyping,
+    // Attributes = annotations are not native; raw blocks remain available
+    SpecCapability::Attributes,
+];
+const RUBY_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, RUBY_CLASS_CAPABILITIES),
+    // Struct is represented as a Ruby class.
+    TypeCapabilities::new(TypeKind::Struct, RUBY_CLASS_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Interface,
+        &[
+            // Methods = methods
+            SpecCapability::Methods,
+            // Attributes = annotations are not native; raw blocks remain available
+            SpecCapability::Attributes,
+        ],
+    ),
+    TypeCapabilities::new(
+        TypeKind::Trait,
+        &[
+            // Methods = methods
+            SpecCapability::Methods,
+            // Attributes = annotations are not native; raw blocks remain available
+            SpecCapability::Attributes,
+        ],
+    ),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // Variants = constants on the class object
+            SpecCapability::Variants,
+            // Attributes = annotations are not native; raw blocks remain available
+            SpecCapability::Attributes,
+        ],
+    ),
+];
+
 impl CodeLang for Ruby {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(RUBY_TYPES)
+    }
+
     fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
         match ctx {
             DeclarationContext::TopLevel => "",

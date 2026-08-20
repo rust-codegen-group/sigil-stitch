@@ -2,6 +2,7 @@
 
 use crate::code_node::BlockIntent;
 use crate::import::ImportGroup;
+use crate::lang::capability::LanguageCapabilities;
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -256,6 +257,12 @@ impl RendererLang for Bash {
 }
 
 impl CodeLang for Bash {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        // Bash has no type declaration system; use CodeBlock for shell
+        // functions and control flow instead.
+        LanguageCapabilities::new(&[])
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

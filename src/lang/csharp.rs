@@ -1,4 +1,5 @@
 use crate::import::ImportGroup;
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -180,7 +181,67 @@ impl RendererLang for CSharp {
     }
 }
 
+const CS_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = fields
+    SpecCapability::RecordFields,
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = base classes and interfaces (`:`)
+    SpecCapability::NominalSubtyping,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic constraints (`where`)
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = `[Attribute]`
+    SpecCapability::Attributes,
+    // OptionalRecordFields = nullable fields
+    SpecCapability::OptionalRecordFields,
+];
+const CS_STRUCT_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = fields
+    SpecCapability::RecordFields,
+    // Methods = methods
+    SpecCapability::Methods,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // Attributes = `[Attribute]`
+    SpecCapability::Attributes,
+    // OptionalRecordFields = nullable fields
+    SpecCapability::OptionalRecordFields,
+];
+const CS_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = base classes and interfaces (`:`)
+    SpecCapability::NominalSubtyping,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic constraints (`where`)
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = `[Attribute]`
+    SpecCapability::Attributes,
+];
+const CS_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, CS_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Struct, CS_STRUCT_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Interface, CS_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, CS_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // Variants = enum members
+            SpecCapability::Variants,
+            // Attributes = `[Attribute]`
+            SpecCapability::Attributes,
+        ],
+    ),
+];
+
 impl CodeLang for CSharp {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(CS_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

@@ -45,6 +45,7 @@
 use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, OptionalFieldStyle,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -179,7 +180,71 @@ impl RendererLang for Php {
     }
 }
 
+const PHP_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = properties
+    SpecCapability::RecordFields,
+    // AccessorMethods = promoted/accessor properties
+    SpecCapability::AccessorMethods,
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // InterfaceImplementation = `implements`
+    SpecCapability::InterfaceImplementation,
+    // Attributes = PHP attributes
+    SpecCapability::Attributes,
+    // OptionalRecordFields = nullable properties
+    SpecCapability::OptionalRecordFields,
+];
+const PHP_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, PHP_CLASS_CAPABILITIES),
+    // Struct is represented as a PHP class.
+    TypeCapabilities::new(TypeKind::Struct, PHP_CLASS_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Interface,
+        &[
+            // Methods = methods
+            SpecCapability::Methods,
+            // NominalSubtyping = `extends`
+            SpecCapability::NominalSubtyping,
+            // Attributes = PHP attributes
+            SpecCapability::Attributes,
+        ],
+    ),
+    TypeCapabilities::new(
+        TypeKind::Trait,
+        &[
+            // RecordFields = properties
+            SpecCapability::RecordFields,
+            // AccessorMethods = promoted/accessor properties
+            SpecCapability::AccessorMethods,
+            // Methods = methods
+            SpecCapability::Methods,
+            // Attributes = PHP attributes
+            SpecCapability::Attributes,
+        ],
+    ),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // Methods = methods
+            SpecCapability::Methods,
+            // InterfaceImplementation = `implements`
+            SpecCapability::InterfaceImplementation,
+            // Attributes = PHP attributes
+            SpecCapability::Attributes,
+            // Variants = enum cases
+            SpecCapability::Variants,
+        ],
+    ),
+    TypeCapabilities::new(TypeKind::Newtype, &[]),
+];
+
 impl CodeLang for Php {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(PHP_TYPES)
+    }
+
     fn variable_prefix(&self) -> &str {
         "$"
     }

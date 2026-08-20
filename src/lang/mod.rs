@@ -2,6 +2,8 @@
 pub mod bash;
 /// C language support.
 pub mod c;
+/// Language capability declarations for spec emission.
+pub mod capability;
 /// Shared configuration types (quote style, optional-field rendering).
 pub mod config;
 /// C++ language support.
@@ -48,6 +50,7 @@ use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::BlockIntent;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
+use crate::lang::capability::LanguageCapabilities;
 use crate::spec::modifiers::TypeKind;
 use crate::spec::where_spec::{TypeParamSpec, render_type_params};
 use crate::type_name::TypeName;
@@ -282,6 +285,17 @@ pub trait RendererLang: std::fmt::Debug + 'static {
 /// # Ok::<(), SigilStitchError>(())
 /// ```
 pub trait CodeLang: RendererLang {
+    // ── Capability contract ───────────────────────────────────────────
+
+    /// Declare which spec constructs this language supports.
+    ///
+    /// Built-in languages return strict local matrices. Unknown external
+    /// adapters inherit the permissive legacy `all()` profile.
+    #[allow(deprecated)]
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::all()
+    }
+
     // ── Spec-layer methods — used by FunSpec, TypeSpec, FieldSpec, etc. ───
 
     /// Render an import group to a string.

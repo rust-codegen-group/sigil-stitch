@@ -3,6 +3,7 @@
 use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::TypeParamSpec;
@@ -187,7 +188,37 @@ impl RendererLang for C {
     }
 }
 
+const C_RECORD_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = struct members
+    SpecCapability::RecordFields,
+    // Attributes = __attribute__ annotations
+    SpecCapability::Attributes,
+    // OptionalRecordFields = pointer-typed fields
+    SpecCapability::OptionalRecordFields,
+];
+const C_ENUM_CAPABILITIES: &[SpecCapability] = &[
+    // Variants = enumerators
+    SpecCapability::Variants,
+    // Attributes = __attribute__ annotations
+    SpecCapability::Attributes,
+];
+const C_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Struct, C_RECORD_CAPABILITIES),
+    // Class is represented as a C struct.
+    TypeCapabilities::new(TypeKind::Class, C_RECORD_CAPABILITIES),
+    // Interface/Trait are represented as C structs.
+    TypeCapabilities::new(TypeKind::Interface, C_RECORD_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Trait, C_RECORD_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Enum, C_ENUM_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+    TypeCapabilities::new(TypeKind::Newtype, &[]),
+];
+
 impl CodeLang for C {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(C_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

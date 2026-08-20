@@ -1,6 +1,7 @@
 //! Java language implementation.
 
 use crate::import::ImportGroup;
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -145,7 +146,65 @@ impl RendererLang for Java {
     }
 }
 
+const JAVA_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = fields
+    SpecCapability::RecordFields,
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // InterfaceImplementation = `implements`
+    SpecCapability::InterfaceImplementation,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic bounds (`extends`)
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = annotations
+    SpecCapability::Attributes,
+    // OptionalRecordFields = Optional members
+    SpecCapability::OptionalRecordFields,
+];
+const JAVA_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic bounds (`extends`)
+    SpecCapability::BoundedPolymorphism,
+    // Attributes = annotations
+    SpecCapability::Attributes,
+];
+const JAVA_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, JAVA_CLASS_CAPABILITIES),
+    // Struct is represented as a Java class.
+    TypeCapabilities::new(TypeKind::Struct, JAVA_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Interface, JAVA_CONTRACT_CAPABILITIES),
+    // Trait is represented as a Java interface.
+    TypeCapabilities::new(TypeKind::Trait, JAVA_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // RecordFields = fields
+            SpecCapability::RecordFields,
+            // Methods = methods
+            SpecCapability::Methods,
+            // InterfaceImplementation = `implements`
+            SpecCapability::InterfaceImplementation,
+            // Attributes = annotations
+            SpecCapability::Attributes,
+            // Variants = enum constants
+            SpecCapability::Variants,
+        ],
+    ),
+];
+
 impl CodeLang for Java {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(JAVA_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

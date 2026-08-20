@@ -1,6 +1,7 @@
 //! Dart language implementation.
 
 use crate::import::ImportGroup;
+use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -186,7 +187,56 @@ impl RendererLang for Dart {
     }
 }
 
+const DART_CLASS_CAPABILITIES: &[SpecCapability] = &[
+    // RecordFields = instance fields
+    SpecCapability::RecordFields,
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // InterfaceImplementation = `implements`
+    SpecCapability::InterfaceImplementation,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // Attributes = metadata annotations
+    SpecCapability::Attributes,
+    // OptionalRecordFields = nullable fields
+    SpecCapability::OptionalRecordFields,
+];
+const DART_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+    // Methods = methods
+    SpecCapability::Methods,
+    // NominalSubtyping = `extends`
+    SpecCapability::NominalSubtyping,
+    // InterfaceImplementation = `implements`
+    SpecCapability::InterfaceImplementation,
+    // ParametricPolymorphism = generic type parameters
+    SpecCapability::ParametricPolymorphism,
+    // Attributes = metadata annotations
+    SpecCapability::Attributes,
+];
+const DART_TYPES: &[TypeCapabilities] = &[
+    TypeCapabilities::new(TypeKind::Class, DART_CLASS_CAPABILITIES),
+    // Struct is represented as a Dart class.
+    TypeCapabilities::new(TypeKind::Struct, DART_CLASS_CAPABILITIES),
+    TypeCapabilities::new(TypeKind::Interface, DART_CONTRACT_CAPABILITIES),
+    // Trait is represented as a Dart abstract class.
+    TypeCapabilities::new(TypeKind::Trait, DART_CONTRACT_CAPABILITIES),
+    TypeCapabilities::new(
+        TypeKind::Enum,
+        &[
+            // Variants = enum values
+            SpecCapability::Variants,
+        ],
+    ),
+    TypeCapabilities::new(TypeKind::TypeAlias, &[]),
+];
+
 impl CodeLang for Dart {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::new(DART_TYPES)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();
