@@ -467,15 +467,78 @@ fn validate_reports_unsupported_type_before_render() {
         .build()
         .unwrap();
 
-    let validate_error = file.validate().unwrap_err();
+    for error in [file.validate().unwrap_err(), file.render(80).unwrap_err()] {
+        let SigilStitchError::FileSpecValidation {
+            filename,
+            error_count,
+            errors,
+        } = error
+        else {
+            panic!("expected FileSpecValidation, got {error:?}");
+        };
+        assert_eq!(filename, "user.bash");
+        assert_eq!(error_count, 1);
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(
+            &errors[0],
+            SigilStitchError::UnsupportedTypeKind { type_name, .. } if type_name == "User"
+        ));
+    }
+}
+
+#[test]
+fn validate_aggregates_multiple_unsupported_types() {
+    let file = FileSpec::builder_with("user.bash", sigil_stitch::lang::bash::Bash::new())
+        .add_type(TypeSpec::builder("User", TypeKind::Class).build().unwrap())
+        .add_type(
+            TypeSpec::builder("Account", TypeKind::Class)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = file.validate().unwrap_err();
+    let SigilStitchError::FileSpecValidation {
+        filename,
+        error_count,
+        errors,
+    } = error
+    else {
+        panic!("expected FileSpecValidation, got {error:?}");
+    };
+
+    assert_eq!(filename, "user.bash");
+    assert_eq!(error_count, 2);
+    assert_eq!(errors.len(), 2);
+
+    let mut names: Vec<_> = errors
+        .iter()
+        .map(|error| match error {
+            SigilStitchError::UnsupportedTypeKind { type_name, .. } => type_name.as_str(),
+            other => panic!("expected UnsupportedTypeKind, got {other:?}"),
+        })
+        .collect();
+    names.sort_unstable();
+    assert_eq!(names, ["Account", "User"]);
+
     let render_error = file.render(80).unwrap_err();
     assert!(matches!(
-        validate_error,
-        SigilStitchError::UnsupportedTypeKind { .. }
-    ));
-    assert!(matches!(
         render_error,
-        SigilStitchError::UnsupportedTypeKind { .. }
+        SigilStitchError::FileSpecValidation { .. }
+    ));
+}
+
+#[test]
+fn validate_missing_lang_stays_direct() {
+    let file = FileSpec::builder("empty.ts").build().unwrap();
+    let json = serde_json::to_string(&file).unwrap();
+    let deserialized: FileSpec = serde_json::from_str(&json).unwrap();
+
+    let error = deserialized.validate().unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::MissingLang { ref filename } if filename == "empty.ts"
     ));
 }
 

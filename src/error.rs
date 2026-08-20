@@ -186,6 +186,21 @@ pub enum SigilStitchError {
         filename: String,
     },
 
+    /// A FileSpec contains one or more invalid spec members.
+    ///
+    /// Validation is collected rather than fail-fast: every invalid
+    /// [`TypeSpec`](crate::spec::type_spec::TypeSpec) is checked and all
+    /// resulting errors are returned together.
+    #[snafu(display("FileSpec {filename:?} has {error_count} validation error(s): {errors:?}"))]
+    FileSpecValidation {
+        /// The filename of the invalid FileSpec.
+        filename: String,
+        /// The number of collected validation errors. Equal to `errors.len()`.
+        error_count: usize,
+        /// The collected member validation errors.
+        errors: Vec<SigilStitchError>,
+    },
+
     /// Invalid enum declaration.
     #[snafu(display("invalid enum {type_name:?}: {reason}"))]
     InvalidEnum {
