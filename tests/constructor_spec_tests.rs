@@ -1,4 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::lang::capability::TypeCapability;
 use sigil_stitch::lang::cpp::Cpp;
 use sigil_stitch::lang::dart::Dart;
 use sigil_stitch::lang::java::Java;
@@ -346,7 +347,8 @@ fn test_backward_compat_ts_constructor_without_flag() {
 
 #[test]
 fn test_backward_compat_java_constructor_without_flag() {
-    // Existing pattern: FunSpec with class name and no is_constructor flag.
+    // Existing direct-emission pattern: a member without a return type remains
+    // constructor-shaped even though this path has no declaring-type owner.
     let java = Java::new();
     let output = render_fun(
         &FunSpec::builder("UserService")
@@ -522,8 +524,7 @@ fn test_dart_constructor_with_super_delegation() {
         &dart,
         DeclarationContext::Member,
     );
-    assert!(output.contains("Dog(String name) {"));
-    assert!(output.contains("super(name);"));
+    assert!(output.contains("Dog(String name) : super(name) {"));
     assert!(output.contains("print('Dog created');"));
 }
 
@@ -561,9 +562,23 @@ fn test_cpp_constructor_with_super_delegation() {
         &cpp,
         DeclarationContext::Member,
     );
-    // C++ uses body-style delegation (in this simplified model)
-    assert!(output.contains("Dog(std::string name) {"));
-    assert!(output.contains("Animal(name);"));
+    assert!(output.contains("Dog(std::string name) : Animal(name) {"));
+}
+
+#[test]
+fn test_cpp_bodyless_constructor_delegation_emits_definition_body() {
+    let output = render_fun(
+        &FunSpec::builder("Dog")
+            .is_constructor()
+            .delegation(CodeBlock::of("Animal()", ()).unwrap())
+            .build()
+            .unwrap(),
+        &Cpp::new(),
+        DeclarationContext::Member,
+    );
+
+    assert!(output.contains("Dog() : Animal() {"), "{output}");
+    assert!(output.ends_with("}\n"), "{output}");
 }
 
 // ── Delegation in class context ─────────────────────────
@@ -716,10 +731,10 @@ fn test_ts_rejects_primary_constructor() {
     assert!(
         matches!(
             error,
-            sigil_stitch::error::SigilStitchError::UnsupportedSpecCapabilities {
+            sigil_stitch::error::SigilStitchError::UnsupportedTypeCapabilities {
                 ref capabilities,
                 ..
-            } if capabilities.iter().any(|c| c.as_str() == "ConstructorParameters")
+            } if capabilities.contains(&TypeCapability::ConstructorParameters)
         ),
         "{error}"
     );

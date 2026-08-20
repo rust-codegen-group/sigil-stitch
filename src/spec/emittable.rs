@@ -12,6 +12,15 @@ use crate::lang::CodeLang;
 /// Built-in implementations: [`TypeSpec`](super::type_spec::TypeSpec),
 /// [`FunSpec`](super::fun_spec::FunSpec).
 pub trait Emittable: std::fmt::Debug {
+    /// Append any language-specific validation failures for this spec.
+    ///
+    /// The default preserves compatibility for custom specs that predate
+    /// capability validation. Built-in specs override this so using
+    /// [`add_spec`](super::file_spec::FileSpecBuilder::add_spec) cannot bypass
+    /// aggregate file validation.
+    fn collect_validation_errors(&self, _lang: &dyn CodeLang, _errors: &mut Vec<SigilStitchError>) {
+    }
+
     /// Emit this spec as one or more code blocks for a given language.
     fn emit_members(&self, lang: &dyn CodeLang) -> Result<Vec<CodeBlock>, SigilStitchError>;
 }

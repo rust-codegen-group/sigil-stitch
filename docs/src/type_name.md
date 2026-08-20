@@ -2,7 +2,10 @@
 
 `TypeName` is the type reference enum at the heart of sigil-stitch's import tracking. When you use a `TypeName` with the `%T` format specifier in a `CodeBlock`, the library renders the type name in the output *and* records the import. At render time, `FileSpec` collects all recorded imports, deduplicates them, resolves naming conflicts, and emits the import header automatically.
 
-`TypeName` is language-agnostic — it carries no generic parameter. The same `TypeName` value can be rendered for any target language at `FileSpec::render()` time.
+`TypeName` carries semantic type structure and has no language generic
+parameter. A target's `RendererLang` presentation decides how each supported
+variant is spelled at `FileSpec::render()` time. `Primitive`, `Qualified`, and
+especially `Raw` values may still contain target-specific names or syntax.
 
 Public type rendering is always language-aware. For normal generation, place a
 `TypeName` in a `CodeBlock` `%T` slot and let `FileSpec` collect imports, resolve
@@ -77,7 +80,11 @@ let map = TypeName::qualified("java.util", "HashMap");
 # }
 ```
 
-The separator between module and name comes from `CodeLang::module_separator()` — `"::"` for Rust/C++, `"."` for Go/Python/Java/Kotlin/Scala/Swift/Dart/Haskell/OCaml. Languages without module-qualified paths (TypeScript, JavaScript, C, Bash, Zsh) silently fall back to rendering just the name.
+The separator between module and name comes from
+`RendererLang::module_separator()` — `"::"` for Rust/C++, `"."` for
+Go/Python/Java/Kotlin/Scala/Swift/Dart/Haskell/OCaml. Languages without
+module-qualified paths (TypeScript, JavaScript, C, Bash, Zsh) silently fall
+back to rendering just the name.
 
 Qualified types work anywhere a `TypeName` is accepted, including inside generics:
 

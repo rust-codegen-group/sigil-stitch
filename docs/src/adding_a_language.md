@@ -2,10 +2,15 @@
 
 sigil-stitch supports new languages by implementing two traits: `RendererLang` (renderer-only methods) and `CodeLang` (spec-layer methods). `CodeLang` extends `RendererLang`, so implementing `CodeLang` requires both. If you only need `CodeBlock`-level rendering without specs, `RendererLang` alone is sufficient.
 
-`RendererLang` covers rendering essentials. `CodeLang` adds spec-layer behavior,
-six config struct accessors, and structured emission hooks, all with sensible
-defaults. You only need to override the defaults when your language diverges
-from the common patterns.
+`RendererLang` covers rendering essentials. `CodeLang` adds declaration
+validation, materialization, and file-level behavior. The current trait also
+contains pre-0.6.8 syntax configuration and structured emission hooks with
+compatibility defaults.
+
+Do not treat those declaration syntax structs as an extensible universal
+grammar. New syntax dimensions belong in complete language-local lowering. See
+[Declaration Specs and Language Lowering](declaration_lowering.md) for the
+ownership model and migration policy.
 
 This guide walks through the process using a hypothetical language, with references to real implementations you can study.
 
@@ -39,7 +44,6 @@ Only two methods have no default:
 
 | Method | Default | Purpose |
 |--------|---------|---------|
-| `capabilities()` | `LanguageCapabilities::all()` legacy default | Declare supported type kinds and semantic spec capabilities |
 | `reserved_words()` | Empty | Words that need escaping |
 | `render_string_literal()` | C-style double quotes | Language-specific string quoting |
 | `render_verbatim_string()` | Delegates to `render_string_literal()` | Minimal escaping for interpolated strings |
@@ -51,48 +55,114 @@ Only two methods have no default:
 
 Override `render_verbatim_string()` if your language has string interpolation (e.g., Bash `"$x"`, TypeScript `` `${x}` ``, Python `f"{x}"`).
 
-Implement `capabilities()` for new adapters. Return a local
-`LanguageCapabilities` matrix that lists supported `TypeKind`s and the
-`SpecCapability`s each kind supports. Unknown legacy adapters inherit
-`LanguageCapabilities::all()`.
-
 For keyword-delimited languages, implement `block_open_for_intent()` and
 `block_close_for_intent()` as a local `match` over `BlockIntent`. The legacy
 string-based `block_open_for()` / `block_close_for()` methods remain supported
 only for old serialized nodes and external adapters.
 
-`rewrite_nodes()` is available for syntax corrections that require a tree-level
-view after macro expansion. Prefer intent-keyed structural rewrites for blocks
-and declarative config for ordinary syntax.
+`rewrite_nodes()` is available for renderer corrections that require a
+tree-level view after macro expansion. Prefer intent-keyed structural rewrites
+for blocks. Declaration grammar belongs to language-local lowering; the
+existing declaration syntax structs are a compatibility path, not the place to
+add another ordering or placement concept.
 
 ## The CodeLang Trait
 
 Extends `RendererLang` with the additional methods needed by the spec layer.
 
-### Core Spec Support Methods
+Implement `capabilities()` for new adapters. Return a local
+`LanguageCapabilities::strict()` matrix, add `TypeCapabilityProfile`s with
+`with_types()`, and add `FunctionCapabilityProfile`s with `with_functions()`.
+Function profiles are keyed by both context (`TopLevel`, `ReceiverMethod`,
+`Member`, or `InterfaceMember`) and form (`Function`, `Constructor`, or
+`Destructor`). Omit a profile when that combination is unsupported. Include
+`ExplicitReturnType` and `TypedParameters` only where the form can represent
+them. Use `with_required_capabilities()` for semantic facts that every
+declaration must provide, `with_body_policy()` for required or forbidden
+implementation bodies, and `with_incompatible_capabilities()` for supported
+features that cannot be combined. Use `with_maximum_parameters()` for
+form-specific arity limits, such as a zero-parameter destructor. Adapters
+written for sigil-stitch 0.6.8 inherit
+`LanguageCapabilities::permissive()` so their existing `CodeLang`
+implementations remain source-compatible.
 
-These methods enable useful TypeSpec, FunSpec, and FieldSpec rendering. Their
-defaults are intentionally minimal, so most language adapters override them:
+### Function Lowering and Compatibility Methods
+
+`CodeLang::validate_function()` receives classified, read-only `FunctionIntent`
+after sigil-stitch applies its semantic capability matrix against the actual
+adapter. An override returns `Result<(), SigilStitchError>` and can add
+target-local checks, but cannot construct or bypass `ValidatedFunction`.
+`CodeLang::lower_function()` receives the validated view and returns a
+structured `CodeBlock`. New adapters implement this method as the owner of the
+target's complete function grammar. Both views expose the function form and
+context as well as names, types, parameters, modifiers, annotations,
+constraints, delegation, suffix escape hatches, and the body.
+
+The remaining interface mixes semantic validation hooks with older grammar
+fragments used by compatibility lowerers. Grammar-oriented methods must be
+absorbed by complete language-local lowering rather than multiplied:
 
 | Method | Example | Purpose |
 |--------|---------|---------|
+| `capabilities()` | Strict type and function profiles | Declare semantic representability by context and form |
 | `render_visibility()` | `"public "`, `"pub "` | Visibility prefix |
 | `function_keyword()` | `"function"`, `"fn"` | Function declaration keyword |
+| `abstract_modifier_capability()` | `AbstractMethod`, `VirtualMethod` | Semantic meaning of the legacy abstract modifier |
+| `function_form()` | `Function`, `Constructor`, `Destructor` | Classify declaration form for capability validation |
+| `constructor_name_matches()` | `constructor`, `init`, or declaring type | Recognize implicit constructor spellings with or without an owning type |
+| `static_constructor_name_matches()` | `true` / `false` for name and owner | Decide whether a constructor-shaped static member is still a constructor |
+| `constructor_name_with_return_type_is_function()` | `true` / `false` | Let an explicit return type disambiguate an owner-named ordinary method |
+| `constructor_name_is_valid()` | `true` / `false` for name and owner | Reject explicitly marked constructors whose names violate local syntax |
+| `type_member_declaration_context()` | `Member`, `InterfaceMember` | Select concrete or contract member rules for each `TypeKind` |
+| `abstract_type_modifier_is_valid()` | `true` / `false` for one `TypeKind` | Restrict explicit abstract type declarations to valid kinds |
+| `function_parameters_are_typed()` | `true` / `false` for the complete list | Refine required typing for receiver spellings or shared annotations |
+| `function_body_policy()` | `Required`, `Forbidden`, `Optional` | Refine profile body policy when modifiers change the rule |
+| `maximum_function_parameters()` | maximum arity or `None` | Refine profile arity when modifiers change the limit |
+| `function_visibility_is_valid()` | `true` / `false` | Reject form- or modifier-specific visibility before emission |
+| `function_parameters_require_trailing_defaults()` | `true` / `false` | Require every defaulted parameter to follow required parameters |
+| `validate_function_type_constraints()` | `Result<(), SigilStitchError>` | Validate whether the complete type-constraint set is semantically representable |
+| `requires_complete_function_type_information()` | `true` / `false` | Require partial type metadata to form one complete typed declaration |
+| `constructor_return_type_is_valid()` | `true` / `false` for one type | Restrict constructor return annotations after capability validation |
+| `validate_function()` | `FunctionIntent -> Result<(), _>` | Add target-local checks after crate-owned semantic validation |
+| `lower_function()` | `ValidatedFunction -> CodeBlock` | Own complete function grammar; defaults to the frozen compatibility lowerer |
 | `type_keyword()` | `"class"`, `"struct"` | Type declaration keyword |
-| `methods_inside_type_body()` | `true` / `false` | Key structural decision (see below) |
+| `methods_inside_type_body()` | `true` / `false` | Legacy structural switch used by the compatibility type emitter |
 
-#### The `methods_inside_type_body` Decision
+#### Legacy `methods_inside_type_body()`
 
-This is the most important method for structural correctness. It determines whether TypeSpec emits one CodeBlock or two:
+The current compatibility type emitter uses this method to decide whether a
+`TypeSpec` produces one `CodeBlock` or two:
 
 - **Returns `true`** (TypeScript, Java, Python, Swift, Dart, Kotlin, C++): Methods go inside the type body. TypeSpec emits a single block: `class Foo { fields; methods; }`.
 - **Returns `false`** (Rust struct/enum): Methods go in a separate `impl` block. TypeSpec emits two blocks: `struct Foo { fields }` and `impl Foo { methods }`.
 
-The method takes a `TypeKind` parameter, so you can vary by type. Rust returns `true` for `TypeKind::Trait` (trait methods go inside) but `false` for `TypeKind::Struct` and `TypeKind::Enum`.
+The method takes a `TypeKind` parameter, so current adapters can vary by type.
+Rust returns `true` for `TypeKind::Trait` but `false` for `TypeKind::Struct` and
+`TypeKind::Enum`. In the target design this structure is part of the adapter's
+complete type lowering; the shared spec does not interpret a nesting switch.
 
-### Config Struct Accessors and Default Methods
+### Renderer Configuration and Legacy Declaration Configuration
 
-Instead of dozens of individual trait methods, the v2.0 API groups related configuration into 6 config structs returned by accessor methods. Each struct uses `..Default::default()` so you only specify fields where your language differs. The remaining standalone override methods cover cases that don't fit neatly into a struct.
+The current interface groups related values into six config structs. They do
+not all have the same architectural role:
+
+- `block_syntax()`, `generic_syntax()`, and `type_presentation()` participate in
+  lower-level rendering seams with their own invariants.
+- `function_syntax()`, `type_decl_syntax()`, and
+  `enum_and_annotation()` expose declaration grammar that generic specs still
+  interpret for pre-0.6.8 adapter compatibility. These accessors and their
+  configuration types are deprecated. New function grammar belongs in
+  `lower_function()`. Type and enum adapters may temporarily use the existing
+  fields where no complete lowering seam exists yet, but must not extend them.
+
+Do not add public flags, enums, or fields to accommodate a new language. A
+previously unseen declaration form is evidence that lowering must move behind
+the language adapter's complete-declaration seam. The detailed tables below
+document the frozen function compatibility contract and the transitional type
+and enum behavior that existing specs may still require.
+
+Each config struct uses `..Default::default()` so current adapters only specify
+values where they differ.
 
 #### `block_syntax()`
 
@@ -108,7 +178,7 @@ Returns `BlockSyntaxConfig` controlling block delimiters and formatting:
 | `type_close_terminator` | (default) | Terminator after closing brace for types. |
 | `bases_close` | (default) | Closing syntax for base-class lists. |
 
-#### `function_syntax()`
+#### Legacy `function_syntax()`
 
 Returns `FunctionSyntaxConfig` controlling function declarations:
 
@@ -122,11 +192,12 @@ Returns `FunctionSyntaxConfig` controlling function declarations:
 | `param_list_style` | (default) | How parameter lists are formatted. |
 | `function_signature_style` | (default) | Controls overall signature layout. |
 | `constructor_keyword` | `""` | Constructor keyword. Python: `"def"`. Rust: `"fn"`. |
-| `constructor_delegation_style` | (default `Body`) | Super/this call placement. Kotlin: `Signature`. |
+| `constructor_delegation_style` | (default `Body`) | Super/this call placement. Kotlin, Dart, and C++ use `Signature`. |
 | `where_clause_style` | `Inline` | `Inline`: bounds in `<T: Bound>`. `WhereBlock`: Rust `where\n    T: Bound,`. `SeparateWhere`: C# `where T : Bound` per constraint. |
 | `empty_body` | `""` | Empty method body. Python overrides to `"..."`. |
+| `type_params_before_return_type` | `false` | Legacy placement switch interpreted by the default function lowerer. Java sets it; Kotlin owns its different order in local lowering. |
 
-#### `type_decl_syntax()`
+#### Legacy `type_decl_syntax()`
 
 Returns `TypeDeclSyntaxConfig` controlling type declarations:
 
@@ -155,7 +226,7 @@ Returns `GenericSyntaxConfig` controlling generic/type-parameter syntax:
 | `constraint_separator` | `" + "` | Between multiple bounds. Java/TS override to `" & "`. |
 | `context_bound_keyword` | (default) | Context bound syntax (e.g. Scala's `:`). |
 
-#### `enum_and_annotation()`
+#### Legacy `enum_and_annotation()`
 
 Returns `EnumAndAnnotationConfig` controlling enums, annotations, and field modifiers:
 
@@ -168,7 +239,7 @@ Returns `EnumAndAnnotationConfig` controlling enums, annotations, and field modi
 | `annotation_prefix` | `"@"` | Annotation opening. Rust: `"#["`. C++: `"[["`. |
 | `annotation_suffix` | `""` | Annotation closing. Rust: `"]"`. C++: `"]]"`. |
 | `readonly_keyword` | `"const "` | TS: `"readonly "`. Kotlin: `"val "`. Java: `"final "`. |
-| `mutable_field_keyword` | `""` | Kotlin overrides to `"var "`. |
+| `mutable_field_keyword` | `""` | Default mutable property-promotion keyword; Kotlin uses `"var "`. |
 
 #### `type_presentation()`
 
@@ -227,10 +298,9 @@ use sigil_stitch::code_block::{Arg, CodeBlock};
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::ImportGroup;
 use sigil_stitch::lang::config::{
-    BlockSyntaxConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
-    TypeDeclSyntaxConfig,
+    BlockSyntaxConfig, GenericSyntaxConfig, TypeDeclSyntaxConfig,
 };
-use sigil_stitch::lang::{CodeLang, RendererLang};
+use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedFunction};
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use sigil_stitch::spec::where_spec::{TypeParamSpec, render_type_params};
 use sigil_stitch::type_name::TypeName;
@@ -295,7 +365,45 @@ impl CodeLang for YourLang {
         out
     }
 
-    // Spec support methods...
+    fn lower_function(
+        &self,
+        function: ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let mut block = CodeBlock::builder();
+        block.add(
+            "%Lfunction %L(",
+            (
+                self.render_visibility(
+                    function.modifiers().visibility,
+                    function.declaration_context(),
+                ),
+                function.name(),
+            ),
+        );
+        for (index, parameter) in function.parameters().iter().enumerate() {
+            if index > 0 {
+                block.add(",%W", ());
+            }
+            block.add("%L: %T", (parameter.name(), parameter.param_type().clone()));
+        }
+        block.add(")", ());
+        if let Some(return_type) = function.return_type() {
+            block.add(": %T", return_type.clone());
+        }
+        if let Some(body) = function.body() {
+            block.add(" {", ());
+            block.add_line();
+            block.add("%>", ());
+            block.add_code(body.clone());
+            block.add_line();
+            block.add("%<}", ());
+        } else {
+            block.add(";", ());
+        }
+        block.build()
+    }
+
+    // Remaining spec support methods...
     fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
         match vis {
             Visibility::Public => "public ",
@@ -305,7 +413,6 @@ impl CodeLang for YourLang {
         }
     }
 
-    fn function_keyword(&self, _ctx: DeclarationContext) -> &str { "function" }
     fn type_keyword(&self, kind: TypeKind) -> &str {
         match kind {
             TypeKind::Class => "class",
@@ -331,17 +438,12 @@ impl CodeLang for YourLang {
         CodeBlock::of(&format!("{visibility}opaque {name}{params} = %T"), args)
     }
 
-    // Config struct overrides...
+    // Transitional type-declaration compatibility override. Do not add fields
+    // here for new grammar; move complete type lowering behind an adapter seam.
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             super_type_keyword: " extends ",
             implements_keyword: " implements ",
-            ..Default::default()
-        }
-    }
-    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
-        FunctionSyntaxConfig {
-            return_type_separator: ": ",
             ..Default::default()
         }
     }
@@ -403,11 +505,15 @@ just bless
 
 This runs all tests with `BLESS=1`, which creates `test-goldens/your_lang/*.yl` files from the actual output. Review them manually, then commit.
 
-### 5. Override defaults
+### 5. Complete transitional non-function compatibility
 
-Run the full test suite and review golden file output. Override config struct accessors and default methods where your language's syntax differs. Common overrides:
+Run the full test suite and review golden file output. Implement function
+grammar in `lower_function()`. Type and enum declaration forms that have not
+yet moved behind a complete language-local seam may still require deprecated
+syntax accessors. Use existing fields only where they already express the
+target, and do not add a shared field or enum for an unseen grammar dimension.
+Examples of remaining transitional overrides are:
 
-- If your language uses indentation instead of braces: override `block_syntax()` to set `block_open`, `block_close`; override `function_syntax()` to set `empty_body`
 - If types come before names (`int x` instead of `x: int`): override `type_decl_syntax()` to set `type_before_name`, `return_type_is_prefix`
 - If generics use brackets instead of angle brackets: override `generic_syntax()` to set `open`, `close`
 
@@ -448,7 +554,7 @@ Each `TypeName` variant (Array, Optional, Map, etc.) uses your language's `TypeP
 All fields in `TypePresentationConfig` have defaults matching TypeScript conventions. Override only when your language differs:
 
 ```rust,ignore
-impl CodeLang for YourLang {
+impl RendererLang for YourLang {
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
             // Array: default is Postfix { suffix: "[]" } (TS: T[])

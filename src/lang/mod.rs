@@ -46,13 +46,23 @@ pub mod zsh;
 /// Helpers for implementing language-specific node rewrite passes.
 pub mod rewrite;
 
+mod cpp_function_lowering;
+mod csharp_function_lowering;
+mod function_lowering;
+mod kotlin_function_lowering;
+mod typescript_function_lowering;
+
 use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::BlockIntent;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::capability::LanguageCapabilities;
-use crate::spec::modifiers::TypeKind;
-use crate::spec::where_spec::{TypeParamSpec, render_type_params};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionContext, FunctionForm, LanguageCapabilities,
+};
+pub use crate::spec::fun_spec::{FunctionIntent, ValidatedFunction};
+use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::spec::parameter_spec::ParameterSpec;
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint, render_type_params};
 use crate::type_name::TypeName;
 
 /// Narrow trait for `CodeRenderer` and `TypeName` rendering.
@@ -289,11 +299,222 @@ pub trait CodeLang: RendererLang {
 
     /// Declare which spec constructs this language supports.
     ///
-    /// Built-in languages return strict local matrices. Unknown external
-    /// adapters inherit the permissive legacy `all()` profile.
-    #[allow(deprecated)]
+    /// Built-in languages return strict local matrices. Adapters written for
+    /// sigil-stitch 0.6.8 inherit a permissive compatibility profile.
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::all()
+        LanguageCapabilities::permissive()
+    }
+
+    /// Semantic capability represented by the legacy `is_abstract` modifier.
+    ///
+    /// Most languages use [`FunctionCapability::AbstractMethod`]. C++ uses
+    /// [`FunctionCapability::VirtualMethod`] to preserve the established
+    /// virtual-only behavior of `is_abstract`.
+    fn abstract_modifier_capability(&self) -> FunctionCapability {
+        FunctionCapability::AbstractMethod
+    }
+
+    /// Classify the declaration form used for capability validation.
+    ///
+    /// The default distinguishes ordinary functions from declarations marked
+    /// as constructors. `FunSpec` and `TypeSpec` apply implicit naming rules in
+    /// member context before calling this classifier. C++ additionally
+    /// recognizes its established `~Type` destructor naming convention.
+    fn function_form(&self, _name: &str, is_constructor: bool) -> FunctionForm {
+        if is_constructor {
+            FunctionForm::Constructor
+        } else {
+            FunctionForm::Function
+        }
+    }
+
+    /// Whether a name identifies a constructor without an explicit marker.
+    ///
+    /// `declaring_type` is available for declarations owned by a
+    /// [`TypeSpec`](crate::spec::type_spec::TypeSpec) and absent for direct
+    /// [`FunSpec`](crate::spec::fun_spec::FunSpec) emission. Languages with
+    /// fixed names such as `constructor` or `init` can recognize both contexts;
+    /// languages whose constructors repeat the declaring type require the owner.
+    fn constructor_name_matches(&self, _name: &str, _declaring_type: Option<&str>) -> bool {
+        false
+    }
+
+    /// Whether a static member with a constructor-shaped name is still a
+    /// constructor declaration.
+    ///
+    /// This defaults to the ordinary constructor naming rule because most
+    /// languages reject static constructors through the capability matrix.
+    /// Languages where the same spelling is a valid ordinary static method
+    /// override this hook.
+    fn static_constructor_name_matches(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        self.constructor_name_matches(name, declaring_type)
+    }
+
+    /// Whether an owner-named declaration with an explicit return type is an
+    /// ordinary function instead of a malformed constructor.
+    ///
+    /// Most languages reserve the owner name for constructors. Java overrides
+    /// this because a return type disambiguates a same-named method.
+    fn constructor_name_with_return_type_is_function(&self) -> bool {
+        false
+    }
+
+    /// Whether an explicitly marked constructor has a valid name in its type.
+    ///
+    /// `declaring_type` is present for declarations owned by a `TypeSpec` and
+    /// absent for direct `FunSpec` validation. The compatibility default
+    /// accepts any name. Built-in languages with fixed or owner-derived
+    /// constructor names override this hook.
+    fn constructor_name_is_valid(&self, _name: &str, _declaring_type: Option<&str>) -> bool {
+        true
+    }
+
+    /// Declaration context used for members of one language-level type kind.
+    ///
+    /// Interfaces and traits are contracts by default. Languages that render a
+    /// nominal kind with concrete member semantics can override this mapping;
+    /// PHP traits, for example, allow bodyful and non-public methods.
+    fn type_member_declaration_context(&self, kind: TypeKind) -> DeclarationContext {
+        match kind {
+            TypeKind::Interface | TypeKind::Trait => DeclarationContext::InterfaceMember,
+            TypeKind::Class
+            | TypeKind::Struct
+            | TypeKind::Enum
+            | TypeKind::TypeAlias
+            | TypeKind::Newtype => DeclarationContext::Member,
+        }
+    }
+
+    /// Whether this language permits an explicit `abstract` modifier on a
+    /// declaration of `kind`.
+    ///
+    /// The compatibility default preserves pre-capability adapters. Strict
+    /// built-in adapters override this for the type kinds their grammar can
+    /// represent as explicitly abstract declarations.
+    fn abstract_type_modifier_is_valid(&self, _kind: TypeKind) -> bool {
+        self.capabilities().function_validation_is_permissive()
+    }
+
+    /// Whether the complete parameter list satisfies this language's typing
+    /// rules when a profile requires [`FunctionCapability::TypedParameters`].
+    ///
+    /// The default requires every parameter to carry a type. Rust overrides
+    /// this for receiver spellings such as `&self`, while Go permits a run of
+    /// names to share the following parameter's type.
+    fn function_parameters_are_typed(
+        &self,
+        parameters: &[ParameterSpec],
+        _context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        parameters
+            .iter()
+            .all(|parameter| !parameter.param_type().is_empty())
+    }
+
+    /// Body policy after accounting for declaration modifiers.
+    ///
+    /// The default uses the static capability profile. Languages whose body
+    /// requirements depend on a modifier can refine it here; Java uses this
+    /// for static interface methods.
+    fn function_body_policy(
+        &self,
+        context: FunctionContext,
+        form: FunctionForm,
+        _is_static: bool,
+    ) -> FunctionBodyPolicy {
+        self.capabilities().function_body_policy(context, form)
+    }
+
+    /// Modifier-aware parameter limit for one function profile.
+    ///
+    /// The default uses the static capability profile. Languages with limits
+    /// that depend on a modifier can refine it here; C# uses this for
+    /// parameterless static constructors.
+    fn maximum_function_parameters(
+        &self,
+        context: FunctionContext,
+        form: FunctionForm,
+        _is_static: bool,
+    ) -> Option<usize> {
+        self.capabilities()
+            .maximum_function_parameters(context, form)
+    }
+
+    /// Whether a function profile accepts the selected visibility.
+    ///
+    /// The default accepts only inherited visibility. Languages that can
+    /// preserve explicit visibility opt in to the forms and contexts they own.
+    fn function_visibility_is_valid(
+        &self,
+        _context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        visibility == Visibility::Inherited
+    }
+
+    /// Whether required parameters must precede every defaulted parameter.
+    fn function_parameters_require_trailing_defaults(
+        &self,
+        _context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        false
+    }
+
+    /// Validate that function type constraints are representable by this
+    /// language.
+    ///
+    /// The default is deliberately syntax-independent. Languages that lower
+    /// constraints onto declared type parameters opt into the policy-free
+    /// structural validator; languages with another semantic constraint model
+    /// validate the complete set locally.
+    fn validate_function_type_constraints(
+        &self,
+        _function_name: &str,
+        _type_params: &[TypeParamSpec],
+        _constraints: &[WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        Ok(())
+    }
+
+    /// Whether any explicit function type information must form a complete
+    /// typed declaration.
+    ///
+    /// Haskell uses this to reject partial type signatures assembled from a
+    /// return type, parameter types, type parameters, or constraints. The
+    /// compatibility default preserves the permissive pre-0.6.8 behavior.
+    fn requires_complete_function_type_information(
+        &self,
+        _context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        false
+    }
+
+    /// Apply additional target-specific validation to one classified function.
+    ///
+    /// `FunSpec` always applies the semantic capability matrix and shared
+    /// validation hooks against this same adapter before calling this method.
+    /// An override can only add target-local checks; sigil-stitch constructs
+    /// the `ValidatedFunction` wrapper after both phases succeed.
+    fn validate_function(&self, _function: FunctionIntent<'_>) -> Result<(), SigilStitchError> {
+        Ok(())
+    }
+
+    /// Lower one fully validated function declaration into structured output.
+    ///
+    /// The default preserves the pre-0.6.8 syntax-configuration contract for
+    /// external adapters. New language-specific grammar belongs in an override
+    /// of this complete lowering seam, not in another placement or keyword
+    /// hook interpreted by `FunSpec`.
+    fn lower_function(
+        &self,
+        function: ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        function_lowering::lower_compatibility(self, function)
     }
 
     // ── Spec-layer methods — used by FunSpec, TypeSpec, FieldSpec, etc. ───
@@ -341,6 +562,16 @@ pub trait CodeLang: RendererLang {
     /// Default: `""`.
     fn function_keyword(&self, _ctx: crate::spec::modifiers::DeclarationContext) -> &str {
         ""
+    }
+
+    /// Whether a constructor may use this explicit return type.
+    ///
+    /// The capability profile decides whether constructor return annotations
+    /// exist at all. This hook handles languages such as Python that permit
+    /// only a particular annotated type. The permissive default preserves
+    /// behavior for adapters written before capability validation.
+    fn constructor_return_type_is_valid(&self, _return_type: &TypeName) -> bool {
+        true
     }
 
     /// The keyword for a type declaration (e.g., "struct", "class").
@@ -490,17 +721,26 @@ pub trait CodeLang: RendererLang {
 
     // ── Config struct accessors (spec-only) ───────────────────────────
 
-    /// Function signature syntax.
+    /// Legacy function-declaration syntax used by the 0.6.8 compatibility lowerer.
+    #[deprecated(
+        note = "legacy 0.6.8 declaration grammar; implement CodeLang::lower_function instead"
+    )]
     fn function_syntax(&self) -> config::FunctionSyntaxConfig<'_> {
         config::FunctionSyntaxConfig::default()
     }
 
-    /// Type declaration syntax (inheritance, field order).
+    /// Legacy type-declaration syntax retained for 0.6.8 adapter compatibility.
+    #[deprecated(
+        note = "legacy 0.6.8 declaration grammar; migrate declarations to language-owned lowering"
+    )]
     fn type_decl_syntax(&self) -> config::TypeDeclSyntaxConfig<'_> {
         config::TypeDeclSyntaxConfig::default()
     }
 
-    /// Enum variant formatting, annotation syntax, and field mutability keywords.
+    /// Legacy enum, annotation, and field declaration syntax retained for compatibility.
+    #[deprecated(
+        note = "legacy 0.6.8 declaration grammar; migrate declarations to language-owned lowering"
+    )]
     fn enum_and_annotation(&self) -> config::EnumAndAnnotationConfig<'_> {
         config::EnumAndAnnotationConfig::default()
     }

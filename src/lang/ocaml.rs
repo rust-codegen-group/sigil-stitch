@@ -2,7 +2,10 @@
 
 use crate::code_node::BlockIntent;
 use crate::import::ImportGroup;
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -269,37 +272,49 @@ impl RendererLang for OCaml {
     }
 }
 
-const OCAML_RECORD_CAPABILITIES: &[SpecCapability] = &[
+const OCAML_RECORD_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = record labels
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // ParametricPolymorphism = type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
 ];
-const OCAML_VARIANT_CAPABILITIES: &[SpecCapability] = &[
+const OCAML_VARIANT_CAPABILITIES: &[TypeCapability] = &[
     // ParametricPolymorphism = type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // ConstructorParameters = constructor arguments
-    SpecCapability::ConstructorParameters,
+    TypeCapability::ConstructorParameters,
     // Variants = constructors
-    SpecCapability::Variants,
+    TypeCapability::Variants,
 ];
-const OCAML_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Struct, OCAML_RECORD_CAPABILITIES),
+const OCAML_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Struct, OCAML_RECORD_CAPABILITIES),
     // Class is represented as an OCaml record type.
-    TypeCapabilities::new(TypeKind::Class, OCAML_RECORD_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Enum, OCAML_VARIANT_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Class, OCAML_RECORD_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Enum, OCAML_VARIANT_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
             // ParametricPolymorphism = type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
         ],
     ),
 ];
 
+const OCAML_FUNCTIONS: &[FunctionCapabilityProfile] = &[FunctionCapabilityProfile::new(
+    FunctionContext::TopLevel,
+    FunctionForm::Function,
+    &[
+        FunctionCapability::ExplicitReturnType,
+        FunctionCapability::TypedParameters,
+    ],
+)
+.with_body_policy(FunctionBodyPolicy::Required)];
+
 impl CodeLang for OCaml {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(OCAML_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(OCAML_TYPES)
+            .with_functions(OCAML_FUNCTIONS)
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

@@ -2,8 +2,8 @@
 
 use snafu::prelude::*;
 
-use crate::lang::capability::SpecCapability;
-use crate::spec::modifiers::TypeKind;
+use crate::lang::capability::{FunctionCapability, FunctionContext, FunctionForm, TypeCapability};
+use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Errors returned by sigil-stitch operations.
 #[derive(Debug, Snafu)]
@@ -154,17 +154,17 @@ pub enum SigilStitchError {
         type_name: String,
     },
 
-    /// A language does not support one or more semantic spec capabilities.
+    /// A language does not support one or more semantic type capabilities.
     #[snafu(display(
         "language {language:?} does not support {capabilities:?} for type {type_name:?}"
     ))]
-    UnsupportedSpecCapabilities {
+    UnsupportedTypeCapabilities {
         /// The language file extension.
         language: String,
         /// The type being emitted.
         type_name: String,
         /// The unsupported semantic capabilities.
-        capabilities: Vec<SpecCapability>,
+        capabilities: Vec<TypeCapability>,
     },
 
     /// Duplicate filename in a project specification.
@@ -208,5 +208,321 @@ pub enum SigilStitchError {
         type_name: String,
         /// The reason the declaration is invalid.
         reason: String,
+    },
+
+    /// A type kind used an abstract modifier that its language does not permit.
+    #[snafu(display(
+        "language {language:?} does not allow an abstract modifier on {kind:?} type {type_name:?}"
+    ))]
+    InvalidAbstractType {
+        /// The language file extension.
+        language: String,
+        /// The rejected type kind.
+        kind: TypeKind,
+        /// The type being emitted.
+        type_name: String,
+    },
+
+    /// A receiver parameter was used outside a top-level receiver method.
+    #[snafu(display(
+        "function {function_name:?} cannot use a receiver in {context:?} declaration context"
+    ))]
+    InvalidFunctionPlacement {
+        /// The function being emitted.
+        function_name: String,
+        /// The declaration context supplied by the caller.
+        context: DeclarationContext,
+    },
+
+    /// A function form used a visibility that the language does not permit.
+    #[snafu(display(
+        "language {language:?} does not allow {visibility:?} visibility for {form:?} {function_name:?} in {context:?} context"
+    ))]
+    InvalidFunctionVisibility {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The declaration form being emitted.
+        form: FunctionForm,
+        /// The rejected visibility.
+        visibility: Visibility,
+    },
+
+    /// A receiver used parameter-only features that receiver syntax cannot represent.
+    #[snafu(display(
+        "receiver {receiver_name:?} on function {function_name:?} cannot use {capabilities:?}"
+    ))]
+    InvalidReceiverCapabilities {
+        /// The function being emitted.
+        function_name: String,
+        /// The receiver parameter.
+        receiver_name: String,
+        /// Parameter capabilities that cannot be represented on a receiver.
+        capabilities: Vec<FunctionCapability>,
+    },
+
+    /// Constructor-only features were attached to a non-constructor function.
+    #[snafu(display(
+        "function {function_name:?} cannot use constructor-only features {capabilities:?} without being a constructor"
+    ))]
+    InvalidConstructorFeaturePlacement {
+        /// The function being emitted.
+        function_name: String,
+        /// Constructor-only features used by the function.
+        capabilities: Vec<FunctionCapability>,
+    },
+
+    /// An abstract function declaration included an implementation body.
+    #[snafu(display("abstract function {function_name:?} cannot have a body"))]
+    AbstractFunctionWithBody {
+        /// The function being emitted.
+        function_name: String,
+    },
+
+    /// A function constraint did not target a declared type parameter as required.
+    #[snafu(display(
+        "language {language:?} cannot lower constraint for {subject:?} on function {function_name:?}; the subject must name a declared type parameter"
+    ))]
+    InvalidFunctionConstraintSubject {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The constraint subject that could not be attached to a declared type parameter.
+        subject: String,
+    },
+
+    /// A language does not support the requested function context.
+    #[snafu(display(
+        "language {language:?} does not support function {function_name:?} in {context:?} context"
+    ))]
+    UnsupportedFunctionContext {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The unsupported semantic function context.
+        context: FunctionContext,
+    },
+
+    /// A language does not support the requested function declaration form.
+    #[snafu(display(
+        "language {language:?} does not support {form:?} {function_name:?} in {context:?} context"
+    ))]
+    UnsupportedFunctionForm {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The unsupported declaration form.
+        form: FunctionForm,
+    },
+
+    /// A profile forbids a requested pair of otherwise supported capabilities.
+    #[snafu(display(
+        "language {language:?} does not allow {capabilities:?} together for {form:?} {function_name:?} in {context:?} context"
+    ))]
+    IncompatibleFunctionCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The declaration form being emitted.
+        form: FunctionForm,
+        /// The incompatible pair.
+        capabilities: Vec<FunctionCapability>,
+    },
+
+    /// A parameter combined features that cannot coexist on one parameter.
+    #[snafu(display(
+        "parameter {parameter_name:?} on function {function_name:?} cannot combine {capabilities:?}"
+    ))]
+    IncompatibleParameterCapabilities {
+        /// The function being emitted.
+        function_name: String,
+        /// The parameter with the invalid combination.
+        parameter_name: String,
+        /// The incompatible parameter capabilities.
+        capabilities: Vec<FunctionCapability>,
+    },
+
+    /// A function profile requires syntax that the declaration omitted.
+    #[snafu(display(
+        "language {language:?} requires {capabilities:?} for {form:?} {function_name:?} in {context:?} context"
+    ))]
+    MissingRequiredFunctionCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The declaration form being emitted.
+        form: FunctionForm,
+        /// Required capabilities omitted by the declaration.
+        capabilities: Vec<FunctionCapability>,
+    },
+
+    /// A concrete function declaration omitted its required body.
+    #[snafu(display(
+        "language {language:?} requires a body for {form:?} {function_name:?} in {context:?} context"
+    ))]
+    FunctionBodyRequired {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The declaration form being emitted.
+        form: FunctionForm,
+    },
+
+    /// A function declaration supplied a body in a bodyless context.
+    #[snafu(display(
+        "language {language:?} forbids a body for {form:?} {function_name:?} in {context:?} context"
+    ))]
+    FunctionBodyForbidden {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The declaration form being emitted.
+        form: FunctionForm,
+    },
+
+    /// A function declared more than one variadic/rest parameter.
+    #[snafu(display("function {function_name:?} cannot declare more than one variadic parameter"))]
+    MultipleVariadicParameters {
+        /// The function being emitted.
+        function_name: String,
+    },
+
+    /// A variadic/rest parameter was followed by another parameter.
+    #[snafu(display(
+        "variadic parameter {parameter_name:?} on function {function_name:?} must be last"
+    ))]
+    VariadicParameterNotLast {
+        /// The function being emitted.
+        function_name: String,
+        /// The misplaced variadic parameter.
+        parameter_name: String,
+    },
+
+    /// A required parameter followed a parameter with a default value.
+    #[snafu(display(
+        "required parameter {parameter_name:?} cannot follow a defaulted parameter on function {function_name:?}"
+    ))]
+    RequiredParameterAfterDefault {
+        /// The function being emitted.
+        function_name: String,
+        /// The required parameter that appeared after a defaulted parameter.
+        parameter_name: String,
+    },
+
+    /// A constructor return annotation violated a language-specific restriction.
+    #[snafu(display(
+        "language {language:?} does not allow return type {return_type:?} on constructor {function_name:?}"
+    ))]
+    InvalidConstructorReturnType {
+        /// The language file extension.
+        language: String,
+        /// The constructor being emitted.
+        function_name: String,
+        /// The rejected return type.
+        return_type: String,
+    },
+
+    /// A language does not support one or more function capabilities.
+    #[snafu(display(
+        "language {language:?} does not support {capabilities:?} for {form:?} {function_name:?} in {context:?} context"
+    ))]
+    UnsupportedFunctionCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The declaration form being emitted.
+        form: FunctionForm,
+        /// The unsupported function capabilities.
+        capabilities: Vec<FunctionCapability>,
+    },
+
+    /// A function form declared more parameters than its profile permits.
+    #[snafu(display(
+        "language {language:?} allows at most {maximum} parameter(s) for {form:?} {function_name:?} in {context:?} context, but got {actual}"
+    ))]
+    TooManyFunctionParameters {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The declaration form being emitted.
+        form: FunctionForm,
+        /// Maximum parameter count accepted by the profile.
+        maximum: usize,
+        /// Actual parameter count.
+        actual: usize,
+    },
+
+    /// A destructor name did not match its declaring type.
+    #[snafu(display(
+        "language {language:?} requires destructor {destructor_name:?} to be named after declaring type {type_name:?}"
+    ))]
+    InvalidDestructorName {
+        /// The language file extension.
+        language: String,
+        /// The declaring type.
+        type_name: String,
+        /// The rejected destructor name.
+        destructor_name: String,
+    },
+
+    /// A constructor name did not match the language's naming rule.
+    #[snafu(display("language {language:?} does not allow constructor name {constructor_name:?}"))]
+    InvalidConstructorName {
+        /// The language file extension.
+        language: String,
+        /// The declaring type, when validation has owner context.
+        type_name: Option<String>,
+        /// The rejected constructor name.
+        constructor_name: String,
+    },
+
+    /// An abstract method was declared in a non-abstract concrete type.
+    #[snafu(display(
+        "language {language:?} requires type {type_name:?} to be abstract because method {function_name:?} is abstract"
+    ))]
+    AbstractMethodInConcreteType {
+        /// The language file extension.
+        language: String,
+        /// The containing concrete type.
+        type_name: String,
+        /// The abstract method.
+        function_name: String,
+    },
+
+    /// A constructor parameter was marked as both readonly and mutable.
+    #[snafu(display(
+        "constructor parameter {parameter_name:?} on function {function_name:?} cannot be both readonly and mutable"
+    ))]
+    ConflictingConstructorPropertyMutability {
+        /// The constructor being emitted.
+        function_name: String,
+        /// The parameter with contradictory property markers.
+        parameter_name: String,
     },
 }

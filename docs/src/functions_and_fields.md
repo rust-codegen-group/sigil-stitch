@@ -1,6 +1,12 @@
 # Building Functions & Fields
 
-Specs are structural builders that produce `Vec<CodeBlock>`. They encapsulate common declaration patterns -- classes, functions, fields, enums -- so you work with named concepts instead of raw format strings. Every spec takes a `&dyn CodeLang` language reference at emit time, which means the same builder definition renders correctly for any target language.
+Specs are builders for declaration intent. They let you work with semantic
+concepts such as functions, parameters, fields, and modifiers instead of
+assembling declaration grammar from raw format strings. At emit time the
+selected `CodeLang` validates whether the target can represent that intent and
+lowers it to structured `CodeBlock`s. The same builder can be reused across
+targets that support the requested semantics; unsupported combinations fail
+closed.
 
 All spec types live in `src/spec/`. They follow a consistent builder pattern:
 
@@ -66,7 +72,11 @@ let p = ParameterSpec::builder("name", TypeName::primitive("String"))
 # }
 ```
 
-`ParameterSpec` adapts to the target language. TypeScript emits `name: type`, C emits `type name`, and Python omits the type annotation when the type is empty. The `is_property()` and `is_mutable_property()` methods prepend the language's readonly/mutable keyword — `val`/`var` in Kotlin, `readonly` in C# — so you don't need to embed language-specific keywords in the parameter name.
+`ParameterSpec` records parameter intent. The selected adapter may lower it as
+`name: type` in TypeScript, `type name` in C, or without an annotation in Python
+when the type is empty. Likewise, `is_property()` and
+`is_mutable_property()` record constructor-property intent; the adapter chooses
+spellings such as `val`/`var` in Kotlin or `readonly` in C#.
 
 ## FieldSpec
 
@@ -241,7 +251,9 @@ let fun = FunSpec::builder("validate")
 
 ### Constructor delegation
 
-Use `.delegation()` to emit `super(...)` or `this(...)` calls. The placement is language-dependent: body-style (TS, Java, Dart, Swift) emits it as the first statement; signature-style (Kotlin) emits it after the parameter list.
+Use `.delegation()` to provide a `super(...)` or `this(...)` delegation payload.
+The selected adapter owns its placement: TypeScript, Java, Dart, and Swift put
+it first in the body, while Kotlin places it after the parameter list.
 
 ```rust
 # extern crate sigil_stitch;

@@ -1,5 +1,10 @@
+use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -234,72 +239,243 @@ impl RendererLang for TypeScript {
     }
 }
 
-const TS_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const TS_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = properties/fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // AccessorMethods = get/set accessors
-    SpecCapability::AccessorMethods,
+    TypeCapability::AccessorMethods,
     // Methods = methods
-    SpecCapability::Methods,
-    SpecCapability::StructuralEmbedding,
+    TypeCapability::Methods,
+    TypeCapability::StructuralEmbedding,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // InterfaceImplementation = `implements`
-    SpecCapability::InterfaceImplementation,
+    TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = decorators
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = optional properties
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const TS_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+const TS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = properties/fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // AccessorMethods = get/set accessors
-    SpecCapability::AccessorMethods,
+    TypeCapability::AccessorMethods,
     // Methods = methods
-    SpecCapability::Methods,
-    SpecCapability::StructuralEmbedding,
+    TypeCapability::Methods,
+    TypeCapability::StructuralEmbedding,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = decorators
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = optional properties
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const TS_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, TS_CLASS_CAPABILITIES),
+const TS_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, TS_CLASS_CAPABILITIES),
     // Struct is represented as a TypeScript class.
-    TypeCapabilities::new(TypeKind::Struct, TS_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Interface, TS_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, TS_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, TS_CONTRACT_CAPABILITIES),
     // Trait is represented as a TypeScript interface.
-    TypeCapabilities::new(TypeKind::Trait, TS_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Trait, TS_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // Variants = enum members
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
             // ParametricPolymorphism = generic type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
         ],
     ),
 ];
 
+const TS_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = async
+    FunctionCapability::AsyncEffect,
+    // BoundedPolymorphism = extends constraints
+    FunctionCapability::BoundedPolymorphism,
+    // DefaultParameters = default parameters
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = return type annotation
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = optional parameter annotations
+    FunctionCapability::TypedParameters,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+    // VariadicParameters = rest parameters
+    FunctionCapability::VariadicParameters,
+];
+const TS_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AbstractMethod = abstract
+    FunctionCapability::AbstractMethod,
+    // AsyncEffect = async
+    FunctionCapability::AsyncEffect,
+    // Attributes = decorators
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = extends constraints
+    FunctionCapability::BoundedPolymorphism,
+    // DefaultParameters = default parameters
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = return type annotation
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = optional parameter annotations
+    FunctionCapability::TypedParameters,
+    // Override = override
+    FunctionCapability::Override,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+    // StaticMethod = static
+    FunctionCapability::StaticMethod,
+    // VariadicParameters = rest parameters
+    FunctionCapability::VariadicParameters,
+];
+const TS_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::TypedParameters,
+    FunctionCapability::VariadicParameters,
+];
+const TS_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::ConstructorDelegation,
+    FunctionCapability::ConstructorProperties,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::TypedParameters,
+    FunctionCapability::VariadicParameters,
+];
+const TS_MEMBER_INCOMPATIBILITIES: &[(FunctionCapability, FunctionCapability)] = &[
+    (
+        FunctionCapability::AbstractMethod,
+        FunctionCapability::AsyncEffect,
+    ),
+    (
+        FunctionCapability::AbstractMethod,
+        FunctionCapability::StaticMethod,
+    ),
+    (
+        FunctionCapability::AbstractMethod,
+        FunctionCapability::DefaultParameters,
+    ),
+];
+const TS_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        TS_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        TS_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_incompatible_capabilities(TS_MEMBER_INCOMPATIBILITIES)
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        TS_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        TS_INTERFACE_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Forbidden),
+];
+
 impl CodeLang for TypeScript {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(TS_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(TS_TYPES)
+            .with_functions(TS_FUNCTIONS)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::function_lowering::validate_constraints_target_declared_type_params(
+            self.file_extension(),
+            function_name,
+            type_params,
+            constraints,
+        )
+    }
+
+    fn constructor_name_matches(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "constructor"
+    }
+
+    fn static_constructor_name_matches(&self, _name: &str, _declaring_type: Option<&str>) -> bool {
+        false
+    }
+
+    fn abstract_type_modifier_is_valid(&self, kind: TypeKind) -> bool {
+        matches!(kind, TypeKind::Class | TypeKind::Struct)
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::TopLevel => {
+                matches!(
+                    visibility,
+                    Visibility::Inherited | Visibility::Public | Visibility::Private
+                )
+            }
+            FunctionContext::Member => matches!(
+                visibility,
+                Visibility::Inherited
+                    | Visibility::Public
+                    | Visibility::Private
+                    | Visibility::Protected
+            ),
+            FunctionContext::InterfaceMember => {
+                matches!(visibility, Visibility::Inherited | Visibility::Public)
+            }
+            FunctionContext::ReceiverMethod => false,
+        }
+    }
+
+    fn function_parameters_require_trailing_defaults(
+        &self,
+        _context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        true
+    }
+
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::typescript_function_lowering::lower(self, function)
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "constructor"
     }
 
     fn escape_field_name(&self, name: &str) -> String {

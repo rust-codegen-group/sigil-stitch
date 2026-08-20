@@ -1,5 +1,8 @@
 use crate::import::{ImportEntry, ImportGroup};
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -139,77 +142,173 @@ impl RendererLang for Rust {
     }
 }
 
-const RUST_RECORD_CAPABILITIES: &[SpecCapability] = &[
+const RUST_RECORD_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = struct fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // Methods = impl methods
-    SpecCapability::Methods,
-    SpecCapability::StructuralEmbedding,
+    TypeCapability::Methods,
+    TypeCapability::StructuralEmbedding,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = trait bounds
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = `#[attr]`
-    SpecCapability::Attributes,
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::Attributes,
+    TypeCapability::OptionalRecordFields,
 ];
-const RUST_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+const RUST_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = impl methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = trait bounds
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = `#[attr]`
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const RUST_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Struct, RUST_RECORD_CAPABILITIES),
+const RUST_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Struct, RUST_RECORD_CAPABILITIES),
     // Class is represented as a Rust struct plus an impl block.
-    TypeCapabilities::new(TypeKind::Class, RUST_RECORD_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Trait, RUST_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Class, RUST_RECORD_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, RUST_CONTRACT_CAPABILITIES),
     // Interface is represented as a Rust trait.
-    TypeCapabilities::new(TypeKind::Interface, RUST_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Interface, RUST_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // Methods = impl methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // ParametricPolymorphism = generic type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
             // BoundedPolymorphism = trait bounds
-            SpecCapability::BoundedPolymorphism,
+            TypeCapability::BoundedPolymorphism,
             // Attributes = `#[attr]`
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
             // Variants = enum variants
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
             // ParametricPolymorphism = generic type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
             // BoundedPolymorphism = trait bounds
-            SpecCapability::BoundedPolymorphism,
+            TypeCapability::BoundedPolymorphism,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Newtype,
         &[
             // ParametricPolymorphism = generic type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
             // BoundedPolymorphism = trait bounds
-            SpecCapability::BoundedPolymorphism,
+            TypeCapability::BoundedPolymorphism,
             // Attributes = `#[attr]`
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
 ];
 
+const RUST_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = async fn
+    FunctionCapability::AsyncEffect,
+    // Attributes = attributes #[...]
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = trait bounds
+    FunctionCapability::BoundedPolymorphism,
+    // ExplicitReturnType = function result type
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+];
+const RUST_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] =
+    RUST_TOP_LEVEL_FUNCTION_CAPABILITIES;
+const RUST_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        RUST_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Constructor,
+        RUST_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        RUST_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        RUST_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        RUST_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters]),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Constructor,
+        RUST_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters]),
+];
+
 impl CodeLang for Rust {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(RUST_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(RUST_TYPES)
+            .with_functions(RUST_FUNCTIONS)
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::TopLevel | FunctionContext::Member => {
+                !matches!(visibility, Visibility::Protected)
+            }
+            FunctionContext::InterfaceMember => {
+                matches!(visibility, Visibility::Inherited | Visibility::Public)
+            }
+            FunctionContext::ReceiverMethod => false,
+        }
+    }
+
+    fn function_parameters_are_typed(
+        &self,
+        parameters: &[crate::spec::parameter_spec::ParameterSpec],
+        context: FunctionContext,
+        _form: FunctionForm,
+    ) -> bool {
+        parameters.iter().all(|parameter| {
+            !parameter.param_type().is_empty()
+                || (matches!(
+                    context,
+                    FunctionContext::Member | FunctionContext::InterfaceMember
+                ) && matches!(
+                    parameter.name(),
+                    "self" | "mut self" | "&self" | "&mut self"
+                ))
+        })
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
@@ -318,7 +417,10 @@ impl CodeLang for Rust {
             .join("\n")
     }
 
-    fn render_visibility(&self, vis: Visibility, _ctx: DeclarationContext) -> &str {
+    fn render_visibility(&self, vis: Visibility, ctx: DeclarationContext) -> &str {
+        if ctx == DeclarationContext::InterfaceMember {
+            return "";
+        }
         match vis {
             Visibility::Inherited => "",
             Visibility::Public => "pub ",

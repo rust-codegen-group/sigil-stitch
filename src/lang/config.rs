@@ -242,7 +242,8 @@ impl Default for BlockSyntaxConfig<'_> {
     }
 }
 
-/// Function signature syntax.
+/// Legacy function-declaration syntax retained for 0.6.8 adapter compatibility.
+#[deprecated(note = "legacy 0.6.8 declaration grammar; implement CodeLang::lower_function instead")]
 #[derive(Debug, Clone, Copy)]
 pub struct FunctionSyntaxConfig<'a> {
     /// Separator between parameters and return type (e.g. `" -> "`, `": "`).
@@ -288,6 +289,9 @@ pub struct FunctionSyntaxConfig<'a> {
     /// `public static <T extends Comparable> List<T> sortList(...)`.
     /// Most other languages place them after the function name:
     /// `fun <T> sortList(...)` or `fn sort_list<T>(...)`.
+    ///
+    /// This legacy field remains part of the 0.6.8 adapter contract and is
+    /// interpreted only by the default compatibility function lowerer.
     pub type_params_before_return_type: bool,
     /// Whether to suppress the `async` keyword for interface/trait member declarations.
     ///
@@ -323,7 +327,10 @@ impl Default for FunctionSyntaxConfig<'_> {
     }
 }
 
-/// Type declaration syntax (inheritance, annotation, field order).
+/// Legacy type-declaration syntax retained for 0.6.8 adapter compatibility.
+#[deprecated(
+    note = "legacy 0.6.8 declaration grammar; migrate declarations to language-owned lowering"
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct TypeDeclSyntaxConfig<'a> {
     /// Whether type annotations use type-before-name order (e.g. C: `int count`).
@@ -372,7 +379,10 @@ pub enum VariantValueFormat {
     ConstructorArg,
 }
 
-/// Enum variant formatting, annotation syntax, and field mutability keywords.
+/// Legacy enum, annotation, and field syntax retained for 0.6.8 compatibility.
+#[deprecated(
+    note = "legacy 0.6.8 declaration grammar; migrate declarations to language-owned lowering"
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct EnumAndAnnotationConfig<'a> {
     /// Prefix before each enum variant (e.g. `""`, `"case "`).

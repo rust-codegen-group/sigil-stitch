@@ -176,7 +176,7 @@ pub struct WildcardPresentation<'a> {
 /// // Optional: string | null
 /// let maybe_str = TypeName::optional(TypeName::primitive("string"));
 /// ```
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TypeName {
     /// A type that requires an import statement.
     Importable {
@@ -584,6 +584,7 @@ impl TypeName {
 }
 
 #[cfg(test)]
+#[allow(deprecated)] // Test wrappers forward the complete legacy CodeLang surface.
 mod tests {
     use super::*;
     use crate::lang::typescript::TypeScript;

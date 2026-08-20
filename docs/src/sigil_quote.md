@@ -504,10 +504,10 @@ affect the output.
 
 ### Annotations (`$attr`)
 
-`$attr("text")` emits a structural annotation/attribute rendered with the target
-language's syntax. This keeps the macro body language-agnostic — write `$attr("override")`
-and it renders as `@override` in TypeScript/Java, `#[override]` in Rust, or
-`[[override]]` in C++.
+`$attr("text")` emits a structural annotation/attribute rendered with the
+selected target's delimiters. The annotation name remains structured until
+rendering: `$attr("override")` becomes `@override` in TypeScript/Java,
+`#[override]` in Rust, or `[[override]]` in C++.
 
 ```rust
 # extern crate sigil_stitch;

@@ -1,6 +1,13 @@
 # Type Presentation
 
-This chapter describes how sigil-stitch renders `TypeName` variants across different languages using a data-driven presentation layer.
+This chapter describes how sigil-stitch renders `TypeName` variants across
+different languages using a data-driven presentation layer.
+
+This is a lower-level seam than declaration lowering. It converts one semantic
+type algebra into a width-aware document; declaration specs do not inspect its
+patterns to assemble functions, fields, or types. The decision to keep complete
+declaration grammar in language adapters is documented in [Declaration Specs
+and Language Lowering](declaration_lowering.md).
 
 ## The Problem
 
@@ -28,18 +35,20 @@ Each variant needs language-specific rendering, but the rendering follows a smal
                      │ to_doc_with_lang(resolve, lang)
                      ▼
           ┌──────────────────────────────┐
-          │  lang.type_presentation()    │  CodeLang returns TypePresentationConfig (DATA)
+          │  lang.type_presentation()    │  RendererLang returns TypePresentationConfig (DATA)
           └──────────────┬───────────────┘
                          ▼
           ┌─────────────────────┐
           │  Rendering engine   │  Single function: (TypePresentation, inner docs) → BoxDoc
-          │  (one place)        │  Lives in type_name.rs, NEVER in CodeLang impls
+          │  (one place)        │  Lives in type_name_render.rs, not in adapters
           └──────────┬──────────┘
                      ▼
                 BoxDoc output
 ```
 
-The key invariant: **`BoxDoc` never appears in the `CodeLang` trait.** Languages declare data (which syntactic pattern to use). The rendering engine — a single function in `type_name.rs` — interprets that data into `BoxDoc` output.
+The key invariant: **`BoxDoc` never appears in the `RendererLang` trait.**
+Languages declare data describing which type pattern to use. The rendering
+engine in `type_name_render.rs` interprets that data into `BoxDoc` output.
 
 This separates three concerns that were previously tangled:
 
@@ -100,12 +109,13 @@ pub struct FunctionPresentation<'a> {
 
 This declaratively covers TypeScript `(A, B) => R`, Rust `fn(A, B) -> R`, Python `Callable[[A, B], R]`, C++ `std::function<R(A, B)>`, Dart `R Function(A, B)`, and Haskell `A -> B -> R` — all from a single rendering engine interpreting the data.
 
-## CodeLang Trait Method
+## RendererLang Trait Method
 
-Languages declare their type syntax by returning a `TypePresentationConfig` from a single method on the `CodeLang` trait:
+Languages declare their type syntax by returning a `TypePresentationConfig`
+from a single method on the `RendererLang` trait:
 
 ```rust,ignore
-trait CodeLang {
+trait RendererLang {
     fn type_presentation(&self) -> TypePresentationConfig<'_>;
 }
 ```
@@ -270,7 +280,7 @@ fn type_presentation(&self) -> TypePresentationConfig<'_> {
 
 ## Design Properties
 
-1. **`BoxDoc` never appears in `CodeLang`** — languages declare data, the engine renders.
+1. **`BoxDoc` never appears in `RendererLang`** — languages declare data, the engine renders.
 2. **Adding a `TypeName` variant** requires one new field on `TypePresentationConfig`. No per-language render code needed.
 3. **17 fields** on `TypePresentationConfig` replace what would otherwise be ~20+ render methods. Each override is a single struct field.
 4. **One rendering engine** in `type_name.rs` handles all patterns uniformly.

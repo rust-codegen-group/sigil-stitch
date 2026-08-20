@@ -1,4 +1,6 @@
 use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::error::SigilStitchError;
+use sigil_stitch::lang::capability::FunctionCapability;
 use sigil_stitch::lang::csharp::CSharp;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -110,6 +112,7 @@ fn test_constructor() {
         .visibility(Visibility::Public)
         .add_method(
             FunSpec::builder("Person")
+                .is_constructor()
                 .visibility(Visibility::Public)
                 .add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap())
                 .add_param(ParameterSpec::new("age", TypeName::primitive("int")).unwrap())
@@ -162,7 +165,7 @@ fn test_function_with_doc() {
 }
 
 #[test]
-fn test_async_suppressed_in_interface() {
+fn test_async_rejected_in_interface() {
     let ts = TypeSpec::builder("IUserService", TypeKind::Interface)
         .visibility(Visibility::Public)
         .add_method(
@@ -188,7 +191,14 @@ fn test_async_suppressed_in_interface() {
         .add_type(ts)
         .build()
         .unwrap();
-    let output = file.render(80).unwrap();
-
-    golden::assert_golden("csharp/async_interface.cs", &output);
+    assert!(matches!(
+        file.render(80),
+        Err(SigilStitchError::FileSpecValidation { errors, .. })
+            if errors.len() == 2
+                && errors.iter().all(|error| matches!(
+                    error,
+                    SigilStitchError::UnsupportedFunctionCapabilities { capabilities, .. }
+                        if capabilities.as_slice() == [FunctionCapability::AsyncEffect]
+                ))
+    ));
 }

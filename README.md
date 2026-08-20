@@ -97,7 +97,7 @@ continuation in multi-line expressions. Go `const (`, `var (`, `import (`, and
 Bare `&str` maps to `%L`. Use `NameArg` for `%N`, `StringLitArg` for `%S`, and `VerbatimStrArg` for `%V`.
 See the [Format Specifiers](docs/src/format_specifiers.md) chapter for the full deep dive.
 
-## The Spec Layer
+## Declaration Specs
 
 Build structured declarations with the spec builders:
 
@@ -115,7 +115,9 @@ Build structured declarations with the spec builders:
 | **ProjectSpec** | Multi-file project generation |
 | **CodeTemplate** | Reusable parameterized templates with named parameters |
 
-All specs emit `CodeBlock`s internally, so import tracking works everywhere.
+Specs record declaration intent. At render time the selected language validates
+that intent and lowers it to structured `CodeBlock`s, so type references remain
+available to import tracking and alias resolution.
 See [Building Functions & Fields](docs/src/functions_and_fields.md), [Building Types & Enums](docs/src/types_and_enums.md), and [Files & Projects](docs/src/files_and_projects.md) for examples and the full API.
 
 ## Supported Languages
@@ -160,7 +162,9 @@ The [sigil-stitch book](docs/src/SUMMARY.md) covers everything in depth:
 
 **Development Guide:**
 
-- [Architecture](docs/src/architecture.md) -- four layers, three-pass pipeline, import resolution
+- [Architecture](docs/src/architecture.md) -- ownership, materialization, rendering, and import resolution
+- [Design](docs/src/design.md) -- accepted seams and design invariants
+- [Declaration Specs and Language Lowering](docs/src/declaration_lowering.md) -- declaration intent, capabilities, and language-owned grammar
 - [Type Presentation](docs/src/type_presentation.md) -- data-driven cross-language type rendering
 - [Adding a Language](docs/src/adding_a_language.md) -- implementing the CodeLang trait step by step
 

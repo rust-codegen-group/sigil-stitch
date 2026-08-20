@@ -35,6 +35,7 @@ fn test_class_with_methods() {
         )
         .add_method(
             FunSpec::builder("UserService")
+                .is_constructor()
                 .visibility(Visibility::Public)
                 .add_param(
                     ParameterSpec::new("repo", TypeName::primitive("UserRepository")).unwrap(),

@@ -87,8 +87,14 @@ pub mod import;
 /// Walks `CodeBlock` trees to extract all import references.
 pub mod import_collector;
 /// Language abstraction trait and per-language implementations.
+// Built-in adapters and compatibility lowering intentionally consume the
+// deprecated 0.6.8 declaration-config accessors until each path is migrated.
+#[allow(deprecated)]
 pub mod lang;
 /// Structural builders (TypeSpec, FunSpec, FileSpec, etc.) that emit `CodeBlock`s.
+// Transitional spec emitters intentionally consume deprecated declaration
+// configuration; downstream adapter code still receives deprecation warnings.
+#[allow(deprecated)]
 pub mod spec;
 /// Exact rendered-code assertion helpers for tests.
 pub mod testing;
@@ -106,7 +112,10 @@ pub mod prelude {
     pub use crate::code_node::{BlockIntent, CodeNode};
     pub use crate::code_template::{CodeTemplate, ParamKind};
     pub use crate::error::SigilStitchError;
-    pub use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+    pub use crate::lang::capability::{
+        FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+        FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    };
     pub use crate::lang::{CodeLang, RendererLang};
     pub use crate::spec::annotation_spec::AnnotationSpec;
     pub use crate::spec::emittable::Emittable;

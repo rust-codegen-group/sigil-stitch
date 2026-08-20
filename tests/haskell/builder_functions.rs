@@ -1,4 +1,6 @@
 use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::error::SigilStitchError;
+use sigil_stitch::lang::capability::FunctionCapability;
 use sigil_stitch::lang::haskell::Haskell;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -78,7 +80,7 @@ fn test_split_signature_preserves_compound_param_and_return_types() {
 }
 
 #[test]
-fn test_split_signature_handles_parameter_only_and_untyped_functions() {
+fn test_split_signature_rejects_parameter_types_without_return_type() {
     let consume = FunSpec::builder("consume")
         .add_param(
             ParameterSpec::new("value", TypeName::importable("Domain.Input", "Input")).unwrap(),
@@ -86,22 +88,48 @@ fn test_split_signature_handles_parameter_only_and_untyped_functions() {
         .body(CodeBlock::of("undefined", ()).unwrap())
         .build()
         .unwrap();
-    let tick = FunSpec::builder("tick")
-        .body(CodeBlock::of("pure ()", ()).unwrap())
-        .build()
-        .unwrap();
 
-    let output = FileSpec::builder_with("Consumer.hs", Haskell::new())
+    let error = FileSpec::builder_with("Consumer.hs", Haskell::new())
         .add_function(consume)
-        .add_function(tick)
         .build()
         .unwrap()
         .render(80)
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        SigilStitchError::FileSpecValidation { errors, .. }
+            if matches!(errors.as_slice(), [SigilStitchError::MissingRequiredFunctionCapabilities {
+                capabilities,
+                ..
+            }] if capabilities == &vec![FunctionCapability::ExplicitReturnType])
+    ));
+}
+
+#[test]
+fn test_split_signature_rejects_untyped_parameters_with_return_type() {
+    let consume = FunSpec::builder("consume")
+        .add_param(ParameterSpec::new("value", TypeName::primitive("")).unwrap())
+        .returns(TypeName::primitive("Int"))
+        .body(CodeBlock::of("0", ()).unwrap())
+        .build()
         .unwrap();
 
-    assert!(output.contains("import Domain.Input (Input)"), "{output}");
-    assert!(output.contains("consume :: Input"), "{output}");
-    assert!(!output.contains("tick ::"), "{output}");
+    let error = FileSpec::builder_with("Consumer.hs", Haskell::new())
+        .add_function(consume)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        SigilStitchError::FileSpecValidation { errors, .. }
+            if matches!(errors.as_slice(), [SigilStitchError::MissingRequiredFunctionCapabilities {
+                capabilities,
+                ..
+            }] if capabilities == &vec![FunctionCapability::TypedParameters])
+    ));
 }
 
 #[test]
@@ -202,13 +230,18 @@ fn test_function_no_body() {
         .build()
         .unwrap();
 
-    let file = FileSpec::builder_with("Add.hs", Haskell::new())
+    let error = FileSpec::builder_with("Add.hs", Haskell::new())
         .add_function(fun)
         .build()
-        .unwrap();
-    let output = file.render(80).unwrap();
+        .unwrap()
+        .render(80)
+        .unwrap_err();
 
-    golden::assert_golden("haskell/function_no_body.hs", &output);
+    assert!(matches!(
+        error,
+        SigilStitchError::FileSpecValidation { errors, .. }
+            if matches!(errors.as_slice(), [SigilStitchError::FunctionBodyRequired { .. }])
+    ));
 }
 
 #[test]

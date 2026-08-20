@@ -14,11 +14,11 @@ internal interface UserRepository {
 internal class InMemoryUserRepository : UserRepository {
     private val users: MutableList<User>
 
-    internal override fun findById(id: String): User? {
+    override fun findById(id: String): User? {
         return users.firstOrNull { it.id == id }
     }
 
-    internal override fun findAll(): List<User> {
+    override fun findAll(): List<User> {
         return ArrayList<User>(users)
     }
 }

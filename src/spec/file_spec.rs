@@ -143,10 +143,17 @@ impl FileSpec {
 
         let mut errors = Vec::new();
         for member in &self.members {
-            if let FileMember::Type(spec) = member
-                && let Err(error) = spec.validate(lang)
-            {
-                errors.push(error);
+            match member {
+                FileMember::Type(spec) => spec.collect_validation_errors(lang, &mut errors),
+                FileMember::Fun(spec) => {
+                    if let Err(error) = spec.validate(lang, DeclarationContext::TopLevel) {
+                        errors.push(error);
+                    }
+                }
+                FileMember::Spec(spec) => spec.collect_validation_errors(lang, &mut errors),
+                FileMember::Code(_)
+                | FileMember::RawContent(_)
+                | FileMember::RawContentWithImports { .. } => {}
             }
         }
 

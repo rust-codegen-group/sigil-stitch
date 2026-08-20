@@ -21,7 +21,8 @@ This chapter collects practical, copy-paste-ready recipes for each supported lan
 
 ## Cross-language comparison
 
-The same logical concept -- a simple data type with two fields -- rendered across four languages from the same builder structure:
+The same declaration intent -- a simple data type with two fields -- lowered by
+different language adapters:
 
 | Language   | Output |
 |------------|--------|
@@ -35,4 +36,7 @@ The same logical concept -- a simple data type with two fields -- rendered acros
 | Haskell    | `data Point = Point { pointX :: Double, pointY :: Double }` |
 | OCaml      | `type point = { x : float; y : float }` |
 
-The language's `CodeLang` trait controls every syntax detail: keywords, delimiters, field ordering, visibility rendering, and whether methods live inside the type body or in a separate `impl` block. You build the spec once and the language passed to `render()` does the rest.
+Each `CodeLang` adapter owns the declaration's complete target grammar:
+keywords, delimiters, field ordering, visibility rendering, and whether methods
+live inside the type body or in a separate `impl` block. You build declaration
+intent once; each compatible adapter validates and lowers it independently.

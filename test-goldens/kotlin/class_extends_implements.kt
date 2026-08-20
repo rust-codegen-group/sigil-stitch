@@ -3,7 +3,7 @@ import com.example.base.BaseService
 import com.example.serial.Serializable
 
 internal class AdminService : BaseService, Authenticatable, Serializable {
-    internal fun isAdmin(): Boolean {
+    fun isAdmin(): Boolean {
         return true
     }
 }

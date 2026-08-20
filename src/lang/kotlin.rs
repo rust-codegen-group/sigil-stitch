@@ -3,7 +3,10 @@
 use crate::code_block::{Arg, CodeBlock};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::{TypeParamSpec, render_type_params};
@@ -232,85 +235,227 @@ impl RendererLang for Kotlin {
     }
 }
 
-const KOTLIN_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const KOTLIN_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = properties and backing fields
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // AccessorMethods = get/set accessors
-    SpecCapability::AccessorMethods,
+    TypeCapability::AccessorMethods,
     // Methods = member functions
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = supertypes (`:`)
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // ConstructorParameters = primary constructor parameters
-    SpecCapability::ConstructorParameters,
+    TypeCapability::ConstructorParameters,
     // Attributes = annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = nullable properties
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const KOTLIN_CONTRACT_CAPABILITIES: &[SpecCapability] = &[
+const KOTLIN_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // AccessorMethods = get/set accessors
-    SpecCapability::AccessorMethods,
+    TypeCapability::AccessorMethods,
     // Methods = member functions
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = supertypes (`:`)
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = generic type parameters
-    SpecCapability::ParametricPolymorphism,
+    TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints
-    SpecCapability::BoundedPolymorphism,
+    TypeCapability::BoundedPolymorphism,
     // Attributes = annotations
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
 ];
-const KOTLIN_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, KOTLIN_CLASS_CAPABILITIES),
+const KOTLIN_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, KOTLIN_CLASS_CAPABILITIES),
     // Struct is represented as a Kotlin data class.
-    TypeCapabilities::new(TypeKind::Struct, KOTLIN_CLASS_CAPABILITIES),
-    TypeCapabilities::new(TypeKind::Interface, KOTLIN_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, KOTLIN_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, KOTLIN_CONTRACT_CAPABILITIES),
     // Trait is represented as a Kotlin interface.
-    TypeCapabilities::new(TypeKind::Trait, KOTLIN_CONTRACT_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Trait, KOTLIN_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // RecordFields = properties and backing fields
-            SpecCapability::RecordFields,
+            TypeCapability::RecordFields,
             // AccessorMethods = get/set accessors
-            SpecCapability::AccessorMethods,
+            TypeCapability::AccessorMethods,
             // Methods = member functions
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // ConstructorParameters = primary constructor parameters
-            SpecCapability::ConstructorParameters,
+            TypeCapability::ConstructorParameters,
             // Attributes = annotations
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
             // Variants = enum entries
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
             // ParametricPolymorphism = generic type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Newtype,
         &[
             // ParametricPolymorphism = generic type parameters
-            SpecCapability::ParametricPolymorphism,
+            TypeCapability::ParametricPolymorphism,
             // Attributes = annotations
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
 ];
 
+const KOTLIN_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AsyncEffect = suspend
+    FunctionCapability::AsyncEffect,
+    // Attributes = annotations
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = type parameter constraints
+    FunctionCapability::BoundedPolymorphism,
+    // default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = function result type
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+];
+const KOTLIN_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AbstractMethod = abstract
+    FunctionCapability::AbstractMethod,
+    // AsyncEffect = suspend
+    FunctionCapability::AsyncEffect,
+    // Attributes = annotations
+    FunctionCapability::Attributes,
+    // BoundedPolymorphism = type parameter constraints
+    FunctionCapability::BoundedPolymorphism,
+    // default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = method result type
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    // Override = override
+    FunctionCapability::Override,
+    // ParametricPolymorphism = generic type parameters
+    FunctionCapability::ParametricPolymorphism,
+];
+const KOTLIN_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::AbstractMethod,
+    FunctionCapability::AsyncEffect,
+    FunctionCapability::Attributes,
+    FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    FunctionCapability::Override,
+    FunctionCapability::ParametricPolymorphism,
+];
+const KOTLIN_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::Attributes,
+    FunctionCapability::ConstructorDelegation,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::TypedParameters,
+];
+const KOTLIN_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        KOTLIN_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        KOTLIN_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        KOTLIN_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters])
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        KOTLIN_INTERFACE_FUNCTION_CAPABILITIES,
+    )
+    .with_required_capabilities(&[FunctionCapability::TypedParameters]),
+];
+
 impl CodeLang for Kotlin {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(KOTLIN_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(KOTLIN_TYPES)
+            .with_functions(KOTLIN_FUNCTIONS)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::function_lowering::validate_constraints_target_declared_type_params(
+            self.file_extension(),
+            function_name,
+            type_params,
+            constraints,
+        )
+    }
+
+    fn constructor_name_matches(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "constructor"
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "constructor"
+    }
+
+    fn abstract_type_modifier_is_valid(&self, kind: TypeKind) -> bool {
+        kind == TypeKind::Class
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::TopLevel => matches!(
+                visibility,
+                Visibility::Inherited | Visibility::Public | Visibility::Private
+            ),
+            FunctionContext::Member => matches!(
+                visibility,
+                Visibility::Inherited
+                    | Visibility::Public
+                    | Visibility::Private
+                    | Visibility::Protected
+            ),
+            FunctionContext::InterfaceMember => {
+                matches!(visibility, Visibility::Inherited | Visibility::Public)
+            }
+            FunctionContext::ReceiverMethod => false,
+        }
+    }
+
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::kotlin_function_lowering::lower(self, function)
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

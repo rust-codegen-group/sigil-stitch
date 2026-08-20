@@ -45,7 +45,10 @@
 use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::capability::{LanguageCapabilities, SpecCapability, TypeCapabilities};
+use crate::lang::capability::{
+    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+};
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, OptionalFieldStyle,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -180,75 +183,200 @@ impl RendererLang for Php {
     }
 }
 
-const PHP_CLASS_CAPABILITIES: &[SpecCapability] = &[
+const PHP_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = properties
-    SpecCapability::RecordFields,
+    TypeCapability::RecordFields,
     // AccessorMethods = promoted/accessor properties
-    SpecCapability::AccessorMethods,
+    TypeCapability::AccessorMethods,
     // Methods = methods
-    SpecCapability::Methods,
+    TypeCapability::Methods,
     // NominalSubtyping = `extends`
-    SpecCapability::NominalSubtyping,
+    TypeCapability::NominalSubtyping,
     // InterfaceImplementation = `implements`
-    SpecCapability::InterfaceImplementation,
+    TypeCapability::InterfaceImplementation,
     // Attributes = PHP attributes
-    SpecCapability::Attributes,
+    TypeCapability::Attributes,
     // OptionalRecordFields = nullable properties
-    SpecCapability::OptionalRecordFields,
+    TypeCapability::OptionalRecordFields,
 ];
-const PHP_TYPES: &[TypeCapabilities] = &[
-    TypeCapabilities::new(TypeKind::Class, PHP_CLASS_CAPABILITIES),
+const PHP_TYPES: &[TypeCapabilityProfile] = &[
+    TypeCapabilityProfile::new(TypeKind::Class, PHP_CLASS_CAPABILITIES),
     // Struct is represented as a PHP class.
-    TypeCapabilities::new(TypeKind::Struct, PHP_CLASS_CAPABILITIES),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(TypeKind::Struct, PHP_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(
         TypeKind::Interface,
         &[
             // Methods = methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // NominalSubtyping = `extends`
-            SpecCapability::NominalSubtyping,
+            TypeCapability::NominalSubtyping,
             // Attributes = PHP attributes
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Trait,
         &[
             // RecordFields = properties
-            SpecCapability::RecordFields,
+            TypeCapability::RecordFields,
             // AccessorMethods = promoted/accessor properties
-            SpecCapability::AccessorMethods,
+            TypeCapability::AccessorMethods,
             // Methods = methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // Attributes = PHP attributes
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
             // Methods = methods
-            SpecCapability::Methods,
+            TypeCapability::Methods,
             // InterfaceImplementation = `implements`
-            SpecCapability::InterfaceImplementation,
+            TypeCapability::InterfaceImplementation,
             // Attributes = PHP attributes
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
             // Variants = enum cases
-            SpecCapability::Variants,
+            TypeCapability::Variants,
         ],
     ),
-    TypeCapabilities::new(
+    TypeCapabilityProfile::new(
         TypeKind::Newtype,
         &[
             // Attributes = PHP attributes
-            SpecCapability::Attributes,
+            TypeCapability::Attributes,
         ],
     ),
 ];
 
+const PHP_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // Attributes = attributes #[...]
+    FunctionCapability::Attributes,
+    // DefaultParameters = default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = return type declaration
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = optional parameter declarations
+    FunctionCapability::TypedParameters,
+];
+const PHP_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    // AbstractMethod = abstract
+    FunctionCapability::AbstractMethod,
+    // Attributes = attributes #[...]
+    FunctionCapability::Attributes,
+    // DefaultParameters = default parameter values
+    FunctionCapability::DefaultParameters,
+    // ExplicitReturnType = return type declaration
+    FunctionCapability::ExplicitReturnType,
+    // TypedParameters = optional parameter declarations
+    FunctionCapability::TypedParameters,
+    // Override = #[Override]
+    FunctionCapability::Override,
+    // StaticMethod = static
+    FunctionCapability::StaticMethod,
+];
+const PHP_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::Attributes,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::TypedParameters,
+    FunctionCapability::Override,
+    FunctionCapability::StaticMethod,
+];
+const PHP_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::AbstractMethod,
+    FunctionCapability::Attributes,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::TypedParameters,
+];
+const PHP_INTERFACE_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::Attributes,
+    FunctionCapability::DefaultParameters,
+    FunctionCapability::TypedParameters,
+];
+const PHP_FUNCTIONS: &[FunctionCapabilityProfile] = &[
+    FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        PHP_TOP_LEVEL_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Function,
+        PHP_MEMBER_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::Member,
+        FunctionForm::Constructor,
+        PHP_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Required),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Function,
+        PHP_INTERFACE_FUNCTION_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Forbidden),
+    FunctionCapabilityProfile::new(
+        FunctionContext::InterfaceMember,
+        FunctionForm::Constructor,
+        PHP_INTERFACE_CONSTRUCTOR_CAPABILITIES,
+    )
+    .with_body_policy(FunctionBodyPolicy::Forbidden),
+];
+
 impl CodeLang for Php {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
-        LanguageCapabilities::new(PHP_TYPES)
+        LanguageCapabilities::strict()
+            .with_types(PHP_TYPES)
+            .with_functions(PHP_FUNCTIONS)
+    }
+
+    fn function_visibility_is_valid(
+        &self,
+        context: FunctionContext,
+        _form: FunctionForm,
+        _is_static: bool,
+        visibility: Visibility,
+    ) -> bool {
+        match context {
+            FunctionContext::TopLevel => {
+                matches!(visibility, Visibility::Inherited | Visibility::Public)
+            }
+            FunctionContext::Member => matches!(
+                visibility,
+                Visibility::Inherited
+                    | Visibility::Public
+                    | Visibility::Private
+                    | Visibility::Protected
+            ),
+            FunctionContext::InterfaceMember => {
+                matches!(visibility, Visibility::Inherited | Visibility::Public)
+            }
+            FunctionContext::ReceiverMethod => false,
+        }
+    }
+
+    fn constructor_name_matches(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "__construct"
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, _declaring_type: Option<&str>) -> bool {
+        name == "__construct"
+    }
+
+    fn type_member_declaration_context(&self, kind: TypeKind) -> DeclarationContext {
+        if kind == TypeKind::Interface {
+            DeclarationContext::InterfaceMember
+        } else {
+            DeclarationContext::Member
+        }
+    }
+
+    fn abstract_type_modifier_is_valid(&self, kind: TypeKind) -> bool {
+        matches!(kind, TypeKind::Class | TypeKind::Struct)
     }
 
     fn variable_prefix(&self) -> &str {
@@ -313,7 +441,8 @@ impl CodeLang for Php {
                 Visibility::Public => "public ",
                 Visibility::Private => "private ",
                 Visibility::Protected => "protected ",
-                _ => "public ",
+                Visibility::Inherited => "public ",
+                Visibility::PublicCrate | Visibility::PublicSuper => "public ",
             },
             DeclarationContext::InterfaceMember => match vis {
                 Visibility::Public => "public ",
@@ -347,6 +476,7 @@ impl CodeLang for Php {
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: ": ",
+            constructor_keyword: "function",
             async_keyword: "",
             abstract_keyword: "abstract ",
             override_keyword: "",

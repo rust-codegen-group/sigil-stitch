@@ -1,45 +1,87 @@
 # Architecture
 
-This chapter describes how sigil-stitch works internally. It covers the four-layer design, the three-pass rendering pipeline, and the import resolution system.
+This chapter describes how sigil-stitch carries declaration intent to source
+text. It covers ownership, the materialization and rendering pipeline, and
+import resolution.
 
-## Four Layers
+The function declaration-lowering seam described here is implemented. Some
+other pre-0.6.8 compatibility paths still let generic spec emitters interpret
+shared syntax configuration. Those paths are transitional and must not be
+expanded. See [Declaration Specs and Language
+Lowering](declaration_lowering.md) for the decision and migration rules.
 
-The library is organized in four layers, each building on the one below:
+## Pipeline and Ownership
 
 ```text
-┌─────────────────────────────────────┐
-│  Spec Layer (TypeSpec, FunSpec, ...) │  Structural builders
-├─────────────────────────────────────┤
-│  CodeBlock + Format Specifiers       │  Composable code fragments
-├─────────────────────────────────────┤
-│  TypeName                            │  Type references with import tracking
-├─────────────────────────────────────┤
-│  CodeLang Trait                      │  Language abstraction
-└─────────────────────────────────────┘
+Declaration specs + TypeName + opaque CodeBlock payloads
+                         |
+                         +-- intrinsic validation
+                         +-- target capability validation
+                         |
+                         v
+              target-language adapter
+              owns complete declaration lowering
+                         |
+                         v
+                   CodeBlock tree
+                         |
+                         +-- collect and resolve imports
+                         +-- rewrite and validate nodes
+                         +-- select one layout adapter
+                         |
+                         v
+                     source text
 ```
 
-### Layer 1: RendererLang + CodeLang
+The important seam is between declaration intent and target grammar. Specs own
+the former; a language adapter owns the latter. `CodeBlock` is the structured
+rendering IR passed to import resolution and final rendering.
+
+## Language Interfaces
 
 `src/lang/mod.rs` defines two traits:
 
-- **`RendererLang`** — the renderer-only surface used by `code_renderer.rs`
-  and `TypeName::to_doc_with_lang`. Covers file extension, string literals,
-  verbatim strings, block syntax, type presentation, generic syntax, and
-  rendering helpers. If you only need `CodeBlock`-level rendering (no specs),
-  implementing `RendererLang` is sufficient.
-- **`CodeLang: RendererLang`** — extends `RendererLang` with the additional
-  methods needed by the spec layer (TypeSpec, FunSpec, FieldSpec) and FileSpec
-  imports. It also owns structured hooks for newtype declarations, split
-  signature contexts, and type-close suffixes. Those hooks return `CodeBlock`
-  values so semantic `TypeName` references survive until import resolution.
+- **`RendererLang`** is the renderer-only interface used by
+  `code_renderer.rs` and `TypeName::to_doc_with_lang`. It covers file
+  extensions, string literals, block rendering, type presentation, and other
+  final-rendering policy. Implementing it is sufficient for direct
+  `CodeBlock` rendering.
+- **`CodeLang: RendererLang`** adds declaration representability, lowering,
+  imports, and spec-level documentation. After crate-owned validation against
+  the selected adapter, `validate_function()` may add target-local checks to a
+  classified `FunctionIntent`. sigil-stitch then constructs a
+  `ValidatedFunction`; `lower_function()` accepts that validated read-only view
+  and returns a structured `CodeBlock`. Callers do not assemble target function
+  grammar from fragments, and adapters cannot construct or bypass the validated
+  wrapper.
 
-Each supported language implements both traits in its own module (`src/lang/typescript.rs`, etc.). The 6 config struct accessors (`type_presentation()`, `generic_syntax()`, `block_syntax()`, `function_syntax()`, `type_decl_syntax()`, `enum_and_annotation()`) return data structs with sensible defaults. Control-flow nodes carry a language-neutral `BlockIntent`; each adapter maps that intent locally through `block_open_for_intent()` / `block_close_for_intent()`. Languages can still implement `rewrite_nodes()` for structural or literal fixups (e.g., Go IIFE `}()` fusion, C++ lambda `};` semicolons).
+Each supported language implements both traits in its own module
+(`src/lang/typescript.rs`, etc.). Control-flow nodes carry a language-neutral
+`BlockIntent`; each adapter maps that intent locally through
+`block_open_for_intent()` / `block_close_for_intent()`. Languages can implement
+`rewrite_nodes()` for structural or literal fixups such as Go IIFE `}()` fusion
+or C++ lambda `};` semicolons.
+
+The existing `function_syntax()`, `type_decl_syntax()`, and
+`enum_and_annotation()` accessors belong to compatibility lowering paths.
+`lang/function_lowering/compatibility.rs` interprets the function portion for
+pre-0.6.8 external adapters; some non-function specs still interpret the other
+legacy fields directly. All three accessors and their configuration types are
+deprecated: existing adapters may retain them while their declaration paths
+are migrated, but new adapters and new syntax dimensions must use
+language-owned lowering. Stable renderer policy and the separately documented
+`TypeName` presentation seam are lower-level concerns, not permission for
+specs to interpret target grammar.
 
 At the macro level, the `MacroLang` enum (`macros/src/parse/lang.rs`) provides compile-time language-aware tokenizer annotations. Languages like Bash, Zsh, Go, and Haskell get specialized spacing rules in `sigil_quote!` without runtime overhead. See [Language-Aware Tokenizer](macrolang.md).
 
-Public types are language-agnostic — no generic parameter. The language enters as `&dyn RendererLang` (for rendering) or `&dyn CodeLang` (for spec emission) at render time. `FileSpec` stores a `Box<dyn CodeLang>` internally; all other types (`CodeBlock`, `TypeName`, specs) are language-independent.
+Public container types have no language generic parameter. The language enters
+as `&dyn RendererLang` for direct rendering or `&dyn CodeLang` for declaration
+materialization. `FileSpec` stores a `Box<dyn CodeLang>` internally. A
+`CodeBlock` can nevertheless contain target-specific literal text; language
+independence of its Rust type is not a promise that every block is portable.
 
-#### Macro Front End
+## Macro Front End
 
 `sigil_quote!` has a private typed pipeline before the public `CodeBlock` layer:
 
@@ -75,7 +117,7 @@ input fails with a macro diagnostic instead of exhausting rustc while parsing
 the generated nesting. The public `CodeBlock`, error, and rendering contracts
 are unaffected.
 
-### Layer 2: TypeName
+## Semantic Type References: TypeName
 
 `src/type_name.rs` defines type references. Key variants:
 
@@ -107,56 +149,126 @@ TypeName also renders to `pretty::BoxDoc` for width-aware output of complex type
 1. Each `TypeName` variant asks the language for a `TypePresentation` — a data enum describing the syntactic pattern (e.g., `GenericWrap`, `Prefix`, `Postfix`, `Surround`, `Delimited`, `Infix`).
 2. A single rendering engine in `type_name_render.rs` interprets the pattern into `BoxDoc` output.
 
-`BoxDoc` never appears in the `CodeLang` trait. Languages return pure data; the engine does all rendering. See [Type Presentation](type_presentation.md) for the full design.
+`BoxDoc` never appears in the `RendererLang` interface. Languages return pure
+data; the engine does all rendering. See [Type
+Presentation](type_presentation.md) for the full design.
 
-### Layer 3: CodeBlock
+## Rendering IR: CodeBlock
 
 A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `NameRef`, `StringLit`, `Comment`, `Nested`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, and control-flow nodes carry a language-neutral `BlockIntent` (`BlockOpenIntent`, `BlockCloseIntent`, `BranchCloseIntent`) with no per-language rendering policy.
 
 CodeBlocks are immutable after construction. The builder (`CodeBlockBuilder`) validates argument counts and indent balance before producing a block.
 
-### Layer 4: Spec Layer
+## Declaration Specs
 
-`src/spec/` contains structural builders that emit `Vec<CodeBlock>`. TypeSpec emits one or two blocks depending on `methods_inside_type_body()`. FunSpec emits one block. FileSpec orchestrates the full rendering pipeline.
+`src/spec/` contains builders for target-independent declaration intent.
+`TypeSpec`, `FunSpec`, `FieldSpec`, and related types record what the caller
+wants to declare. They are a semantic superset: target capability validation
+may reject intent that one language cannot represent.
 
-The key design decision: specs and language hooks emit CodeBlocks, never
-type-bearing raw strings. This means the renderer and import system never need
-to change when new spec types are added. A new `WidgetSpec` would just emit
-CodeBlocks with `%T` references, and imports would work automatically.
+Specs enforce intrinsic coherence, select declaration context, and delegate
+target representability and lowering. They do not own keyword spelling, token
+order, separators, type-parameter placement, or other target grammar. The
+language adapter returns `CodeBlock`, never a type-bearing raw string, so
+semantic `TypeName` references survive import collection and alias resolution.
 
-The structured type path is:
+The intended declaration path is:
 
 ```text
 TypeSpec / FunSpec
         |
-        v
-CodeLang emit_* hook -> nested CodeBlock with TypeRef nodes
+        +-- intrinsic validation
+        +-- language capability validation
         |
         v
-collect imports -> resolve aliases -> CodeRenderer -> to_doc_with_lang
+CodeLang complete declaration lowering
+        |
+        v
+CodeBlock with TypeRef nodes
+        |
+        v
+collect imports -> resolve aliases -> CodeRenderer -> source text
 ```
+
+Raw bodies, annotations, suffixes, and file fragments are explicit escape
+hatches. They may contain target-specific syntax, but remain opaque to generic
+specs and shared lowerers; their existence does not move ownership of the
+surrounding declaration grammar into the spec. A private Python validator
+recognizes the documented 0.6.8 `is_static` plus decorator pattern solely as a
+frozen adapter-local compatibility exception. New semantics must not extend
+that recognizer or add a shared syntax hook.
+
+The current compatibility emitter still reads pre-0.6.8 syntax configuration
+inside several specs. Migration moves complete declaration lowering behind the
+language adapter while preserving that path as a default for existing external
+adapters.
 
 ## Three-Pass Rendering Pipeline
 
 `FileSpec::render(width)` drives everything. It runs three passes over the file's members.
 
 Before materialization, `FileSpec::validate()` checks every `TypeSpec` against
-`CodeLang::capabilities()`. Unsupported type kinds and unsupported semantic
-capabilities return structured errors instead of rendering plausible wrong
-code. Unknown legacy adapters inherit the permissive `all()` matrix.
+the type and function profiles returned by `CodeLang::capabilities()`.
+Function validation distinguishes free functions, receiver methods, concrete
+members, and interface members, then selects an ordinary-function, constructor,
+or destructor profile within that context. Profiles declare supported and
+required semantic capabilities, body policy, and forbidden capability pairs.
+This rejects missing return or parameter types, unsupported annotations,
+invalid body placement, malformed rest-parameter lists, and incompatible
+modifiers before plausible wrong code can render. Adapters written for
+sigil-stitch 0.6.8 inherit the permissive compatibility profile.
+
+When a strict member profile requires a return type but its constructor
+profile does not, direct `FunSpec` emission preserves the legacy ambiguous
+constructor-shaped member convention because it has no declaring-type owner.
+`TypeSpec` has the owner context and validates constructor identities exactly:
+fixed names such as `constructor` and `init`, owner-derived Java/C#/C++ names,
+and Dart named constructors are classified before capability validation. New
+direct-emission code should use `is_constructor()` explicitly when the name
+does not identify the form on its own.
+
+Constructor classification remains language-specific after modifiers and
+return types are known. A static owner-named member may be an ordinary method
+in one language and a static constructor in another; Java also permits a
+same-named ordinary method when an explicit return type disambiguates it.
+Modifier-aware hooks refine the selected profile's body policy, parameter
+limit, visibility, default-parameter ordering, and type-constraint
+representability without weakening the declared capability matrix.
+Constraint validation is syntax-independent by default. Adapters whose local
+lowering attaches constraint subjects to declared type parameters opt into the
+shared structural check explicitly; Rust retains its broader where-subject
+model.
+
+Type kinds select their member validation context through the language. Most
+interfaces and traits use contract-member profiles, while module- or
+trait-backed concrete constructs such as Ruby modules and PHP traits retain
+concrete member rules. The same language policy decides which type kinds may
+carry an explicit abstract modifier.
+
+For languages where `is_abstract` represents an abstract method, a concrete
+type containing such a method must itself be marked abstract. C++ remains the
+exception because a pure virtual member makes the class abstract structurally.
 
 ### Pass 0: Materialize
 
-Specs are converted to CodeBlocks:
+Declaration specs are validated and converted to `CodeBlock`s:
 - `FileMember::Type(TypeSpec)` calls `type_spec.emit(&lang)` -> `Vec<CodeBlock>`
 - `FileMember::Fun(FunSpec)` calls `fun_spec.emit(&lang, ctx)` -> `CodeBlock`
 - `FileMember::Code(CodeBlock)` passes through unchanged
 - `FileMember::RawContent(String)` passes through as-is
 
-Spec emitters append structured hook results as nested CodeBlocks. Hook
-construction errors propagate from this pass; they are never converted to
-empty output. After this phase, everything is either a CodeBlock or raw
-content.
+The public function `emit` methods apply crate-owned semantic validation, call
+`CodeLang::validate_function()` for additional target-local checks, construct a
+`ValidatedFunction`, and then call `CodeLang::lower_function()`. The default
+lowerer delegates to the frozen legacy-syntax compatibility module so
+pre-0.6.8 external adapters remain source compatible. Kotlin, C++, C#, and
+TypeScript own their complete function grammar in adapter-local lowering
+modules and do not consume deprecated declaration configuration there.
+
+Language lowering composes structured child blocks and preserves every
+`TypeName` as a `TypeRef`. Construction errors propagate from this pass; they
+are never converted to empty output. After materialization, everything is
+either a `CodeBlock` or explicitly raw content.
 
 ### Pass 1: Collect Imports
 
@@ -248,33 +360,23 @@ const b: LegacyUser = getB();
 
 The first `User` (from `./models`) wins the simple name. The second (from `./legacy`) gets the alias `LegacyUser`, derived from the module path.
 
-## Language-Agnostic Types
+## Language-Independent Containers and Target-Specific Payloads
 
-All public types (`CodeBlock`, `TypeName`, `TypeSpec`, `FunSpec`, etc.) are language-agnostic. The language is supplied at render time via `&dyn CodeLang`:
+Public types such as `CodeBlock`, `TypeName`, `TypeSpec`, and `FunSpec` have no
+target-language generic parameter. The target is supplied through
+`&dyn RendererLang` or `&dyn CodeLang` when a block or declaration is
+materialized and rendered.
 
-```rust
-# extern crate sigil_stitch;
-# use sigil_stitch::prelude::*;
-# fn main() {
-let user = TypeName::importable_type("./models", "User");
-let mut cb = CodeBlock::builder();
-cb.add("const u: %T = getUser()", (user,));
-let block = cb.build().unwrap();
-// Render for any language:
-let output_ts = FileSpec::builder("user.ts")
-    .add_code(block.clone())
-    .build()
-    .unwrap()
-    .render(80)
-    .unwrap();
+The distinction is about the Rust interface, not automatic portability of all
+values:
 
-let output_rs = FileSpec::builder("user.rs")
-    .add_code(block)
-    .build()
-    .unwrap()
-    .render(80)
-    .unwrap();
-# }
-```
+- `TypeName::Array(T)` and a `FunSpec` type-parameter list are semantic and can
+  be lowered for different targets.
+- A `CodeBlock` containing the literal `const u = ...` is already
+  target-language source, even though the `CodeBlock` type itself is shared.
+- `TypeRef`, `StringLit`, comments, layout intent, and import references remain
+  structured until the renderer applies target policy.
 
-`FileSpec::builder("user.ts")` auto-detects the language from the file extension. Use `FileSpec::builder_with("user.ts", TypeScript::new())` for explicit control.
+`FileSpec::builder("user.ts")` auto-detects the adapter from the file
+extension. `FileSpec::builder_with(...)` selects one explicitly. In both cases,
+the adapter must validate declaration intent and own its concrete grammar.

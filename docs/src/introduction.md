@@ -22,10 +22,12 @@ is rendered with direct string concatenation (no pretty-printer overhead).
 
 ## Four key properties
 
-**Ergonomic multi-language.** `CodeBlock`, `TypeName`, and all spec types are
-language-agnostic — no generic parameter. The language enters at render time when
-you call `FileSpec::render()` or pass `&dyn CodeLang` to a renderer. You can build
-code blocks once and render them for different languages.
+**Ergonomic multi-language.** `CodeBlock`, `TypeName`, and all spec types have no
+language generic parameter. The language enters when `FileSpec` materializes a
+declaration or when a renderer receives `&dyn RendererLang`. Semantic
+`TypeName` and spec values can be reused across targets that support their
+intent. Literal text inside a `CodeBlock` is already target syntax and is only
+portable where that syntax is shared.
 
 **Import-aware.** When you use `%T` with a `TypeName::Importable`, the library records
 that import. At render time, `FileSpec` collects all imports from every code block,
@@ -39,22 +41,21 @@ produces a newline with proper indentation. This is the Wadler-Lindig algorithm 
 work, via the `pretty` crate. You pass the target width to `FileSpec::render(width)`,
 and the same code blocks produce different layouts for different widths.
 
-**Multi-language.** The `RendererLang` and `CodeLang` traits abstract everything that varies between
-languages: string delimiters, statement terminators, import syntax, visibility keywords,
-type formatting, annotation style, and more. sigil-stitch ships with implementations
-for TypeScript, JavaScript, Rust, Go, Python, Java, Kotlin, Swift, Dart, Scala,
-Haskell, OCaml, C, C++, C#, Lua, Bash, and Zsh.
-The same `CodeBlock`, `TypeName`, and `Spec` types work across all of them -- only the
-language passed to `render()` changes.
+**Multi-language.** `RendererLang` owns final-rendering policy, while each
+`CodeLang` adapter validates declaration intent and owns its target grammar.
+sigil-stitch ships with adapters for TypeScript, JavaScript, Rust, Go, Python,
+Java, Kotlin, Swift, Dart, Scala, Haskell, OCaml, C, C++, C#, Lua, Bash, and Zsh.
+The shared container types work with every adapter; each value must still be
+representable by its selected target.
 
 ## Design philosophy
 
-**Specs emit CodeBlocks, never raw strings.** A `FunSpec` produces a `CodeBlock` via
-its `.emit()` method. A `TypeSpec` produces one or two `CodeBlock`s (depending on
-whether the language places methods inside or outside the type body). The renderer
-and import system only ever see `CodeBlock` trees. This means you can add new spec
-types -- or build your own -- without touching the renderer or import collector.
-The format-specifier system and the spec system are fully decoupled.
+**Specs lower to structured blocks.** Specs record target-independent
+declaration intent. Their `.emit()` facade performs validation and delegates
+target grammar to the selected language adapter, producing `CodeBlock` trees
+rather than type-bearing strings. The renderer and import collector therefore
+remain independent of declaration kinds while retaining structured type
+references.
 
 **Minimal dependencies.** The runtime dependencies are `pretty` (v0.12) for
 Wadler-Lindig formatting, `serde` (v1, with `derive`) so every spec can round-trip
@@ -101,10 +102,10 @@ There are three levels of abstraction, and you can use whichever fits:
 - **CodeBlock** for code fragments. Use format specifiers (`%T`, `%S`, `%L`, `%W`)
   to interpolate values. Good for function bodies, one-off statements, and anything
   that doesn't need structural metadata.
-- **Specs** (FunSpec, TypeSpec, FieldSpec, ParameterSpec, etc.) for structured
-  declarations. They produce CodeBlocks internally but carry metadata like visibility,
-  annotations, type parameters, and modifiers that the language trait uses to emit
-  correct syntax.
+- **Specs** (`FunSpec`, `TypeSpec`, `FieldSpec`, `ParameterSpec`, etc.) for
+  declaration intent. They carry semantic facts such as visibility, annotations,
+  type parameters, and modifiers; the selected adapter validates and lowers
+  them to target syntax.
 - **FileSpec** to render a complete file. It orchestrates the three-pass pipeline:
   materialize specs into code blocks, collect and resolve imports, then render
   everything with proper formatting. Pass a target width to `file.render(80)` and
