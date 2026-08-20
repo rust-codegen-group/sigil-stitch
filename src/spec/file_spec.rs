@@ -128,6 +128,11 @@ impl FileSpec {
     ///
     /// Unknown external adapters inherit the permissive legacy capability
     /// profile, so this is strict only when the adapter declares a matrix.
+    ///
+    /// Validation is collected rather than fail-fast: every invalid type
+    /// member is checked and all resulting errors are returned in one
+    /// [`SigilStitchError::FileSpecValidation`]. A missing language is
+    /// returned immediately as [`SigilStitchError::MissingLang`].
     pub fn validate(&self) -> Result<(), SigilStitchError> {
         let lang: &dyn CodeLang =
             self.lang
@@ -136,12 +141,25 @@ impl FileSpec {
                     filename: self.filename.clone(),
                 })?;
 
+        let mut errors = Vec::new();
         for member in &self.members {
-            if let FileMember::Type(spec) = member {
-                spec.validate(lang)?;
+            if let FileMember::Type(spec) = member
+                && let Err(error) = spec.validate(lang)
+            {
+                errors.push(error);
             }
         }
-        Ok(())
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            let error_count = errors.len();
+            Err(SigilStitchError::FileSpecValidation {
+                filename: self.filename.clone(),
+                error_count,
+                errors,
+            })
+        }
     }
 
     /// Render the file to a string using the three-pass algorithm.
