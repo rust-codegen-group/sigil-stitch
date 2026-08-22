@@ -5,7 +5,8 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -311,6 +312,14 @@ const KOTLIN_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const KOTLIN_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::ConstructorArguments,
+        VariantCapability::Attributes,
+    ],
+)];
+
 const KOTLIN_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = suspend
     FunctionCapability::AsyncEffect,
@@ -397,6 +406,29 @@ impl CodeLang for Kotlin {
         LanguageCapabilities::strict()
             .with_types(KOTLIN_TYPES)
             .with_functions(KOTLIN_FUNCTIONS)
+            .with_variants(KOTLIN_VARIANTS)
+    }
+
+    fn validate_variants(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::variant_lowering::kotlin::validate(self, variants)
+    }
+
+    fn collect_variant_validation_errors(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::variant_lowering::kotlin::collect_validation_errors(self, variants, errors);
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::kotlin::lower(self, variants)
     }
 
     fn validate_function_type_constraints(

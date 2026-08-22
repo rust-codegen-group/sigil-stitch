@@ -4,10 +4,10 @@ This chapter describes how sigil-stitch carries declaration intent to source
 text. It covers ownership, the materialization and rendering pipeline, and
 import resolution.
 
-The function declaration-lowering seam described here is implemented. Some
-other pre-0.6.8 compatibility paths still let generic spec emitters interpret
-shared syntax configuration. Those paths are transitional and must not be
-expanded. See [Declaration Specs and Language
+The function and enum-variant declaration-lowering seams described here are
+implemented. Some other pre-0.6.8 compatibility paths still let generic spec
+emitters interpret shared syntax configuration. Those paths are transitional
+and must not be expanded. See [Declaration Specs and Language
 Lowering](declaration_lowering.md) for the decision and migration rules.
 
 ## Pipeline and Ownership
@@ -51,9 +51,14 @@ rendering IR passed to import resolution and final rendering.
   the selected adapter, `validate_function()` may add target-local checks to a
   classified `FunctionIntent`. sigil-stitch then constructs a
   `ValidatedFunction`; `lower_function()` accepts that validated read-only view
-  and returns a structured `CodeBlock`. Callers do not assemble target function
-  grammar from fragments, and adapters cannot construct or bypass the validated
-  wrapper.
+  and returns a structured `CodeBlock`. Enum variants follow the same pattern:
+  `validate_variants()` sees the owning declaration and complete ordered
+  `VariantIntent`; adapters with independent per-variant checks implement the
+  additive `collect_variant_validation_errors()` seam. `lower_variants()`
+  receives `ValidatedVariants` and owns preambles, payload spelling,
+  separators, and section termination. Callers do not assemble target
+  declaration grammar from fragments, and adapters cannot construct or bypass
+  the validated wrappers.
 
 Each supported language implements both traits in its own module
 (`src/lang/typescript.rs`, etc.). Control-flow nodes carry a language-neutral
@@ -64,8 +69,8 @@ or C++ lambda `};` semicolons.
 
 The existing `function_syntax()`, `type_decl_syntax()`, and
 `enum_and_annotation()` accessors belong to compatibility lowering paths.
-`lang/function_lowering/compatibility.rs` interprets the function portion for
-pre-0.6.8 external adapters; some non-function specs still interpret the other
+Private compatibility modules interpret the function and enum-variant portions
+for pre-0.6.8 external adapters; some other specs still interpret the remaining
 legacy fields directly. All three accessors and their configuration types are
 deprecated: existing adapters may retain them while their declaration paths
 are migrated, but new adapters and new syntax dimensions must use
@@ -172,6 +177,17 @@ order, separators, type-parameter placement, or other target grammar. The
 language adapter returns `CodeBlock`, never a type-bearing raw string, so
 semantic `TypeName` references survive import collection and alias resolution.
 
+An enum is lowered as one owner-aware variant sequence. `VariantIntent`
+contains the owner name and kind, all variants in declaration order, whether
+ordinary members follow, the accepted arity ranges of structured constructors,
+and whether opaque members may provide target-specific constructor syntax. A
+language profile distinguishes discriminants, enum-entry constructor arguments,
+positional payloads, record payloads, and attributes. `VariantContext` is only
+the deprecated positional input to the permissive external-adapter
+compatibility path; strict built-ins reject ownerless direct emission because
+caller-supplied first/last flags cannot prove valid separators or section
+termination.
+
 The intended declaration path is:
 
 ```text
@@ -208,7 +224,8 @@ adapters.
 `FileSpec::render(width)` drives everything. It runs three passes over the file's members.
 
 Before materialization, `FileSpec::validate()` checks every `TypeSpec` against
-the type and function profiles returned by `CodeLang::capabilities()`.
+the type, function, and enum-variant profiles returned by
+`CodeLang::capabilities()`.
 Function validation distinguishes free functions, receiver methods, concrete
 members, and interface members, then selects an ordinary-function, constructor,
 or destructor profile within that context. Profiles declare supported and
@@ -257,13 +274,14 @@ Declaration specs are validated and converted to `CodeBlock`s:
 - `FileMember::Code(CodeBlock)` passes through unchanged
 - `FileMember::RawContent(String)` passes through as-is
 
-The public function `emit` methods apply crate-owned semantic validation, call
-`CodeLang::validate_function()` for additional target-local checks, construct a
-`ValidatedFunction`, and then call `CodeLang::lower_function()`. The default
-lowerer delegates to the frozen legacy-syntax compatibility module so
-pre-0.6.8 external adapters remain source compatible. Kotlin, C++, C#, and
-TypeScript own their complete function grammar in adapter-local lowering
-modules and do not consume deprecated declaration configuration there.
+The public function and owner-aware variant `emit` paths apply crate-owned
+semantic validation, call the corresponding `CodeLang::validate_*()` method
+for additional target-local checks, construct a `ValidatedFunction` or
+`ValidatedVariants`, and then call the matching `CodeLang::lower_*()` method.
+The defaults delegate to frozen legacy-syntax compatibility modules so
+pre-0.6.8 external adapters remain source compatible. Built-in complete
+lowerers do not consume deprecated declaration configuration for the migrated
+family.
 
 Language lowering composes structured child blocks and preserves every
 `TypeName` as a `TypeRef`. Construction errors propagate from this pass; they

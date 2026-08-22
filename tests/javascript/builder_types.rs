@@ -194,25 +194,25 @@ fn test_enum() {
                 .doc("Cardinal directions.")
                 .add_variant(
                     EnumVariantSpec::builder("Up")
-                        .value(CodeBlock::of("'UP'", ()).unwrap())
+                        .discriminant(CodeBlock::of("'UP'", ()).unwrap())
                         .build()
                         .unwrap(),
                 )
                 .add_variant(
                     EnumVariantSpec::builder("Down")
-                        .value(CodeBlock::of("'DOWN'", ()).unwrap())
+                        .discriminant(CodeBlock::of("'DOWN'", ()).unwrap())
                         .build()
                         .unwrap(),
                 )
                 .add_variant(
                     EnumVariantSpec::builder("Left")
-                        .value(CodeBlock::of("'LEFT'", ()).unwrap())
+                        .discriminant(CodeBlock::of("'LEFT'", ()).unwrap())
                         .build()
                         .unwrap(),
                 )
                 .add_variant(
                     EnumVariantSpec::builder("Right")
-                        .value(CodeBlock::of("'RIGHT'", ()).unwrap())
+                        .discriminant(CodeBlock::of("'RIGHT'", ()).unwrap())
                         .build()
                         .unwrap(),
                 )
@@ -223,5 +223,7 @@ fn test_enum() {
         .unwrap();
     let output = file.render(80).unwrap();
 
+    assert!(output.contains("static Up = 'UP'"));
+    assert!(!output.contains("\n  Up = 'UP'"));
     golden::assert_golden("javascript/enum.js", &output);
 }

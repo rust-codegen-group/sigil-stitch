@@ -156,8 +156,12 @@ impl AnnotationSpec {
         self.emit_with_syntax(ea.annotation_prefix, ea.annotation_suffix)
     }
 
-    /// Emit with syntax selected by one complete language-local lowerer.
-    pub(crate) fn emit_with_syntax(
+    /// Emit with delimiters selected by one complete language-local lowerer.
+    ///
+    /// This helper preserves an importable annotation name as a `%T` node. It
+    /// does not choose target syntax or placement; the calling adapter owns
+    /// those decisions.
+    pub fn emit_with_syntax(
         &self,
         prefix: &str,
         suffix: &str,

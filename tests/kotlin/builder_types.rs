@@ -219,13 +219,13 @@ fn test_enum_with_values() {
         )
         .add_variant(
             EnumVariantSpec::builder("ACTIVE")
-                .value(CodeBlock::of("\"active\"", ()).unwrap())
+                .constructor_argument(CodeBlock::of("\"active\"", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("INACTIVE")
-                .value(CodeBlock::of("\"inactive\"", ()).unwrap())
+                .constructor_argument(CodeBlock::of("\"inactive\"", ()).unwrap())
                 .build()
                 .unwrap(),
         )

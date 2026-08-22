@@ -205,19 +205,19 @@ fn test_enum_with_values() {
         .visibility(Visibility::Public)
         .add_variant(
             EnumVariantSpec::builder("AVAILABLE")
-                .value(CodeBlock::of("\"available\"", ()).unwrap())
+                .constructor_argument(CodeBlock::of("\"available\"", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("PENDING")
-                .value(CodeBlock::of("\"pending\"", ()).unwrap())
+                .constructor_argument(CodeBlock::of("\"pending\"", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("SOLD")
-                .value(CodeBlock::of("\"sold\"", ()).unwrap())
+                .constructor_argument(CodeBlock::of("\"sold\"", ()).unwrap())
                 .build()
                 .unwrap(),
         )

@@ -5,7 +5,7 @@ use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
 use crate::lang::capability::{FunctionCapability, FunctionForm, TypeCapability};
 use crate::spec::annotation_spec::AnnotationSpec;
-use crate::spec::enum_variant_spec::EnumVariantSpec;
+use crate::spec::enum_variant_spec::{ConstructorArity, EnumVariantSpec, VariantOwnerContext};
 use crate::spec::field_spec::FieldSpec;
 use crate::spec::fun_spec::FunSpec;
 use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
@@ -131,6 +131,21 @@ impl TypeSpec {
             errors.push(error);
         }
 
+        if !self.variants.is_empty() {
+            let has_following_members = !self.fields.is_empty()
+                || !self.properties.is_empty()
+                || !self.methods.is_empty()
+                || !self.extra_members.is_empty();
+            EnumVariantSpec::collect_sequence_validation_errors(
+                &self.name,
+                self.kind,
+                &self.variants,
+                self.variant_owner_context(lang, has_following_members),
+                lang,
+                errors,
+            );
+        }
+
         let declaration_context = lang.type_member_declaration_context(self.kind);
         for method in &self.methods {
             let method = self.method_for_context(method, lang, declaration_context);
@@ -222,6 +237,37 @@ impl TypeSpec {
         } else {
             std::borrow::Cow::Borrowed(method)
         }
+    }
+
+    /// Structured constructor arities that enum-entry lowering may rely on.
+    fn variant_constructor_arities(&self, lang: &dyn CodeLang) -> Vec<ConstructorArity> {
+        let mut arities = Vec::new();
+        if !self.primary_constructor.is_empty() {
+            arities.push(ConstructorArity::from_parameters(&self.primary_constructor));
+        }
+
+        let declaration_context = lang.type_member_declaration_context(self.kind);
+        for method in &self.methods {
+            let method = self.method_for_context(method, lang, declaration_context);
+            if lang.function_form(&method.name, method.modifiers.is_constructor)
+                == FunctionForm::Constructor
+            {
+                arities.push(ConstructorArity::from_parameters(&method.params));
+            }
+        }
+        arities
+    }
+
+    fn variant_owner_context(
+        &self,
+        lang: &dyn CodeLang,
+        has_following_members: bool,
+    ) -> VariantOwnerContext {
+        VariantOwnerContext::new(
+            has_following_members,
+            self.variant_constructor_arities(lang),
+            !self.extra_members.is_empty(),
+        )
     }
 
     fn validate_type(&self, lang: &dyn CodeLang) -> Result<(), crate::error::SigilStitchError> {
@@ -381,9 +427,10 @@ impl TypeSpec {
             cb.add("%L", doc_str);
             cb.add_line();
         }
-        let ea = lang.enum_and_annotation();
-        let has_trailing_members =
-            !self.fields.is_empty() || !self.properties.is_empty() || !self.methods.is_empty();
+        let has_trailing_members = !self.fields.is_empty()
+            || !self.properties.is_empty()
+            || !self.methods.is_empty()
+            || !self.extra_members.is_empty();
 
         // Embedded types (Go struct composition: unnamed type references).
         for embedded in &self.embedded_types {
@@ -392,23 +439,23 @@ impl TypeSpec {
             cb.add_line();
         }
 
-        if ea.variants_before_fields {
-            // Variants first (Java/Kotlin pattern).
+        if crate::lang::variant_lowering::variants_precede_fields(lang, true) {
+            // Built-ins use the canonical semantic body order. The selected
+            // adapter owns all grammar within the variant sequence, including
+            // separators and section termination.
             if !self.variants.is_empty() {
                 self.emit_variants(&mut cb, lang, has_trailing_members)?;
             }
-            for (i, field) in self.fields.iter().enumerate() {
-                if i == 0 && !self.variants.is_empty() {
+            for (index, field) in self.fields.iter().enumerate() {
+                if index == 0 && !self.variants.is_empty() {
                     cb.add_line();
                 }
                 cb.add_code(field.emit(lang, member_ctx)?);
             }
         } else {
-            // Fields first, then variants (default).
-            for (i, field) in self.fields.iter().enumerate() {
-                if i > 0 {
-                    // No extra blank line between fields.
-                }
+            // Preserve pre-0.6.8 external-adapter placement through the
+            // private compatibility lowerer.
+            for field in &self.fields {
                 cb.add_code(field.emit(lang, member_ctx)?);
             }
             if !self.variants.is_empty() {
@@ -491,16 +538,27 @@ impl TypeSpec {
             cb.add(&format!("%T{term}"), embedded.clone());
             cb.add_line();
         }
-        for field in &self.fields {
-            cb.add_code(field.emit(lang, DeclarationContext::Member)?);
-        }
-        // Enum variants.
-        if !self.variants.is_empty() {
-            if !self.fields.is_empty() {
-                cb.add_line();
+        let has_trailing = !self.fields.is_empty() || !self.extra_members.is_empty();
+        if crate::lang::variant_lowering::variants_precede_fields(lang, false) {
+            if !self.variants.is_empty() {
+                self.emit_variants(&mut cb, lang, has_trailing)?;
             }
-            let has_trailing = !self.extra_members.is_empty();
-            self.emit_variants(&mut cb, lang, has_trailing)?;
+            for (index, field) in self.fields.iter().enumerate() {
+                if index == 0 && !self.variants.is_empty() {
+                    cb.add_line();
+                }
+                cb.add_code(field.emit(lang, DeclarationContext::Member)?);
+            }
+        } else {
+            for field in &self.fields {
+                cb.add_code(field.emit(lang, DeclarationContext::Member)?);
+            }
+            if !self.variants.is_empty() {
+                if !self.fields.is_empty() {
+                    cb.add_line();
+                }
+                self.emit_variants(&mut cb, lang, !self.extra_members.is_empty())?;
+            }
         }
         for extra in &self.extra_members {
             cb.add_code(extra.clone());
@@ -695,22 +753,20 @@ impl TypeSpec {
         cb.build()
     }
 
-    /// Emit enum variants with language-aware separators.
+    /// Emit one owner-aware enum-variant sequence.
     fn emit_variants(
         &self,
         cb: &mut CodeBlockBuilder,
         lang: &dyn CodeLang,
         has_trailing_members: bool,
     ) -> Result<(), crate::error::SigilStitchError> {
-        let count = self.variants.len();
-        for (i, variant) in self.variants.iter().enumerate() {
-            let ctx = crate::spec::enum_variant_spec::VariantContext {
-                is_first: i == 0,
-                is_last: i == count - 1,
-                has_trailing_members,
-            };
-            variant.emit_into(cb, lang, ctx)?;
-        }
+        cb.add_code(EnumVariantSpec::lower_sequence(
+            &self.name,
+            self.kind,
+            &self.variants,
+            self.variant_owner_context(lang, has_trailing_members),
+            lang,
+        )?);
         Ok(())
     }
 
@@ -1097,14 +1153,24 @@ impl TypeSpecBuilder {
             }
         }
 
-        // Validate Enum consistency between primary constructor and variant values.
+        // Validate enum consistency between primary-constructor parameters and
+        // enum-entry constructor arguments.
         if self.kind == TypeKind::Enum && !self.primary_constructor.is_empty() {
-            let has_valueless_variants = self.variants.iter().any(|v| !v.has_value());
-            if has_valueless_variants {
+            let constructor_arity = ConstructorArity::from_parameters(&self.primary_constructor);
+            if let Some(variant) = self.variants.iter().find(|variant| {
+                let argument_count = if variant.constructor_arguments.is_empty() {
+                    usize::from(variant.value.is_some())
+                } else {
+                    variant.constructor_arguments.len()
+                };
+                !constructor_arity.accepts(argument_count)
+            }) {
                 return Err(crate::error::SigilStitchError::InvalidEnum {
                     type_name: self.name.clone(),
-                    reason: "enum has primary constructor parameters but some variants lack values"
-                        .to_string(),
+                    reason: format!(
+                        "variant {:?} has a constructor-argument count incompatible with the primary constructor",
+                        variant.name
+                    ),
                 });
             }
         }

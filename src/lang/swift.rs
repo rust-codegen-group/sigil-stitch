@@ -4,7 +4,8 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -276,6 +277,14 @@ const SWIFT_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const SWIFT_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::PositionalPayload,
+        VariantCapability::Attributes,
+    ],
+)];
+
 const SWIFT_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = async
     FunctionCapability::AsyncEffect,
@@ -386,6 +395,29 @@ impl CodeLang for Swift {
         LanguageCapabilities::strict()
             .with_types(SWIFT_TYPES)
             .with_functions(SWIFT_FUNCTIONS)
+            .with_variants(SWIFT_VARIANTS)
+    }
+
+    fn validate_variants(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::variant_lowering::swift::validate(self, variants)
+    }
+
+    fn collect_variant_validation_errors(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::variant_lowering::swift::collect_validation_errors(self, variants, errors);
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<crate::code_block::CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::swift::lower(self, variants)
     }
 
     fn validate_function_type_constraints(

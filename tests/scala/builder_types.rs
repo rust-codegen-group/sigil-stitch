@@ -130,6 +130,8 @@ fn test_enum() {
         .unwrap();
     let output = file.render(80).unwrap();
 
+    assert!(output.contains("case Red"));
+    assert!(!output.contains("\n  Red,"));
     golden::assert_golden("scala/enum.scala", &output);
 }
 

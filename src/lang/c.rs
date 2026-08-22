@@ -5,7 +5,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
-    LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -217,6 +218,14 @@ const C_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Newtype, &[]),
 ];
 
+const C_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::Discriminant,
+        VariantCapability::Attributes,
+    ],
+)];
+
 const C_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // Attributes = __attribute__((...))
     FunctionCapability::Attributes,
@@ -242,6 +251,14 @@ impl CodeLang for C {
         LanguageCapabilities::strict()
             .with_types(C_TYPES)
             .with_functions(C_FUNCTIONS)
+            .with_variants(C_VARIANTS)
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::c::lower(self, variants)
     }
 
     fn function_visibility_is_valid(

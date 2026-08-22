@@ -3,7 +3,8 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -242,6 +243,14 @@ const CS_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const CS_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::Discriminant,
+        VariantCapability::Attributes,
+    ],
+)];
+
 const CS_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AbstractMethod = abstract
     FunctionCapability::AbstractMethod,
@@ -327,6 +336,14 @@ impl CodeLang for CSharp {
         LanguageCapabilities::strict()
             .with_types(CS_TYPES)
             .with_functions(CS_FUNCTIONS)
+            .with_variants(CS_VARIANTS)
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::csharp::lower(self, variants)
     }
 
     fn validate_function_type_constraints(

@@ -51,6 +51,7 @@ mod csharp_function_lowering;
 mod function_lowering;
 mod kotlin_function_lowering;
 mod typescript_function_lowering;
+pub(crate) mod variant_lowering;
 
 use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::BlockIntent;
@@ -59,6 +60,7 @@ use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionContext, FunctionForm, LanguageCapabilities,
 };
+pub use crate::spec::enum_variant_spec::{ValidatedVariants, VariantIntent};
 pub use crate::spec::fun_spec::{FunctionIntent, ValidatedFunction};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
@@ -515,6 +517,46 @@ pub trait CodeLang: RendererLang {
         function: ValidatedFunction<'_>,
     ) -> Result<CodeBlock, SigilStitchError> {
         function_lowering::lower_compatibility(self, function)
+    }
+
+    /// Apply additional target-specific validation to one owner-aware variant sequence.
+    ///
+    /// Intrinsic and capability validation run against this same adapter before
+    /// lowering. During file-level aggregation this hook may still receive a
+    /// sequence whose independent sibling produced an earlier error. Overrides
+    /// must therefore inspect only the intent they understand and add
+    /// target-local checks, including a validity-preserving interpretation of
+    /// the deprecated `.value()` input.
+    fn validate_variants(&self, _variants: VariantIntent<'_>) -> Result<(), SigilStitchError> {
+        Ok(())
+    }
+
+    /// Collect target-specific validation failures for one variant sequence.
+    ///
+    /// The default preserves adapters that implement [`CodeLang::validate_variants`]
+    /// by appending its single result. Built-in adapters with independent
+    /// per-variant checks override this hook so file validation can report safe
+    /// sibling failures together.
+    fn collect_variant_validation_errors(
+        &self,
+        variants: VariantIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        if let Err(error) = self.validate_variants(variants) {
+            errors.push(error);
+        }
+    }
+
+    /// Lower one fully validated, owner-aware variant sequence.
+    ///
+    /// The default is the frozen pre-0.6.8 compatibility implementation for
+    /// permissive external adapters. Built-ins override this complete seam and
+    /// do not interpret shared declaration syntax configuration.
+    fn lower_variants(
+        &self,
+        variants: ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        variant_lowering::lower_compatibility(self, variants)
     }
 
     // ── Spec-layer methods — used by FunSpec, TypeSpec, FieldSpec, etc. ───

@@ -2,8 +2,8 @@
  * Cardinal directions.
  */
 export class Direction {
-  Up = 'UP'
-  Down = 'DOWN'
-  Left = 'LEFT'
-  Right = 'RIGHT'
+  static Up = 'UP'
+  static Down = 'DOWN'
+  static Left = 'LEFT'
+  static Right = 'RIGHT'
 }

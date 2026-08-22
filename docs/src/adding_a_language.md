@@ -72,7 +72,9 @@ Extends `RendererLang` with the additional methods needed by the spec layer.
 
 Implement `capabilities()` for new adapters. Return a local
 `LanguageCapabilities::strict()` matrix, add `TypeCapabilityProfile`s with
-`with_types()`, and add `FunctionCapabilityProfile`s with `with_functions()`.
+`with_types()`, add `FunctionCapabilityProfile`s with `with_functions()`, and
+add `VariantCapabilityProfile`s with `with_variants()` for every owning type
+kind that can contain variants.
 Function profiles are keyed by both context (`TopLevel`, `ReceiverMethod`,
 `Member`, or `InterfaceMember`) and form (`Function`, `Constructor`, or
 `Destructor`). Omit a profile when that combination is unsupported. Include
@@ -86,6 +88,12 @@ written for sigil-stitch 0.6.8 inherit
 `LanguageCapabilities::permissive()` so their existing `CodeLang`
 implementations remain source-compatible.
 
+Variant profiles distinguish `Discriminant`, `ConstructorArguments`,
+`PositionalPayload`, `RecordPayload`, and `Attributes`. They must not encode
+keywords, delimiters, placement, or separator policy. Omit the owner profile if
+the language cannot represent variants for that `TypeKind`; use an empty
+capability list when simple variants are valid but no richer form is.
+
 ### Function Lowering and Compatibility Methods
 
 `CodeLang::validate_function()` receives classified, read-only `FunctionIntent`
@@ -98,13 +106,24 @@ target's complete function grammar. Both views expose the function form and
 context as well as names, types, parameters, modifiers, annotations,
 constraints, delegation, suffix escape hatches, and the body.
 
+`CodeLang::validate_variants()` and `CodeLang::lower_variants()` are the
+corresponding complete-sequence seams for enum variants. Adapters that can find
+multiple independent target-local errors override
+`collect_variant_validation_errors()` as the additive validation entry point;
+its default appends the single `validate_variants()` result. `VariantIntent`
+exposes the owner, ordered variants, payloads, annotations, following-member
+state, structured-constructor arity evidence, and the presence of opaque members. The
+lowerer derives position and owns all target grammar. Use
+`AnnotationSpec::emit_with_syntax()` when a local annotation spelling must keep
+an importable annotation name as a structured `%T` reference.
+
 The remaining interface mixes semantic validation hooks with older grammar
 fragments used by compatibility lowerers. Grammar-oriented methods must be
 absorbed by complete language-local lowering rather than multiplied:
 
 | Method | Example | Purpose |
 |--------|---------|---------|
-| `capabilities()` | Strict type and function profiles | Declare semantic representability by context and form |
+| `capabilities()` | Strict type, function, and variant profiles | Declare semantic representability by context and form |
 | `render_visibility()` | `"public "`, `"pub "` | Visibility prefix |
 | `function_keyword()` | `"function"`, `"fn"` | Function declaration keyword |
 | `abstract_modifier_capability()` | `AbstractMethod`, `VirtualMethod` | Semantic meaning of the legacy abstract modifier |
@@ -125,6 +144,9 @@ absorbed by complete language-local lowering rather than multiplied:
 | `constructor_return_type_is_valid()` | `true` / `false` for one type | Restrict constructor return annotations after capability validation |
 | `validate_function()` | `FunctionIntent -> Result<(), _>` | Add target-local checks after crate-owned semantic validation |
 | `lower_function()` | `ValidatedFunction -> CodeBlock` | Own complete function grammar; defaults to the frozen compatibility lowerer |
+| `validate_variants()` | `VariantIntent -> Result<(), _>` | Add target-local checks after crate-owned sequence validation |
+| `collect_variant_validation_errors()` | `VariantIntent + error sink` | Add independent target-local sibling errors during file validation |
+| `lower_variants()` | `ValidatedVariants -> CodeBlock` | Own complete variant-sequence grammar; defaults to frozen compatibility lowering |
 | `type_keyword()` | `"class"`, `"struct"` | Type declaration keyword |
 | `methods_inside_type_body()` | `true` / `false` | Legacy structural switch used by the compatibility type emitter |
 
@@ -152,8 +174,9 @@ not all have the same architectural role:
   `enum_and_annotation()` expose declaration grammar that generic specs still
   interpret for pre-0.6.8 adapter compatibility. These accessors and their
   configuration types are deprecated. New function grammar belongs in
-  `lower_function()`. Type and enum adapters may temporarily use the existing
-  fields where no complete lowering seam exists yet, but must not extend them.
+  `lower_function()` and new variant grammar belongs in `lower_variants()`.
+  Other type/member emitters may temporarily use existing fields where no
+  complete lowering seam exists yet, but must not extend them.
 
 Do not add public flags, enums, or fields to accommodate a new language. A
 previously unseen declaration form is evidence that lowering must move behind

@@ -200,19 +200,19 @@ fn test_enum() {
         .add_variant(EnumVariantSpec::new("North").unwrap())
         .add_variant(
             EnumVariantSpec::builder("South")
-                .value(CodeBlock::of("1", ()).unwrap())
+                .discriminant(CodeBlock::of("1", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("East")
-                .value(CodeBlock::of("2", ()).unwrap())
+                .discriminant(CodeBlock::of("2", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("West")
-                .value(CodeBlock::of("3", ()).unwrap())
+                .discriminant(CodeBlock::of("3", ()).unwrap())
                 .build()
                 .unwrap(),
         )

@@ -24,25 +24,25 @@ fn build_shared_types() -> (TypeSpec, TypeSpec, TypeSpec) {
         .doc("Logging severity levels.")
         .add_variant(
             EnumVariantSpec::builder("LOG_DEBUG")
-                .value(CodeBlock::of("0", ()).unwrap())
+                .discriminant(CodeBlock::of("0", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("LOG_INFO")
-                .value(CodeBlock::of("1", ()).unwrap())
+                .discriminant(CodeBlock::of("1", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("LOG_WARN")
-                .value(CodeBlock::of("2", ()).unwrap())
+                .discriminant(CodeBlock::of("2", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("LOG_ERROR")
-                .value(CodeBlock::of("3", ()).unwrap())
+                .discriminant(CodeBlock::of("3", ()).unwrap())
                 .build()
                 .unwrap(),
         )

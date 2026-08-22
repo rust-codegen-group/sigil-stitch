@@ -6,7 +6,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
-    LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -343,6 +344,11 @@ const PY_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Newtype, &[]),
 ];
 
+const PY_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[VariantCapability::Discriminant],
+)];
+
 const PY_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = async def
     FunctionCapability::AsyncEffect,
@@ -450,6 +456,14 @@ impl CodeLang for Python {
         LanguageCapabilities::strict()
             .with_types(PY_TYPES)
             .with_functions(PY_FUNCTIONS)
+            .with_variants(PY_VARIANTS)
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::python::lower(self, variants)
     }
 
     fn constructor_name_matches(&self, name: &str, _declaring_type: Option<&str>) -> bool {

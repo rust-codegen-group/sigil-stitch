@@ -1,10 +1,12 @@
 //! OCaml language implementation.
 
 use crate::code_node::BlockIntent;
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -300,6 +302,14 @@ const OCAML_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const OCAML_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::PositionalPayload,
+        VariantCapability::RecordPayload,
+    ],
+)];
+
 const OCAML_FUNCTIONS: &[FunctionCapabilityProfile] = &[FunctionCapabilityProfile::new(
     FunctionContext::TopLevel,
     FunctionForm::Function,
@@ -315,6 +325,29 @@ impl CodeLang for OCaml {
         LanguageCapabilities::strict()
             .with_types(OCAML_TYPES)
             .with_functions(OCAML_FUNCTIONS)
+            .with_variants(OCAML_VARIANTS)
+    }
+
+    fn validate_variants(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::variant_lowering::ocaml::validate(self, variants)
+    }
+
+    fn collect_variant_validation_errors(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::variant_lowering::ocaml::collect_validation_errors(self, variants, errors);
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::variant_lowering::ocaml::lower(self, variants)
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

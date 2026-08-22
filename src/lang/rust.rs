@@ -1,7 +1,8 @@
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -210,6 +211,16 @@ const RUST_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const RUST_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::Discriminant,
+        VariantCapability::PositionalPayload,
+        VariantCapability::RecordPayload,
+        VariantCapability::Attributes,
+    ],
+)];
+
 const RUST_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = async fn
     FunctionCapability::AsyncEffect,
@@ -273,6 +284,29 @@ impl CodeLang for Rust {
         LanguageCapabilities::strict()
             .with_types(RUST_TYPES)
             .with_functions(RUST_FUNCTIONS)
+            .with_variants(RUST_VARIANTS)
+    }
+
+    fn validate_variants(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::variant_lowering::rust::validate(self, variants)
+    }
+
+    fn collect_variant_validation_errors(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+        errors: &mut Vec<crate::error::SigilStitchError>,
+    ) {
+        crate::lang::variant_lowering::rust::collect_validation_errors(variants, errors);
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::variant_lowering::rust::lower(self, variants)
     }
 
     fn function_visibility_is_valid(

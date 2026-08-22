@@ -139,17 +139,17 @@ fn test_enum_tuple_variants() {
         .add_variant(EnumVariantSpec::new("Unit").unwrap())
         .add_variant(
             EnumVariantSpec::builder("Literal")
-                .associated_type(TypeName::primitive("i64"))
+                .positional_payload(TypeName::primitive("i64"))
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("Add")
-                .associated_type(TypeName::generic(
+                .positional_payload(TypeName::generic(
                     TypeName::primitive("Box"),
                     vec![TypeName::primitive("Expr")],
                 ))
-                .associated_type(TypeName::generic(
+                .positional_payload(TypeName::generic(
                     TypeName::primitive("Box"),
                     vec![TypeName::primitive("Expr")],
                 ))
@@ -176,12 +176,12 @@ fn test_enum_struct_variants() {
         .add_variant(EnumVariantSpec::new("Quit").unwrap())
         .add_variant(
             EnumVariantSpec::builder("Move")
-                .add_field(
+                .record_payload_field(
                     FieldSpec::builder("x", TypeName::primitive("i32"))
                         .build()
                         .unwrap(),
                 )
-                .add_field(
+                .record_payload_field(
                     FieldSpec::builder("y", TypeName::primitive("i32"))
                         .build()
                         .unwrap(),
@@ -191,23 +191,23 @@ fn test_enum_struct_variants() {
         )
         .add_variant(
             EnumVariantSpec::builder("Write")
-                .associated_type(TypeName::primitive("String"))
+                .positional_payload(TypeName::primitive("String"))
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("ChangeColor")
-                .add_field(
+                .record_payload_field(
                     FieldSpec::builder("r", TypeName::primitive("u8"))
                         .build()
                         .unwrap(),
                 )
-                .add_field(
+                .record_payload_field(
                     FieldSpec::builder("g", TypeName::primitive("u8"))
                         .build()
                         .unwrap(),
                 )
-                .add_field(
+                .record_payload_field(
                     FieldSpec::builder("b", TypeName::primitive("u8"))
                         .build()
                         .unwrap(),

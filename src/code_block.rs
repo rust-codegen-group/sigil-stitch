@@ -244,8 +244,36 @@ impl CodeBlock {
     }
 
     /// Check if this code block is empty.
+    #[allow(deprecated)]
     pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
+        fn node_is_empty(node: &CodeNode) -> bool {
+            match node {
+                CodeNode::Literal(value)
+                | CodeNode::NameRef(value)
+                | CodeNode::InlineLiteral(value) => value.is_empty(),
+                CodeNode::TypeRef(type_name) => type_name.is_empty(),
+                CodeNode::Nested(block) => block.is_empty(),
+                CodeNode::Sequence(nodes) => nodes.iter().all(node_is_empty),
+                CodeNode::StringLit(_)
+                | CodeNode::VerbatimStr(_)
+                | CodeNode::Comment(_)
+                | CodeNode::Attribute(_)
+                | CodeNode::SoftBreak
+                | CodeNode::Indent
+                | CodeNode::Dedent
+                | CodeNode::StatementBegin
+                | CodeNode::StatementEnd
+                | CodeNode::Newline
+                | CodeNode::BlockOpen(_)
+                | CodeNode::BlockClose(_)
+                | CodeNode::BranchClose(_)
+                | CodeNode::BlockOpenIntent { .. }
+                | CodeNode::BlockCloseIntent { .. }
+                | CodeNode::BranchCloseIntent { .. } => false,
+            }
+        }
+
+        self.nodes.iter().all(node_is_empty)
     }
 
     /// Create a parsed fragment from a single format string and arguments.
@@ -984,6 +1012,24 @@ mod tests {
     fn test_parse_empty() {
         let parts = parse_format("").unwrap();
         assert!(parts.is_empty());
+    }
+
+    #[test]
+    fn empty_literal_and_nested_blocks_are_empty() {
+        let empty_literal = CodeBlock::of("%L", "").unwrap();
+        assert!(empty_literal.is_empty());
+
+        let nested_empty = CodeBlock::of("%L", CodeBlock::of("", ()).unwrap()).unwrap();
+        assert!(nested_empty.is_empty());
+
+        let empty_type = CodeBlock::of("%T", TypeName::raw("")).unwrap();
+        assert!(empty_type.is_empty());
+
+        assert!(
+            !CodeBlock::of("%S", StringLitArg(String::new()))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

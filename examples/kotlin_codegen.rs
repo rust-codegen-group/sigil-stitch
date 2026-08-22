@@ -26,25 +26,31 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
     let status = TypeSpec::builder("Status", TypeKind::Enum)
         .add_variant(
             EnumVariantSpec::builder("PENDING")
-                .value(CodeBlock::of("%S", (StringLitArg("pending".into()),)).unwrap())
+                .constructor_argument(
+                    CodeBlock::of("%S", (StringLitArg("pending".into()),)).unwrap(),
+                )
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("ACTIVE")
-                .value(CodeBlock::of("%S", (StringLitArg("active".into()),)).unwrap())
+                .constructor_argument(
+                    CodeBlock::of("%S", (StringLitArg("active".into()),)).unwrap(),
+                )
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("ARCHIVED")
-                .value(CodeBlock::of("%S", (StringLitArg("archived".into()),)).unwrap())
+                .constructor_argument(
+                    CodeBlock::of("%S", (StringLitArg("archived".into()),)).unwrap(),
+                )
                 .build()
                 .unwrap(),
         )
-        .add_field(
-            FieldSpec::builder("label", TypeName::primitive("String"))
-                .is_readonly()
+        .add_primary_constructor_param(
+            ParameterSpec::builder("label", TypeName::primitive("String"))
+                .is_property()
                 .build()
                 .unwrap(),
         )

@@ -273,13 +273,13 @@ TypeSpec with `TypeKind::Enum` uses `add_variant()` instead of `add_field()`. Se
 let type_spec = TypeSpec::builder("Direction", TypeKind::Enum)
     .add_variant(
         EnumVariantSpec::builder("Up")
-            .value(CodeBlock::of("'UP'", ()).unwrap())
+            .discriminant(CodeBlock::of("'UP'", ()).unwrap())
             .build()
             .unwrap(),
     )
     .add_variant(
         EnumVariantSpec::builder("Down")
-            .value(CodeBlock::of("'DOWN'", ()).unwrap())
+            .discriminant(CodeBlock::of("'DOWN'", ()).unwrap())
             .build()
             .unwrap(),
     )
@@ -375,7 +375,13 @@ If `AnnotationSpec` does not cover your annotation format, every builder also ha
 
 ## EnumVariantSpec
 
-Individual enum variants. Four forms are supported:
+Variants are validated and lowered as one owner-aware sequence through
+`TypeSpec`. This lets the selected language derive first/last position, choose
+valid separators, and terminate the variant section when fields or methods
+follow. Direct positional emission with `VariantContext` is deprecated and is
+rejected by strict built-in adapters.
+
+Individual enum variants. Five forms are supported:
 
 ### Simple variant
 
@@ -390,7 +396,7 @@ let v = EnumVariantSpec::new("Red").unwrap();
 # }
 ```
 
-### Valued variant
+### Discriminated variant
 
 ```rust
 # extern crate sigil_stitch;
@@ -399,14 +405,47 @@ let v = EnumVariantSpec::new("Red").unwrap();
 # use sigil_stitch::prelude::*;
 # fn main() {
 let variant = EnumVariantSpec::builder("Up")
-    .value(CodeBlock::of("'UP'", ()).unwrap())
+    .discriminant(CodeBlock::of("'UP'", ()).unwrap())
     .build()
     .unwrap();
 // TypeScript: Up = 'UP',
 # }
 ```
 
-### Tuple variant (Rust, Swift)
+Use `.constructor_argument(...)` instead when an enum entry invokes its
+declaring enum's constructor, as in Java or Kotlin. Discriminants, constructor
+arguments, positional payload types, and record payload fields are distinct
+semantic forms and cannot be combined on one variant. The deprecated
+`.value(...)` builder remains only for 0.6.8 compatibility and is rejected when
+the selected language cannot give it one validity-preserving meaning.
+
+### Enum-entry constructor arguments (Java, Kotlin)
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let variant = EnumVariantSpec::builder("ACTIVE")
+    .constructor_argument(CodeBlock::of("\"active\"", ()).unwrap())
+    .build()
+    .unwrap();
+// Java/Kotlin: ACTIVE("active")
+# }
+```
+
+The owning enum must also declare a compatible structured constructor (or
+Kotlin primary constructor). sigil-stitch checks every enum entry against the
+accepted argument-count ranges of structured constructors, including overloads,
+defaulted parameters, and variadic parameters. Opaque extra members remain an
+escape hatch whose target-language constructor signatures cannot be inferred.
+
+Structured variant annotations are accepted only when the adapter can preserve
+declaration-metadata semantics. Ruby therefore rejects `AnnotationSpec` on enum
+constants instead of rendering it as a comment; `.annotation(CodeBlock)` remains
+an explicit escape hatch for target-specific Ruby code.
+
+### Positional payload (Rust, Swift)
 
 ```rust
 # extern crate sigil_stitch;
@@ -415,22 +454,22 @@ let variant = EnumVariantSpec::builder("Up")
 # use sigil_stitch::prelude::*;
 # fn main() {
 let variant = EnumVariantSpec::builder("Literal")
-    .associated_type(TypeName::primitive("i64"))
+    .positional_payload(TypeName::primitive("i64"))
     .build()
     .unwrap();
 // Rust: Literal(i64),
 
 // Multi-element tuple
 let variant = EnumVariantSpec::builder("Pair")
-    .associated_type(TypeName::primitive("String"))
-    .associated_type(TypeName::primitive("i32"))
+    .positional_payload(TypeName::primitive("String"))
+    .positional_payload(TypeName::primitive("i32"))
     .build()
     .unwrap();
 // Rust: Pair(String, i32),
 # }
 ```
 
-### Struct variant (Rust)
+### Record payload (Rust)
 
 ```rust
 # extern crate sigil_stitch;
@@ -440,10 +479,10 @@ let variant = EnumVariantSpec::builder("Pair")
 # use sigil_stitch::prelude::*;
 # fn main() {
 let variant = EnumVariantSpec::builder("Move")
-    .add_field(
+    .record_payload_field(
         FieldSpec::builder("x", TypeName::primitive("i32")).build().unwrap(),
     )
-    .add_field(
+    .record_payload_field(
         FieldSpec::builder("y", TypeName::primitive("i32")).build().unwrap(),
     )
     .build()
@@ -458,4 +497,6 @@ let variant = EnumVariantSpec::builder("Move")
 
 Variants are added to a `TypeSpec` via `add_variant()`. The language adapter
 owns their complete grammar, including separators, trailing punctuation, and
-prefixes such as Swift's `case`.
+prefixes such as Swift's `case`. The pre-0.6.8 builder names
+`.associated_type(...)` and `.add_field(...)` remain as deprecated aliases for
+`.positional_payload(...)` and `.record_payload_field(...)`, respectively.

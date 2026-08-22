@@ -119,25 +119,25 @@ let type_spec = TypeSpec::builder("Direction", TypeKind::Enum)
     .visibility(Visibility::Public)
     .add_variant(
         EnumVariantSpec::builder("Up")
-            .value(CodeBlock::of("'UP'", ()).unwrap())
+            .discriminant(CodeBlock::of("'UP'", ()).unwrap())
             .build()
             .unwrap(),
     )
     .add_variant(
         EnumVariantSpec::builder("Down")
-            .value(CodeBlock::of("'DOWN'", ()).unwrap())
+            .discriminant(CodeBlock::of("'DOWN'", ()).unwrap())
             .build()
             .unwrap(),
     )
     .add_variant(
         EnumVariantSpec::builder("Left")
-            .value(CodeBlock::of("'LEFT'", ()).unwrap())
+            .discriminant(CodeBlock::of("'LEFT'", ()).unwrap())
             .build()
             .unwrap(),
     )
     .add_variant(
         EnumVariantSpec::builder("Right")
-            .value(CodeBlock::of("'RIGHT'", ()).unwrap())
+            .discriminant(CodeBlock::of("'RIGHT'", ()).unwrap())
             .build()
             .unwrap(),
     )

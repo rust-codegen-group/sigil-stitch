@@ -5,7 +5,8 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -263,6 +264,11 @@ const SCALA_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const SCALA_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[VariantCapability::Attributes],
+)];
+
 const SCALA_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // Attributes = annotations
     FunctionCapability::Attributes,
@@ -321,6 +327,29 @@ impl CodeLang for Scala {
         LanguageCapabilities::strict()
             .with_types(SCALA_TYPES)
             .with_functions(SCALA_FUNCTIONS)
+            .with_variants(SCALA_VARIANTS)
+    }
+
+    fn validate_variants(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::variant_lowering::scala::validate(self, variants)
+    }
+
+    fn collect_variant_validation_errors(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::variant_lowering::scala::collect_validation_errors(self, variants, errors);
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::scala::lower(self, variants)
     }
 
     fn validate_function_type_constraints(

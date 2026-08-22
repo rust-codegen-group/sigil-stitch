@@ -109,7 +109,7 @@ Build structured declarations with the spec builders:
 | **TypeSpec** | Class, struct, interface, trait, enum, type alias, newtype, embedded types |
 | **PropertySpec** | Computed property with getter/setter |
 | **AnnotationSpec** | `@Override`, `#[derive(...)]`, `[[nodiscard]]` |
-| **EnumVariantSpec** | Enum variant with optional value, tuple, or struct fields |
+| **EnumVariantSpec** | Enum variant with a discriminant, constructor arguments, or positional/record payload |
 | **ImportSpec** | Explicit imports (aliased, side-effect, wildcard) |
 | **FileSpec** | Top-level file with automatic import resolution |
 | **ProjectSpec** | Multi-file project generation |

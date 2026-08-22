@@ -116,8 +116,8 @@ rather than a semantic capability.
 
 ## Language-Local Lowering
 
-The external function seams first validate classified intent and then lower a
-complete validated declaration into a structured block:
+The external declaration seams first validate classified intent and then lower
+a complete validated declaration into a structured block:
 
 ```rust
 # extern crate sigil_stitch;
@@ -136,12 +136,43 @@ fn lower_function(
 # }
 ```
 
+Enum variants use the same shape at sequence granularity:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::code_block::CodeBlock;
+# use sigil_stitch::error::SigilStitchError;
+# use sigil_stitch::lang::{ValidatedVariants, VariantIntent};
+# trait Example {
+fn validate_variants(&self, variants: VariantIntent<'_>)
+    -> Result<(), SigilStitchError>;
+fn collect_variant_validation_errors(
+    &self,
+    variants: VariantIntent<'_>,
+    errors: &mut Vec<SigilStitchError>,
+);
+fn lower_variants(&self, variants: ValidatedVariants<'_>)
+    -> Result<CodeBlock, SigilStitchError>;
+# }
+```
+
 `FunctionIntent` provides read-only access after context and form
 classification and crate-owned semantic validation against the selected
 adapter. `ValidatedFunction` can only be constructed by the crate after the
 adapter's additional validation succeeds. `FunSpec::emit()` remains the
 convenience facade: it delegates validation and lowering without interpreting
 target grammar switches itself.
+
+`VariantIntent` provides the owner name and kind, every variant in declaration
+order, whether ordinary members follow, structured-constructor arity evidence,
+and whether opaque members may provide target-specific constructor syntax. The
+adapter derives first/last position and owns preambles, payload grammar,
+separators, and section termination for the complete sequence. Variant
+capabilities name semantic forms—discriminant, constructor arguments,
+positional payload, record payload, and attributes—not their spelling. The
+additive collector reports independent sibling failures; `ValidatedVariants`
+is constructed only after intrinsic, profile, and every adapter-local
+validation phase succeeds.
 
 Each adapter owns the complete ordering and spelling of a declaration. Private
 leaf helpers may render structured fragments such as a parameter list or body,
@@ -173,6 +204,15 @@ Compatibility is not permission to extend that design:
   preserved as another compatibility layer.
 - Existing built-in adapters should migrate incrementally, with rendered-output
   tests at the adapter seam and parity coverage across direct and pretty paths.
+
+Compatibility is bounded by validity. The deprecated `VariantContext` and
+ownerless `EnumVariantSpec::emit()` remain usable only with permissive external
+adapters. Strict built-ins require `TypeSpec` so they can validate and lower the
+complete sequence. The deprecated `.value()` field is interpreted locally only
+where its old meaning is unambiguous and valid; new code uses
+`.discriminant(...)` or `.constructor_argument(...)`. The private compatibility
+path also preserves the old `variants_before_fields` placement for permissive
+adapters; built-ins do not consult that shared grammar flag.
 
 This policy lets external adapters keep working while the built-in
 implementation moves toward the intended ownership model.

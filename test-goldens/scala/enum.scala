@@ -2,7 +2,7 @@
  * Supported colors.
  */
 enum Color {
-  Red,
-  Green,
-  Blue
+  case Red
+  case Green
+  case Blue
 }

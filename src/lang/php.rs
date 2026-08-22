@@ -47,7 +47,8 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, OptionalFieldStyle,
@@ -249,6 +250,11 @@ const PHP_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const PHP_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[VariantCapability::Attributes],
+)];
+
 const PHP_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // Attributes = attributes #[...]
     FunctionCapability::Attributes,
@@ -332,6 +338,29 @@ impl CodeLang for Php {
         LanguageCapabilities::strict()
             .with_types(PHP_TYPES)
             .with_functions(PHP_FUNCTIONS)
+            .with_variants(PHP_VARIANTS)
+    }
+
+    fn validate_variants(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::variant_lowering::php::validate(self, variants)
+    }
+
+    fn collect_variant_validation_errors(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::variant_lowering::php::collect_validation_errors(self, variants, errors);
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::variant_lowering::php::lower(self, variants)
     }
 
     fn function_visibility_is_valid(
