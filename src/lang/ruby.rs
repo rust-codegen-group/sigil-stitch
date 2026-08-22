@@ -24,10 +24,12 @@
 //! Ruby uses `end` to close blocks, same as Lua. Braces `{ }` in
 //! `sigil_quote!` map to indent/dedent + `end` in the output.
 
+use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, TypeDeclSyntaxConfig,
@@ -183,6 +185,14 @@ const RUBY_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const RUBY_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::Discriminant,
+        VariantCapability::Attributes,
+    ],
+)];
+
 const RUBY_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // DefaultParameters = default parameters
     FunctionCapability::DefaultParameters,
@@ -217,6 +227,29 @@ impl CodeLang for Ruby {
         LanguageCapabilities::strict()
             .with_types(RUBY_TYPES)
             .with_functions(RUBY_FUNCTIONS)
+            .with_variants(RUBY_VARIANTS)
+    }
+
+    fn validate_variants(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::variant_lowering::ruby::validate(self, variants)
+    }
+
+    fn collect_variant_validation_errors(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::variant_lowering::ruby::collect_validation_errors(self, variants, errors);
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::variant_lowering::ruby::lower(self, variants)
     }
 
     fn function_visibility_is_valid(

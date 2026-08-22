@@ -22,32 +22,32 @@ fn main() {
 fn build_shared_types() -> (TypeSpec, TypeSpec, TypeSpec) {
     let hashmap = TypeName::importable("std::collections", "HashMap");
 
-    // --- Enum with tuple and struct variants ---
+    // --- Enum with positional and record payloads ---
     let event_enum = TypeSpec::builder("Event", TypeKind::Enum)
         .visibility(Visibility::Public)
         .annotate(AnnotationSpec::new("derive").args(["Debug", "Clone"]))
         .add_variant(
             EnumVariantSpec::builder("Click")
                 .doc("A mouse click at (x, y).")
-                .associated_type(TypeName::primitive("i32"))
-                .associated_type(TypeName::primitive("i32"))
+                .positional_payload(TypeName::primitive("i32"))
+                .positional_payload(TypeName::primitive("i32"))
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("KeyPress")
-                .associated_type(TypeName::primitive("char"))
+                .positional_payload(TypeName::primitive("char"))
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("Resize")
-                .add_field(
+                .record_payload_field(
                     FieldSpec::builder("width", TypeName::primitive("u32"))
                         .build()
                         .unwrap(),
                 )
-                .add_field(
+                .record_payload_field(
                     FieldSpec::builder("height", TypeName::primitive("u32"))
                         .build()
                         .unwrap(),

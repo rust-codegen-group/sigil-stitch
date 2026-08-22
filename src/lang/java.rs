@@ -4,7 +4,8 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -204,6 +205,14 @@ const JAVA_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const JAVA_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::ConstructorArguments,
+        VariantCapability::Attributes,
+    ],
+)];
+
 const JAVA_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AbstractMethod = abstract
     FunctionCapability::AbstractMethod,
@@ -283,6 +292,29 @@ impl CodeLang for Java {
         LanguageCapabilities::strict()
             .with_types(JAVA_TYPES)
             .with_functions(JAVA_FUNCTIONS)
+            .with_variants(JAVA_VARIANTS)
+    }
+
+    fn validate_variants(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::variant_lowering::java::validate(self, variants)
+    }
+
+    fn collect_variant_validation_errors(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::variant_lowering::java::collect_validation_errors(self, variants, errors);
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<crate::code_block::CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::java::lower(self, variants)
     }
 
     fn validate_function_type_constraints(

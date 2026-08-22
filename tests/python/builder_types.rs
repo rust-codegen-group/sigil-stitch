@@ -158,25 +158,25 @@ fn test_enum() {
         .extends(enum_base)
         .add_variant(
             EnumVariantSpec::builder("UP")
-                .value(CodeBlock::of("'UP'", ()).unwrap())
+                .discriminant(CodeBlock::of("'UP'", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("DOWN")
-                .value(CodeBlock::of("'DOWN'", ()).unwrap())
+                .discriminant(CodeBlock::of("'DOWN'", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("LEFT")
-                .value(CodeBlock::of("'LEFT'", ()).unwrap())
+                .discriminant(CodeBlock::of("'LEFT'", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("RIGHT")
-                .value(CodeBlock::of("'RIGHT'", ()).unwrap())
+                .discriminant(CodeBlock::of("'RIGHT'", ()).unwrap())
                 .build()
                 .unwrap(),
         );

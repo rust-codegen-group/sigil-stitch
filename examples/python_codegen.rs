@@ -29,19 +29,19 @@ fn build_shared_types() -> (TypeSpec,) {
         .annotation(CodeBlock::of("# %T", (enum_import,)).unwrap())
         .add_variant(
             EnumVariantSpec::builder("DEBUG")
-                .value(CodeBlock::of("%S", (StringLitArg("debug".into()),)).unwrap())
+                .discriminant(CodeBlock::of("%S", (StringLitArg("debug".into()),)).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("INFO")
-                .value(CodeBlock::of("%S", (StringLitArg("info".into()),)).unwrap())
+                .discriminant(CodeBlock::of("%S", (StringLitArg("info".into()),)).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("ERROR")
-                .value(CodeBlock::of("%S", (StringLitArg("error".into()),)).unwrap())
+                .discriminant(CodeBlock::of("%S", (StringLitArg("error".into()),)).unwrap())
                 .build()
                 .unwrap(),
         )

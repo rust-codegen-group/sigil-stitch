@@ -87,10 +87,53 @@ impl FieldSpec {
         &self.field_type
     }
 
+    /// Returns the semantic field modifiers.
+    pub fn modifiers(&self) -> &Modifiers {
+        &self.modifiers
+    }
+
+    /// Returns the field documentation lines.
+    pub fn doc(&self) -> &[String] {
+        &self.doc
+    }
+
+    /// Returns the initializer expression, when present.
+    pub fn initializer(&self) -> Option<&CodeBlock> {
+        self.initializer.as_ref()
+    }
+
+    /// Returns opaque annotation blocks supplied through the escape hatch.
+    pub fn annotations(&self) -> &[CodeBlock] {
+        &self.annotations
+    }
+
+    /// Returns structured annotation declarations.
+    pub fn annotation_specs(&self) -> &[AnnotationSpec] {
+        &self.annotation_specs
+    }
+
+    /// Returns the target-specific struct tag, when present.
+    pub fn tag(&self) -> Option<&str> {
+        self.tag.as_deref()
+    }
+
+    /// Whether the field may be absent from the containing value.
+    pub fn is_optional(&self) -> bool {
+        self.is_optional
+    }
+
     /// Emit this field as a CodeBlock.
     pub fn emit(
         &self,
         lang: &dyn CodeLang,
+        ctx: DeclarationContext,
+    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
+        self.emit_with(lang, ctx)
+    }
+
+    pub(crate) fn emit_with<L: CodeLang + ?Sized>(
+        &self,
+        lang: &L,
         ctx: DeclarationContext,
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
         let mut cb = CodeBlock::builder();
@@ -111,7 +154,7 @@ impl FieldSpec {
         }
 
         for spec in &self.annotation_specs {
-            cb.add_code(spec.emit(lang)?);
+            cb.add_code(spec.emit_with(lang)?);
             cb.add_line();
         }
         for ann in &self.annotations {

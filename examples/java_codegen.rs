@@ -25,19 +25,19 @@ fn build_enum() -> TypeSpec {
         .visibility(Visibility::Public)
         .add_variant(
             EnumVariantSpec::builder("LOW")
-                .value(CodeBlock::of("1", ()).unwrap())
+                .constructor_argument(CodeBlock::of("1", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("MEDIUM")
-                .value(CodeBlock::of("2", ()).unwrap())
+                .constructor_argument(CodeBlock::of("2", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("HIGH")
-                .value(CodeBlock::of("3", ()).unwrap())
+                .constructor_argument(CodeBlock::of("3", ()).unwrap())
                 .build()
                 .unwrap(),
         )
@@ -45,6 +45,14 @@ fn build_enum() -> TypeSpec {
             FieldSpec::builder("value", TypeName::primitive("int"))
                 .visibility(Visibility::Private)
                 .is_readonly()
+                .build()
+                .unwrap(),
+        )
+        .add_method(
+            FunSpec::builder("Priority")
+                .is_constructor()
+                .add_param(ParameterSpec::of("value", TypeName::primitive("int")))
+                .body(CodeBlock::of("this.value = value;", ()).unwrap())
                 .build()
                 .unwrap(),
         )

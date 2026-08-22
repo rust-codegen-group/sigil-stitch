@@ -64,15 +64,15 @@ let type_spec = TypeSpec::builder("Expr", TypeKind::Enum)
     .add_variant(EnumVariantSpec::new("Nil").unwrap())
     .add_variant(
         EnumVariantSpec::builder("Literal")
-            .associated_type(TypeName::primitive("i64"))
+            .positional_payload(TypeName::primitive("i64"))
             .build()
             .unwrap(),
     )
     .add_variant(
         EnumVariantSpec::builder("Binary")
-            .add_field(FieldSpec::builder("left", TypeName::primitive("Box<Expr>")).build().unwrap())
-            .add_field(FieldSpec::builder("op", TypeName::primitive("Op")).build().unwrap())
-            .add_field(FieldSpec::builder("right", TypeName::primitive("Box<Expr>")).build().unwrap())
+            .record_payload_field(FieldSpec::builder("left", TypeName::primitive("Box<Expr>")).build().unwrap())
+            .record_payload_field(FieldSpec::builder("op", TypeName::primitive("Op")).build().unwrap())
+            .record_payload_field(FieldSpec::builder("right", TypeName::primitive("Box<Expr>")).build().unwrap())
             .build()
             .unwrap(),
     )

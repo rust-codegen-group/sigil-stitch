@@ -219,14 +219,14 @@ fn test_enum_associated_values() {
         .doc("Result of a network request.")
         .add_variant(
             EnumVariantSpec::builder("success")
-                .associated_type(TypeName::primitive("Data"))
+                .positional_payload(TypeName::primitive("Data"))
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("failure")
-                .associated_type(TypeName::primitive("Error"))
-                .associated_type(TypeName::primitive("Int"))
+                .positional_payload(TypeName::primitive("Error"))
+                .positional_payload(TypeName::primitive("Int"))
                 .build()
                 .unwrap(),
         )

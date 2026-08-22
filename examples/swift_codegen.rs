@@ -20,18 +20,18 @@ fn main() {
 }
 
 fn build_shared_types() -> (TypeSpec, TypeSpec) {
-    // --- Enum with associated values ---
+    // --- Enum with positional payloads ---
     let result_enum = TypeSpec::builder("NetworkResult", TypeKind::Enum)
         .visibility(Visibility::Public)
         .add_variant(
             EnumVariantSpec::builder("success")
-                .associated_type(TypeName::primitive("Data"))
+                .positional_payload(TypeName::primitive("Data"))
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("failure")
-                .associated_type(TypeName::primitive("Error"))
+                .positional_payload(TypeName::primitive("Error"))
                 .build()
                 .unwrap(),
         )

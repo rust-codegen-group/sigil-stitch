@@ -3,7 +3,8 @@
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -224,6 +225,11 @@ const JS_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const JS_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[VariantCapability::Discriminant],
+)];
+
 const JS_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = async
     FunctionCapability::AsyncEffect,
@@ -285,6 +291,14 @@ impl CodeLang for JavaScript {
         LanguageCapabilities::strict()
             .with_types(JS_TYPES)
             .with_functions(JS_FUNCTIONS)
+            .with_variants(JS_VARIANTS)
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::variant_lowering::javascript::lower(self, variants)
     }
 
     fn function_visibility_is_valid(

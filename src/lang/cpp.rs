@@ -6,7 +6,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
-    LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -300,6 +301,14 @@ const CPP_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const CPP_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::Discriminant,
+        VariantCapability::Attributes,
+    ],
+)];
+
 const CPP_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // Attributes = [[...]]
     FunctionCapability::Attributes,
@@ -414,6 +423,14 @@ impl CodeLang for Cpp {
         LanguageCapabilities::strict()
             .with_types(CPP_TYPES)
             .with_functions(CPP_FUNCTIONS)
+            .with_variants(CPP_VARIANTS)
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::cpp::lower(self, variants)
     }
 
     fn constructor_name_matches(&self, name: &str, declaring_type: Option<&str>) -> bool {

@@ -42,6 +42,54 @@ pub enum TypeCapability {
     OptionalRecordFields,
 }
 
+/// A semantic capability of an enum-variant sequence.
+///
+/// # Naming invariant
+///
+/// These variants describe caller intent, never target spelling, placement,
+/// delimiters, separators, or ordering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum VariantCapability {
+    /// An explicit value identifying an enum member.
+    Discriminant,
+    /// Expressions passed to an enum entry's constructor.
+    ConstructorArguments,
+    /// Types carried positionally by a sum-type constructor or enum case.
+    PositionalPayload,
+    /// Named typed fields carried by a sum-type constructor or enum case.
+    RecordPayload,
+    /// Declaration metadata / annotations attached to a variant.
+    Attributes,
+}
+
+/// Capability profile for variants owned by one [`TypeKind`].
+#[derive(Debug, Clone, Copy)]
+pub struct VariantCapabilityProfile<'a> {
+    owner_kind: TypeKind,
+    capabilities: &'a [VariantCapability],
+}
+
+impl<'a> VariantCapabilityProfile<'a> {
+    /// Create a variant profile for one owning type kind.
+    pub const fn new(owner_kind: TypeKind, capabilities: &'a [VariantCapability]) -> Self {
+        Self {
+            owner_kind,
+            capabilities,
+        }
+    }
+
+    /// The type kind that owns this variant sequence.
+    pub const fn owner_kind(self) -> TypeKind {
+        self.owner_kind
+    }
+
+    /// Whether this owner supports the requested semantic capability.
+    pub fn supports(self, capability: VariantCapability) -> bool {
+        self.capabilities.contains(&capability)
+    }
+}
+
 /// Capability profile for one [`TypeKind`].
 #[derive(Debug, Clone, Copy)]
 pub struct TypeCapabilityProfile<'a> {
@@ -283,6 +331,7 @@ enum CapabilityProfiles<'a, T> {
 pub struct LanguageCapabilities<'a> {
     types: CapabilityProfiles<'a, TypeCapabilityProfile<'a>>,
     functions: CapabilityProfiles<'a, FunctionCapabilityProfile<'a>>,
+    variants: CapabilityProfiles<'a, VariantCapabilityProfile<'a>>,
 }
 
 impl<'a> LanguageCapabilities<'a> {
@@ -291,6 +340,7 @@ impl<'a> LanguageCapabilities<'a> {
         Self {
             types: CapabilityProfiles::Strict(&[]),
             functions: CapabilityProfiles::Strict(&[]),
+            variants: CapabilityProfiles::Strict(&[]),
         }
     }
 
@@ -306,11 +356,18 @@ impl<'a> LanguageCapabilities<'a> {
         self
     }
 
+    /// Add strict owner-aware enum-variant profiles.
+    pub const fn with_variants(mut self, profiles: &'a [VariantCapabilityProfile<'a>]) -> Self {
+        self.variants = CapabilityProfiles::Strict(profiles);
+        self
+    }
+
     /// Compatibility profile for adapters that predate capability validation.
     pub const fn permissive() -> Self {
         Self {
             types: CapabilityProfiles::Permissive,
             functions: CapabilityProfiles::Permissive,
+            variants: CapabilityProfiles::Permissive,
         }
     }
 
@@ -451,6 +508,35 @@ impl<'a> LanguageCapabilities<'a> {
     pub(crate) fn function_validation_is_permissive(&self) -> bool {
         matches!(self.functions, CapabilityProfiles::Permissive)
     }
+
+    /// Whether this language declares a variant profile for `owner_kind`.
+    pub fn supports_variant_owner(&self, owner_kind: TypeKind) -> bool {
+        match self.variants {
+            CapabilityProfiles::Permissive => true,
+            CapabilityProfiles::Strict(profiles) => profiles
+                .iter()
+                .any(|profile| profile.owner_kind() == owner_kind),
+        }
+    }
+
+    /// Whether variants owned by `owner_kind` support `capability`.
+    pub fn supports_variant_capability(
+        &self,
+        owner_kind: TypeKind,
+        capability: VariantCapability,
+    ) -> bool {
+        match self.variants {
+            CapabilityProfiles::Permissive => true,
+            CapabilityProfiles::Strict(profiles) => profiles
+                .iter()
+                .find(|profile| profile.owner_kind() == owner_kind)
+                .is_some_and(|profile| profile.supports(capability)),
+        }
+    }
+
+    pub(crate) fn variant_validation_is_permissive(&self) -> bool {
+        matches!(self.variants, CapabilityProfiles::Permissive)
+    }
 }
 
 #[cfg(test)]
@@ -458,7 +544,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn permissive_matrix_accepts_type_and_function_capabilities() {
+    fn permissive_matrix_accepts_all_capability_families() {
         let capabilities = LanguageCapabilities::permissive();
         assert!(capabilities.supports_type_kind(TypeKind::Enum));
         assert!(capabilities.supports_type_capability(TypeKind::Enum, TypeCapability::Variants));
@@ -469,6 +555,12 @@ mod tests {
             FunctionCapability::AsyncEffect
         ));
         assert!(capabilities.function_validation_is_permissive());
+        assert!(capabilities.supports_variant_owner(TypeKind::Enum));
+        assert!(
+            capabilities
+                .supports_variant_capability(TypeKind::Enum, VariantCapability::RecordPayload)
+        );
+        assert!(capabilities.variant_validation_is_permissive());
     }
 
     #[test]
@@ -497,9 +589,17 @@ mod tests {
                 &[FunctionCapability::AsyncEffect],
             ),
         ];
+        const VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+            TypeKind::Enum,
+            &[
+                VariantCapability::Discriminant,
+                VariantCapability::PositionalPayload,
+            ],
+        )];
         let capabilities = LanguageCapabilities::strict()
             .with_types(TYPES)
-            .with_functions(FUNCTIONS);
+            .with_functions(FUNCTIONS)
+            .with_variants(VARIANTS);
 
         assert!(capabilities.supports_type_kind(TypeKind::Struct));
         assert!(!capabilities.supports_type_kind(TypeKind::Enum));
@@ -541,5 +641,16 @@ mod tests {
             ))
         );
         assert!(!capabilities.function_validation_is_permissive());
+        assert!(capabilities.supports_variant_owner(TypeKind::Enum));
+        assert!(!capabilities.supports_variant_owner(TypeKind::Struct));
+        assert!(
+            capabilities
+                .supports_variant_capability(TypeKind::Enum, VariantCapability::Discriminant)
+        );
+        assert!(
+            !capabilities
+                .supports_variant_capability(TypeKind::Enum, VariantCapability::RecordPayload)
+        );
+        assert!(!capabilities.variant_validation_is_permissive());
     }
 }

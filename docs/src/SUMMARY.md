@@ -40,3 +40,9 @@
   - [Type Presentation](type_presentation.md)
   - [Language-Aware Tokenizer (MacroLang)](macrolang.md)
 - [Adding a Language](adding_a_language.md)
+
+---
+
+# Appendix
+
+- [Code Generation Vocabulary](code_generation_vocabulary.md)

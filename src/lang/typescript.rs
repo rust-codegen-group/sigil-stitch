@@ -3,7 +3,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
@@ -302,6 +303,11 @@ const TS_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const TS_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[VariantCapability::Discriminant],
+)];
+
 const TS_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = async
     FunctionCapability::AsyncEffect,
@@ -403,6 +409,14 @@ impl CodeLang for TypeScript {
         LanguageCapabilities::strict()
             .with_types(TS_TYPES)
             .with_functions(TS_FUNCTIONS)
+            .with_variants(TS_VARIANTS)
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::typescript::lower(self, variants)
     }
 
     fn validate_function_type_constraints(

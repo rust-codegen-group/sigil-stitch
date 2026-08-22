@@ -32,19 +32,19 @@ fn builder_approach() -> String {
         .visibility(Visibility::Public)
         .add_variant(
             EnumVariantSpec::builder("Active")
-                .value(CodeBlock::of("%S", (StringLitArg("active".into()),)).unwrap())
+                .discriminant(CodeBlock::of("%S", (StringLitArg("active".into()),)).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("Inactive")
-                .value(CodeBlock::of("%S", (StringLitArg("inactive".into()),)).unwrap())
+                .discriminant(CodeBlock::of("%S", (StringLitArg("inactive".into()),)).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("Suspended")
-                .value(CodeBlock::of("%S", (StringLitArg("suspended".into()),)).unwrap())
+                .discriminant(CodeBlock::of("%S", (StringLitArg("suspended".into()),)).unwrap())
                 .build()
                 .unwrap(),
         )
@@ -222,19 +222,19 @@ fn macro_approach() -> String {
         .visibility(Visibility::Public)
         .add_variant(
             EnumVariantSpec::builder("Active")
-                .value(CodeBlock::of("%S", (StringLitArg("active".into()),)).unwrap())
+                .discriminant(CodeBlock::of("%S", (StringLitArg("active".into()),)).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("Inactive")
-                .value(CodeBlock::of("%S", (StringLitArg("inactive".into()),)).unwrap())
+                .discriminant(CodeBlock::of("%S", (StringLitArg("inactive".into()),)).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("Suspended")
-                .value(CodeBlock::of("%S", (StringLitArg("suspended".into()),)).unwrap())
+                .discriminant(CodeBlock::of("%S", (StringLitArg("suspended".into()),)).unwrap())
                 .build()
                 .unwrap(),
         )

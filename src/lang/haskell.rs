@@ -6,7 +6,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -348,6 +349,14 @@ const HASKELL_TYPES: &[TypeCapabilityProfile] = &[
     ),
 ];
 
+const HASKELL_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        VariantCapability::PositionalPayload,
+        VariantCapability::RecordPayload,
+    ],
+)];
+
 const HASKELL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // BoundedPolymorphism = class constraints
     FunctionCapability::BoundedPolymorphism,
@@ -386,6 +395,29 @@ impl CodeLang for Haskell {
         LanguageCapabilities::strict()
             .with_types(HASKELL_TYPES)
             .with_functions(HASKELL_FUNCTIONS)
+            .with_variants(HASKELL_VARIANTS)
+    }
+
+    fn validate_variants(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::variant_lowering::haskell::validate(self, variants)
+    }
+
+    fn collect_variant_validation_errors(
+        &self,
+        variants: crate::lang::VariantIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::variant_lowering::haskell::collect_validation_errors(self, variants, errors);
+    }
+
+    fn lower_variants(
+        &self,
+        variants: crate::lang::ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::variant_lowering::haskell::lower(self, variants)
     }
 
     fn validate_function_type_constraints(

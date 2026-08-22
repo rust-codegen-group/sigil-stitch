@@ -2,7 +2,9 @@
 
 use snafu::prelude::*;
 
-use crate::lang::capability::{FunctionCapability, FunctionContext, FunctionForm, TypeCapability};
+use crate::lang::capability::{
+    FunctionCapability, FunctionContext, FunctionForm, TypeCapability, VariantCapability,
+};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 /// Errors returned by sigil-stitch operations.
@@ -27,30 +29,6 @@ pub enum SigilStitchError {
         expected_specifiers: Vec<String>,
         /// The variant names of the provided args (e.g., `["TypeName", "Literal", "Literal"]`).
         actual_arg_kinds: Vec<String>,
-    },
-
-    /// A format argument does not match the corresponding specifier.
-    #[snafu(display(
-        "format string {format:?} argument {index} expects {expected} but got {actual}"
-    ))]
-    FormatArgKind {
-        /// The format string that was passed.
-        format: String,
-        /// Zero-based argument index.
-        index: usize,
-        /// The expected specifier and argument kind.
-        expected: String,
-        /// The provided argument variant.
-        actual: String,
-    },
-
-    /// A format string ends with a bare `%` marker.
-    #[snafu(display("trailing format marker '%' at byte {offset} in format string {format:?}"))]
-    TrailingFormatMarker {
-        /// The format string that contained the marker.
-        format: String,
-        /// Byte offset of the trailing `%`.
-        offset: usize,
     },
 
     /// A required name or filename field was empty.
@@ -143,6 +121,61 @@ pub enum SigilStitchError {
         reason: String,
     },
 
+    /// Duplicate filename in a project specification.
+    #[snafu(display("duplicate filename {filename:?} in ProjectSpec (appears {count} times)"))]
+    DuplicateFileName {
+        /// The duplicated filename.
+        filename: String,
+        /// How many times it appeared.
+        count: usize,
+    },
+
+    /// FileSpec has no language set (e.g. after deserialization).
+    #[snafu(display(
+        "FileSpec {filename:?} has no language — call .with_lang() after deserialization \
+         or use FileSpec::builder_with() to set one"
+    ))]
+    MissingLang {
+        /// The filename of the FileSpec.
+        filename: String,
+    },
+
+    /// Invalid enum declaration.
+    #[snafu(display("invalid enum {type_name:?}: {reason}"))]
+    InvalidEnum {
+        /// The type name.
+        type_name: String,
+        /// The reason the declaration is invalid.
+        reason: String,
+    },
+
+    // Keep all variants introduced after 0.6.8 below the 0.6.8 variants so
+    // extending this non-exhaustive enum does not renumber its legacy
+    // discriminants.
+    /// A format argument does not match the corresponding specifier.
+    #[snafu(display(
+        "format string {format:?} argument {index} expects {expected} but got {actual}"
+    ))]
+    FormatArgKind {
+        /// The format string that was passed.
+        format: String,
+        /// Zero-based argument index.
+        index: usize,
+        /// The expected specifier and argument kind.
+        expected: String,
+        /// The provided argument variant.
+        actual: String,
+    },
+
+    /// A format string ends with a bare `%` marker.
+    #[snafu(display("trailing format marker '%' at byte {offset} in format string {format:?}"))]
+    TrailingFormatMarker {
+        /// The format string that contained the marker.
+        format: String,
+        /// Byte offset of the trailing `%`.
+        offset: usize,
+    },
+
     /// A language does not support the requested type declaration kind.
     #[snafu(display("language {language:?} does not support {kind:?} declaration {type_name:?}"))]
     UnsupportedTypeKind {
@@ -167,25 +200,6 @@ pub enum SigilStitchError {
         capabilities: Vec<TypeCapability>,
     },
 
-    /// Duplicate filename in a project specification.
-    #[snafu(display("duplicate filename {filename:?} in ProjectSpec (appears {count} times)"))]
-    DuplicateFileName {
-        /// The duplicated filename.
-        filename: String,
-        /// How many times it appeared.
-        count: usize,
-    },
-
-    /// FileSpec has no language set (e.g. after deserialization).
-    #[snafu(display(
-        "FileSpec {filename:?} has no language — call .with_lang() after deserialization \
-         or use FileSpec::builder_with() to set one"
-    ))]
-    MissingLang {
-        /// The filename of the FileSpec.
-        filename: String,
-    },
-
     /// A FileSpec contains one or more invalid spec members.
     ///
     /// Validation is collected rather than fail-fast: every invalid
@@ -199,15 +213,6 @@ pub enum SigilStitchError {
         error_count: usize,
         /// The collected member validation errors.
         errors: Vec<SigilStitchError>,
-    },
-
-    /// Invalid enum declaration.
-    #[snafu(display("invalid enum {type_name:?}: {reason}"))]
-    InvalidEnum {
-        /// The type name.
-        type_name: String,
-        /// The reason the declaration is invalid.
-        reason: String,
     },
 
     /// A type kind used an abstract modifier that its language does not permit.
@@ -524,5 +529,151 @@ pub enum SigilStitchError {
         function_name: String,
         /// The parameter with contradictory property markers.
         parameter_name: String,
+    },
+
+    /// A strict language needs an owning declaration to validate enum variants.
+    #[snafu(display(
+        "language {language:?} cannot emit variant {variant_name:?} without its owning type and complete variant sequence"
+    ))]
+    VariantOwnerRequired {
+        /// The language file extension.
+        language: String,
+        /// The ownerless variant being emitted.
+        variant_name: String,
+    },
+
+    /// A language does not support variant declarations for this owner kind.
+    #[snafu(display(
+        "language {language:?} does not support variants owned by {owner_kind:?} type {type_name:?}"
+    ))]
+    UnsupportedVariantOwner {
+        /// The language file extension.
+        language: String,
+        /// The containing type name.
+        type_name: String,
+        /// The rejected owning type kind.
+        owner_kind: TypeKind,
+    },
+
+    /// A language cannot represent one or more requested variant capabilities.
+    #[snafu(display(
+        "language {language:?} does not support {capabilities:?} for variant {variant_name:?} in {owner_kind:?} type {type_name:?}"
+    ))]
+    UnsupportedVariantCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The containing type name.
+        type_name: String,
+        /// The variant being emitted.
+        variant_name: String,
+        /// The containing type kind.
+        owner_kind: TypeKind,
+        /// Unsupported semantic capabilities.
+        capabilities: Vec<VariantCapability>,
+    },
+
+    /// One variant combines mutually exclusive semantic forms.
+    #[snafu(display("variant {variant_name:?} cannot combine semantic forms {capabilities:?}"))]
+    IncompatibleVariantCapabilities {
+        /// The invalid variant.
+        variant_name: String,
+        /// The mutually exclusive capabilities.
+        capabilities: Vec<VariantCapability>,
+    },
+
+    /// A legacy `.value()` request has no validity-preserving interpretation.
+    #[snafu(display(
+        "language {language:?} cannot safely interpret legacy value on variant {variant_name:?}; use discriminant() or constructor_argument()"
+    ))]
+    UnsupportedLegacyVariantValue {
+        /// The language file extension.
+        language: String,
+        /// The variant carrying the ambiguous value.
+        variant_name: String,
+    },
+
+    /// A named variant payload field uses semantics the target cannot represent.
+    #[snafu(display(
+        "language {language:?} cannot represent field {field_name:?} on record payload variant {variant_name:?}: {reason}"
+    ))]
+    InvalidVariantRecordField {
+        /// The language file extension.
+        language: String,
+        /// The variant carrying the field.
+        variant_name: String,
+        /// The rejected field.
+        field_name: String,
+        /// Target-local reason for rejection.
+        reason: String,
+    },
+
+    /// An owner-aware variant sequence repeats one variant name.
+    #[snafu(display("duplicate variant name {variant_name:?} in type {type_name:?}"))]
+    DuplicateVariantName {
+        /// The containing type.
+        type_name: String,
+        /// The duplicated variant name.
+        variant_name: String,
+    },
+
+    /// One record-payload variant repeats a field name.
+    #[snafu(display(
+        "duplicate record-payload field name {field_name:?} in variant {variant_name:?}"
+    ))]
+    DuplicateVariantRecordFieldName {
+        /// The variant carrying the duplicate field.
+        variant_name: String,
+        /// The duplicated field name.
+        field_name: String,
+    },
+
+    /// An enum entry passes constructor arguments without a declared constructor.
+    #[snafu(display(
+        "language {language:?} cannot pass constructor arguments for variant {variant_name:?} in type {type_name:?} without a declared constructor or an opaque member that can provide one"
+    ))]
+    MissingVariantConstructor {
+        /// The language file extension.
+        language: String,
+        /// The containing type.
+        type_name: String,
+        /// The variant carrying constructor arguments.
+        variant_name: String,
+    },
+
+    /// An enum entry's argument count matches none of the declared constructors.
+    #[snafu(display(
+        "language {language:?} cannot pass {argument_count} constructor arguments for variant {variant_name:?} in type {type_name:?}; no declared constructor accepts that count"
+    ))]
+    IncompatibleVariantConstructorArguments {
+        /// The language file extension.
+        language: String,
+        /// The containing type.
+        type_name: String,
+        /// The variant carrying constructor arguments.
+        variant_name: String,
+        /// Number of arguments supplied by the enum entry.
+        argument_count: usize,
+    },
+
+    /// A variant operand was present but contained no semantic value.
+    #[snafu(display("variant {variant_name:?} has an empty {operand}"))]
+    EmptyVariantOperand {
+        /// The invalid variant.
+        variant_name: String,
+        /// The empty operand and, where relevant, its index or field name.
+        operand: String,
+    },
+
+    /// A target cannot preserve one variant annotation form's semantics.
+    #[snafu(display(
+        "language {language:?} cannot represent annotation metadata on variant {variant_name:?}: {reason}"
+    ))]
+    InvalidVariantAnnotation {
+        /// The language file extension.
+        language: String,
+        /// The variant carrying the annotation.
+        variant_name: String,
+        /// Target-local reason for rejection.
+        reason: String,
     },
 }

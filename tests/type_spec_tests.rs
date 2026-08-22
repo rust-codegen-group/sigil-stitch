@@ -1,11 +1,13 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::code_renderer::CodeRenderer;
+use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::ImportGroup;
 use sigil_stitch::lang::CodeLang;
 use sigil_stitch::lang::capability::TypeCapability;
 use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::emittable::Emittable;
+use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -880,7 +882,7 @@ fn test_embedded_import_tracking() {
 }
 
 #[test]
-fn test_enum_constructor_with_valueless_variant_errors() {
+fn test_enum_constructor_with_missing_variant_arguments_errors() {
     use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 
     let result = TypeSpec::builder("Status", TypeKind::Enum)
@@ -901,9 +903,74 @@ fn test_enum_constructor_with_valueless_variant_errors() {
         result
             .unwrap_err()
             .to_string()
-            .contains("some variants lack values"),
-        "should error when enum has constructor but variants lack values"
+            .contains("constructor-argument count incompatible"),
+        "should error when enum has constructor but variants lack constructor arguments"
     );
+}
+
+#[test]
+fn test_enum_primary_constructor_allows_defaulted_variant_arguments() {
+    let result = TypeSpec::builder("Status", TypeKind::Enum)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("code", TypeName::primitive("i32"))
+                .default_value(CodeBlock::of("0", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_variant(EnumVariantSpec::new("Unknown").unwrap())
+        .build();
+
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_enum_primary_constructor_rejects_too_many_variant_arguments() {
+    let result = TypeSpec::builder("Status", TypeKind::Enum)
+        .add_primary_constructor_param(ParameterSpec::of("code", TypeName::primitive("i32")))
+        .add_variant(
+            EnumVariantSpec::builder("Known")
+                .constructor_argument(CodeBlock::of("1", ()).unwrap())
+                .constructor_argument(CodeBlock::of("2", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build();
+
+    assert!(matches!(result, Err(SigilStitchError::InvalidEnum { .. })));
+}
+
+#[test]
+fn test_enum_primary_constructor_uses_last_required_parameter_position() {
+    let defaulted = ParameterSpec::builder("a", TypeName::primitive("i32"))
+        .default_value(CodeBlock::of("0", ()).unwrap())
+        .build()
+        .unwrap();
+    let required = ParameterSpec::of("b", TypeName::primitive("i32"));
+
+    let too_few = TypeSpec::builder("Status", TypeKind::Enum)
+        .add_primary_constructor_param(defaulted.clone())
+        .add_primary_constructor_param(required.clone())
+        .add_variant(
+            EnumVariantSpec::builder("Known")
+                .constructor_argument(CodeBlock::of("1", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build();
+    assert!(matches!(too_few, Err(SigilStitchError::InvalidEnum { .. })));
+
+    let complete = TypeSpec::builder("Status", TypeKind::Enum)
+        .add_primary_constructor_param(defaulted)
+        .add_primary_constructor_param(required)
+        .add_variant(
+            EnumVariantSpec::builder("Known")
+                .constructor_argument(CodeBlock::of("1", ()).unwrap())
+                .constructor_argument(CodeBlock::of("2", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build();
+    assert!(complete.is_ok());
 }
 
 #[test]
@@ -925,13 +992,13 @@ fn test_enum_valued_variants_without_constructor_ok() {
     let result = TypeSpec::builder("Direction", TypeKind::Enum)
         .add_variant(
             EnumVariantSpec::builder("UP")
-                .value(CodeBlock::of("'UP'", ()).unwrap())
+                .discriminant(CodeBlock::of("'UP'", ()).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_variant(
             EnumVariantSpec::builder("DOWN")
-                .value(CodeBlock::of("'DOWN'", ()).unwrap())
+                .discriminant(CodeBlock::of("'DOWN'", ()).unwrap())
                 .build()
                 .unwrap(),
         )
