@@ -30,7 +30,7 @@ pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
     FieldCapabilityProfile::new(FieldContext::TypeMember(TypeKind::Enum), CAPABILITIES),
 ];
 
-fn is_valid_identifier(name: &str) -> bool {
+pub(crate) fn is_valid_identifier(name: &str) -> bool {
     let mut chars = name.chars();
     chars
         .next()

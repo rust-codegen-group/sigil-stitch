@@ -406,6 +406,7 @@ impl CodeLang for Kotlin {
             .with_functions(KOTLIN_FUNCTIONS)
             .with_variants(KOTLIN_VARIANTS)
             .with_fields(crate::lang::field_lowering::kotlin::PROFILES)
+            .with_properties(crate::lang::property_lowering::kotlin::PROFILES)
     }
 
     fn validate_fields(
@@ -428,6 +429,28 @@ impl CodeLang for Kotlin {
         fields: crate::lang::ValidatedFields<'_>,
     ) -> Result<CodeBlock, SigilStitchError> {
         crate::lang::field_lowering::kotlin::lower(self, fields)
+    }
+
+    fn validate_property(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::property_lowering::kotlin::validate(self, property)
+    }
+
+    fn collect_property_validation_errors(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::property_lowering::kotlin::collect_validation_errors(self, property, errors);
+    }
+
+    fn lower_property(
+        &self,
+        property: crate::lang::ValidatedProperty<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::property_lowering::kotlin::lower(self, property)
     }
 
     fn validate_variants(
@@ -648,14 +671,6 @@ impl CodeLang for Kotlin {
             &format!("{visibility}value class {name}{type_params}(val value: %T)"),
             args,
         )
-    }
-
-    fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
-        crate::spec::modifiers::PropertyStyle::Field
-    }
-
-    fn property_getter_keyword(&self) -> &str {
-        "get()"
     }
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {

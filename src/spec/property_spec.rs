@@ -1,32 +1,109 @@
-//! Property specification with getter/setter support.
+//! Computed-property specification with read/write accessor behavior.
 //!
-//! `PropertySpec` renders computed properties in two styles:
-//!
-//! - **Accessor** (TS/JS and fallback): `get name(): T { ... }` / `set name(v: T) { ... }`
-//! - **Field** (Swift/Kotlin): field with inline `get`/`set` body blocks
+//! The selected language adapter validates and completely lowers each
+//! property. Specs carry semantic behavior and metadata, not accessor spelling
+//! or placement policy.
 
-use crate::code_block::{Arg, CodeBlock};
+use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
+use crate::lang::capability::{PropertyCapability, PropertyContext};
 use crate::spec::annotation_spec::AnnotationSpec;
-use crate::spec::modifiers::{DeclarationContext, Modifiers, PropertyStyle, Visibility};
+use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
 use crate::type_name::TypeName;
 
-/// A setter definition: parameter name + body.
+/// Read-only semantic intent for one computed property.
+#[derive(Debug, Clone, Copy)]
+pub struct PropertyIntent<'a> {
+    property: &'a PropertySpec,
+    context: PropertyContext,
+    owner_name: Option<&'a str>,
+}
+
+impl<'a> PropertyIntent<'a> {
+    fn direct(property: &'a PropertySpec, declaration_context: DeclarationContext) -> Self {
+        Self {
+            property,
+            context: PropertyContext::Direct(declaration_context),
+            owner_name: None,
+        }
+    }
+
+    pub(crate) fn type_member(
+        property: &'a PropertySpec,
+        owner_name: &'a str,
+        owner_kind: TypeKind,
+    ) -> Self {
+        Self {
+            property,
+            context: PropertyContext::TypeMember(owner_kind),
+            owner_name: Some(owner_name),
+        }
+    }
+
+    /// The semantic property declaration.
+    pub fn property(&self) -> &'a PropertySpec {
+        self.property
+    }
+
+    /// Semantic context in which the property is emitted.
+    pub fn context(&self) -> PropertyContext {
+        self.context
+    }
+
+    /// Name of the owning type, when available.
+    pub fn owner_name(&self) -> Option<&'a str> {
+        self.owner_name
+    }
+}
+
+/// Property intent whose intrinsic and target validation succeeded.
+///
+/// Only sigil-stitch constructs this wrapper, so a lowerer cannot bypass the
+/// selected adapter's capability profile and additive validation.
+#[derive(Debug, Clone)]
+pub struct ValidatedProperty<'a> {
+    intent: PropertyIntent<'a>,
+}
+
+impl<'a> ValidatedProperty<'a> {
+    fn new(intent: PropertyIntent<'a>) -> Self {
+        Self { intent }
+    }
+}
+
+impl<'a> std::ops::Deref for ValidatedProperty<'a> {
+    type Target = PropertyIntent<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.intent
+    }
+}
+
+/// A setter definition: parameter name plus implementation body.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SetterSpec {
     pub(crate) param_name: String,
     pub(crate) body: CodeBlock,
 }
 
-/// A computed property with optional getter and setter.
+impl SetterSpec {
+    /// Name bound to the assigned value.
+    pub fn param_name(&self) -> &str {
+        &self.param_name
+    }
+
+    /// Implementation body for write access.
+    pub fn body(&self) -> &CodeBlock {
+        &self.body
+    }
+}
+
+/// A computed property with optional read and write behavior.
 ///
-/// `PropertySpec` renders computed properties in two styles depending on the
-/// target language:
-///
-/// - **Accessor** (TS/JS and fallback): `get name(): T { ... }` / `set name(v: T) { ... }`
-/// - **Field** (Swift/Kotlin): field with inline `get`/`set` body blocks
-///
-/// Use [`PropertySpec::builder()`] to construct, then add to a
+/// The selected language adapter decides whether this intent becomes accessor
+/// methods, a field-style computed property, or another valid target construct.
+/// Use [`PropertySpec::builder()`] to construct a property, then add it to a
 /// [`TypeSpec`](crate::spec::type_spec::TypeSpec) with `add_property()`.
 ///
 /// # Examples
@@ -34,11 +111,9 @@ pub struct SetterSpec {
 /// ```
 /// use sigil_stitch::prelude::*;
 /// use sigil_stitch::spec::property_spec::PropertySpec;
-/// use sigil_stitch::lang::typescript::TypeScript;
 ///
 /// let getter_body = CodeBlock::of("return this._name", ()).unwrap();
-///
-/// let prop = PropertySpec::builder("name", TypeName::primitive("string"))
+/// let property = PropertySpec::builder("name", TypeName::primitive("string"))
 ///     .getter(getter_body)
 ///     .build().unwrap();
 /// ```
@@ -55,7 +130,7 @@ pub struct PropertySpec {
 }
 
 impl PropertySpec {
-    /// Create a new builder for a property with the given name and type.
+    /// Create a builder for a property with the given name and value type.
     pub fn builder(name: &str, property_type: TypeName) -> PropertySpecBuilder {
         PropertySpecBuilder {
             name: name.to_string(),
@@ -74,242 +149,206 @@ impl PropertySpec {
         &self.name
     }
 
-    /// Emit this property as one or more CodeBlocks.
-    ///
-    /// Accessor style returns 1–2 blocks (getter, setter).
-    /// Field style returns 1 block (field with inline body).
+    /// Return the explicitly requested property type.
+    pub fn property_type(&self) -> &TypeName {
+        &self.property_type
+    }
+
+    /// Return semantic property modifiers.
+    pub fn modifiers(&self) -> &Modifiers {
+        &self.modifiers
+    }
+
+    /// Return documentation lines supplied by the caller.
+    pub fn doc(&self) -> &[String] {
+        &self.doc
+    }
+
+    /// Return the read-access implementation body, when present.
+    pub fn getter(&self) -> Option<&CodeBlock> {
+        self.getter.as_ref()
+    }
+
+    /// Return the write-access declaration, when present.
+    pub fn setter(&self) -> Option<&SetterSpec> {
+        self.setter.as_ref()
+    }
+
+    /// Return opaque annotation blocks supplied through the escape hatch.
+    pub fn annotations(&self) -> &[CodeBlock] {
+        &self.annotations
+    }
+
+    /// Return structured annotation declarations.
+    pub fn annotation_specs(&self) -> &[AnnotationSpec] {
+        &self.annotation_specs
+    }
+
+    /// Validate and emit this property as one or more structured blocks.
     pub fn emit(
         &self,
         lang: &dyn CodeLang,
-        ctx: DeclarationContext,
-    ) -> Result<Vec<CodeBlock>, crate::error::SigilStitchError> {
-        match lang.property_style() {
-            PropertyStyle::Accessor => self.emit_accessor(lang, ctx),
-            PropertyStyle::Field => self.emit_field(lang, ctx),
-        }
+        context: DeclarationContext,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        Self::lower_intent(PropertyIntent::direct(self, context), lang)
     }
 
-    /// Emit as accessor methods: `get name(): T { ... }` / `set name(v: T) { ... }`.
-    fn emit_accessor(
+    pub(crate) fn collect_intrinsic_validation_errors(
         &self,
-        lang: &dyn CodeLang,
-        ctx: DeclarationContext,
-    ) -> Result<Vec<CodeBlock>, crate::error::SigilStitchError> {
-        let mut blocks = Vec::new();
-
-        if let Some(getter_body) = &self.getter {
-            let mut cb = CodeBlock::builder();
-
-            // Annotations + doc on the getter.
-            self.emit_preamble(&mut cb, lang)?;
-
-            // Signature: [vis] get [name]()[return_type_sep][type][block_open]
-            let vis = lang.render_visibility(self.modifiers.visibility, ctx);
-            let mut sig = String::new();
-            let mut sig_args: Vec<Arg> = Vec::new();
-
-            sig.push_str(vis);
-            if self.modifiers.is_static {
-                sig.push_str(lang.function_syntax().static_keyword);
-            }
-            sig.push_str("get ");
-            sig.push_str(&self.name);
-            sig.push_str("()");
-
-            if !self.property_type.is_empty() {
-                sig.push_str(lang.function_syntax().return_type_separator);
-                sig.push_str("%T");
-                sig_args.push(Arg::TypeName(self.property_type.clone()));
-            }
-
-            sig.push_str(lang.block_syntax().block_open);
-            cb.add(&sig, sig_args);
-            cb.add_line();
-            cb.add("%>", ());
-            cb.add_code(getter_body.clone());
-            cb.add_line();
-            cb.add("%<", ());
-            let close = lang.block_syntax().block_close;
-            if !close.is_empty() {
-                cb.add(close, ());
-                cb.add_line();
-            }
-
-            blocks.push(cb.build()?);
+        context: PropertyContext,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        if self.name.is_empty() {
+            errors.push(SigilStitchError::EmptyName {
+                builder: "PropertySpec",
+            });
         }
-
+        if self.getter.is_none() && self.setter.is_none() {
+            errors.push(SigilStitchError::MissingPropertyAccessors {
+                property_name: self.name.clone(),
+                context,
+            });
+        }
+        if self.getter.as_ref().is_some_and(CodeBlock::is_empty) {
+            errors.push(SigilStitchError::EmptyPropertyOperand {
+                property_name: self.name.clone(),
+                context,
+                operand: "getter body",
+            });
+        }
         if let Some(setter) = &self.setter {
-            let mut cb = CodeBlock::builder();
-
-            // Setter signature: [vis] set [name]([param][sep][type])[block_open]
-            let vis = lang.render_visibility(self.modifiers.visibility, ctx);
-            let mut sig = String::new();
-            let mut sig_args: Vec<Arg> = Vec::new();
-
-            sig.push_str(vis);
-            if self.modifiers.is_static {
-                sig.push_str(lang.function_syntax().static_keyword);
+            if setter.param_name.is_empty() {
+                errors.push(SigilStitchError::EmptyPropertySetterParameter {
+                    property_name: self.name.clone(),
+                    context,
+                });
             }
-            sig.push_str("set ");
-            sig.push_str(&self.name);
-            sig.push('(');
-            sig.push_str(lang.variable_prefix());
-            sig.push_str(&lang.escape_reserved(&setter.param_name));
-
-            if !self.property_type.is_empty() {
-                sig.push_str(lang.type_decl_syntax().type_annotation_separator);
-                sig.push_str("%T");
-                sig_args.push(Arg::TypeName(self.property_type.clone()));
+            if setter.body.is_empty() {
+                errors.push(SigilStitchError::EmptyPropertyOperand {
+                    property_name: self.name.clone(),
+                    context,
+                    operand: "setter body",
+                });
             }
-
-            sig.push(')');
-            sig.push_str(lang.block_syntax().block_open);
-            cb.add(&sig, sig_args);
-            cb.add_line();
-            cb.add("%>", ());
-            cb.add_code(setter.body.clone());
-            cb.add_line();
-            cb.add("%<", ());
-            let close = lang.block_syntax().block_close;
-            if !close.is_empty() {
-                cb.add(close, ());
-                cb.add_line();
-            }
-
-            blocks.push(cb.build()?);
         }
 
-        Ok(blocks)
+        let mut invalid_modifiers = Vec::new();
+        if self.modifiers.is_abstract {
+            invalid_modifiers.push("abstract");
+        }
+        if self.modifiers.is_readonly {
+            invalid_modifiers.push("readonly");
+        }
+        if self.modifiers.is_async {
+            invalid_modifiers.push("async");
+        }
+        if self.modifiers.is_override {
+            invalid_modifiers.push("override");
+        }
+        if self.modifiers.is_constructor {
+            invalid_modifiers.push("constructor");
+        }
+        if !invalid_modifiers.is_empty() {
+            errors.push(SigilStitchError::InvalidPropertyModifiers {
+                property_name: self.name.clone(),
+                context,
+                modifiers: invalid_modifiers,
+            });
+        }
     }
 
-    /// Emit as a field with inline getter/setter body (Swift/Kotlin).
-    fn emit_field(
-        &self,
+    pub(crate) fn collect_validation_errors(
+        intent: PropertyIntent<'_>,
         lang: &dyn CodeLang,
-        ctx: DeclarationContext,
-    ) -> Result<Vec<CodeBlock>, crate::error::SigilStitchError> {
-        let mut cb = CodeBlock::builder();
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        let property = intent.property();
+        property.collect_intrinsic_validation_errors(intent.context(), errors);
 
-        // Annotations + doc.
-        self.emit_preamble(&mut cb, lang)?;
-
-        // Field header: [vis] [var/let] [name]: [type] {
-        let vis = lang.render_visibility(self.modifiers.visibility, ctx);
-        let has_setter = self.setter.is_some();
-
-        let mut sig = String::new();
-        let mut sig_args: Vec<Arg> = Vec::new();
-
-        sig.push_str(vis);
-        if self.modifiers.is_static {
-            sig.push_str(lang.function_syntax().static_keyword);
+        let capabilities = lang.capabilities();
+        if !capabilities.supports_property_context(intent.context()) {
+            errors.push(SigilStitchError::UnsupportedPropertyContext {
+                language: lang.file_extension().to_string(),
+                context: intent.context(),
+                property_name: property.name.clone(),
+                owner_name: intent.owner_name().map(str::to_string),
+            });
+            return;
         }
 
-        if has_setter {
-            sig.push_str(lang.enum_and_annotation().mutable_field_keyword);
-        } else {
-            sig.push_str(lang.enum_and_annotation().readonly_keyword);
+        let requested = property.requested_capabilities();
+        let unsupported: Vec<_> = requested
+            .iter()
+            .copied()
+            .filter(|capability| {
+                !capabilities.supports_property_capability(intent.context(), *capability)
+            })
+            .collect();
+        if !unsupported.is_empty() {
+            errors.push(SigilStitchError::UnsupportedPropertyCapabilities {
+                language: lang.file_extension().to_string(),
+                property_name: property.name.clone(),
+                context: intent.context(),
+                capabilities: unsupported,
+            });
         }
 
-        sig.push_str(lang.variable_prefix());
-        sig.push_str(&lang.escape_field_name(&self.name));
+        let missing: Vec<_> = capabilities
+            .required_property_capabilities(intent.context())
+            .iter()
+            .copied()
+            .filter(|capability| !requested.contains(capability))
+            .collect();
+        if !missing.is_empty() {
+            errors.push(SigilStitchError::MissingRequiredPropertyCapabilities {
+                language: lang.file_extension().to_string(),
+                property_name: property.name.clone(),
+                context: intent.context(),
+                capabilities: missing,
+            });
+        }
 
+        lang.collect_property_validation_errors(intent, errors);
+    }
+
+    pub(crate) fn validate_intent<'a>(
+        intent: PropertyIntent<'a>,
+        lang: &dyn CodeLang,
+    ) -> Result<ValidatedProperty<'a>, SigilStitchError> {
+        let mut errors = Vec::new();
+        Self::collect_validation_errors(intent, lang, &mut errors);
+        if let Some(error) = errors.into_iter().next() {
+            return Err(error);
+        }
+        Ok(ValidatedProperty::new(intent))
+    }
+
+    pub(crate) fn lower_intent(
+        intent: PropertyIntent<'_>,
+        lang: &dyn CodeLang,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        let property = Self::validate_intent(intent, lang)?;
+        lang.lower_property(property)
+    }
+
+    fn requested_capabilities(&self) -> Vec<PropertyCapability> {
+        let mut capabilities = Vec::new();
         if !self.property_type.is_empty() {
-            sig.push_str(lang.type_decl_syntax().type_annotation_separator);
-            sig.push_str("%T");
-            sig_args.push(Arg::TypeName(self.property_type.clone()));
+            capabilities.push(PropertyCapability::ExplicitType);
         }
-
-        sig.push_str(lang.block_syntax().block_open);
-        cb.add(&sig, sig_args);
-        cb.add_line();
-        cb.add("%>", ());
-
-        // Getter block.
-        if let Some(getter_body) = &self.getter {
-            let getter_kw = lang.property_getter_keyword();
-            let getter_sig = format!("{getter_kw}{}", lang.block_syntax().block_open);
-            cb.add(&getter_sig, ());
-            cb.add_line();
-            cb.add("%>", ());
-            cb.add_code(getter_body.clone());
-            cb.add_line();
-            cb.add("%<", ());
-            let close = lang.block_syntax().block_close;
-            if !close.is_empty() {
-                cb.add(close, ());
-                cb.add_line();
-            }
+        if self.getter.is_some() {
+            capabilities.push(PropertyCapability::ReadAccessor);
         }
-
-        // Setter block.
-        if let Some(setter) = &self.setter {
-            let setter_sig = format!(
-                "set({}){}",
-                setter.param_name,
-                lang.block_syntax().block_open
-            );
-            cb.add(&setter_sig, ());
-            cb.add_line();
-            cb.add("%>", ());
-            cb.add_code(setter.body.clone());
-            cb.add_line();
-            cb.add("%<", ());
-            let close = lang.block_syntax().block_close;
-            if !close.is_empty() {
-                cb.add(close, ());
-                cb.add_line();
-            }
+        if self.setter.is_some() {
+            capabilities.push(PropertyCapability::WriteAccessor);
         }
-
-        cb.add("%<", ());
-        let close = lang.block_syntax().block_close;
-        if !close.is_empty() {
-            cb.add(close, ());
-            cb.add_line();
+        if !self.annotations.is_empty() || !self.annotation_specs.is_empty() {
+            capabilities.push(PropertyCapability::Attributes);
         }
-
-        Ok(vec![cb.build()?])
-    }
-
-    /// Emit annotations and doc comment as a preamble.
-    fn emit_preamble(
-        &self,
-        cb: &mut crate::code_block::CodeBlockBuilder,
-        lang: &dyn CodeLang,
-    ) -> Result<(), crate::error::SigilStitchError> {
-        let emit_doc = || -> Option<String> {
-            if self.doc.is_empty() || lang.doc_comment_inside_body() {
-                return None;
-            }
-            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-            Some(lang.render_doc_comment(&doc_lines))
-        };
-
-        if lang.doc_before_annotations()
-            && let Some(doc_str) = emit_doc()
-        {
-            cb.add("%L", doc_str);
-            cb.add_line();
+        if self.modifiers.is_static {
+            capabilities.push(PropertyCapability::StaticProperty);
         }
-
-        for spec in &self.annotation_specs {
-            cb.add_code(spec.emit(lang)?);
-            cb.add_line();
-        }
-        for ann in &self.annotations {
-            cb.add_code(ann.clone());
-            cb.add_line();
-        }
-
-        if !lang.doc_before_annotations()
-            && let Some(doc_str) = emit_doc()
-        {
-            cb.add("%L", doc_str);
-            cb.add_line();
-        }
-
-        Ok(())
+        capabilities
     }
 }
 
@@ -343,8 +382,8 @@ impl PropertySpecBuilder {
     }
 
     /// Set the visibility.
-    pub fn visibility(mut self, vis: Visibility) -> Self {
-        self.modifiers.visibility = vis;
+    pub fn visibility(mut self, visibility: Visibility) -> Self {
+        self.modifiers.visibility = visibility;
         self
     }
 
@@ -354,21 +393,21 @@ impl PropertySpecBuilder {
         self
     }
 
-    /// Add a doc comment line.
+    /// Add a documentation line.
     pub fn doc(mut self, line: &str) -> Self {
         self.doc.push(line.to_string());
         self
     }
 
-    /// Add a raw annotation code block.
-    pub fn annotation(mut self, ann: CodeBlock) -> Self {
-        self.annotations.push(ann);
+    /// Add a raw annotation block.
+    pub fn annotation(mut self, annotation: CodeBlock) -> Self {
+        self.annotations.push(annotation);
         self
     }
 
     /// Add a structured annotation.
-    pub fn annotate(mut self, spec: AnnotationSpec) -> Self {
-        self.annotation_specs.push(spec);
+    pub fn annotate(mut self, annotation: AnnotationSpec) -> Self {
+        self.annotation_specs.push(annotation);
         self
     }
 
@@ -376,8 +415,8 @@ impl PropertySpecBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`SigilStitchError::EmptyName`](crate::error::SigilStitchError::EmptyName) if `name` is empty.
-    pub fn build(self) -> Result<PropertySpec, crate::error::SigilStitchError> {
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
+    pub fn build(self) -> Result<PropertySpec, SigilStitchError> {
         snafu::ensure!(
             !self.name.is_empty(),
             crate::error::EmptyNameSnafu {
@@ -402,7 +441,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_build_empty_name_errors() {
+    fn build_empty_name_errors() {
         let result = PropertySpec::builder("", TypeName::primitive("string")).build();
         assert!(result.is_err());
         assert!(
@@ -411,5 +450,52 @@ mod tests {
                 .to_string()
                 .contains("'name' must not be empty")
         );
+    }
+
+    #[test]
+    fn built_in_validation_hooks_accept_and_reject_property_intent() {
+        let languages: Vec<Box<dyn CodeLang>> = vec![
+            Box::new(crate::lang::javascript::JavaScript::new()),
+            Box::new(crate::lang::typescript::TypeScript::new()),
+            Box::new(crate::lang::kotlin::Kotlin::new()),
+            Box::new(crate::lang::swift::Swift::new()),
+            Box::new(crate::lang::php::Php::new()),
+            Box::new(crate::lang::scala::Scala::new()),
+        ];
+
+        for lang in languages {
+            let property_type = if lang.file_extension() == "js" {
+                TypeName::primitive("")
+            } else {
+                TypeName::primitive("Value")
+            };
+            let accepted = PropertySpec::builder("value", property_type.clone())
+                .getter(CodeBlock::of("return stored", ()).unwrap())
+                .build()
+                .unwrap();
+            assert!(
+                lang.validate_property(PropertyIntent::direct(
+                    &accepted,
+                    DeclarationContext::Member,
+                ))
+                .is_ok(),
+                ".{}",
+                lang.file_extension()
+            );
+
+            let rejected = PropertySpec::builder("bad-name", property_type)
+                .getter(CodeBlock::of("return stored", ()).unwrap())
+                .build()
+                .unwrap();
+            assert!(
+                lang.validate_property(PropertyIntent::direct(
+                    &rejected,
+                    DeclarationContext::Member,
+                ))
+                .is_err(),
+                ".{}",
+                lang.file_extension()
+            );
+        }
     }
 }

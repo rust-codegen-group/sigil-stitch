@@ -79,6 +79,82 @@ pub enum FieldCapability {
     OptionalPresence,
 }
 
+/// The semantic context in which one computed property is emitted.
+///
+/// The context identifies the owning declaration without exposing target
+/// placement, accessor spelling, or preamble order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum PropertyContext {
+    /// A directly emitted property with only legacy declaration placement.
+    Direct(DeclarationContext),
+    /// A property owned by a complete type declaration.
+    TypeMember(TypeKind),
+}
+
+/// A semantic capability of a computed property declaration.
+///
+/// These variants describe caller intent. They do not prescribe whether a
+/// language uses methods, a field-style computed property, or another target
+/// construct to preserve that intent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PropertyCapability {
+    /// An explicit property value type.
+    ExplicitType,
+    /// Read access implemented by the supplied getter body.
+    ReadAccessor,
+    /// Write access implemented by the supplied setter body.
+    WriteAccessor,
+    /// Structured or opaque declaration metadata.
+    Attributes,
+    /// A type-side or static property.
+    StaticProperty,
+}
+
+/// Capability profile for one computed-property context.
+#[derive(Debug, Clone, Copy)]
+pub struct PropertyCapabilityProfile<'a> {
+    context: PropertyContext,
+    capabilities: &'a [PropertyCapability],
+    required_capabilities: &'a [PropertyCapability],
+}
+
+impl<'a> PropertyCapabilityProfile<'a> {
+    /// Create a property profile for one semantic context.
+    pub const fn new(context: PropertyContext, capabilities: &'a [PropertyCapability]) -> Self {
+        Self {
+            context,
+            capabilities,
+            required_capabilities: &[],
+        }
+    }
+
+    /// Declare capabilities every property in this context must provide.
+    pub const fn with_required_capabilities(
+        mut self,
+        capabilities: &'a [PropertyCapability],
+    ) -> Self {
+        self.required_capabilities = capabilities;
+        self
+    }
+
+    /// The semantic property context this profile describes.
+    pub const fn context(self) -> PropertyContext {
+        self.context
+    }
+
+    /// Whether this profile supports the requested semantic capability.
+    pub fn supports(self, capability: PropertyCapability) -> bool {
+        self.capabilities.contains(&capability)
+    }
+
+    /// Capabilities every property in this context must provide.
+    pub fn required_capabilities(self) -> &'a [PropertyCapability] {
+        self.required_capabilities
+    }
+}
+
 /// Capability profile for one field-sequence context.
 #[derive(Debug, Clone, Copy)]
 pub struct FieldCapabilityProfile<'a> {
@@ -410,6 +486,7 @@ pub struct LanguageCapabilities<'a> {
     functions: CapabilityProfiles<'a, FunctionCapabilityProfile<'a>>,
     variants: CapabilityProfiles<'a, VariantCapabilityProfile<'a>>,
     fields: CapabilityProfiles<'a, FieldCapabilityProfile<'a>>,
+    properties: CapabilityProfiles<'a, PropertyCapabilityProfile<'a>>,
 }
 
 impl<'a> LanguageCapabilities<'a> {
@@ -420,6 +497,7 @@ impl<'a> LanguageCapabilities<'a> {
             functions: CapabilityProfiles::Strict(&[]),
             variants: CapabilityProfiles::Strict(&[]),
             fields: CapabilityProfiles::Strict(&[]),
+            properties: CapabilityProfiles::Strict(&[]),
         }
     }
 
@@ -447,6 +525,12 @@ impl<'a> LanguageCapabilities<'a> {
         self
     }
 
+    /// Add strict computed-property profiles.
+    pub const fn with_properties(mut self, profiles: &'a [PropertyCapabilityProfile<'a>]) -> Self {
+        self.properties = CapabilityProfiles::Strict(profiles);
+        self
+    }
+
     /// Compatibility profile for adapters that predate capability validation.
     pub const fn permissive() -> Self {
         Self {
@@ -454,6 +538,7 @@ impl<'a> LanguageCapabilities<'a> {
             functions: CapabilityProfiles::Permissive,
             variants: CapabilityProfiles::Permissive,
             fields: CapabilityProfiles::Permissive,
+            properties: CapabilityProfiles::Permissive,
         }
     }
 
@@ -659,6 +744,45 @@ impl<'a> LanguageCapabilities<'a> {
                 .map_or(&[], |profile| profile.required_capabilities()),
         }
     }
+
+    /// Whether this language declares a property profile for `context`.
+    pub fn supports_property_context(&self, context: PropertyContext) -> bool {
+        match self.properties {
+            CapabilityProfiles::Permissive => true,
+            CapabilityProfiles::Strict(profiles) => {
+                profiles.iter().any(|profile| profile.context() == context)
+            }
+        }
+    }
+
+    /// Whether properties in `context` support `capability`.
+    pub fn supports_property_capability(
+        &self,
+        context: PropertyContext,
+        capability: PropertyCapability,
+    ) -> bool {
+        match self.properties {
+            CapabilityProfiles::Permissive => true,
+            CapabilityProfiles::Strict(profiles) => profiles
+                .iter()
+                .find(|profile| profile.context() == context)
+                .is_some_and(|profile| profile.supports(capability)),
+        }
+    }
+
+    /// Required capabilities for every property in `context`.
+    pub fn required_property_capabilities(
+        &self,
+        context: PropertyContext,
+    ) -> &[PropertyCapability] {
+        match self.properties {
+            CapabilityProfiles::Permissive => &[],
+            CapabilityProfiles::Strict(profiles) => profiles
+                .iter()
+                .find(|profile| profile.context() == context)
+                .map_or(&[], |profile| profile.required_capabilities()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -683,6 +807,13 @@ mod tests {
                 .supports_variant_capability(TypeKind::Enum, VariantCapability::RecordPayload)
         );
         assert!(capabilities.variant_validation_is_permissive());
+        assert!(
+            capabilities.supports_property_context(PropertyContext::TypeMember(TypeKind::Class))
+        );
+        assert!(capabilities.supports_property_capability(
+            PropertyContext::TypeMember(TypeKind::Class),
+            PropertyCapability::ReadAccessor
+        ));
     }
 
     #[test]
@@ -718,10 +849,19 @@ mod tests {
                 VariantCapability::PositionalPayload,
             ],
         )];
+        const PROPERTIES: &[PropertyCapabilityProfile] = &[PropertyCapabilityProfile::new(
+            PropertyContext::TypeMember(TypeKind::Struct),
+            &[
+                PropertyCapability::ExplicitType,
+                PropertyCapability::ReadAccessor,
+            ],
+        )
+        .with_required_capabilities(&[PropertyCapability::ReadAccessor])];
         let capabilities = LanguageCapabilities::strict()
             .with_types(TYPES)
             .with_functions(FUNCTIONS)
-            .with_variants(VARIANTS);
+            .with_variants(VARIANTS)
+            .with_properties(PROPERTIES);
 
         assert!(capabilities.supports_type_kind(TypeKind::Struct));
         assert!(!capabilities.supports_type_kind(TypeKind::Enum));
@@ -774,5 +914,19 @@ mod tests {
                 .supports_variant_capability(TypeKind::Enum, VariantCapability::RecordPayload)
         );
         assert!(!capabilities.variant_validation_is_permissive());
+        let property_context = PropertyContext::TypeMember(TypeKind::Struct);
+        assert!(capabilities.supports_property_context(property_context));
+        assert!(
+            capabilities
+                .supports_property_capability(property_context, PropertyCapability::ExplicitType)
+        );
+        assert!(
+            !capabilities
+                .supports_property_capability(property_context, PropertyCapability::StaticProperty)
+        );
+        assert_eq!(
+            capabilities.required_property_capabilities(property_context),
+            &[PropertyCapability::ReadAccessor]
+        );
     }
 }

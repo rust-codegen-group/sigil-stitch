@@ -73,9 +73,10 @@ Extends `RendererLang` with the additional methods needed by the spec layer.
 Implement `capabilities()` for new adapters. Return a local
 `LanguageCapabilities::strict()` matrix, add `TypeCapabilityProfile`s with
 `with_types()`, add `FunctionCapabilityProfile`s with `with_functions()`, and
-add `FieldCapabilityProfile`s with `with_fields()` and
-`VariantCapabilityProfile`s with `with_variants()` for every supported field
-context or owning type kind.
+add `FieldCapabilityProfile`s with `with_fields()`,
+`PropertyCapabilityProfile`s with `with_properties()`, and
+`VariantCapabilityProfile`s with `with_variants()` for every supported
+declaration context or owning type kind.
 Function profiles are keyed by both context (`TopLevel`, `ReceiverMethod`,
 `Member`, or `InterfaceMember`) and form (`Function`, `Constructor`, or
 `Destructor`). Omit a profile when that combination is unsupported. Include
@@ -103,7 +104,15 @@ only where an untyped field cannot be valid. Optional presence means the member
 may be absent; value nullability is expressed separately with
 `TypeName::Optional`.
 
-### Function Lowering and Compatibility Methods
+Property profiles are keyed by `PropertyContext`: direct member emission or a
+member of one owning `TypeKind`. They distinguish explicit type information,
+read access, write access, attributes, and static behavior. Require
+`ReadAccessor` where a write-only computed property is invalid and require
+`ExplicitType` where inference cannot preserve the declaration. Getter/setter
+spelling and whether the target uses accessor declarations, a field-style
+body, or ordinary methods are lowering decisions, not capabilities.
+
+### Declaration Lowering and Compatibility Methods
 
 `CodeLang::validate_function()` receives classified, read-only `FunctionIntent`
 after sigil-stitch applies its semantic capability matrix against the actual
@@ -137,13 +146,33 @@ field grammar, including documentation and annotation order, access sections,
 tags, delimiters, and terminators. Keep every field type in a `%T` slot and
 compose initializers or raw annotations as nested `CodeBlock`s.
 
+`CodeLang::validate_property()` and `CodeLang::lower_property()` form the
+corresponding seam for one computed property. `PropertyIntent` exposes the
+semantic context, owner when present, property type, read and write bodies,
+modifiers, documentation, and attributes. Override
+`collect_property_validation_errors()` when multiple independent target-local
+failures should survive file-level aggregation. `ValidatedProperty` is
+crate-constructed after intrinsic, profile, and adapter-local validation. The
+lowerer returns `Vec<CodeBlock>` because one property may become separate read
+and write accessor declarations. Preserve its type in `%T` slots and compose
+bodies and raw annotations structurally.
+
+`CodeLang::validate_type_members()` is the validation-only seam for
+relationships among one type's fields, computed properties, and explicit
+methods after their per-family validation has run. Override
+`collect_type_members_validation_errors()` when several independent owner-wide
+failures should be aggregated. Use it for target-derived relationships such as
+case-folded accessor/method collisions. It has no matching lowerer: properties
+still lower one at a time through `lower_property()`, and the intent must not
+grow placement, namespace-layout, or other grammar policy.
+
 The remaining interface mixes semantic validation hooks with older grammar
 fragments used by compatibility lowerers. Grammar-oriented methods must be
 absorbed by complete language-local lowering rather than multiplied:
 
 | Method | Example | Purpose |
 |--------|---------|---------|
-| `capabilities()` | Strict type, function, field, and variant profiles | Declare semantic representability by context and form |
+| `capabilities()` | Strict type, function, field, property, and variant profiles | Declare semantic representability by context and form |
 | `render_visibility()` | `"public "`, `"pub "` | Visibility prefix |
 | `function_keyword()` | `"function"`, `"fn"` | Function declaration keyword |
 | `abstract_modifier_capability()` | `AbstractMethod`, `VirtualMethod` | Semantic meaning of the legacy abstract modifier |
@@ -167,6 +196,11 @@ absorbed by complete language-local lowering rather than multiplied:
 | `validate_fields()` | `FieldSequenceIntent -> Result<(), _>` | Add target-local checks after crate-owned field validation |
 | `collect_field_validation_errors()` | `FieldSequenceIntent + error sink` | Add independent target-local sibling errors during file validation |
 | `lower_fields()` | `ValidatedFields -> CodeBlock` | Own complete field-sequence grammar; defaults to frozen compatibility lowering |
+| `validate_property()` | `PropertyIntent -> Result<(), _>` | Add target-local checks after crate-owned property validation |
+| `collect_property_validation_errors()` | `PropertyIntent + error sink` | Add independent target-local property errors during file validation |
+| `lower_property()` | `ValidatedProperty -> Vec<CodeBlock>` | Own complete property grammar; defaults to frozen compatibility lowering |
+| `validate_type_members()` | `TypeMembersIntent -> Result<(), _>` | Add target-local checks across semantic member families after per-family validation |
+| `collect_type_members_validation_errors()` | `TypeMembersIntent + error sink` | Add independent target-derived cross-member errors during file validation |
 | `validate_variants()` | `VariantIntent -> Result<(), _>` | Add target-local checks after crate-owned sequence validation |
 | `collect_variant_validation_errors()` | `VariantIntent + error sink` | Add independent target-local sibling errors during file validation |
 | `lower_variants()` | `ValidatedVariants -> CodeBlock` | Own complete variant-sequence grammar; defaults to frozen compatibility lowering |
@@ -198,10 +232,13 @@ not all have the same architectural role:
   interpret for pre-0.6.8 adapter compatibility. These accessors and their
   configuration types are deprecated. `optional_field_style()` and
   `OptionalFieldStyle` are likewise deprecated and interpreted only by the
-  frozen external-adapter field compatibility lowerer. New function, field,
-  and variant grammar belongs in `lower_function()`, `lower_fields()`, and
-  `lower_variants()`. Other type/member emitters may temporarily use existing
-  fields where no complete lowering seam exists yet, but must not extend them.
+  frozen external-adapter field compatibility lowerer. `property_style()`,
+  `property_getter_keyword()`, and `PropertyStyle` are deprecated and confined
+  to frozen property compatibility lowering. New function, field, property,
+  and variant grammar belongs in `lower_function()`, `lower_fields()`,
+  `lower_property()`, and `lower_variants()`. Other type/member emitters may
+  temporarily use existing fields where no complete lowering seam exists yet,
+  but must not extend them.
 
 Do not add public flags, enums, or fields to accommodate a new language. A
 previously unseen declaration form is evidence that lowering must move behind
@@ -314,8 +351,10 @@ These methods don't belong to a config struct but have sensible defaults you can
   retained while type/property compatibility paths migrate.
 - `optional_field_style()` -- deprecated pre-0.6.8 field compatibility only;
   new adapters distinguish `OptionalPresence` from `TypeName::Optional`.
-- `property_style()` -- default `Accessor` (TS/JS: `get name()`). Swift/Kotlin: `Field` (inline get/set).
-- `property_getter_keyword()` -- default `"get"`. Kotlin: `"get()"`.
+- `property_style()` -- deprecated pre-0.6.8 property compatibility only;
+  new adapters implement `lower_property()`.
+- `property_getter_keyword()` -- deprecated pre-0.6.8 field-style property
+  compatibility only.
 - `emit_type_context()` -- optional structured context for split function
   signatures.
 - `type_body_prefix()` -- content emitted before the type body.

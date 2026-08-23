@@ -197,6 +197,8 @@ impl RendererLang for JavaScript {
 const JS_CLASS_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = class fields
     TypeCapability::RecordFields,
+    // AccessorMethods = get/set accessors
+    TypeCapability::AccessorMethods,
     // Methods = class methods
     TypeCapability::Methods,
     // NominalSubtyping = `extends`
@@ -206,6 +208,7 @@ const JS_CLASS_CAPABILITIES: &[TypeCapability] = &[
 ];
 const JS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::RecordFields,
+    TypeCapability::AccessorMethods,
     TypeCapability::Methods,
     TypeCapability::NominalSubtyping,
     TypeCapability::Attributes,
@@ -222,6 +225,8 @@ const JS_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // RecordFields = ordinary class fields
             TypeCapability::RecordFields,
+            // AccessorMethods = get/set accessors
+            TypeCapability::AccessorMethods,
             // Methods = class methods
             TypeCapability::Methods,
             // Variants = enum-like static class members
@@ -298,6 +303,7 @@ impl CodeLang for JavaScript {
             .with_functions(JS_FUNCTIONS)
             .with_variants(JS_VARIANTS)
             .with_fields(crate::lang::field_lowering::javascript::PROFILES)
+            .with_properties(crate::lang::property_lowering::javascript::PROFILES)
     }
 
     fn escape_field_name(&self, name: &str) -> String {
@@ -324,6 +330,30 @@ impl CodeLang for JavaScript {
         fields: crate::lang::ValidatedFields<'_>,
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
         crate::lang::field_lowering::javascript::lower(self, fields)
+    }
+
+    fn validate_property(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::property_lowering::javascript::validate(self, property)
+    }
+
+    fn collect_property_validation_errors(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+        errors: &mut Vec<crate::error::SigilStitchError>,
+    ) {
+        crate::lang::property_lowering::javascript::collect_validation_errors(
+            self, property, errors,
+        );
+    }
+
+    fn lower_property(
+        &self,
+        property: crate::lang::ValidatedProperty<'_>,
+    ) -> Result<Vec<CodeBlock>, crate::error::SigilStitchError> {
+        crate::lang::property_lowering::javascript::lower(self, property)
     }
 
     fn lower_variants(

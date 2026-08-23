@@ -30,7 +30,7 @@ pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
     FieldCapabilityProfile::new(FieldContext::TypeMember(TypeKind::Struct), CAPABILITIES),
 ];
 
-fn is_valid_identifier(name: &str) -> bool {
+pub(crate) fn is_valid_identifier(name: &str) -> bool {
     fn is_head(ch: char) -> bool {
         matches!(
             ch,

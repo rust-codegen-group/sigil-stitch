@@ -257,7 +257,6 @@ const SWIFT_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::Attributes,
 ];
 const SWIFT_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    TypeCapability::AccessorMethods,
     TypeCapability::Methods,
     TypeCapability::NominalSubtyping,
     TypeCapability::ParametricPolymorphism,
@@ -402,6 +401,7 @@ impl CodeLang for Swift {
             .with_functions(SWIFT_FUNCTIONS)
             .with_variants(SWIFT_VARIANTS)
             .with_fields(crate::lang::field_lowering::swift::PROFILES)
+            .with_properties(crate::lang::property_lowering::swift::PROFILES)
     }
 
     fn validate_fields(
@@ -424,6 +424,28 @@ impl CodeLang for Swift {
         fields: crate::lang::ValidatedFields<'_>,
     ) -> Result<CodeBlock, SigilStitchError> {
         crate::lang::field_lowering::swift::lower(self, fields)
+    }
+
+    fn validate_property(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::property_lowering::swift::validate(self, property)
+    }
+
+    fn collect_property_validation_errors(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::property_lowering::swift::collect_validation_errors(self, property, errors);
+    }
+
+    fn lower_property(
+        &self,
+        property: crate::lang::ValidatedProperty<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::property_lowering::swift::lower(self, property)
     }
 
     fn validate_variants(
@@ -583,10 +605,6 @@ impl CodeLang for Swift {
 
     fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
         true
-    }
-
-    fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
-        crate::spec::modifiers::PropertyStyle::Field
     }
 
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {

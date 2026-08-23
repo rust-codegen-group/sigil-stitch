@@ -349,18 +349,21 @@ fn java_matrix() {
 fn javascript_matrix() {
     let class_caps = &[
         TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::Attributes,
     ];
     let contract_caps = &[
         TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::Attributes,
     ];
     let enum_caps = &[
         TypeCapability::RecordFields,
+        TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::Variants,
     ];
@@ -650,7 +653,6 @@ fn swift_matrix() {
         TypeCapability::Attributes,
     ];
     let contract_caps = &[
-        TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::ParametricPolymorphism,
@@ -689,7 +691,6 @@ fn typescript_matrix() {
     ];
     let contract_caps = &[
         TypeCapability::RecordFields,
-        TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::StructuralEmbedding,
         TypeCapability::NominalSubtyping,

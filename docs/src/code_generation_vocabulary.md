@@ -10,8 +10,8 @@ Lowering](declaration_lowering.md) records their ownership boundaries.
 ### Declaration spec
 
 A structured, language-independent request for a declaration such as a type,
-function, field, or variant. It records semantic intent, not target-language
-token placement or spelling.
+function, field, property, or variant. It records semantic intent, not
+target-language token placement or spelling.
 
 ### Capability
 
@@ -53,6 +53,35 @@ does not prescribe placement, punctuation, or separators. The
 `Direct(DeclarationContext)` payload retains only the pre-0.6.8 direct-emission
 placement input. It is a narrow compatibility exception, not a reusable
 placement or target-grammar model.
+
+### Property intent
+
+One computed property with a value type, read and/or write behavior, semantic
+modifiers, documentation, and attributes before target-language validation.
+It does not choose accessor syntax or a field-style representation.
+
+### Property context
+
+The semantic role in which one computed property appears: direct emission or a
+member of an owning `TypeKind`. The `Direct(DeclarationContext)` payload exists
+only to retain the pre-0.6.8 public emission facade; it is not a general
+accessor-placement model.
+
+### Type members intent
+
+A validation-only view of one owning type's semantic fields, computed
+properties, and explicit methods. `TypeMembersIntent` exists for relationships
+that cannot be checked within one member family, such as target-derived name
+collisions. It contains no target grammar, has no validated wrapper, and does
+not participate in lowering. It is not a sequence-level replacement for
+`PropertyIntent`.
+
+### Read accessor and write accessor
+
+Semantic read and write behavior supplied by a property's getter and setter
+bodies. A language adapter may express that behavior as accessor declarations,
+a computed-property body, or target-local methods. The capability names do not
+prescribe getter keywords, setter placement, or surrounding grammar.
 
 ### Optional presence
 
