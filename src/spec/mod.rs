@@ -20,6 +20,8 @@ pub mod parameter_spec;
 pub mod project_spec;
 /// Computed property specifications (getters/setters).
 pub mod property_spec;
+/// Owner-level semantic evidence for cross-member validation.
+pub mod type_members_intent;
 /// Type declaration specifications (struct, class, interface, trait, enum).
 pub mod type_spec;
 /// Where-clause types and rendering for generic declarations.

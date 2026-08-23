@@ -10,7 +10,8 @@ use crate::spec::field_spec::{FieldSequenceIntent, FieldSpec};
 use crate::spec::fun_spec::FunSpec;
 use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
-use crate::spec::property_spec::PropertySpec;
+use crate::spec::property_spec::{PropertyIntent, PropertySpec};
+use crate::spec::type_members_intent::TypeMembersIntent;
 use crate::spec::where_spec::{
     TypeParamSpec, WhereClauseStyle, WhereConstraint, emit_separate_where_block, emit_where_block,
     render_type_params,
@@ -158,6 +159,18 @@ impl TypeSpec {
             }
         }
 
+        for property in &self.properties {
+            let intent = self.property_intent(property);
+            if lang
+                .capabilities()
+                .supports_type_capability(self.kind, TypeCapability::AccessorMethods)
+            {
+                PropertySpec::collect_validation_errors(intent, lang, errors);
+            } else {
+                property.collect_intrinsic_validation_errors(intent.context(), errors);
+            }
+        }
+
         let declaration_context = lang.type_member_declaration_context(self.kind);
         for method in &self.methods {
             let method = self.method_for_context(method, lang, declaration_context);
@@ -204,6 +217,10 @@ impl TypeSpec {
                 errors.push(error);
             }
         }
+
+        let members = self.type_members_intent();
+        members.collect_intrinsic_validation_errors(errors);
+        lang.collect_type_members_validation_errors(members, errors);
     }
 
     /// Preserve the pre-capability behavior for constructor-shaped members.
@@ -288,6 +305,28 @@ impl TypeSpec {
 
     fn emit_fields(&self, lang: &dyn CodeLang) -> Result<CodeBlock, SigilStitchError> {
         FieldSpec::lower_sequence(self.field_intent(), lang)
+    }
+
+    fn property_intent<'a>(&'a self, property: &'a PropertySpec) -> PropertyIntent<'a> {
+        PropertyIntent::type_member(property, &self.name, self.kind)
+    }
+
+    fn type_members_intent(&self) -> TypeMembersIntent<'_> {
+        TypeMembersIntent::new(
+            &self.name,
+            self.kind,
+            &self.fields,
+            &self.properties,
+            &self.methods,
+        )
+    }
+
+    fn emit_property(
+        &self,
+        property: &PropertySpec,
+        lang: &dyn CodeLang,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        PropertySpec::lower_intent(self.property_intent(property), lang)
     }
 
     fn validate_type(&self, lang: &dyn CodeLang) -> Result<(), crate::error::SigilStitchError> {
@@ -490,7 +529,7 @@ impl TypeSpec {
                 if i > 0 {
                     cb.add_line();
                 }
-                for block in prop.emit(lang, member_ctx)? {
+                for block in self.emit_property(prop, lang)? {
                     cb.add_code(block);
                 }
             }
@@ -650,7 +689,7 @@ impl TypeSpec {
                 if i > 0 {
                     impl_cb.add_line();
                 }
-                for block in prop.emit(lang, DeclarationContext::Member)? {
+                for block in self.emit_property(prop, lang)? {
                     impl_cb.add_code(block);
                 }
             }

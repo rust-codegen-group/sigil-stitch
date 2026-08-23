@@ -4,9 +4,46 @@ use snafu::prelude::*;
 
 use crate::lang::capability::{
     FieldCapability, FieldContext, FunctionCapability, FunctionContext, FunctionForm,
-    TypeCapability, VariantCapability,
+    PropertyCapability, PropertyContext, TypeCapability, VariantCapability,
 };
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+
+/// Semantic source of a target-emitted type member name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TypeMemberNameOrigin {
+    /// Read behavior lowered from a computed property.
+    PropertyReadAccessor {
+        /// The semantic property name.
+        property_name: String,
+    },
+    /// Write behavior lowered from a computed property.
+    PropertyWriteAccessor {
+        /// The semantic property name.
+        property_name: String,
+    },
+    /// A method declared explicitly on the owning type.
+    ExplicitMethod {
+        /// The semantic method name.
+        method_name: String,
+    },
+}
+
+impl std::fmt::Display for TypeMemberNameOrigin {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::PropertyReadAccessor { property_name } => {
+                write!(formatter, "read accessor of property {property_name:?}")
+            }
+            Self::PropertyWriteAccessor { property_name } => {
+                write!(formatter, "write accessor of property {property_name:?}")
+            }
+            Self::ExplicitMethod { method_name } => {
+                write!(formatter, "explicit method {method_name:?}")
+            }
+        }
+    }
+}
 
 /// Errors returned by sigil-stitch operations.
 #[derive(Debug, Snafu)]
@@ -758,5 +795,137 @@ pub enum SigilStitchError {
         context: FieldContext,
         /// Target-local reason for rejection.
         reason: String,
+    },
+
+    /// A strict language cannot lower a property in this semantic context.
+    #[snafu(display(
+        "language {language:?} does not support property {property_name:?} in {context:?} context for owner {owner_name:?}"
+    ))]
+    UnsupportedPropertyContext {
+        /// The language file extension.
+        language: String,
+        /// The rejected semantic property context.
+        context: PropertyContext,
+        /// The rejected property.
+        property_name: String,
+        /// The owning type, when available.
+        owner_name: Option<String>,
+    },
+
+    /// A property requested capabilities the selected context cannot represent.
+    #[snafu(display(
+        "language {language:?} does not support {capabilities:?} for property {property_name:?} in {context:?} context"
+    ))]
+    UnsupportedPropertyCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The rejected property.
+        property_name: String,
+        /// The semantic property context.
+        context: PropertyContext,
+        /// Unsupported semantic capabilities.
+        capabilities: Vec<PropertyCapability>,
+    },
+
+    /// A property omitted capabilities required by the selected context.
+    #[snafu(display(
+        "language {language:?} requires {capabilities:?} for property {property_name:?} in {context:?} context"
+    ))]
+    MissingRequiredPropertyCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The rejected property.
+        property_name: String,
+        /// The semantic property context.
+        context: PropertyContext,
+        /// Required semantic capabilities omitted by the property.
+        capabilities: Vec<PropertyCapability>,
+    },
+
+    /// A computed property has neither read nor write behavior.
+    #[snafu(display(
+        "property {property_name:?} in {context:?} context must define a getter or setter"
+    ))]
+    MissingPropertyAccessors {
+        /// The rejected property.
+        property_name: String,
+        /// The semantic property context.
+        context: PropertyContext,
+    },
+
+    /// A property operand was present but contained no semantic value.
+    #[snafu(display("property {property_name:?} in {context:?} context has an empty {operand}"))]
+    EmptyPropertyOperand {
+        /// The rejected property.
+        property_name: String,
+        /// The semantic property context.
+        context: PropertyContext,
+        /// The empty operand.
+        operand: &'static str,
+    },
+
+    /// A setter does not bind the assigned value to a name.
+    #[snafu(display(
+        "property {property_name:?} in {context:?} context has an empty setter parameter name"
+    ))]
+    EmptyPropertySetterParameter {
+        /// The rejected property.
+        property_name: String,
+        /// The semantic property context.
+        context: PropertyContext,
+    },
+
+    /// Deserialized non-property modifiers were attached to a property.
+    #[snafu(display(
+        "property {property_name:?} in {context:?} context cannot use modifiers {modifiers:?}"
+    ))]
+    InvalidPropertyModifiers {
+        /// The rejected property.
+        property_name: String,
+        /// The semantic property context.
+        context: PropertyContext,
+        /// Invalid modifier names.
+        modifiers: Vec<&'static str>,
+    },
+
+    /// A target-local property rule rejected otherwise representable intent.
+    #[snafu(display(
+        "language {language:?} cannot represent property {property_name:?} in {context:?} context: {reason}"
+    ))]
+    InvalidProperty {
+        /// The language file extension.
+        language: String,
+        /// The rejected property.
+        property_name: String,
+        /// The semantic property context.
+        context: PropertyContext,
+        /// Target-local reason for rejection.
+        reason: String,
+    },
+
+    /// One type repeats an exact semantic property name.
+    #[snafu(display("duplicate property name {property_name:?} in type {type_name:?}"))]
+    DuplicatePropertyName {
+        /// The containing type.
+        type_name: String,
+        /// The duplicated property name.
+        property_name: String,
+    },
+
+    /// Target lowering maps two semantic members to one target member name.
+    #[snafu(display(
+        "language {language:?} maps {first_member} and {second_member} to the same member name {member_name:?} in type {type_name:?}"
+    ))]
+    TypeMemberNameCollision {
+        /// The language file extension.
+        language: String,
+        /// The containing type.
+        type_name: String,
+        /// The conflicting target-emitted name.
+        member_name: String,
+        /// Structured origin of the first semantic member.
+        first_member: Box<TypeMemberNameOrigin>,
+        /// Structured origin of the second semantic member.
+        second_member: Box<TypeMemberNameOrigin>,
     },
 }

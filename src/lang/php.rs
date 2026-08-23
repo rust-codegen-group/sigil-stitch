@@ -338,6 +338,7 @@ impl CodeLang for Php {
             .with_functions(PHP_FUNCTIONS)
             .with_variants(PHP_VARIANTS)
             .with_fields(crate::lang::field_lowering::php::PROFILES)
+            .with_properties(crate::lang::property_lowering::php::PROFILES)
     }
 
     fn escape_field_name(&self, name: &str) -> String {
@@ -364,6 +365,43 @@ impl CodeLang for Php {
         fields: crate::lang::ValidatedFields<'_>,
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
         crate::lang::field_lowering::php::lower(self, fields)
+    }
+
+    fn validate_property(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::property_lowering::php::validate(self, property)
+    }
+
+    fn collect_property_validation_errors(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+        errors: &mut Vec<crate::error::SigilStitchError>,
+    ) {
+        crate::lang::property_lowering::php::collect_validation_errors(self, property, errors);
+    }
+
+    fn lower_property(
+        &self,
+        property: crate::lang::ValidatedProperty<'_>,
+    ) -> Result<Vec<CodeBlock>, crate::error::SigilStitchError> {
+        crate::lang::property_lowering::php::lower(self, property)
+    }
+
+    fn validate_type_members(
+        &self,
+        members: crate::lang::TypeMembersIntent<'_>,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::type_members_validation::php::validate(self, members)
+    }
+
+    fn collect_type_members_validation_errors(
+        &self,
+        members: crate::lang::TypeMembersIntent<'_>,
+        errors: &mut Vec<crate::error::SigilStitchError>,
+    ) {
+        crate::lang::type_members_validation::php::collect_validation_errors(self, members, errors);
     }
 
     fn validate_variants(

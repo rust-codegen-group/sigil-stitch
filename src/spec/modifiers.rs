@@ -54,6 +54,7 @@ pub enum TypeKind {
 }
 
 /// How a `PropertySpec` renders: accessor methods or inline field body.
+#[deprecated(note = "legacy 0.6.8 property grammar; implement CodeLang::lower_property instead")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PropertyStyle {
     /// Emit getter/setter as separate accessor methods: `get name(): T { ... }` (TS/JS).

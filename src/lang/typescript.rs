@@ -262,8 +262,6 @@ const TS_CLASS_CAPABILITIES: &[TypeCapability] = &[
 const TS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = properties/fields
     TypeCapability::RecordFields,
-    // AccessorMethods = get/set accessors
-    TypeCapability::AccessorMethods,
     // Methods = methods
     TypeCapability::Methods,
     TypeCapability::StructuralEmbedding,
@@ -407,6 +405,7 @@ impl CodeLang for TypeScript {
             .with_functions(TS_FUNCTIONS)
             .with_variants(TS_VARIANTS)
             .with_fields(crate::lang::field_lowering::typescript::PROFILES)
+            .with_properties(crate::lang::property_lowering::typescript::PROFILES)
     }
 
     fn validate_fields(
@@ -429,6 +428,30 @@ impl CodeLang for TypeScript {
         fields: crate::lang::ValidatedFields<'_>,
     ) -> Result<CodeBlock, SigilStitchError> {
         crate::lang::field_lowering::typescript::lower(self, fields)
+    }
+
+    fn validate_property(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::property_lowering::typescript::validate(self, property)
+    }
+
+    fn collect_property_validation_errors(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::property_lowering::typescript::collect_validation_errors(
+            self, property, errors,
+        );
+    }
+
+    fn lower_property(
+        &self,
+        property: crate::lang::ValidatedProperty<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::property_lowering::typescript::lower(self, property)
     }
 
     fn lower_variants(

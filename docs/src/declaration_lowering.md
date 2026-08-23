@@ -176,6 +176,50 @@ fn lower_fields(&self, fields: ValidatedFields<'_>)
 # }
 ```
 
+Computed properties cross as one complete semantic declaration:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::code_block::CodeBlock;
+# use sigil_stitch::error::SigilStitchError;
+# use sigil_stitch::lang::{PropertyIntent, ValidatedProperty};
+# trait Example {
+fn validate_property(
+    &self,
+    property: PropertyIntent<'_>,
+) -> Result<(), SigilStitchError>;
+fn collect_property_validation_errors(
+    &self,
+    property: PropertyIntent<'_>,
+    errors: &mut Vec<SigilStitchError>,
+);
+fn lower_property(
+    &self,
+    property: ValidatedProperty<'_>,
+) -> Result<Vec<CodeBlock>, SigilStitchError>;
+# }
+```
+
+Relationships among different member families use a validation-only owner
+view rather than another lowering abstraction:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::error::SigilStitchError;
+# use sigil_stitch::lang::TypeMembersIntent;
+# trait Example {
+fn validate_type_members(
+    &self,
+    members: TypeMembersIntent<'_>,
+) -> Result<(), SigilStitchError>;
+fn collect_type_members_validation_errors(
+    &self,
+    members: TypeMembersIntent<'_>,
+    errors: &mut Vec<SigilStitchError>,
+);
+# }
+```
+
 `FunctionIntent` provides read-only access after context and form
 classification and crate-owned semantic validation against the selected
 adapter. `ValidatedFunction` can only be constructed by the crate after the
@@ -212,6 +256,24 @@ requests `FieldCapability::OptionalPresence`. A `TypeName::Optional(T)` field
 is still present but may hold the target language's option or null
 representation. An adapter must not substitute one meaning for the other.
 
+`PropertyIntent` provides one property and its semantic `PropertyContext`:
+direct emission with the legacy declaration context, or a member of an owning
+`TypeKind`. Property profiles distinguish explicit type information, read and
+write behavior, attributes, and static behavior. A getter or setter body is
+semantic implementation input; whether the target expresses it as accessor
+declarations, a field-style computed property, or ordinary target-local methods
+belongs entirely to `lower_property()`. `ValidatedProperty` is constructed only
+after intrinsic, profile, and adapter-local validation succeeds.
+
+`TypeMembersIntent` provides the owning type's name and kind together with its
+semantic fields, computed properties, and explicit methods. It is constructed
+once after the per-family validation passes. The crate rejects exact duplicate
+property names; the adapter owns collisions created by target lowering, such
+as PHP's case-insensitive generated accessor names colliding with another
+property accessor or an explicit method. The intent contains no target grammar,
+has no validated wrapper, and has no lowering method: every accepted property
+still follows `ValidatedProperty -> lower_property()` independently.
+
 Each adapter owns the complete ordering and spelling of a declaration. Private
 leaf helpers may render structured fragments such as a parameter list or body,
 but do not choose their relative order. Related adapters may additionally share
@@ -242,6 +304,14 @@ default `lower_fields()` implementation. `optional_field_style()` and
 `OptionalFieldStyle` remain available only for that deprecated compatibility
 path; their historical type-prefix, type-suffix, and wrapper branches conflate
 absence with nullable values and are not a semantic model for new code.
+
+Property lowering follows the same boundary. Strict built-ins declare exact
+property profiles and implement complete language-local lowering. Permissive
+external adapters retain the frozen pre-0.6.8 property emitter as the default
+`lower_property()` implementation. `PropertyStyle`, `property_style()`, and
+`property_getter_keyword()` remain available and deprecated only for that
+compatibility path. Built-ins do not consult them, and new adapters must not
+extend them with additional grammar choices.
 
 Compatibility is not permission to extend that design:
 

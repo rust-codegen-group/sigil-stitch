@@ -51,6 +51,8 @@ mod csharp_function_lowering;
 pub(crate) mod field_lowering;
 mod function_lowering;
 mod kotlin_function_lowering;
+pub(crate) mod property_lowering;
+pub(crate) mod type_members_validation;
 mod typescript_function_lowering;
 pub(crate) mod variant_lowering;
 
@@ -66,6 +68,8 @@ pub use crate::spec::field_spec::{FieldSequenceIntent, ValidatedFields};
 pub use crate::spec::fun_spec::{FunctionIntent, ValidatedFunction};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
+pub use crate::spec::property_spec::{PropertyIntent, ValidatedProperty};
+pub use crate::spec::type_members_intent::TypeMembersIntent;
 use crate::spec::where_spec::{TypeParamSpec, WhereConstraint, render_type_params};
 use crate::type_name::TypeName;
 
@@ -554,6 +558,68 @@ pub trait CodeLang: RendererLang {
         field_lowering::lower_compatibility(self, fields)
     }
 
+    /// Apply additional target-specific validation to one computed property.
+    ///
+    /// Intrinsic and capability validation run against this same adapter first.
+    /// An override can add identifier, visibility, accessor-combination, and
+    /// other target-local checks before sigil-stitch constructs the
+    /// `ValidatedProperty` wrapper.
+    fn validate_property(&self, _property: PropertyIntent<'_>) -> Result<(), SigilStitchError> {
+        Ok(())
+    }
+
+    /// Collect target-specific failures for one computed property.
+    ///
+    /// The default preserves adapters that implement
+    /// [`CodeLang::validate_property`] by appending its single result.
+    fn collect_property_validation_errors(
+        &self,
+        property: PropertyIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        if let Err(error) = self.validate_property(property) {
+            errors.push(error);
+        }
+    }
+
+    /// Lower one fully validated property into structured output.
+    ///
+    /// The default is the frozen pre-0.6.8 compatibility implementation for
+    /// external adapters. Built-ins override this complete seam and keep
+    /// target grammar local.
+    fn lower_property(
+        &self,
+        property: ValidatedProperty<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        property_lowering::lower_compatibility(self, property)
+    }
+
+    /// Apply target-specific validation to relationships among one type's members.
+    ///
+    /// Per-family validation has already run. This validation-only seam is for
+    /// owner-wide rules such as target-derived collisions among fields,
+    /// properties, and explicit methods. It does not participate in lowering.
+    fn validate_type_members(
+        &self,
+        _members: TypeMembersIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        Ok(())
+    }
+
+    /// Collect target-specific owner-wide member failures.
+    ///
+    /// The default preserves adapters that implement
+    /// [`CodeLang::validate_type_members`] by appending its single result.
+    fn collect_type_members_validation_errors(
+        &self,
+        members: TypeMembersIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        if let Err(error) = self.validate_type_members(members) {
+            errors.push(error);
+        }
+    }
+
     /// Apply additional target-specific validation to one owner-aware variant sequence.
     ///
     /// Intrinsic and capability validation run against this same adapter before
@@ -750,6 +816,9 @@ pub trait CodeLang: RendererLang {
     /// How `PropertySpec` renders: accessor methods or inline field body.
     ///
     /// Default: `Accessor`.
+    #[deprecated(
+        note = "legacy 0.6.8 property grammar; implement CodeLang::lower_property instead"
+    )]
     fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
         crate::spec::modifiers::PropertyStyle::Accessor
     }
@@ -757,6 +826,9 @@ pub trait CodeLang: RendererLang {
     /// The keyword for a property getter in field-style rendering.
     ///
     /// Default: `"get"`.
+    #[deprecated(
+        note = "legacy 0.6.8 property grammar; implement CodeLang::lower_property instead"
+    )]
     fn property_getter_keyword(&self) -> &str {
         "get"
     }

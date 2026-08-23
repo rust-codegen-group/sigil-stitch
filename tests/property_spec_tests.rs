@@ -147,8 +147,9 @@ fn test_swift_getter_only() {
         &swift,
         DeclarationContext::Member,
     );
-    // Getter-only → readonly → "let" keyword.
-    assert!(output.contains("let count: Int {"));
+    // Swift computed properties are always declared with `var`, even when
+    // they expose only a getter.
+    assert!(output.contains("var count: Int {"));
     assert!(output.contains("get {"));
     assert!(output.contains("return _count"));
 }
@@ -185,7 +186,7 @@ fn test_swift_property_with_visibility() {
         &swift,
         DeclarationContext::Member,
     );
-    assert!(output.contains("public let count: Int {"));
+    assert!(output.contains("public var count: Int {"));
 }
 
 #[test]
@@ -224,7 +225,7 @@ fn test_kotlin_getter_only() {
         DeclarationContext::Member,
     );
     // Getter-only → readonly → "val" keyword.
-    assert!(output.contains("val count: Int {"));
+    assert!(output.contains("val count: Int\n"));
     assert!(output.contains("get() {"));
     assert!(output.contains("return _count"));
 }
@@ -242,7 +243,7 @@ fn test_kotlin_getter_setter() {
         DeclarationContext::Member,
     );
     // Getter+setter → mutable → "var" keyword.
-    assert!(output.contains("var name: String {"));
+    assert!(output.contains("var name: String\n"));
     assert!(output.contains("get() {"));
     assert!(output.contains("set(value) {"));
 }
@@ -263,7 +264,7 @@ fn test_kotlin_property_in_class() {
         &kt,
     );
     assert!(output.contains("class Person {"));
-    assert!(output.contains("val name: String {"));
+    assert!(output.contains("val name: String\n"));
     assert!(output.contains("get() {"));
 }
 

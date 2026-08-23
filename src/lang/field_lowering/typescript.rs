@@ -209,7 +209,7 @@ fn is_numeric_literal(name: &str) -> bool {
     normalized.parse::<f64>().is_ok()
 }
 
-fn property_key(name: &str) -> Option<String> {
+pub(crate) fn property_key(name: &str) -> Option<String> {
     if let Some(private) = name.strip_prefix('#') {
         return is_identifier_name(private).then(|| private.to_string());
     }
@@ -222,7 +222,7 @@ fn property_key(name: &str) -> Option<String> {
     }
 }
 
-fn is_valid_property_name(name: &str) -> bool {
+pub(crate) fn is_valid_property_name(name: &str) -> bool {
     property_key(name).is_some()
 }
 

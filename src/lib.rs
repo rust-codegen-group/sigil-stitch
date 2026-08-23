@@ -115,8 +115,8 @@ pub mod prelude {
     pub use crate::lang::capability::{
         FieldCapability, FieldCapabilityProfile, FieldContext, FunctionBodyPolicy,
         FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
-        LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-        VariantCapabilityProfile,
+        LanguageCapabilities, PropertyCapability, PropertyCapabilityProfile, PropertyContext,
+        TypeCapability, TypeCapabilityProfile, VariantCapability, VariantCapabilityProfile,
     };
     pub use crate::lang::{CodeLang, RendererLang};
     pub use crate::spec::annotation_spec::AnnotationSpec;

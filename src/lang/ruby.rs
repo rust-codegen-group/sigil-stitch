@@ -344,14 +344,6 @@ impl CodeLang for Ruby {
         "" // Class/module bodies start on next line
     }
 
-    fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
-        crate::spec::modifiers::PropertyStyle::Field
-    }
-
-    fn property_getter_keyword(&self) -> &str {
-        "attr_reader"
-    }
-
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             type_before_name: false,

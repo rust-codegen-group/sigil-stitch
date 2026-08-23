@@ -294,10 +294,25 @@ let type_spec = TypeSpec::builder("Direction", TypeKind::Enum)
 
 ## PropertySpec
 
-Computed properties with getter and/or setter. Rendering depends on `lang.property_style()`:
+`PropertySpec` describes a computed value with read and/or write behavior. It
+records the value type, accessor bodies, visibility, static intent,
+documentation, and annotations without choosing a target syntax. At emission,
+the selected adapter validates `PropertyIntent` against its context-specific
+profile and completely lowers the accepted declaration:
 
-- **Accessor** (TypeScript, JavaScript): emits separate `get name(): T { ... }` and `set name(v: T) { ... }` methods
-- **Field** (Swift, Kotlin): emits a field with inline `get`/`set` blocks
+- TypeScript and JavaScript emit native accessor declarations.
+- Swift emits a `var` computed property, including getter-only properties.
+- Kotlin emits a `val` or `var` followed directly by its indented accessors;
+  there is no outer property brace.
+- PHP emits `getName()` and `setName()` methods.
+- Scala emits `def name` and `def name_=` methods.
+
+Other built-ins reject the unsupported property context instead of falling
+back to plausible target text. Swift and Kotlin require an explicit value type
+and read accessor. Kotlin and Scala reject static property intent.
+TypeScript interfaces and Swift protocols also reject `PropertySpec`: those
+targets support bodyless property requirements, while this spec carries
+concrete accessor bodies and never discards them.
 
 ```rust
 # extern crate sigil_stitch;
@@ -313,7 +328,7 @@ let prop = PropertySpec::builder("name", TypeName::primitive("string"))
     .setter("value", setter_body)
     .build()
     .unwrap();
-// TypeScript (Accessor style):
+// TypeScript:
 // get name(): string {
 //     return this._name
 // }
@@ -323,7 +338,21 @@ let prop = PropertySpec::builder("name", TypeName::primitive("string"))
 # }
 ```
 
-For Swift and Kotlin, the same PropertySpec renders as a field with inline body blocks instead.
+`PropertySpec::emit()` retains its pre-0.6.8 direct facade and accepts a
+`DeclarationContext`. Adding the property to `TypeSpec` supplies the owning
+`TypeKind`, which lets the adapter reject invalid contract or declaration
+contexts before lowering. External adapters written against 0.6.8 retain the
+deprecated `PropertyStyle` compatibility behavior; new adapters implement
+`validate_property()` and `lower_property()` instead.
+
+When a target lowers properties into a namespace shared with other members,
+`TypeSpec` also supplies one validation-only `TypeMembersIntent` after all
+per-family checks. Exact duplicate property names are rejected by the crate;
+the adapter rejects names that collide only after its own lowering. PHP uses
+this pass because method names are case-insensitive and generated `getName()`
+or `setName()` accessors can collide with accessors from another property or
+with an explicit method. This owner-wide view does not change the per-property
+`PropertyIntent -> ValidatedProperty -> lower_property()` path.
 
 ## AnnotationSpec
 

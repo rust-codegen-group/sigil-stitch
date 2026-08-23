@@ -329,6 +329,7 @@ impl CodeLang for Scala {
             .with_functions(SCALA_FUNCTIONS)
             .with_variants(SCALA_VARIANTS)
             .with_fields(crate::lang::field_lowering::scala::PROFILES)
+            .with_properties(crate::lang::property_lowering::scala::PROFILES)
     }
 
     fn validate_fields(
@@ -351,6 +352,28 @@ impl CodeLang for Scala {
         fields: crate::lang::ValidatedFields<'_>,
     ) -> Result<CodeBlock, SigilStitchError> {
         crate::lang::field_lowering::scala::lower(self, fields)
+    }
+
+    fn validate_property(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::property_lowering::scala::validate(self, property)
+    }
+
+    fn collect_property_validation_errors(
+        &self,
+        property: crate::lang::PropertyIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::property_lowering::scala::collect_validation_errors(self, property, errors);
+    }
+
+    fn lower_property(
+        &self,
+        property: crate::lang::ValidatedProperty<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::property_lowering::scala::lower(self, property)
     }
 
     fn validate_variants(
