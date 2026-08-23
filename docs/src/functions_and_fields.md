@@ -184,6 +184,8 @@ The deprecated `OptionalFieldStyle` and `CodeLang::optional_field_style()` API
 exists only so adapters written against 0.6.8 keep their frozen output through
 the default compatibility lowerer. New adapters must use field capabilities,
 `TypeName::Optional`, and complete `lower_fields()` implementations instead.
+See [0.6.8 Legacy Compatibility and Migration](legacy_compatibility_and_migration.md)
+for the compatibility boundary and adapter migration sequence.
 
 ## FunSpec
 

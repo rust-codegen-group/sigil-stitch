@@ -1,0 +1,52 @@
+//! Zsh-owned function declaration grammar.
+
+#![deny(deprecated)]
+
+use crate::code_block::{CodeBlock, CodeBlockBuilder};
+use crate::error::SigilStitchError;
+use crate::lang::CodeLang;
+use crate::lang::function_lowering::SignatureBuilder;
+use crate::lang::zsh::Zsh;
+use crate::spec::fun_spec::ValidatedFunction;
+
+pub(crate) fn lower(
+    lang: &Zsh,
+    function: ValidatedFunction<'_>,
+) -> Result<CodeBlock, SigilStitchError> {
+    let mut block = CodeBlock::builder();
+    emit_preamble(&mut block, lang, function);
+
+    let mut signature = SignatureBuilder::new();
+    signature.push_literal("function ");
+    signature.push_literal(function.name());
+    signature.push_literal("() {");
+    append_suffixes(&mut signature, function);
+    signature.append_to(&mut block);
+    block.add_line();
+    block.add("%>", ());
+    let body = function
+        .body()
+        .expect("Zsh function validation requires a body");
+    block.add_code(body.clone());
+    if !body.ends_with_newline_or_block_close() {
+        block.add_line();
+    }
+    block.add("%<}", ());
+    block.add_line();
+    block.build()
+}
+
+fn append_suffixes(signature: &mut SignatureBuilder, function: ValidatedFunction<'_>) {
+    for suffix in function.suffixes() {
+        signature.push_literal(" ");
+        signature.push_literal(suffix);
+    }
+}
+
+fn emit_preamble(block: &mut CodeBlockBuilder, lang: &Zsh, function: ValidatedFunction<'_>) {
+    if !function.doc().is_empty() {
+        let lines: Vec<&str> = function.doc().iter().map(String::as_str).collect();
+        block.add("%L", lang.render_doc_comment(&lines));
+        block.add_line();
+    }
+}

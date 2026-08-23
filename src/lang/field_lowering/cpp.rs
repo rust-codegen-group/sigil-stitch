@@ -9,6 +9,7 @@ use crate::lang::cpp::Cpp;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::field_spec::{FieldSequenceIntent, ValidatedFields};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::type_name::TypeName;
 
 use super::{
     collect_escaped_name_collisions, collect_invalid_identifiers, emit_annotations, emit_doc,
@@ -57,6 +58,45 @@ fn is_valid_identifier(name: &str) -> bool {
         && chars.all(unicode_ident::is_xid_continue)
 }
 
+fn supports_pre_cpp17_in_class_initializer(field_type: &TypeName) -> bool {
+    let TypeName::Primitive(name) = field_type else {
+        return false;
+    };
+    matches!(
+        name.split_whitespace().collect::<Vec<_>>().as_slice(),
+        ["bool"]
+            | ["char"]
+            | ["signed", "char"]
+            | ["unsigned", "char"]
+            | ["wchar_t"]
+            | ["char16_t"]
+            | ["char32_t"]
+            | ["short"]
+            | ["short", "int"]
+            | ["signed", "short"]
+            | ["signed", "short", "int"]
+            | ["unsigned", "short"]
+            | ["unsigned", "short", "int"]
+            | ["int"]
+            | ["signed"]
+            | ["signed", "int"]
+            | ["unsigned"]
+            | ["unsigned", "int"]
+            | ["long"]
+            | ["long", "int"]
+            | ["signed", "long"]
+            | ["signed", "long", "int"]
+            | ["unsigned", "long"]
+            | ["unsigned", "long", "int"]
+            | ["long", "long"]
+            | ["long", "long", "int"]
+            | ["signed", "long", "long"]
+            | ["signed", "long", "long", "int"]
+            | ["unsigned", "long", "long"]
+            | ["unsigned", "long", "long", "int"]
+    )
+}
+
 pub(crate) fn validate(
     lang: &Cpp,
     fields: FieldSequenceIntent<'_>,
@@ -103,6 +143,30 @@ pub(crate) fn collect_validation_errors(
                 reason: "the legacy tag escape hatch is only valid for Go struct fields"
                     .to_string(),
             });
+        }
+        if fields.context() != FieldContext::Direct(DeclarationContext::TopLevel)
+            && field.modifiers().is_static
+            && field.initializer().is_some()
+        {
+            let reason = if !field.modifiers().is_readonly {
+                Some(
+                    "a mutable C++ static member initializer needs an inline C++17 declaration or an out-of-class definition, neither of which FieldSpec models",
+                )
+            } else if !supports_pre_cpp17_in_class_initializer(field.field_type()) {
+                Some(
+                    "an in-class C++ static const initializer requires a proven integral type; use TypeSpecBuilder::extra_member(CodeBlock) for an enumeration constant or provide an out-of-class definition",
+                )
+            } else {
+                None
+            };
+            if let Some(reason) = reason {
+                errors.push(SigilStitchError::InvalidField {
+                    language: lang.file_extension().to_string(),
+                    field_name: field.name().to_string(),
+                    context: fields.context(),
+                    reason: reason.to_string(),
+                });
+            }
         }
     }
 }
@@ -162,12 +226,6 @@ pub(crate) fn lower(
         }
         emit_doc(&mut block, lang, field);
         emit_annotations(&mut block, field, "[[", "]]")?;
-        if fields.context() != FieldContext::Direct(DeclarationContext::TopLevel)
-            && field.modifiers().is_static
-            && field.initializer().is_some()
-        {
-            block.add("inline ", ());
-        }
         if field.modifiers().is_static {
             block.add("static ", ());
         }

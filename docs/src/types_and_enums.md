@@ -343,7 +343,9 @@ let prop = PropertySpec::builder("name", TypeName::primitive("string"))
 `TypeKind`, which lets the adapter reject invalid contract or declaration
 contexts before lowering. External adapters written against 0.6.8 retain the
 deprecated `PropertyStyle` compatibility behavior; new adapters implement
-`validate_property()` and `lower_property()` instead.
+`validate_property()` and `lower_property()` instead. The complete deprecated
+surface and migration paths are listed in [0.6.8 Legacy Compatibility and
+Migration](legacy_compatibility_and_migration.md).
 
 When a target lowers properties into a namespace shared with other members,
 `TypeSpec` also supplies one validation-only `TypeMembersIntent` after all
@@ -351,8 +353,14 @@ per-family checks. Exact duplicate property names are rejected by the crate;
 the adapter rejects names that collide only after its own lowering. PHP uses
 this pass because method names are case-insensitive and generated `getName()`
 or `setName()` accessors can collide with accessors from another property or
-with an explicit method. This owner-wide view does not change the per-property
-`PropertyIntent -> ValidatedProperty -> lower_property()` path.
+with an explicit method. TypeScript, Kotlin, Swift, and Scala use the same seam
+for their own field/property namespaces; only declarations in the same
+target-local namespace collide, so TypeScript private names and TypeScript and
+Swift static members stay distinct from their instance counterparts.
+TypeScript, Swift, and Scala also reject explicit methods that occupy the same
+emitted member name in that namespace. These are separate adapter rules, not
+one general namespace abstraction. This owner-wide view does not change the
+per-property `PropertyIntent -> ValidatedProperty -> lower_property()` path.
 
 ## AnnotationSpec
 
@@ -408,7 +416,9 @@ Variants are validated and lowered as one owner-aware sequence through
 `TypeSpec`. This lets the selected language derive first/last position, choose
 valid separators, and terminate the variant section when fields or methods
 follow. Direct positional emission with `VariantContext` is deprecated and is
-rejected by strict built-in adapters.
+rejected by strict built-in adapters. See [0.6.8 Legacy Compatibility and
+Migration](legacy_compatibility_and_migration.md) for direct-facade and builder
+replacements.
 
 Individual enum variants. Five forms are supported:
 

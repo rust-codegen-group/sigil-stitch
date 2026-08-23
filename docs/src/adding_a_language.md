@@ -10,18 +10,20 @@ compatibility defaults.
 Do not treat those declaration syntax structs as an extensible universal
 grammar. New syntax dimensions belong in complete language-local lowering. See
 [Declaration Specs and Language Lowering](declaration_lowering.md) for the
-ownership model and migration policy.
+ownership model and [0.6.8 Legacy Compatibility and
+Migration](legacy_compatibility_and_migration.md) for the deprecated surface.
 
 This guide walks through the process using a hypothetical language, with references to real implementations you can study.
 
 ## Overview
 
-Adding a language takes four steps:
+Adding a language takes five steps:
 
 1. Create `src/lang/your_lang.rs` implementing `CodeLang`
 2. Add `pub mod your_lang;` to `src/lang/mod.rs`
 3. Write integration tests in `tests/`
 4. Run `just bless` to generate golden files
+5. Bridge the remaining transitional type-declaration path
 
 If your language has tokenizer conflicts in `sigil_quote!` that the universal heuristics
 can't handle (e.g., shell flags, Go channel operators), you may also need to add a
@@ -207,47 +209,19 @@ absorbed by complete language-local lowering rather than multiplied:
 | `type_keyword()` | `"class"`, `"struct"` | Type declaration keyword |
 | `methods_inside_type_body()` | `true` / `false` | Legacy structural switch used by the compatibility type emitter |
 
-#### Legacy `methods_inside_type_body()`
+`methods_inside_type_body()` is a legacy switch used by the transitional
+`TypeSpec` emitter. Existing adapters may keep an override until complete type
+lowering owns whether methods appear in the declaration body or a separate
+block. New declaration families must not reuse it as a general placement hook.
+See the [legacy surface matrix](legacy_compatibility_and_migration.md#legacy-surface-matrix).
 
-The current compatibility type emitter uses this method to decide whether a
-`TypeSpec` produces one `CodeBlock` or two:
+### Renderer Configuration
 
-- **Returns `true`** (TypeScript, Java, Python, Swift, Dart, Kotlin, C++): Methods go inside the type body. TypeSpec emits a single block: `class Foo { fields; methods; }`.
-- **Returns `false`** (Rust struct/enum): Methods go in a separate `impl` block. TypeSpec emits two blocks: `struct Foo { fields }` and `impl Foo { methods }`.
-
-The method takes a `TypeKind` parameter, so current adapters can vary by type.
-Rust returns `true` for `TypeKind::Trait` but `false` for `TypeKind::Struct` and
-`TypeKind::Enum`. In the target design this structure is part of the adapter's
-complete type lowering; the shared spec does not interpret a nesting switch.
-
-### Renderer Configuration and Legacy Declaration Configuration
-
-The current interface groups related values into six config structs. They do
-not all have the same architectural role:
-
-- `block_syntax()`, `generic_syntax()`, and `type_presentation()` participate in
-  lower-level rendering seams with their own invariants.
-- `function_syntax()`, `type_decl_syntax()`, and
-  `enum_and_annotation()` expose declaration grammar that generic specs still
-  interpret for pre-0.6.8 adapter compatibility. These accessors and their
-  configuration types are deprecated. `optional_field_style()` and
-  `OptionalFieldStyle` are likewise deprecated and interpreted only by the
-  frozen external-adapter field compatibility lowerer. `property_style()`,
-  `property_getter_keyword()`, and `PropertyStyle` are deprecated and confined
-  to frozen property compatibility lowering. New function, field, property,
-  and variant grammar belongs in `lower_function()`, `lower_fields()`,
-  `lower_property()`, and `lower_variants()`. Other type/member emitters may
-  temporarily use existing fields where no complete lowering seam exists yet,
-  but must not extend them.
-
-Do not add public flags, enums, or fields to accommodate a new language. A
-previously unseen declaration form is evidence that lowering must move behind
-the language adapter's complete-declaration seam. The detailed tables below
-document the frozen function compatibility contract and the transitional type
-and enum behavior that existing specs may still require.
-
-Each config struct uses `..Default::default()` so current adapters only specify
-values where they differ.
+`block_syntax()`, `generic_syntax()`, and `type_presentation()` are lower-level
+renderer and type-presentation seams. The deprecated declaration configuration
+structs have a different role and are documented centrally in [0.6.8 Legacy
+Compatibility and Migration](legacy_compatibility_and_migration.md#frozen-declaration-configuration).
+Do not add public flags, enums, or fields to them for a new language.
 
 #### `block_syntax()`
 
@@ -263,41 +237,6 @@ Returns `BlockSyntaxConfig` controlling block delimiters and formatting:
 | `type_close_terminator` | (default) | Terminator after closing brace for types. |
 | `bases_close` | (default) | Closing syntax for base-class lists. |
 
-#### Legacy `function_syntax()`
-
-Returns `FunctionSyntaxConfig` controlling function declarations:
-
-| Field | Default | Purpose |
-|-------|---------|---------|
-| `return_type_separator` | `": "` | Between params and return type. Rust overrides to `" -> "`. |
-| `async_keyword` | `"async "` | Async function prefix. |
-| `async_suffix` | `""` | Async suffix after params. Dart: `" async"`. |
-| `async_suffix_before_return` | `false` | When `true`, suffix goes before return type. Swift: `func f() async -> T`. |
-| `abstract_keyword` | `"abstract "` | Abstract method prefix. C++ overrides to `"virtual "`. |
-| `param_list_style` | (default) | How parameter lists are formatted. |
-| `function_signature_style` | (default) | Controls overall signature layout. |
-| `constructor_keyword` | `""` | Constructor keyword. Python: `"def"`. Rust: `"fn"`. |
-| `constructor_delegation_style` | (default `Body`) | Super/this call placement. Kotlin, Dart, and C++ use `Signature`. |
-| `where_clause_style` | `Inline` | `Inline`: bounds in `<T: Bound>`. `WhereBlock`: Rust `where\n    T: Bound,`. `SeparateWhere`: C# `where T : Bound` per constraint. |
-| `empty_body` | `""` | Empty method body. Python overrides to `"..."`. |
-| `type_params_before_return_type` | `false` | Legacy placement switch interpreted by the default function lowerer. Java sets it; Kotlin owns its different order in local lowering. |
-
-#### Legacy `type_decl_syntax()`
-
-Returns `TypeDeclSyntaxConfig` controlling type declarations:
-
-| Field | Default | Purpose |
-|-------|---------|---------|
-| `type_before_name` | `false` | C/C++/Java override to `true` for `int count`. |
-| `return_type_is_prefix` | `false` | C/C++/Java override to `true` for `int add(...)`. |
-| `type_annotation_separator` | `": "` | Between name and type annotation. |
-| `super_type_keyword` | (default) | Inheritance keyword, e.g. `" extends "`. |
-| `super_type_separator` | (default) | Separator between multiple super types. |
-| `super_type_subsequent_separator` | (default) | Separator for subsequent super types. |
-| `implements_keyword` | (default) | Interface keyword, e.g. `" implements "`. |
-| `type_alias_target_first` | `false` | C overrides to `true` for `typedef target name;`. |
-| `supports_primary_constructor` | `false` | Kotlin overrides to `true`. |
-
 #### `generic_syntax()`
 
 Returns `GenericSyntaxConfig` controlling generic/type-parameter syntax:
@@ -310,21 +249,6 @@ Returns `GenericSyntaxConfig` controlling generic/type-parameter syntax:
 | `constraint_keyword` | `": "` | Generic bounds keyword. Java/TS override to `" extends "`. |
 | `constraint_separator` | `" + "` | Between multiple bounds. Java/TS override to `" & "`. |
 | `context_bound_keyword` | (default) | Context bound syntax (e.g. Scala's `:`). |
-
-#### Legacy `enum_and_annotation()`
-
-Returns `EnumAndAnnotationConfig` controlling enums, annotations, and field modifiers:
-
-| Field | Default | Purpose |
-|-------|---------|---------|
-| `variant_prefix` | `""` | Enum variant prefix. Swift overrides to `"case "`. |
-| `variant_prefix_first` | (default) | Prefix for the first variant specifically. |
-| `variant_separator` | `","` | Between enum variants. Python/Swift override to `""`. |
-| `variant_trailing_separator` | `false` | Rust/TypeScript override to `true`. |
-| `annotation_prefix` | `"@"` | Annotation opening. Rust: `"#["`. C++: `"[["`. |
-| `annotation_suffix` | `""` | Annotation closing. Rust: `"]"`. C++: `"]]"`. |
-| `readonly_keyword` | `"const "` | TS: `"readonly "`. Kotlin: `"val "`. Java: `"final "`. |
-| `mutable_field_keyword` | `""` | Default mutable property-promotion keyword; Kotlin uses `"var "`. |
 
 #### `type_presentation()`
 
@@ -345,16 +269,6 @@ These methods don't belong to a config struct but have sensible defaults you can
   default is the Rust tuple struct `struct Name(Inner);`.
 - `fun_block_open()` -- custom block opener for functions.
 - `type_header_block_open()` -- custom block opener for type headers.
-- `doc_comment_inside_body()` -- deprecated pre-0.6.8 preamble placement;
-  retained while type/property compatibility paths migrate.
-- `doc_before_annotations()` -- deprecated pre-0.6.8 preamble ordering;
-  retained while type/property compatibility paths migrate.
-- `optional_field_style()` -- deprecated pre-0.6.8 field compatibility only;
-  new adapters distinguish `OptionalPresence` from `TypeName::Optional`.
-- `property_style()` -- deprecated pre-0.6.8 property compatibility only;
-  new adapters implement `lower_property()`.
-- `property_getter_keyword()` -- deprecated pre-0.6.8 field-style property
-  compatibility only.
 - `emit_type_context()` -- optional structured context for split function
   signatures.
 - `type_body_prefix()` -- content emitted before the type body.
@@ -363,6 +277,10 @@ These methods don't belong to a config struct but have sensible defaults you can
   delimiter, such as Haskell `deriving`.
 - `render_type_param_kind()` -- how type parameters are annotated with variance.
 - `line_comment_suffix()` -- suffix for line comments (default `""`).
+
+Deprecated standalone declaration hooks such as preamble ordering, optional-
+field style, and property style are listed with their replacements in the
+[legacy surface matrix](legacy_compatibility_and_migration.md#legacy-surface-matrix).
 
 `render_imports()` receives a deduplicated, alias-resolved `ImportGroup` and
 emits the file's import header. `render_doc_comment()` emits spec-level doc
@@ -657,14 +575,15 @@ just bless
 
 This runs all tests with `BLESS=1`, which creates `test-goldens/your_lang/*.yl` files from the actual output. Review them manually, then commit.
 
-### 5. Complete transitional declaration compatibility
+### 5. Bridge transitional type lowering
 
-Run the full test suite and review golden file output. Implement function and
-field grammar in `lower_function()` and `lower_fields()`. Type and property
-declaration forms that have not
-yet moved behind a complete language-local seam may still require deprecated
-syntax accessors. Use existing fields only where they already express the
-target, and do not add a shared field or enum for an unseen grammar dimension.
+Run the full test suite and review golden file output. Implement function,
+field, property, and variant grammar in the corresponding complete lowering
+seams. Type declarations have not yet moved behind a complete language-local
+seam and may still require deprecated syntax accessors. Use existing fields
+only where they already express the target, and do not add a shared field or
+enum for an unseen grammar dimension. Follow the [external-adapter migration
+sequence](legacy_compatibility_and_migration.md#external-adapter-migration).
 Examples of remaining transitional overrides are:
 
 - If types come before names (`int x` instead of `x: int`): override `type_decl_syntax()` to set `type_before_name`, `return_type_is_prefix`

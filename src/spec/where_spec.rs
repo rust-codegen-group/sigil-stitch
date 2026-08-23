@@ -31,6 +31,9 @@ impl WhereConstraint {
 }
 
 /// How where-clause constraints are rendered.
+#[deprecated(
+    note = "legacy 0.6.8 declaration grammar; migrate declarations to language-owned lowering"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum WhereClauseStyle {
     /// Bounds stay inline in the type parameter list.

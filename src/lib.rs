@@ -131,6 +131,7 @@ pub mod prelude {
     pub use crate::spec::project_spec::{ProjectSpec, RenderedFile};
     pub use crate::spec::property_spec::PropertySpec;
     pub use crate::spec::type_spec::TypeSpec;
+    #[allow(deprecated)]
     pub use crate::spec::where_spec::{
         TypeParamKind, TypeParamSpec, WhereClauseStyle, WhereConstraint,
     };

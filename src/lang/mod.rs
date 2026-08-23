@@ -46,15 +46,31 @@ pub mod zsh;
 /// Helpers for implementing language-specific node rewrite passes.
 pub mod rewrite;
 
+mod bash_function_lowering;
+mod c_function_lowering;
 mod cpp_function_lowering;
 mod csharp_function_lowering;
+mod dart_function_lowering;
 pub(crate) mod field_lowering;
 mod function_lowering;
+mod go_function_lowering;
+mod haskell_function_lowering;
+mod java_function_lowering;
+mod javascript_function_lowering;
 mod kotlin_function_lowering;
+mod lua_function_lowering;
+mod ocaml_function_lowering;
+mod php_function_lowering;
 pub(crate) mod property_lowering;
+mod python_function_lowering;
+mod ruby_function_lowering;
+mod rust_function_lowering;
+mod scala_function_lowering;
+mod swift_function_lowering;
 pub(crate) mod type_members_validation;
 mod typescript_function_lowering;
 pub(crate) mod variant_lowering;
+mod zsh_function_lowering;
 
 use crate::code_block::{Arg, CodeBlock};
 use crate::code_node::BlockIntent;

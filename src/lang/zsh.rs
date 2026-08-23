@@ -256,6 +256,13 @@ impl CodeLang for Zsh {
         LanguageCapabilities::strict().with_functions(ZSH_FUNCTIONS)
     }
 
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::zsh_function_lowering::lower(self, function)
+    }
+
     fn render_imports(&self, imports: &ImportGroup) -> String {
         if imports.entries().is_empty() {
             return String::new();

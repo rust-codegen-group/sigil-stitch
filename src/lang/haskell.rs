@@ -399,6 +399,13 @@ impl CodeLang for Haskell {
             .with_fields(crate::lang::field_lowering::haskell::PROFILES)
     }
 
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::haskell_function_lowering::lower(self, function)
+    }
+
     fn validate_fields(
         &self,
         fields: crate::lang::FieldSequenceIntent<'_>,

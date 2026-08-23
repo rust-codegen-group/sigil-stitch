@@ -409,7 +409,7 @@ fn c_top_level_preserves_static_initializers() {
 }
 
 #[test]
-fn cpp_static_initializers_use_a_complete_valid_declaration() {
+fn cpp_preserves_pre_cpp17_static_constant_initializers() {
     let field = FieldSpec::builder("answer", TypeName::primitive("int"))
         .is_static()
         .is_readonly()
@@ -420,7 +420,7 @@ fn cpp_static_initializers_use_a_complete_valid_declaration() {
         render_field(&sigil_stitch::lang::cpp::Cpp::new(), &field)
             .unwrap()
             .trim(),
-        "inline static const int answer = 42;"
+        "static const int answer = 42;"
     );
     let lang = sigil_stitch::lang::cpp::Cpp::new();
     let output = field
@@ -429,6 +429,50 @@ fn cpp_static_initializers_use_a_complete_valid_declaration() {
         .render_standalone(&lang, 120)
         .unwrap();
     assert_eq!(output.trim(), "static const int answer = 42;");
+}
+
+#[test]
+fn cpp_rejects_static_initializers_that_need_an_unmodelled_definition() {
+    let field = FieldSpec::builder("count", TypeName::primitive("int"))
+        .is_static()
+        .initializer(CodeBlock::of("1", ()).unwrap())
+        .build()
+        .unwrap();
+    let error = render_field(&sigil_stitch::lang::cpp::Cpp::new(), &field).unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::InvalidField { reason, .. }
+            if reason.contains("out-of-class definition")
+    ));
+}
+
+#[test]
+fn cpp_rejects_static_const_initializers_without_a_proven_integral_type() {
+    let field_types = [
+        TypeName::primitive("std::string"),
+        TypeName::primitive("double"),
+        TypeName::primitive("Mode"),
+        TypeName::Pointer(Box::new(TypeName::primitive("int"))),
+        TypeName::Reference {
+            inner: Box::new(TypeName::primitive("int")),
+            mutable: false,
+            lifetime: None,
+        },
+    ];
+    for field_type in field_types {
+        let field = FieldSpec::builder("value", field_type)
+            .is_static()
+            .is_readonly()
+            .initializer(CodeBlock::of("value", ()).unwrap())
+            .build()
+            .unwrap();
+        let error = render_field(&sigil_stitch::lang::cpp::Cpp::new(), &field).unwrap_err();
+        assert!(matches!(
+            error,
+            SigilStitchError::InvalidField { reason, .. }
+                if reason.contains("proven integral type")
+        ));
+    }
 }
 
 #[test]

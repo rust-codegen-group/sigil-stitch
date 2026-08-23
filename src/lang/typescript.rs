@@ -454,6 +454,23 @@ impl CodeLang for TypeScript {
         crate::lang::property_lowering::typescript::lower(self, property)
     }
 
+    fn validate_type_members(
+        &self,
+        members: crate::lang::TypeMembersIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::type_members_validation::typescript::validate(self, members)
+    }
+
+    fn collect_type_members_validation_errors(
+        &self,
+        members: crate::lang::TypeMembersIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::type_members_validation::typescript::collect_validation_errors(
+            self, members, errors,
+        );
+    }
+
     fn lower_variants(
         &self,
         variants: crate::lang::ValidatedVariants<'_>,

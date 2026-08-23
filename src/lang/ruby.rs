@@ -228,6 +228,13 @@ impl CodeLang for Ruby {
             .with_variants(RUBY_VARIANTS)
     }
 
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::ruby_function_lowering::lower(self, function)
+    }
+
     fn validate_variants(
         &self,
         variants: crate::lang::VariantIntent<'_>,

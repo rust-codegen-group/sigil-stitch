@@ -361,6 +361,7 @@ impl Default for TypeDeclSyntaxConfig<'_> {
 }
 
 /// How an enum variant's value is formatted.
+#[deprecated(note = "legacy 0.6.8 variant grammar; implement CodeLang::lower_variants instead")]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum VariantValueFormat {
     /// `NAME = value` — TypeScript, Rust, C, Swift, etc.

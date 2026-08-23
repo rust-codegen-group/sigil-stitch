@@ -453,6 +453,23 @@ impl CodeLang for Kotlin {
         crate::lang::property_lowering::kotlin::lower(self, property)
     }
 
+    fn validate_type_members(
+        &self,
+        members: crate::lang::TypeMembersIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::type_members_validation::kotlin::validate(self, members)
+    }
+
+    fn collect_type_members_validation_errors(
+        &self,
+        members: crate::lang::TypeMembersIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::type_members_validation::kotlin::collect_validation_errors(
+            self, members, errors,
+        );
+    }
+
     fn validate_variants(
         &self,
         variants: crate::lang::VariantIntent<'_>,

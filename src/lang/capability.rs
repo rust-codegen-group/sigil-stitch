@@ -474,6 +474,19 @@ enum CapabilityProfiles<'a, T> {
     Strict(&'a [T]),
 }
 
+impl<T> CapabilityProfiles<'_, T> {
+    fn resolve<R>(self, permissive: R, strict: impl FnOnce(&[T]) -> R) -> R {
+        match self {
+            Self::Permissive => permissive,
+            Self::Strict(profiles) => strict(profiles),
+        }
+    }
+
+    fn uses_permissive_validation(self) -> bool {
+        matches!(self, Self::Permissive)
+    }
+}
+
 /// Complete spec capability matrix for a language.
 ///
 /// Built-in languages construct a fail-closed matrix with [`Self::strict`].
@@ -544,43 +557,35 @@ impl<'a> LanguageCapabilities<'a> {
 
     /// Whether any profile declares this type kind.
     pub fn supports_type_kind(&self, kind: TypeKind) -> bool {
-        match self.types {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => {
-                profiles.iter().any(|profile| profile.kind() == kind)
-            }
-        }
+        self.types.resolve(true, |profiles| {
+            profiles.iter().any(|profile| profile.kind() == kind)
+        })
     }
 
     /// Whether the profile for `kind` declares `capability`.
     pub fn supports_type_capability(&self, kind: TypeKind, capability: TypeCapability) -> bool {
-        match self.types {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.types.resolve(true, |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.kind() == kind)
-                .is_some_and(|profile| profile.supports(capability)),
-        }
+                .is_some_and(|profile| profile.supports(capability))
+        })
     }
 
     /// Whether any profile declares this function context.
     pub fn supports_function_context(&self, context: FunctionContext) -> bool {
-        match self.functions {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => {
-                profiles.iter().any(|profile| profile.context() == context)
-            }
-        }
+        self.functions.resolve(true, |profiles| {
+            profiles.iter().any(|profile| profile.context() == context)
+        })
     }
 
     /// Whether a profile declares this context and declaration form.
     pub fn supports_function_form(&self, context: FunctionContext, form: FunctionForm) -> bool {
-        match self.functions {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.functions.resolve(true, |profiles| {
+            profiles
                 .iter()
-                .any(|profile| profile.context() == context && profile.form() == form),
-        }
+                .any(|profile| profile.context() == context && profile.form() == form)
+        })
     }
 
     /// Whether the profile for `context` and `form` declares `capability`.
@@ -590,13 +595,12 @@ impl<'a> LanguageCapabilities<'a> {
         form: FunctionForm,
         capability: FunctionCapability,
     ) -> bool {
-        match self.functions {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.functions.resolve(true, |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.context() == context && profile.form() == form)
-                .is_some_and(|profile| profile.supports(capability)),
-        }
+                .is_some_and(|profile| profile.supports(capability))
+        })
     }
 
     pub(crate) fn first_incompatible_function_capabilities(
@@ -605,13 +609,12 @@ impl<'a> LanguageCapabilities<'a> {
         form: FunctionForm,
         requested: &[FunctionCapability],
     ) -> Option<(FunctionCapability, FunctionCapability)> {
-        match self.functions {
-            CapabilityProfiles::Permissive => None,
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.functions.resolve(None, |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.context() == context && profile.form() == form)
-                .and_then(|profile| profile.first_incompatible_pair(requested)),
-        }
+                .and_then(|profile| profile.first_incompatible_pair(requested))
+        })
     }
 
     /// Required capabilities for this context and declaration form.
@@ -620,13 +623,12 @@ impl<'a> LanguageCapabilities<'a> {
         context: FunctionContext,
         form: FunctionForm,
     ) -> &[FunctionCapability] {
-        match self.functions {
-            CapabilityProfiles::Permissive => &[],
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.functions.resolve(&[], |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.context() == context && profile.form() == form)
-                .map_or(&[], |profile| profile.required_capabilities()),
-        }
+                .map_or(&[], |profile| profile.required_capabilities())
+        })
     }
 
     /// Body policy for this context and declaration form.
@@ -635,15 +637,15 @@ impl<'a> LanguageCapabilities<'a> {
         context: FunctionContext,
         form: FunctionForm,
     ) -> FunctionBodyPolicy {
-        match self.functions {
-            CapabilityProfiles::Permissive => FunctionBodyPolicy::Optional,
-            CapabilityProfiles::Strict(profiles) => profiles
-                .iter()
-                .find(|profile| profile.context() == context && profile.form() == form)
-                .map_or(FunctionBodyPolicy::Optional, |profile| {
-                    profile.body_policy()
-                }),
-        }
+        self.functions
+            .resolve(FunctionBodyPolicy::Optional, |profiles| {
+                profiles
+                    .iter()
+                    .find(|profile| profile.context() == context && profile.form() == form)
+                    .map_or(FunctionBodyPolicy::Optional, |profile| {
+                        profile.body_policy()
+                    })
+            })
     }
 
     /// Incompatible capability pairs for this context and declaration form.
@@ -652,13 +654,12 @@ impl<'a> LanguageCapabilities<'a> {
         context: FunctionContext,
         form: FunctionForm,
     ) -> &[(FunctionCapability, FunctionCapability)] {
-        match self.functions {
-            CapabilityProfiles::Permissive => &[],
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.functions.resolve(&[], |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.context() == context && profile.form() == form)
-                .map_or(&[], |profile| profile.incompatible_capabilities()),
-        }
+                .map_or(&[], |profile| profile.incompatible_capabilities())
+        })
     }
 
     /// Maximum parameter count for this context and declaration form.
@@ -667,27 +668,25 @@ impl<'a> LanguageCapabilities<'a> {
         context: FunctionContext,
         form: FunctionForm,
     ) -> Option<usize> {
-        match self.functions {
-            CapabilityProfiles::Permissive => None,
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.functions.resolve(None, |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.context() == context && profile.form() == form)
-                .and_then(|profile| profile.maximum_parameters()),
-        }
+                .and_then(|profile| profile.maximum_parameters())
+        })
     }
 
     pub(crate) fn function_validation_is_permissive(&self) -> bool {
-        matches!(self.functions, CapabilityProfiles::Permissive)
+        self.functions.uses_permissive_validation()
     }
 
     /// Whether this language declares a variant profile for `owner_kind`.
     pub fn supports_variant_owner(&self, owner_kind: TypeKind) -> bool {
-        match self.variants {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.variants.resolve(true, |profiles| {
+            profiles
                 .iter()
-                .any(|profile| profile.owner_kind() == owner_kind),
-        }
+                .any(|profile| profile.owner_kind() == owner_kind)
+        })
     }
 
     /// Whether variants owned by `owner_kind` support `capability`.
@@ -696,27 +695,23 @@ impl<'a> LanguageCapabilities<'a> {
         owner_kind: TypeKind,
         capability: VariantCapability,
     ) -> bool {
-        match self.variants {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.variants.resolve(true, |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.owner_kind() == owner_kind)
-                .is_some_and(|profile| profile.supports(capability)),
-        }
+                .is_some_and(|profile| profile.supports(capability))
+        })
     }
 
     pub(crate) fn variant_validation_is_permissive(&self) -> bool {
-        matches!(self.variants, CapabilityProfiles::Permissive)
+        self.variants.uses_permissive_validation()
     }
 
     /// Whether this language declares a profile for `context`.
     pub fn supports_field_context(&self, context: FieldContext) -> bool {
-        match self.fields {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => {
-                profiles.iter().any(|profile| profile.context() == context)
-            }
-        }
+        self.fields.resolve(true, |profiles| {
+            profiles.iter().any(|profile| profile.context() == context)
+        })
     }
 
     /// Whether fields in `context` support `capability`.
@@ -725,34 +720,29 @@ impl<'a> LanguageCapabilities<'a> {
         context: FieldContext,
         capability: FieldCapability,
     ) -> bool {
-        match self.fields {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.fields.resolve(true, |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.context() == context)
-                .is_some_and(|profile| profile.supports(capability)),
-        }
+                .is_some_and(|profile| profile.supports(capability))
+        })
     }
 
     /// Required capabilities for every field in `context`.
     pub fn required_field_capabilities(&self, context: FieldContext) -> &[FieldCapability] {
-        match self.fields {
-            CapabilityProfiles::Permissive => &[],
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.fields.resolve(&[], |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.context() == context)
-                .map_or(&[], |profile| profile.required_capabilities()),
-        }
+                .map_or(&[], |profile| profile.required_capabilities())
+        })
     }
 
     /// Whether this language declares a property profile for `context`.
     pub fn supports_property_context(&self, context: PropertyContext) -> bool {
-        match self.properties {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => {
-                profiles.iter().any(|profile| profile.context() == context)
-            }
-        }
+        self.properties.resolve(true, |profiles| {
+            profiles.iter().any(|profile| profile.context() == context)
+        })
     }
 
     /// Whether properties in `context` support `capability`.
@@ -761,13 +751,12 @@ impl<'a> LanguageCapabilities<'a> {
         context: PropertyContext,
         capability: PropertyCapability,
     ) -> bool {
-        match self.properties {
-            CapabilityProfiles::Permissive => true,
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.properties.resolve(true, |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.context() == context)
-                .is_some_and(|profile| profile.supports(capability)),
-        }
+                .is_some_and(|profile| profile.supports(capability))
+        })
     }
 
     /// Required capabilities for every property in `context`.
@@ -775,13 +764,12 @@ impl<'a> LanguageCapabilities<'a> {
         &self,
         context: PropertyContext,
     ) -> &[PropertyCapability] {
-        match self.properties {
-            CapabilityProfiles::Permissive => &[],
-            CapabilityProfiles::Strict(profiles) => profiles
+        self.properties.resolve(&[], |profiles| {
+            profiles
                 .iter()
                 .find(|profile| profile.context() == context)
-                .map_or(&[], |profile| profile.required_capabilities()),
-        }
+                .map_or(&[], |profile| profile.required_capabilities())
+        })
     }
 }
 
