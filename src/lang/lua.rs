@@ -210,6 +210,13 @@ impl CodeLang for Lua {
         LanguageCapabilities::strict().with_functions(LUA_FUNCTIONS)
     }
 
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::lua_function_lowering::lower(self, function)
+    }
+
     fn render_visibility(&self, _vis: Visibility, _ctx: DeclarationContext) -> &str {
         ""
     }

@@ -3,7 +3,9 @@
 This appendix defines the vocabulary used throughout sigil-stitch. The
 [architecture overview](architecture.md) describes how these concepts flow
 through the implementation, while [Declaration Specs and Language
-Lowering](declaration_lowering.md) records their ownership boundaries.
+Lowering](declaration_lowering.md) records their ownership boundaries. Versioned
+exceptions are catalogued in [0.6.8 Legacy Compatibility and
+Migration](legacy_compatibility_and_migration.md).
 
 ## Declaration Intent
 
@@ -74,7 +76,10 @@ properties, and explicit methods. `TypeMembersIntent` exists for relationships
 that cannot be checked within one member family, such as target-derived name
 collisions. It contains no target grammar, has no validated wrapper, and does
 not participate in lowering. It is not a sequence-level replacement for
-`PropertyIntent`.
+`PropertyIntent`. Each adapter defines its own emitted namespaces: a
+field/property pair collides in TypeScript, Kotlin, Swift, and Scala only when
+both declarations occupy the same target-local namespace, while PHP properties
+instead derive case-insensitive accessor-method names.
 
 ### Read accessor and write accessor
 

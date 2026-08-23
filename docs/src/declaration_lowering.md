@@ -2,8 +2,8 @@
 
 This chapter defines the ownership model for structured declarations. It is the
 accepted design direction for `spec/*` and `lang/*`; pre-0.6.8 compatibility
-paths that do not yet follow it are described under
-[Migration](#compatibility-and-migration).
+paths that do not yet follow it are described in [0.6.8 Legacy Compatibility
+and Migration](legacy_compatibility_and_migration.md).
 
 ## Decision
 
@@ -287,33 +287,9 @@ generic spec emitter, target grammar has crossed the seam.
 
 ## Compatibility and Migration
 
-Public syntax configuration that was already part of the 0.6.8 adapter
-interface cannot disappear without a deliberate compatibility decision.
-During migration it may remain behind a default compatibility lowerer for
-external adapters. The `function_syntax()`, `type_decl_syntax()`, and
-`enum_and_annotation()` accessors and their configuration types are deprecated
-to make this boundary visible to adapter authors at compile time. The preamble
-ordering hooks `doc_before_annotations()` and `doc_comment_inside_body()` are
-deprecated for the same reason, although remaining type and property
-compatibility paths still consult them during migration.
-
-Field lowering follows the same compatibility boundary. Strict built-in
-adapters declare field profiles and implement the complete sequence seam.
-Permissive external adapters retain the frozen pre-0.6.8 field emitter as the
-default `lower_fields()` implementation. `optional_field_style()` and
-`OptionalFieldStyle` remain available only for that deprecated compatibility
-path; their historical type-prefix, type-suffix, and wrapper branches conflate
-absence with nullable values and are not a semantic model for new code.
-
-Property lowering follows the same boundary. Strict built-ins declare exact
-property profiles and implement complete language-local lowering. Permissive
-external adapters retain the frozen pre-0.6.8 property emitter as the default
-`lower_property()` implementation. `PropertyStyle`, `property_style()`, and
-`property_getter_keyword()` remain available and deprecated only for that
-compatibility path. Built-ins do not consult them, and new adapters must not
-extend them with additional grammar choices.
-
-Compatibility is not permission to extend that design:
+Public declaration grammar that was already part of the 0.6.8 adapter surface
+may remain behind a deprecated, frozen compatibility lowerer. Compatibility is
+not permission to extend that design:
 
 - Do not add new shared declaration-placement enums, flags, or keyword fields.
 - Do not add new branches in specs to interpret target grammar.
@@ -324,17 +300,11 @@ Compatibility is not permission to extend that design:
 - Existing built-in adapters should migrate incrementally, with rendered-output
   tests at the adapter seam and parity coverage across direct and pretty paths.
 
-Compatibility is bounded by validity. The deprecated `VariantContext` and
-ownerless `EnumVariantSpec::emit()` remain usable only with permissive external
-adapters. Strict built-ins require `TypeSpec` so they can validate and lower the
-complete sequence. The deprecated `.value()` field is interpreted locally only
-where its old meaning is unambiguous and valid; new code uses
-`.discriminant(...)` or `.constructor_argument(...)`. The private compatibility
-path also preserves the old `variants_before_fields` placement for permissive
-adapters; built-ins do not consult that shared grammar flag.
-
-This policy lets external adapters keep working while the built-in
-implementation moves toward the intended ownership model.
+Compatibility is bounded by validity: a built-in adapter may restrict an old
+entry point rather than emit malformed or unverifiable target code. The full
+version boundary, deprecated-surface matrix, builder recipes, external-adapter
+sequence, and remaining type-lowering transition are centralized in [0.6.8
+Legacy Compatibility and Migration](legacy_compatibility_and_migration.md).
 
 ## Scope of This Decision
 

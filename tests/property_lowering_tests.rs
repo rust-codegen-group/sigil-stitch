@@ -7,6 +7,7 @@ use sigil_stitch::lang::config::{
 };
 use sigil_stitch::lang::{CodeLang, RendererLang};
 use sigil_stitch::spec::annotation_spec::AnnotationSpec;
+use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, PropertyStyle, TypeKind, Visibility};
@@ -431,6 +432,196 @@ fn php_exact_duplicate_properties_only_report_the_crate_owned_error() {
             property_name,
         }] if type_name == "Values" && property_name == "value"
     ));
+}
+
+#[test]
+fn stored_and_computed_members_with_one_target_name_fail_closed() {
+    let cases: Vec<(Box<dyn CodeLang>, &str)> = vec![
+        (
+            Box::new(sigil_stitch::lang::typescript::TypeScript::new()),
+            "ts",
+        ),
+        (Box::new(sigil_stitch::lang::kotlin::Kotlin::new()), "kt"),
+        (Box::new(sigil_stitch::lang::swift::Swift::new()), "swift"),
+        (Box::new(sigil_stitch::lang::scala::Scala::new()), "scala"),
+    ];
+
+    for (lang, extension) in cases {
+        let ty = TypeSpec::builder("Values", TypeKind::Class)
+            .add_field(FieldSpec::of("value", TypeName::primitive("String")))
+            .add_property(property("value", TypeName::primitive("String")))
+            .build()
+            .unwrap();
+        let error = ty.validate(lang.as_ref()).unwrap_err();
+        assert!(matches!(
+            error,
+            SigilStitchError::TypeMemberNameCollision {
+                language,
+                member_name,
+                first_member,
+                ..
+            } if language == extension
+                && member_name == "value"
+                && first_member.as_ref() == &TypeMemberNameOrigin::StoredField {
+                    field_name: "value".to_string(),
+                }
+        ));
+    }
+}
+
+#[test]
+fn target_local_member_namespaces_do_not_create_false_collisions() {
+    let typescript = sigil_stitch::lang::typescript::TypeScript::new();
+    TypeSpec::builder("Values", TypeKind::Class)
+        .add_field(FieldSpec::of("#value", TypeName::primitive("string")))
+        .add_property(property("value", TypeName::primitive("string")))
+        .build()
+        .unwrap()
+        .validate(&typescript)
+        .unwrap();
+    TypeSpec::builder("Values", TypeKind::Class)
+        .add_field(
+            FieldSpec::builder("value", TypeName::primitive("string"))
+                .is_static()
+                .build()
+                .unwrap(),
+        )
+        .add_property(property("value", TypeName::primitive("string")))
+        .build()
+        .unwrap()
+        .validate(&typescript)
+        .unwrap();
+
+    let swift = sigil_stitch::lang::swift::Swift::new();
+    TypeSpec::builder("Values", TypeKind::Class)
+        .add_field(
+            FieldSpec::builder("value", TypeName::primitive("Int"))
+                .is_static()
+                .initializer(getter("0"))
+                .build()
+                .unwrap(),
+        )
+        .add_property(property("value", TypeName::primitive("Int")))
+        .build()
+        .unwrap()
+        .validate(&swift)
+        .unwrap();
+
+    for lang in [
+        Box::new(typescript) as Box<dyn CodeLang>,
+        Box::new(swift) as Box<dyn CodeLang>,
+    ] {
+        TypeSpec::builder("Values", TypeKind::Class)
+            .add_property(property("value", TypeName::primitive("Int")))
+            .add_method(
+                FunSpec::builder("value")
+                    .returns(TypeName::primitive("Void"))
+                    .is_static()
+                    .body(getter("return"))
+                    .build()
+                    .unwrap(),
+            )
+            .build()
+            .unwrap()
+            .validate(lang.as_ref())
+            .unwrap();
+    }
+}
+
+#[test]
+fn exact_duplicate_properties_do_not_gain_target_collision_errors() {
+    fn assert_only_duplicate(lang: impl CodeLang, filename: &str) {
+        let ty = TypeSpec::builder("Values", TypeKind::Class)
+            .add_property(property("value", TypeName::primitive("String")))
+            .add_property(property("value", TypeName::primitive("String")))
+            .build()
+            .unwrap();
+        let error = FileSpec::builder_with(filename, lang)
+            .add_type(ty)
+            .build()
+            .unwrap()
+            .render(120)
+            .unwrap_err();
+        let SigilStitchError::FileSpecValidation { errors, .. } = error else {
+            panic!("expected aggregate validation, got {error:#?}")
+        };
+        assert!(matches!(
+            errors.as_slice(),
+            [SigilStitchError::DuplicatePropertyName {
+                type_name,
+                property_name,
+            }] if type_name == "Values" && property_name == "value"
+        ));
+    }
+
+    assert_only_duplicate(
+        sigil_stitch::lang::typescript::TypeScript::new(),
+        "values.ts",
+    );
+    assert_only_duplicate(sigil_stitch::lang::kotlin::Kotlin::new(), "values.kt");
+    assert_only_duplicate(sigil_stitch::lang::swift::Swift::new(), "values.swift");
+    assert_only_duplicate(sigil_stitch::lang::scala::Scala::new(), "values.scala");
+}
+
+#[test]
+fn target_member_names_collide_with_explicit_methods_where_the_language_forbids_it() {
+    let cases: Vec<Box<dyn CodeLang>> = vec![
+        Box::new(sigil_stitch::lang::typescript::TypeScript::new()),
+        Box::new(sigil_stitch::lang::swift::Swift::new()),
+        Box::new(sigil_stitch::lang::scala::Scala::new()),
+    ];
+
+    for lang in cases {
+        let ty = TypeSpec::builder("Values", TypeKind::Class)
+            .add_property(property("value", TypeName::primitive("String")))
+            .add_method(
+                FunSpec::builder("value")
+                    .body(getter("return current"))
+                    .build()
+                    .unwrap(),
+            )
+            .build()
+            .unwrap();
+        let error = ty.validate(lang.as_ref()).unwrap_err();
+        assert!(matches!(
+            error,
+            SigilStitchError::TypeMemberNameCollision {
+                second_member,
+                ..
+            } if second_member.as_ref() == &TypeMemberNameOrigin::ExplicitMethod {
+                method_name: "value".to_string(),
+            }
+        ));
+    }
+}
+
+#[test]
+fn scala_write_only_property_collides_with_stored_field_setter() {
+    let ty = TypeSpec::builder("Values", TypeKind::Class)
+        .add_field(FieldSpec::of("value", TypeName::primitive("String")))
+        .add_property(
+            PropertySpec::builder("value", TypeName::primitive("String"))
+                .setter("next", getter("value = next"))
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let error = ty
+        .validate(&sigil_stitch::lang::scala::Scala::new())
+        .unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            SigilStitchError::TypeMemberNameCollision {
+                second_member,
+                ..
+            } if second_member.as_ref() == &TypeMemberNameOrigin::PropertyWriteAccessor {
+                property_name: "value".to_string(),
+            }
+        ),
+        "{error:#?}"
+    );
 }
 
 #[test]

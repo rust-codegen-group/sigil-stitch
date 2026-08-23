@@ -306,6 +306,13 @@ impl CodeLang for JavaScript {
             .with_properties(crate::lang::property_lowering::javascript::PROFILES)
     }
 
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::javascript_function_lowering::lower(self, function)
+    }
+
     fn escape_field_name(&self, name: &str) -> String {
         name.to_string()
     }

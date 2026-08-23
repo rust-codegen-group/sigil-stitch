@@ -458,6 +458,13 @@ impl CodeLang for Python {
             .with_fields(crate::lang::field_lowering::python::PROFILES)
     }
 
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::python_function_lowering::lower(self, function)
+    }
+
     fn validate_fields(
         &self,
         fields: crate::lang::FieldSequenceIntent<'_>,

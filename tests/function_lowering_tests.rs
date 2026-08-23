@@ -372,8 +372,455 @@ fn boxed_adapter_preserves_type_refs_and_pretty_layout() {
     assert!(pretty.contains('\n'), "{pretty}");
 }
 
+#[test]
+fn dynamic_languages_lower_complete_function_intent() {
+    let lua = FunSpec::builder("work")
+        .doc("Run Lua work.")
+        .add_param(ParameterSpec::of("end", TypeName::primitive("")))
+        .suffix("-- tail")
+        .body(CodeBlock::of("return end_", ()).unwrap())
+        .build()
+        .unwrap();
+    assert_eq!(
+        render(&lua, &sigil_stitch::lang::lua::Lua::new(), 80),
+        "--- Run Lua work.\nfunction work(end_) -- tail\n  return end_\nend\n"
+    );
+
+    let ruby = FunSpec::builder("work")
+        .doc("Run Ruby work.")
+        .add_param(
+            ParameterSpec::builder("class", TypeName::primitive(""))
+                .default_value(CodeBlock::of("Object.new", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .suffix("# tail")
+        .body(CodeBlock::of("class_", ()).unwrap())
+        .build()
+        .unwrap();
+    assert_eq!(
+        render(&ruby, &sigil_stitch::lang::ruby::Ruby::new(), 80),
+        "# Run Ruby work.\ndef work(class_ = Object.new) # tail\n  class_\nend\n"
+    );
+}
+
+#[test]
+fn c_dart_go_haskell_and_java_lower_reachable_function_features() {
+    let c = FunSpec::builder("work")
+        .add_param(ParameterSpec::of("value", TypeName::primitive("int")))
+        .returns(TypeName::primitive("int"))
+        .annotation(CodeBlock::of("__attribute__((cold))", ()).unwrap())
+        .suffix("__attribute__((noreturn))")
+        .body(CodeBlock::of("return value;", ()).unwrap())
+        .build()
+        .unwrap();
+    let c = render(&c, &sigil_stitch::lang::c::C::new(), 80);
+    assert!(
+        c.contains("__attribute__((cold))\nint work(int value) __attribute__((noreturn)) {"),
+        "{c}"
+    );
+
+    let dart = FunSpec::builder("work")
+        .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
+        .annotate(AnnotationSpec::new("tracked"))
+        .suffix("sync*")
+        .is_static()
+        .body(CodeBlock::of("yield value;", ()).unwrap())
+        .build()
+        .unwrap();
+    let dart = render_in_context(
+        &dart,
+        &sigil_stitch::lang::dart::Dart::new(),
+        DeclarationContext::Member,
+        80,
+    );
+    assert!(
+        dart.contains("@tracked\nstatic work(Value value) sync* {"),
+        "{dart}"
+    );
+
+    let go = FunSpec::builder("Work")
+        .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
+        .suffix("/* tail */")
+        .body(CodeBlock::of("use(value)", ()).unwrap())
+        .build()
+        .unwrap();
+    let go = render(&go, &sigil_stitch::lang::go::Go::new(), 80);
+    assert!(go.contains("func Work(value Value) /* tail */ {"), "{go}");
+
+    let haskell = FunSpec::builder("work")
+        .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
+        .returns(TypeName::primitive("Result"))
+        .suffix("-- tail")
+        .body(CodeBlock::of("use value", ()).unwrap())
+        .build()
+        .unwrap();
+    let haskell = render(&haskell, &sigil_stitch::lang::haskell::Haskell::new(), 80);
+    assert_eq!(
+        haskell,
+        "work :: Value -> Result -- tail\nwork value =\n  use value\n"
+    );
+
+    let inferred_haskell = FunSpec::builder("inferred")
+        .suffix("-- tail")
+        .body(CodeBlock::of("42", ()).unwrap())
+        .build()
+        .unwrap();
+    assert_eq!(
+        render(
+            &inferred_haskell,
+            &sigil_stitch::lang::haskell::Haskell::new(),
+            80,
+        ),
+        "inferred = -- tail\n  42\n"
+    );
+
+    let java = FunSpec::builder("work")
+        .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
+        .returns(TypeName::primitive("Result"))
+        .suffix("throws Failure")
+        .body(CodeBlock::of("return use(value);", ()).unwrap())
+        .build()
+        .unwrap();
+    let java = render_in_context(
+        &java,
+        &sigil_stitch::lang::java::Java::new(),
+        DeclarationContext::Member,
+        80,
+    );
+    assert!(
+        java.contains("Result work(Value value) throws Failure {"),
+        "{java}"
+    );
+}
+
+#[test]
+fn shell_lowerers_preserve_suffix_escape_hatches() {
+    let function = FunSpec::builder("work")
+        .suffix("# tail")
+        .body(CodeBlock::of("return 0", ()).unwrap())
+        .build()
+        .unwrap();
+    for lang in [
+        Box::new(sigil_stitch::lang::bash::Bash::new()) as Box<dyn CodeLang>,
+        Box::new(sigil_stitch::lang::zsh::Zsh::new()),
+    ] {
+        let output = render(&function, lang.as_ref(), 80);
+        assert!(output.contains("function work() { # tail\n"), "{output}");
+    }
+}
+
+#[test]
+fn tupled_builtin_lowerers_cover_direct_and_pretty_rendering() {
+    struct Case {
+        lang: Box<dyn CodeLang>,
+        context: DeclarationContext,
+        typed: bool,
+    }
+
+    let cases = [
+        Case {
+            lang: Box::new(sigil_stitch::lang::c::C::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::cpp::Cpp::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::csharp::CSharp::new()),
+            context: DeclarationContext::Member,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::dart::Dart::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::go::Go::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::java::Java::new()),
+            context: DeclarationContext::Member,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::javascript::JavaScript::new()),
+            context: DeclarationContext::TopLevel,
+            typed: false,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::kotlin::Kotlin::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::lua::Lua::new()),
+            context: DeclarationContext::TopLevel,
+            typed: false,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::php::Php::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::python::Python::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::ruby::Ruby::new()),
+            context: DeclarationContext::TopLevel,
+            typed: false,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::rust::Rust::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::scala::Scala::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::swift::Swift::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+        Case {
+            lang: Box::new(sigil_stitch::lang::typescript::TypeScript::new()),
+            context: DeclarationContext::TopLevel,
+            typed: true,
+        },
+    ];
+
+    for case in cases {
+        let parameter_type = if case.typed { "LongValue" } else { "" };
+        let mut direct = FunSpec::builder("work")
+            .add_param(ParameterSpec::of(
+                "first_argument_name",
+                TypeName::primitive(parameter_type),
+            ))
+            .body(CodeBlock::of("use(first_argument_name)", ()).unwrap());
+        if case.typed {
+            direct = direct.returns(TypeName::primitive("LongResult"));
+        }
+        let direct = direct.build().unwrap();
+        render_in_context(&direct, case.lang.as_ref(), case.context, 120);
+
+        let mut pretty = FunSpec::builder("work")
+            .add_param(ParameterSpec::of(
+                "first_argument_name",
+                TypeName::primitive(parameter_type),
+            ))
+            .add_param(ParameterSpec::of(
+                "second_argument_name",
+                TypeName::primitive(parameter_type),
+            ))
+            .body(CodeBlock::of("use(second_argument_name)", ()).unwrap());
+        if case.typed {
+            pretty = pretty.returns(TypeName::primitive("LongResult"));
+        }
+        let pretty = pretty.build().unwrap();
+        let output = render_in_context(&pretty, case.lang.as_ref(), case.context, 18);
+        assert!(
+            output
+                .lines()
+                .any(|line| { line.contains("second_argument_name") && line.trim_start() != line }),
+            ".{} did not wrap and indent its second parameter:\n{output}",
+            case.lang.file_extension()
+        );
+    }
+}
+
+#[test]
+fn javascript_ocaml_php_and_python_lower_reachable_function_features() {
+    let javascript = FunSpec::builder("work")
+        .add_param(
+            ParameterSpec::builder("value", TypeName::primitive(""))
+                .default_value(CodeBlock::of("seed", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_param(
+            ParameterSpec::builder("rest", TypeName::primitive(""))
+                .variadic()
+                .build()
+                .unwrap(),
+        )
+        .suffix("/* tail */")
+        .body(CodeBlock::of("return rest;", ()).unwrap())
+        .build()
+        .unwrap();
+    let javascript = render(
+        &javascript,
+        &sigil_stitch::lang::javascript::JavaScript::new(),
+        80,
+    );
+    assert!(
+        javascript.contains("function work(value = seed, ...rest) /* tail */ {"),
+        "{javascript}"
+    );
+
+    let constructor = FunSpec::builder("constructor")
+        .is_constructor()
+        .delegation(CodeBlock::of("super()", ()).unwrap())
+        .body(CodeBlock::of("initialize();", ()).unwrap())
+        .build()
+        .unwrap();
+    let constructor = render_in_context(
+        &constructor,
+        &sigil_stitch::lang::javascript::JavaScript::new(),
+        DeclarationContext::Member,
+        80,
+    );
+    assert!(
+        constructor.contains("constructor() {\n  super();\n  initialize();"),
+        "{constructor}"
+    );
+
+    let ocaml = FunSpec::builder("work")
+        .add_param(ParameterSpec::of("value", TypeName::primitive("value")))
+        .returns(TypeName::primitive("result"))
+        .suffix("(* tail *)")
+        .body(CodeBlock::of("use value", ()).unwrap())
+        .build()
+        .unwrap();
+    let ocaml = render(&ocaml, &sigil_stitch::lang::ocaml::OCaml::new(), 80);
+    assert!(
+        ocaml.contains("let work (value : value) (* tail *) : result ="),
+        "{ocaml}"
+    );
+
+    let php = FunSpec::builder("work")
+        .add_param(
+            ParameterSpec::builder("value", TypeName::primitive("Value"))
+                .default_value(CodeBlock::of("null", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .returns(TypeName::primitive("Result"))
+        .annotation(CodeBlock::of("#[Raw]", ()).unwrap())
+        .suffix("/* tail */")
+        .is_override()
+        .body(CodeBlock::of("return use($value);", ()).unwrap())
+        .build()
+        .unwrap();
+    let php = render_in_context(
+        &php,
+        &sigil_stitch::lang::php::Php::new(),
+        DeclarationContext::Member,
+        80,
+    );
+    assert!(
+        php.contains(
+            "#[Raw]\n#[Override]\npublic function work(Value $value = null) /* tail */: Result {"
+        ),
+        "{php}"
+    );
+
+    let python = FunSpec::builder("work")
+        .add_param(
+            ParameterSpec::builder("value", TypeName::primitive("Value"))
+                .default_value(CodeBlock::of("None", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .annotation(CodeBlock::of("@raw", ()).unwrap())
+        .is_async()
+        .body(CodeBlock::of("return value", ()).unwrap())
+        .build()
+        .unwrap();
+    let python = render(&python, &sigil_stitch::lang::python::Python::new(), 80);
+    assert!(
+        python.contains("@raw\nasync def work(value: Value = None):"),
+        "{python}"
+    );
+}
+
+#[test]
+fn rust_scala_and_swift_lower_reachable_function_features() {
+    let rust = FunSpec::builder("work")
+        .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
+        .suffix("/* tail */")
+        .build()
+        .unwrap();
+    let rust = render_in_context(
+        &rust,
+        &sigil_stitch::lang::rust::Rust::new(),
+        DeclarationContext::InterfaceMember,
+        80,
+    );
+    assert_eq!(rust, "fn work(value: Value) /* tail */;\n");
+
+    let scala = FunSpec::builder("work")
+        .add_param(
+            ParameterSpec::builder("value", TypeName::primitive("Value"))
+                .default_value(CodeBlock::of("seed", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .annotation(CodeBlock::of("@raw", ()).unwrap())
+        .suffix("/* tail */")
+        .is_override()
+        .body(CodeBlock::of("use(value)", ()).unwrap())
+        .build()
+        .unwrap();
+    let scala = render_in_context(
+        &scala,
+        &sigil_stitch::lang::scala::Scala::new(),
+        DeclarationContext::Member,
+        80,
+    );
+    assert!(
+        scala.contains("@raw\noverride def work(value: Value = seed) /* tail */ = {"),
+        "{scala}"
+    );
+
+    let swift = FunSpec::builder("work")
+        .add_param(
+            ParameterSpec::builder("value", TypeName::primitive("Value"))
+                .default_value(CodeBlock::of("seed", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .annotate(AnnotationSpec::new("tracked"))
+        .annotation(CodeBlock::of("@raw", ()).unwrap())
+        .suffix("throws")
+        .is_static()
+        .body(CodeBlock::of("use(value)", ()).unwrap())
+        .build()
+        .unwrap();
+    let swift = render_in_context(
+        &swift,
+        &sigil_stitch::lang::swift::Swift::new(),
+        DeclarationContext::Member,
+        80,
+    );
+    assert!(
+        swift.contains("@tracked\n@raw\nstatic func work(value: Value = seed) throws {"),
+        "{swift}"
+    );
+}
+
 fn render(function: &FunSpec, lang: &dyn CodeLang, width: usize) -> String {
-    let block = function.emit(lang, DeclarationContext::TopLevel).unwrap();
+    render_in_context(function, lang, DeclarationContext::TopLevel, width)
+}
+
+fn render_in_context(
+    function: &FunSpec,
+    lang: &dyn CodeLang,
+    context: DeclarationContext,
+    width: usize,
+) -> String {
+    let block = function.emit(lang, context).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
     let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, width);
     renderer.render(&block).unwrap()

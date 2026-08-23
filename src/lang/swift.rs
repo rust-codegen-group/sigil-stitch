@@ -404,6 +404,13 @@ impl CodeLang for Swift {
             .with_properties(crate::lang::property_lowering::swift::PROFILES)
     }
 
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::swift_function_lowering::lower(self, function)
+    }
+
     fn validate_fields(
         &self,
         fields: crate::lang::FieldSequenceIntent<'_>,
@@ -446,6 +453,23 @@ impl CodeLang for Swift {
         property: crate::lang::ValidatedProperty<'_>,
     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         crate::lang::property_lowering::swift::lower(self, property)
+    }
+
+    fn validate_type_members(
+        &self,
+        members: crate::lang::TypeMembersIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::type_members_validation::swift::validate(self, members)
+    }
+
+    fn collect_type_members_validation_errors(
+        &self,
+        members: crate::lang::TypeMembersIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::type_members_validation::swift::collect_validation_errors(
+            self, members, errors,
+        );
     }
 
     fn validate_variants(

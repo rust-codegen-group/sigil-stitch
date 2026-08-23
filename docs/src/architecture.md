@@ -5,10 +5,13 @@ text. It covers ownership, the materialization and rendering pipeline, and
 import resolution.
 
 The function, field, property, and enum-variant declaration-lowering seams
-described here are implemented. Some other pre-0.6.8 compatibility paths still
-let generic spec emitters interpret shared syntax configuration. Those paths are
-transitional and must not be expanded. See [Declaration Specs and Language
-Lowering](declaration_lowering.md) for the decision and migration rules.
+described here are implemented for every built-in language. Type declarations
+still have a pre-0.6.8 compatibility path in which the generic spec emitter
+interprets shared syntax configuration. That path is transitional and must not
+be expanded. See [Declaration Specs and Language
+Lowering](declaration_lowering.md) for the ownership decision and [0.6.8 Legacy
+Compatibility and Migration](legacy_compatibility_and_migration.md) for the
+versioned compatibility contract.
 
 ## Pipeline and Ownership
 
@@ -80,18 +83,12 @@ Each supported language implements both traits in its own module
 `rewrite_nodes()` for structural or literal fixups such as Go IIFE `}()` fusion
 or C++ lambda `};` semicolons.
 
-The existing `function_syntax()`, `type_decl_syntax()`, and
-`enum_and_annotation()` accessors belong to compatibility lowering paths.
-Private compatibility modules interpret the function, field, property, and
-enum-variant portions for pre-0.6.8 external adapters; some other specs still
-interpret the remaining legacy fields directly. All three accessors and their
-configuration types are deprecated, as are `doc_before_annotations()`,
-`doc_comment_inside_body()`, the field-only `optional_field_style()` and
-`OptionalFieldStyle` API, and the property-only `property_style()`,
-`property_getter_keyword()`, and `PropertyStyle` API. Existing adapters may
-retain them while their declaration paths are migrated, but new adapters and
-new syntax dimensions must use language-owned lowering. Stable renderer policy
-and the separately documented `TypeName` presentation seam are lower-level
+Deprecated declaration-grammar accessors remain only at compatibility
+boundaries for external adapters and the transitional `TypeSpec` emitter. New
+adapters and new syntax dimensions use language-owned lowering. The complete
+inventory and migration replacements are in [0.6.8 Legacy Compatibility and
+Migration](legacy_compatibility_and_migration.md). Stable renderer policy and
+the separately documented `TypeName` presentation seam are lower-level
 concerns, not permission for specs to interpret target grammar.
 
 At the macro level, the `MacroLang` enum (`macros/src/parse/lang.rs`) provides compile-time language-aware tokenizer annotations. Languages like Bash, Zsh, Go, and Haskell get specialized spacing rules in `sigil_quote!` without runtime overhead. See [Language-Aware Tokenizer](macrolang.md).
@@ -239,10 +236,15 @@ Owner-wide validation is a separate concern from property lowering.
 properties, and explicit methods after the per-family checks have run. The
 crate rejects exact duplicate property names; an adapter uses
 `collect_type_members_validation_errors()` for relationships created by its
-own lowering. PHP, for example, checks the case-insensitive method namespace
-that contains both derived property accessors and explicit methods. This intent
-contains no placement or syntax data, has no validated wrapper, and never
-enters the materialization pipeline.
+own lowering. PHP checks the case-insensitive method namespace that contains
+derived property accessors and explicit methods. TypeScript, Kotlin, Swift,
+and Scala reject field/property names that their lowering maps into the same
+target-local namespace; TypeScript private names and the TypeScript and Swift
+static namespaces remain distinct. TypeScript, Swift, and Scala also reject
+corresponding explicit-method collisions within the same namespace. These
+rules remain language-local because the namespaces and derived names differ.
+This intent contains no placement or syntax data, has no validated wrapper,
+and never enters the materialization pipeline.
 
 The intended declaration path is:
 
@@ -270,10 +272,10 @@ recognizes the documented 0.6.8 `is_static` plus decorator pattern solely as a
 frozen adapter-local compatibility exception. New semantics must not extend
 that recognizer or add a shared syntax hook.
 
-The current compatibility emitter still reads pre-0.6.8 syntax configuration
-inside several specs. Migration moves complete declaration lowering behind the
-language adapter while preserving that path as a default for existing external
-adapters.
+The current type compatibility emitter still reads pre-0.6.8 syntax
+configuration inside `TypeSpec`. Complete type-declaration migration will move
+that grammar behind the language adapter while preserving a frozen default for
+existing external adapters.
 
 ## Three-Pass Rendering Pipeline
 

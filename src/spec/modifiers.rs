@@ -64,6 +64,7 @@ pub enum PropertyStyle {
 }
 
 /// Where a constructor delegation call (`super(...)` / `this(...)`) is placed.
+#[deprecated(note = "legacy 0.6.8 function grammar; implement CodeLang::lower_function instead")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ConstructorDelegationStyle {
     /// Delegation is the first statement in the constructor body.

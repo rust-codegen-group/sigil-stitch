@@ -46,3 +46,4 @@
 # Appendix
 
 - [Code Generation Vocabulary](code_generation_vocabulary.md)
+- [0.6.8 Legacy Compatibility and Migration](legacy_compatibility_and_migration.md)

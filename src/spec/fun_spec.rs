@@ -13,6 +13,7 @@ use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
 use crate::type_name::TypeName;
 
 /// How function parameter lists are formatted.
+#[deprecated(note = "legacy 0.6.8 function grammar; implement CodeLang::lower_function instead")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParamListStyle {
     /// All params in a single `(name: T, name: T)` list (most languages).
@@ -22,6 +23,7 @@ pub enum ParamListStyle {
 }
 
 /// How function signatures are rendered.
+#[deprecated(note = "legacy 0.6.8 function grammar; implement CodeLang::lower_function instead")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FunctionSignatureStyle {
     /// Single line: `fn add(x: Int, y: Int) -> Int {` (most languages).

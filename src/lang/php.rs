@@ -341,6 +341,13 @@ impl CodeLang for Php {
             .with_properties(crate::lang::property_lowering::php::PROFILES)
     }
 
+    fn lower_function(
+        &self,
+        function: crate::spec::fun_spec::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::php_function_lowering::lower(self, function)
+    }
+
     fn escape_field_name(&self, name: &str) -> String {
         name.to_string()
     }

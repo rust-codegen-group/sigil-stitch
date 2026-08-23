@@ -12,6 +12,11 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TypeMemberNameOrigin {
+    /// A stored field declaration.
+    StoredField {
+        /// Semantic field name supplied by the caller.
+        field_name: String,
+    },
     /// Read behavior lowered from a computed property.
     PropertyReadAccessor {
         /// The semantic property name.
@@ -32,6 +37,9 @@ pub enum TypeMemberNameOrigin {
 impl std::fmt::Display for TypeMemberNameOrigin {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::StoredField { field_name } => {
+                write!(formatter, "stored field {field_name:?}")
+            }
             Self::PropertyReadAccessor { property_name } => {
                 write!(formatter, "read accessor of property {property_name:?}")
             }
