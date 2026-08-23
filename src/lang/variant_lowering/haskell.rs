@@ -7,7 +7,7 @@ use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
 use crate::lang::haskell::Haskell;
 use crate::spec::enum_variant_spec::{ValidatedVariants, VariantIntent};
-use crate::spec::modifiers::Visibility;
+use crate::spec::field_spec::{FieldSequenceIntent, FieldSpec};
 
 use super::{collect_legacy_value_errors, emit_doc};
 
@@ -32,42 +32,8 @@ pub(crate) fn collect_validation_errors(
     collect_legacy_value_errors(language, &variants, errors);
     let mut record_selectors = std::collections::HashMap::new();
     for variant in variants.variants() {
-        let mut escaped_field_names = std::collections::HashMap::new();
         for field in variant.record_payload() {
             let escaped_field_name = lang.escape_field_name(field.name());
-            if let Some(previous_name) = escaped_field_names
-                .insert(escaped_field_name.clone(), field.name())
-                .filter(|previous_name| *previous_name != field.name())
-            {
-                errors.push(SigilStitchError::InvalidVariantRecordField {
-                    language: language.to_string(),
-                    variant_name: variant.name().to_string(),
-                    field_name: field.name().to_string(),
-                    reason: format!(
-                        "field name collides with {previous_name:?} after both escape as {escaped_field_name:?}"
-                    ),
-                });
-            }
-
-            if field.modifiers.visibility != Visibility::Inherited
-                || field.modifiers.is_static
-                || field.modifiers.is_readonly
-                || field.initializer.is_some()
-                || !field.doc.is_empty()
-                || !field.annotations.is_empty()
-                || !field.annotation_specs.is_empty()
-                || field.tag.is_some()
-                || field.is_optional
-            {
-                errors.push(SigilStitchError::InvalidVariantRecordField {
-                    language: "hs".to_string(),
-                    variant_name: variant.name().to_string(),
-                    field_name: field.name().to_string(),
-                    reason: "record constructor fields currently require a plain name and type"
-                        .to_string(),
-                });
-            }
-
             if let Some((previous_type, previous_variant)) =
                 record_selectors.get(&escaped_field_name).copied()
             {
@@ -109,18 +75,15 @@ pub(crate) fn lower(
             }
         } else if !variant.record_payload().is_empty() {
             block.add(" { ", ());
-            for (field_index, field) in variant.record_payload().iter().enumerate() {
-                if field_index > 0 {
-                    block.add(", ", ());
-                }
-                block.add(
-                    "%L :: %T",
-                    (
-                        lang.escape_field_name(field.name()),
-                        field.field_type().clone(),
-                    ),
-                );
-            }
+            block.add_code(FieldSpec::lower_sequence(
+                FieldSequenceIntent::variant_record_payload(
+                    variant.record_payload(),
+                    variants.owner_name(),
+                    variants.owner_kind(),
+                    variant.name(),
+                ),
+                lang,
+            )?);
             block.add(" }", ());
         }
         block.add_line();

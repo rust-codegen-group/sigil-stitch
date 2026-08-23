@@ -328,6 +328,29 @@ impl CodeLang for Scala {
             .with_types(SCALA_TYPES)
             .with_functions(SCALA_FUNCTIONS)
             .with_variants(SCALA_VARIANTS)
+            .with_fields(crate::lang::field_lowering::scala::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::scala::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::scala::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::scala::lower(self, fields)
     }
 
     fn validate_variants(

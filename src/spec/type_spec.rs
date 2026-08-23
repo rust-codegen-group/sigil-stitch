@@ -6,7 +6,7 @@ use crate::lang::CodeLang;
 use crate::lang::capability::{FunctionCapability, FunctionForm, TypeCapability};
 use crate::spec::annotation_spec::AnnotationSpec;
 use crate::spec::enum_variant_spec::{ConstructorArity, EnumVariantSpec, VariantOwnerContext};
-use crate::spec::field_spec::FieldSpec;
+use crate::spec::field_spec::{FieldSequenceIntent, FieldSpec};
 use crate::spec::fun_spec::FunSpec;
 use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
@@ -146,6 +146,18 @@ impl TypeSpec {
             );
         }
 
+        if !self.fields.is_empty() {
+            let intent = self.field_intent();
+            if lang
+                .capabilities()
+                .supports_type_capability(self.kind, TypeCapability::RecordFields)
+            {
+                FieldSpec::collect_sequence_validation_errors(intent, lang, errors);
+            } else {
+                FieldSpec::collect_sequence_intrinsic_validation_errors(intent, errors);
+            }
+        }
+
         let declaration_context = lang.type_member_declaration_context(self.kind);
         for method in &self.methods {
             let method = self.method_for_context(method, lang, declaration_context);
@@ -270,6 +282,14 @@ impl TypeSpec {
         )
     }
 
+    fn field_intent(&self) -> FieldSequenceIntent<'_> {
+        FieldSequenceIntent::type_members(&self.fields, &self.name, self.kind)
+    }
+
+    fn emit_fields(&self, lang: &dyn CodeLang) -> Result<CodeBlock, SigilStitchError> {
+        FieldSpec::lower_sequence(self.field_intent(), lang)
+    }
+
     fn validate_type(&self, lang: &dyn CodeLang) -> Result<(), crate::error::SigilStitchError> {
         let capabilities = lang.capabilities();
         let language = lang.file_extension().to_string();
@@ -358,12 +378,6 @@ impl TypeSpec {
             !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
             &mut missing,
         );
-        require(
-            TypeCapability::OptionalRecordFields,
-            self.fields.iter().any(|field| field.is_optional),
-            &mut missing,
-        );
-
         if missing.is_empty() {
             Ok(())
         } else {
@@ -446,17 +460,17 @@ impl TypeSpec {
             if !self.variants.is_empty() {
                 self.emit_variants(&mut cb, lang, has_trailing_members)?;
             }
-            for (index, field) in self.fields.iter().enumerate() {
-                if index == 0 && !self.variants.is_empty() {
+            if !self.fields.is_empty() {
+                if !self.variants.is_empty() {
                     cb.add_line();
                 }
-                cb.add_code(field.emit(lang, member_ctx)?);
+                cb.add_code(self.emit_fields(lang)?);
             }
         } else {
             // Preserve pre-0.6.8 external-adapter placement through the
             // private compatibility lowerer.
-            for field in &self.fields {
-                cb.add_code(field.emit(lang, member_ctx)?);
+            if !self.fields.is_empty() {
+                cb.add_code(self.emit_fields(lang)?);
             }
             if !self.variants.is_empty() {
                 if !self.fields.is_empty() {
@@ -543,15 +557,15 @@ impl TypeSpec {
             if !self.variants.is_empty() {
                 self.emit_variants(&mut cb, lang, has_trailing)?;
             }
-            for (index, field) in self.fields.iter().enumerate() {
-                if index == 0 && !self.variants.is_empty() {
+            if !self.fields.is_empty() {
+                if !self.variants.is_empty() {
                     cb.add_line();
                 }
-                cb.add_code(field.emit(lang, DeclarationContext::Member)?);
+                cb.add_code(self.emit_fields(lang)?);
             }
         } else {
-            for field in &self.fields {
-                cb.add_code(field.emit(lang, DeclarationContext::Member)?);
+            if !self.fields.is_empty() {
+                cb.add_code(self.emit_fields(lang)?);
             }
             if !self.variants.is_empty() {
                 if !self.fields.is_empty() {

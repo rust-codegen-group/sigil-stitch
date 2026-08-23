@@ -268,16 +268,12 @@ const CPP_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::ParametricPolymorphism,
     // Attributes = [[attribute]]
     TypeCapability::Attributes,
-    // OptionalRecordFields = std::optional members
-    TypeCapability::OptionalRecordFields,
 ];
 const CPP_RECORD_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = data members
     TypeCapability::RecordFields,
     // Attributes = [[attribute]]
     TypeCapability::Attributes,
-    // OptionalRecordFields = std::optional members
-    TypeCapability::OptionalRecordFields,
 ];
 const CPP_ENUM_CAPABILITIES: &[TypeCapability] = &[
     // Variants = enumerators
@@ -424,6 +420,29 @@ impl CodeLang for Cpp {
             .with_types(CPP_TYPES)
             .with_functions(CPP_FUNCTIONS)
             .with_variants(CPP_VARIANTS)
+            .with_fields(crate::lang::field_lowering::cpp::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::cpp::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::cpp::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::cpp::lower(self, fields)
     }
 
     fn lower_variants(

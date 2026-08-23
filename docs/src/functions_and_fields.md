@@ -82,6 +82,14 @@ spellings such as `val`/`var` in Kotlin or `readonly` in C#.
 
 A struct field or class property: name, type, visibility, static/readonly flags, initializer, annotations, and doc comments.
 
+Fields are validated and lowered as a complete ordered sequence. The selected
+adapter receives a semantic context for direct emission, ordinary type members,
+or a variant record payload. It can therefore validate sibling name collisions
+and own sequence-level grammar such as access sections and separators. Every
+built-in declares explicit field capability profiles; an unsupported context,
+modifier, annotation form, tag, or type requirement returns an error before
+lowering.
+
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
@@ -133,9 +141,10 @@ let field = FieldSpec::builder("Name", TypeName::primitive("string"))
 
 ### Optional fields
 
-`is_optional()` marks a field whose key may be absent (distinct from a value that
-can be `null`). Rendering is language-specific, delegated to
-`CodeLang::optional_field_style()`:
+`is_optional()` marks a field whose key may be absent. This requests
+`FieldCapability::OptionalPresence`, which is distinct from a present value
+that can be `null` or option-like. The selected adapter must explicitly support
+the capability in the current field context:
 
 ```rust
 # extern crate sigil_stitch;
@@ -146,22 +155,35 @@ let field = FieldSpec::builder("email", TypeName::primitive("string"))
     .build()
     .unwrap();
 // TypeScript:  email?: string;
-// JavaScript:  email;                (marker stripped — no optionality in JS)
-// Rust:        email: Option<String>,
-// Go:          Email *string
-// Python:      email: str | None
-// Java:        Optional<String> email;   (caller must import java.util.Optional)
-// Kotlin:      name: String?
-// Swift:       name: String?
-// Dart:        String? name;
-// C:           string *email;
-// C++:         std::optional<string> email;   (caller must #include <optional>)
+// Other built-in adapters currently reject OptionalPresence rather than
+// silently changing its meaning.
 # }
 ```
 
 Use `is_optional()` for "the key might not be there" (e.g., an OpenAPI property
-not listed in `required`). Use `TypeName::optional(...)` for "the value might be
-null" at the type level.
+not listed in `required`). Use `TypeName::optional(...)` for "the field is
+present, but its value might be absent or null" at the type level:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let field = FieldSpec::builder(
+    "email",
+    TypeName::optional(TypeName::primitive("String")),
+)
+.build()
+.unwrap();
+// Rust:   email: Option<String>,
+// Swift:  var email: String?
+// Python: email: String | None
+# }
+```
+
+The deprecated `OptionalFieldStyle` and `CodeLang::optional_field_style()` API
+exists only so adapters written against 0.6.8 keep their frozen output through
+the default compatibility lowerer. New adapters must use field capabilities,
+`TypeName::Optional`, and complete `lower_fields()` implementations instead.
 
 ## FunSpec
 

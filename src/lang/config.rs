@@ -43,40 +43,31 @@ impl QuoteStyle {
 /// by `TypeName::Optional`. A `FieldSpec` marked `is_optional` is rendered
 /// using this style.
 ///
-/// Examples:
-///
-/// | Language | Style | Rendered output |
-/// |----------|-------|-----------------|
-/// | TypeScript | `NameSuffix("?")` | `name?: T` |
-/// | Rust | `TypeWrap { open: "Option<", close: ">" }` | `name: Option<T>` |
-/// | Go | `TypePrefix("*")` | `name *T` |
-/// | Python | `UnionWithNone(" \| ")` | `name: T \| None` |
-/// | Kotlin, Swift, Dart | `TypeSuffix("?")` | `name: T?` or `T? name` |
-/// | Java | `TypeWrap { open: "Optional<", close: ">" }` | `Optional<T> name` |
-/// | C++ | `TypeWrap { open: "std::optional<", close: ">" }` | `std::optional<T> name` |
-/// | C | `TypePrefix("*")` | `T *name` |
-/// | JavaScript, Bash, Zsh | `Ignored` | field rendered without any optionality marker |
+/// This enum freezes the pre-0.6.8 external-adapter contract; it is not the
+/// semantic model for new field lowering. Historically its branches conflated
+/// an absent member with a present nullable or option-like value. New code uses
+/// [`FieldCapability::OptionalPresence`](crate::lang::capability::FieldCapability::OptionalPresence)
+/// for absence and [`TypeName::Optional`](crate::type_name::TypeName::Optional)
+/// for value nullability, then lets the selected language lower those meanings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[deprecated(note = "legacy 0.6.8 field grammar; implement CodeLang::lower_fields instead")]
 pub enum OptionalFieldStyle {
     /// Append a suffix to the field name. TypeScript: `name?: T`.
     NameSuffix(&'static str),
-    /// Append a suffix to the type. Kotlin/Swift/Dart: `T?`.
+    /// Append a suffix to the rendered type in the compatibility lowerer.
     TypeSuffix(&'static str),
-    /// Wrap the type in `open...close`. Rust `Option<T>`, Java `Optional<T>`,
-    /// C++ `std::optional<T>`.
+    /// Wrap the rendered type in `open...close` in the compatibility lowerer.
     TypeWrap {
         /// Opening wrapper, e.g. `"Option<"`.
         open: &'static str,
         /// Closing wrapper, e.g. `">"`.
         close: &'static str,
     },
-    /// Prepend a prefix to the type. Go: `name *T`, C: `T *name`.
+    /// Prepend a prefix to the rendered type in the compatibility lowerer.
     TypePrefix(&'static str),
-    /// Render as a union with `None`. Python: `T | None` (separator is
-    /// language-configurable for future flexibility).
+    /// Append a compatibility-only union branch named `None`.
     UnionWithNone(&'static str),
-    /// Optional fields are not expressible in this language's type system.
-    /// The field is rendered without any marker.
+    /// Preserve the legacy behavior of rendering no marker.
     Ignored,
 }
 

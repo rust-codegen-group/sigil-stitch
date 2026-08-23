@@ -197,8 +197,6 @@ const PHP_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::InterfaceImplementation,
     // Attributes = PHP attributes
     TypeCapability::Attributes,
-    // OptionalRecordFields = nullable properties
-    TypeCapability::OptionalRecordFields,
 ];
 const PHP_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Class, PHP_CLASS_CAPABILITIES),
@@ -339,6 +337,33 @@ impl CodeLang for Php {
             .with_types(PHP_TYPES)
             .with_functions(PHP_FUNCTIONS)
             .with_variants(PHP_VARIANTS)
+            .with_fields(crate::lang::field_lowering::php::PROFILES)
+    }
+
+    fn escape_field_name(&self, name: &str) -> String {
+        name.to_string()
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::field_lowering::php::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<crate::error::SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::php::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::field_lowering::php::lower(self, fields)
     }
 
     fn validate_variants(

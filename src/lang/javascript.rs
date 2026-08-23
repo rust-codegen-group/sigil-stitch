@@ -1,5 +1,6 @@
 //! JavaScript language implementation.
 
+use crate::code_block::CodeBlock;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
@@ -202,20 +203,24 @@ const JS_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::NominalSubtyping,
     // Attributes = decorators
     TypeCapability::Attributes,
-    // OptionalRecordFields = object fields that may be absent
-    TypeCapability::OptionalRecordFields,
+];
+const JS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
+    TypeCapability::RecordFields,
+    TypeCapability::Methods,
+    TypeCapability::NominalSubtyping,
+    TypeCapability::Attributes,
 ];
 const JS_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Class, JS_CLASS_CAPABILITIES),
-    // Struct/Interface/Trait are represented as JavaScript classes.
+    // Struct is represented as a JavaScript class.
     TypeCapabilityProfile::new(TypeKind::Struct, JS_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, JS_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, JS_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, JS_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, JS_CONTRACT_CAPABILITIES),
     // Enum is represented as a class with static members.
     TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
-            // RecordFields = class fields
+            // RecordFields = ordinary class fields
             TypeCapability::RecordFields,
             // Methods = class methods
             TypeCapability::Methods,
@@ -292,6 +297,33 @@ impl CodeLang for JavaScript {
             .with_types(JS_TYPES)
             .with_functions(JS_FUNCTIONS)
             .with_variants(JS_VARIANTS)
+            .with_fields(crate::lang::field_lowering::javascript::PROFILES)
+    }
+
+    fn escape_field_name(&self, name: &str) -> String {
+        name.to_string()
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::field_lowering::javascript::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<crate::error::SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::javascript::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::field_lowering::javascript::lower(self, fields)
     }
 
     fn lower_variants(

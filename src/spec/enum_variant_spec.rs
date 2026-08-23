@@ -5,7 +5,7 @@ use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
 use crate::lang::capability::VariantCapability;
 use crate::spec::annotation_spec::AnnotationSpec;
-use crate::spec::field_spec::FieldSpec;
+use crate::spec::field_spec::{FieldSequenceIntent, FieldSpec};
 use crate::spec::modifiers::TypeKind;
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::type_name::TypeName;
@@ -420,14 +420,9 @@ impl EnumVariantSpec {
             }
         }
 
-        let intrinsic_validity: Vec<_> = variants
-            .iter()
-            .map(|variant| {
-                let initial_error_count = errors.len();
-                variant.collect_intrinsic_validation_errors(errors);
-                errors.len() == initial_error_count
-            })
-            .collect();
+        for variant in variants {
+            variant.collect_intrinsic_validation_errors(errors);
+        }
 
         let capabilities = lang.capabilities();
         if !capabilities.supports_variant_owner(owner_kind) {
@@ -439,10 +434,7 @@ impl EnumVariantSpec {
             return;
         }
 
-        for (variant, intrinsic_is_valid) in variants.iter().zip(intrinsic_validity) {
-            if !intrinsic_is_valid {
-                continue;
-            }
+        for variant in variants {
             let unsupported: Vec<_> = variant
                 .requested_capabilities()
                 .into_iter()
@@ -458,6 +450,22 @@ impl EnumVariantSpec {
                     owner_kind,
                     capabilities: unsupported,
                 });
+            }
+
+            if !variant.record_payload().is_empty() {
+                let field_intent = FieldSequenceIntent::variant_record_payload(
+                    variant.record_payload(),
+                    owner_name,
+                    owner_kind,
+                    variant.name(),
+                );
+                if capabilities
+                    .supports_variant_capability(owner_kind, VariantCapability::RecordPayload)
+                {
+                    FieldSpec::collect_sequence_validation_errors(field_intent, lang, errors);
+                } else {
+                    FieldSpec::collect_sequence_intrinsic_validation_errors(field_intent, errors);
+                }
             }
         }
 
@@ -914,12 +922,15 @@ mod tests {
             .unwrap()];
         let rust = Rust::new();
         assert!(
-            rust.validate_variants(VariantIntent::new(
-                "Owner",
-                TypeKind::Enum,
-                &invalid_rust,
-                context.clone(),
-            ))
+            FieldSpec::validate_sequence(
+                FieldSequenceIntent::variant_record_payload(
+                    invalid_rust[0].record_payload(),
+                    "Owner",
+                    TypeKind::Enum,
+                    "Record",
+                ),
+                &rust,
+            )
             .is_err()
         );
         assert!(

@@ -1,3 +1,5 @@
+use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
@@ -155,7 +157,6 @@ const RUST_RECORD_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::BoundedPolymorphism,
     // Attributes = `#[attr]`
     TypeCapability::Attributes,
-    TypeCapability::OptionalRecordFields,
 ];
 const RUST_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = impl methods
@@ -285,6 +286,29 @@ impl CodeLang for Rust {
             .with_types(RUST_TYPES)
             .with_functions(RUST_FUNCTIONS)
             .with_variants(RUST_VARIANTS)
+            .with_fields(crate::lang::field_lowering::rust::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::field_lowering::rust::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::rust::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::rust::lower(self, fields)
     }
 
     fn validate_variants(

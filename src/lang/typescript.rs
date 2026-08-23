@@ -258,8 +258,6 @@ const TS_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::BoundedPolymorphism,
     // Attributes = decorators
     TypeCapability::Attributes,
-    // OptionalRecordFields = optional properties
-    TypeCapability::OptionalRecordFields,
 ];
 const TS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // RecordFields = properties/fields
@@ -277,8 +275,6 @@ const TS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::BoundedPolymorphism,
     // Attributes = decorators
     TypeCapability::Attributes,
-    // OptionalRecordFields = optional properties
-    TypeCapability::OptionalRecordFields,
 ];
 const TS_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Class, TS_CLASS_CAPABILITIES),
@@ -410,6 +406,29 @@ impl CodeLang for TypeScript {
             .with_types(TS_TYPES)
             .with_functions(TS_FUNCTIONS)
             .with_variants(TS_VARIANTS)
+            .with_fields(crate::lang::field_lowering::typescript::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::typescript::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::typescript::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::typescript::lower(self, fields)
     }
 
     fn lower_variants(

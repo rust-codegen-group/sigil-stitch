@@ -1,5 +1,6 @@
 //! Dart language implementation.
 
+use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
@@ -205,8 +206,6 @@ const DART_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::ParametricPolymorphism,
     // Attributes = metadata annotations
     TypeCapability::Attributes,
-    // OptionalRecordFields = nullable fields
-    TypeCapability::OptionalRecordFields,
 ];
 const DART_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = methods
@@ -341,6 +340,29 @@ impl CodeLang for Dart {
             .with_types(DART_TYPES)
             .with_functions(DART_FUNCTIONS)
             .with_variants(DART_VARIANTS)
+            .with_fields(crate::lang::field_lowering::dart::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::dart::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::dart::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::dart::lower(self, fields)
     }
 
     fn validate_variants(

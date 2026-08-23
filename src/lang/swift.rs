@@ -1,5 +1,6 @@
 //! Swift language implementation.
 
+use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
@@ -254,19 +255,23 @@ const SWIFT_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::BoundedPolymorphism,
     // Attributes = attributes
     TypeCapability::Attributes,
-    // OptionalRecordFields = optional properties
-    TypeCapability::OptionalRecordFields,
+];
+const SWIFT_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
+    TypeCapability::AccessorMethods,
+    TypeCapability::Methods,
+    TypeCapability::NominalSubtyping,
+    TypeCapability::ParametricPolymorphism,
+    TypeCapability::BoundedPolymorphism,
+    TypeCapability::Attributes,
 ];
 const SWIFT_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Class, SWIFT_CLASS_CAPABILITIES),
     TypeCapabilityProfile::new(TypeKind::Struct, SWIFT_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, SWIFT_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Interface, SWIFT_CONTRACT_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Trait, SWIFT_CONTRACT_CAPABILITIES),
     TypeCapabilityProfile::new(
         TypeKind::Enum,
         &[
-            // RecordFields = stored properties
-            TypeCapability::RecordFields,
             // Methods = methods
             TypeCapability::Methods,
             // Attributes = attributes
@@ -396,6 +401,29 @@ impl CodeLang for Swift {
             .with_types(SWIFT_TYPES)
             .with_functions(SWIFT_FUNCTIONS)
             .with_variants(SWIFT_VARIANTS)
+            .with_fields(crate::lang::field_lowering::swift::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::swift::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::swift::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::swift::lower(self, fields)
     }
 
     fn validate_variants(

@@ -73,8 +73,9 @@ Extends `RendererLang` with the additional methods needed by the spec layer.
 Implement `capabilities()` for new adapters. Return a local
 `LanguageCapabilities::strict()` matrix, add `TypeCapabilityProfile`s with
 `with_types()`, add `FunctionCapabilityProfile`s with `with_functions()`, and
-add `VariantCapabilityProfile`s with `with_variants()` for every owning type
-kind that can contain variants.
+add `FieldCapabilityProfile`s with `with_fields()` and
+`VariantCapabilityProfile`s with `with_variants()` for every supported field
+context or owning type kind.
 Function profiles are keyed by both context (`TopLevel`, `ReceiverMethod`,
 `Member`, or `InterfaceMember`) and form (`Function`, `Constructor`, or
 `Destructor`). Omit a profile when that combination is unsupported. Include
@@ -93,6 +94,14 @@ Variant profiles distinguish `Discriminant`, `ConstructorArguments`,
 keywords, delimiters, placement, or separator policy. Omit the owner profile if
 the language cannot represent variants for that `TypeKind`; use an empty
 capability list when simple variants are valid but no richer form is.
+
+Field profiles are keyed by `FieldContext`: direct member emission, ordinary
+members of one `TypeKind`, or record payloads of one variant owner kind. They
+distinguish explicit type information, initializers, attributes, static and
+readonly fields, and `OptionalPresence`. Add `ExplicitType` to the required set
+only where an untyped field cannot be valid. Optional presence means the member
+may be absent; value nullability is expressed separately with
+`TypeName::Optional`.
 
 ### Function Lowering and Compatibility Methods
 
@@ -117,13 +126,24 @@ lowerer derives position and owns all target grammar. Use
 `AnnotationSpec::emit_with_syntax()` when a local annotation spelling must keep
 an importable annotation name as a structured `%T` reference.
 
+`CodeLang::validate_fields()` and `CodeLang::lower_fields()` form the
+corresponding complete-sequence seam for fields. `FieldSequenceIntent` exposes
+the semantic context, owner names when present, and the ordered read-only field
+data. Override `collect_field_validation_errors()` as well when independent
+sibling failures should survive file-level aggregation; its default appends
+the single `validate_fields()` result. `ValidatedFields` is crate-constructed
+after intrinsic, profile, and adapter-local validation. The lowerer owns all
+field grammar, including documentation and annotation order, access sections,
+tags, delimiters, and terminators. Keep every field type in a `%T` slot and
+compose initializers or raw annotations as nested `CodeBlock`s.
+
 The remaining interface mixes semantic validation hooks with older grammar
 fragments used by compatibility lowerers. Grammar-oriented methods must be
 absorbed by complete language-local lowering rather than multiplied:
 
 | Method | Example | Purpose |
 |--------|---------|---------|
-| `capabilities()` | Strict type, function, and variant profiles | Declare semantic representability by context and form |
+| `capabilities()` | Strict type, function, field, and variant profiles | Declare semantic representability by context and form |
 | `render_visibility()` | `"public "`, `"pub "` | Visibility prefix |
 | `function_keyword()` | `"function"`, `"fn"` | Function declaration keyword |
 | `abstract_modifier_capability()` | `AbstractMethod`, `VirtualMethod` | Semantic meaning of the legacy abstract modifier |
@@ -144,6 +164,9 @@ absorbed by complete language-local lowering rather than multiplied:
 | `constructor_return_type_is_valid()` | `true` / `false` for one type | Restrict constructor return annotations after capability validation |
 | `validate_function()` | `FunctionIntent -> Result<(), _>` | Add target-local checks after crate-owned semantic validation |
 | `lower_function()` | `ValidatedFunction -> CodeBlock` | Own complete function grammar; defaults to the frozen compatibility lowerer |
+| `validate_fields()` | `FieldSequenceIntent -> Result<(), _>` | Add target-local checks after crate-owned field validation |
+| `collect_field_validation_errors()` | `FieldSequenceIntent + error sink` | Add independent target-local sibling errors during file validation |
+| `lower_fields()` | `ValidatedFields -> CodeBlock` | Own complete field-sequence grammar; defaults to frozen compatibility lowering |
 | `validate_variants()` | `VariantIntent -> Result<(), _>` | Add target-local checks after crate-owned sequence validation |
 | `collect_variant_validation_errors()` | `VariantIntent + error sink` | Add independent target-local sibling errors during file validation |
 | `lower_variants()` | `ValidatedVariants -> CodeBlock` | Own complete variant-sequence grammar; defaults to frozen compatibility lowering |
@@ -173,10 +196,12 @@ not all have the same architectural role:
 - `function_syntax()`, `type_decl_syntax()`, and
   `enum_and_annotation()` expose declaration grammar that generic specs still
   interpret for pre-0.6.8 adapter compatibility. These accessors and their
-  configuration types are deprecated. New function grammar belongs in
-  `lower_function()` and new variant grammar belongs in `lower_variants()`.
-  Other type/member emitters may temporarily use existing fields where no
-  complete lowering seam exists yet, but must not extend them.
+  configuration types are deprecated. `optional_field_style()` and
+  `OptionalFieldStyle` are likewise deprecated and interpreted only by the
+  frozen external-adapter field compatibility lowerer. New function, field,
+  and variant grammar belongs in `lower_function()`, `lower_fields()`, and
+  `lower_variants()`. Other type/member emitters may temporarily use existing
+  fields where no complete lowering seam exists yet, but must not extend them.
 
 Do not add public flags, enums, or fields to accommodate a new language. A
 previously unseen declaration form is evidence that lowering must move behind
@@ -283,9 +308,12 @@ These methods don't belong to a config struct but have sensible defaults you can
   default is the Rust tuple struct `struct Name(Inner);`.
 - `fun_block_open()` -- custom block opener for functions.
 - `type_header_block_open()` -- custom block opener for type headers.
-- `doc_comment_inside_body()` -- whether doc comments go inside the body (Python docstrings).
-- `doc_before_annotations()` -- whether doc comments appear before annotations.
-- `optional_field_style()` -- how optional fields are represented.
+- `doc_comment_inside_body()` -- deprecated pre-0.6.8 preamble placement;
+  retained while type/property compatibility paths migrate.
+- `doc_before_annotations()` -- deprecated pre-0.6.8 preamble ordering;
+  retained while type/property compatibility paths migrate.
+- `optional_field_style()` -- deprecated pre-0.6.8 field compatibility only;
+  new adapters distinguish `OptionalPresence` from `TypeName::Optional`.
 - `property_style()` -- default `Accessor` (TS/JS: `get name()`). Swift/Kotlin: `Field` (inline get/set).
 - `property_getter_keyword()` -- default `"get"`. Kotlin: `"get()"`.
 - `emit_type_context()` -- optional structured context for split function
@@ -307,23 +335,31 @@ The three `emit_*` type hooks return `Result` so construction failures reach
 `emit_type_close_suffix()` return `Ok(None)` when the language has no fragment
 to add. Use `Arg::TypeName` or `%T` for every semantic type and compose child
 blocks structurally; do not render a `TypeName` to a string inside a hook.
+These fragment hooks return blocks without a trailing newline. A complete
+sequence lowerer such as `lower_fields()` instead owns every line boundary its
+sequence requires, including the boundary after its final declaration; the
+caller owns only spacing between declaration families.
 
 ## Step-by-Step Walkthrough
 
 ### 1. Create the language file
 
-Create `src/lang/your_lang.rs`. Keep semantic types in `%T` slots and return
-blocks without a trailing newline; the spec caller owns surrounding whitespace,
-indentation, and line breaks. Hook errors should be returned unchanged.
+Create `src/lang/your_lang.rs`. Keep semantic types in `%T` slots. Fragment
+hooks omit surrounding whitespace, while complete lowerers own the internal
+and terminating line boundaries required by their grammar. Hook errors should
+be returned unchanged.
 
 ```rust,ignore
 use sigil_stitch::code_block::{Arg, CodeBlock};
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::ImportGroup;
+use sigil_stitch::lang::capability::{
+    FieldCapability, FieldCapabilityProfile, FieldContext, LanguageCapabilities,
+};
 use sigil_stitch::lang::config::{
     BlockSyntaxConfig, GenericSyntaxConfig, TypeDeclSyntaxConfig,
 };
-use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedFunction};
+use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedFields, ValidatedFunction};
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use sigil_stitch::spec::where_spec::{TypeParamSpec, render_type_params};
 use sigil_stitch::type_name::TypeName;
@@ -338,6 +374,24 @@ impl YourLang {
 }
 
 const RESERVED: &[&str] = &["if", "else", "for", "while", /* ... */];
+const FIELD_CAPABILITIES: &[FieldCapability] = &[
+    FieldCapability::ExplicitType,
+    FieldCapability::Initializer,
+];
+const REQUIRED_FIELD_CAPABILITIES: &[FieldCapability] =
+    &[FieldCapability::ExplicitType];
+const FIELD_PROFILES: &[FieldCapabilityProfile<'_>] = &[
+    FieldCapabilityProfile::new(
+        FieldContext::Direct(DeclarationContext::Member),
+        FIELD_CAPABILITIES,
+    )
+    .with_required_capabilities(REQUIRED_FIELD_CAPABILITIES),
+    FieldCapabilityProfile::new(
+        FieldContext::TypeMember(TypeKind::Class),
+        FIELD_CAPABILITIES,
+    )
+    .with_required_capabilities(REQUIRED_FIELD_CAPABILITIES),
+];
 
 impl RendererLang for YourLang {
     fn file_extension(&self) -> &str { "yl" }
@@ -367,6 +421,11 @@ impl RendererLang for YourLang {
 }
 
 impl CodeLang for YourLang {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        // Add the language's exact type, function, and variant profiles too.
+        LanguageCapabilities::strict().with_fields(FIELD_PROFILES)
+    }
+
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         let mut out = String::from("/**\n");
         for line in lines {
@@ -422,6 +481,37 @@ impl CodeLang for YourLang {
             block.add("%<}", ());
         } else {
             block.add(";", ());
+        }
+        block.build()
+    }
+
+    fn lower_fields(
+        &self,
+        fields: ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let mut block = CodeBlock::builder();
+        for field in fields.fields() {
+            if !field.doc().is_empty() {
+                let lines: Vec<&str> = field.doc().iter().map(String::as_str).collect();
+                block.add("%L", self.render_doc_comment(&lines));
+                block.add_line();
+            }
+            block.add(
+                "%L%L: %T",
+                (
+                    self.render_visibility(
+                        field.modifiers().visibility,
+                        DeclarationContext::Member,
+                    ),
+                    self.escape_field_name(field.name()),
+                    field.field_type().clone(),
+                ),
+            );
+            if let Some(initializer) = field.initializer() {
+                block.add(" = %L", initializer.clone());
+            }
+            block.add(";", ());
+            block.add_line();
         }
         block.build()
     }
@@ -528,10 +618,11 @@ just bless
 
 This runs all tests with `BLESS=1`, which creates `test-goldens/your_lang/*.yl` files from the actual output. Review them manually, then commit.
 
-### 5. Complete transitional non-function compatibility
+### 5. Complete transitional declaration compatibility
 
-Run the full test suite and review golden file output. Implement function
-grammar in `lower_function()`. Type and enum declaration forms that have not
+Run the full test suite and review golden file output. Implement function and
+field grammar in `lower_function()` and `lower_fields()`. Type and property
+declaration forms that have not
 yet moved behind a complete language-local seam may still require deprecated
 syntax accessors. Use existing fields only where they already express the
 target, and do not add a shared field or enum for an unseen grammar dimension.
