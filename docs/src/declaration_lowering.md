@@ -156,6 +156,26 @@ fn lower_variants(&self, variants: ValidatedVariants<'_>)
 # }
 ```
 
+Fields also cross the adapter boundary as one complete sequence:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::code_block::CodeBlock;
+# use sigil_stitch::error::SigilStitchError;
+# use sigil_stitch::lang::{FieldSequenceIntent, ValidatedFields};
+# trait Example {
+fn validate_fields(&self, fields: FieldSequenceIntent<'_>)
+    -> Result<(), SigilStitchError>;
+fn collect_field_validation_errors(
+    &self,
+    fields: FieldSequenceIntent<'_>,
+    errors: &mut Vec<SigilStitchError>,
+);
+fn lower_fields(&self, fields: ValidatedFields<'_>)
+    -> Result<CodeBlock, SigilStitchError>;
+# }
+```
+
 `FunctionIntent` provides read-only access after context and form
 classification and crate-owned semantic validation against the selected
 adapter. `ValidatedFunction` can only be constructed by the crate after the
@@ -173,6 +193,24 @@ positional payload, record payload, and attributes—not their spelling. The
 additive collector reports independent sibling failures; `ValidatedVariants`
 is constructed only after intrinsic, profile, and every adapter-local
 validation phase succeeds.
+
+`FieldSequenceIntent` provides every field in declaration order and a semantic
+`FieldContext`: direct emission, ordinary type members, or a variant record
+payload. Owner and variant names are included when they exist. Field profiles
+declare supported and required semantic capabilities for each context, while
+the adapter-local validator handles identifier rules, escaped-name collisions,
+modifier combinations, and target-specific restrictions. The additive
+collector retains independent sibling failures during `FileSpec` validation;
+`ValidatedFields` is created only after intrinsic, profile, and adapter-local
+validation all succeed. `lower_fields()` owns the sequence's complete grammar,
+including documentation, annotations, access sections, tags, separators, and
+declarator restrictions.
+
+Optional presence and optional values are separate semantics. A field marked
+with `FieldSpec::is_optional()` may be absent from its containing value and
+requests `FieldCapability::OptionalPresence`. A `TypeName::Optional(T)` field
+is still present but may hold the target language's option or null
+representation. An adapter must not substitute one meaning for the other.
 
 Each adapter owns the complete ordering and spelling of a declaration. Private
 leaf helpers may render structured fragments such as a parameter list or body,
@@ -192,7 +230,18 @@ interface cannot disappear without a deliberate compatibility decision.
 During migration it may remain behind a default compatibility lowerer for
 external adapters. The `function_syntax()`, `type_decl_syntax()`, and
 `enum_and_annotation()` accessors and their configuration types are deprecated
-to make this boundary visible to adapter authors at compile time.
+to make this boundary visible to adapter authors at compile time. The preamble
+ordering hooks `doc_before_annotations()` and `doc_comment_inside_body()` are
+deprecated for the same reason, although remaining type and property
+compatibility paths still consult them during migration.
+
+Field lowering follows the same compatibility boundary. Strict built-in
+adapters declare field profiles and implement the complete sequence seam.
+Permissive external adapters retain the frozen pre-0.6.8 field emitter as the
+default `lower_fields()` implementation. `optional_field_style()` and
+`OptionalFieldStyle` remain available only for that deprecated compatibility
+path; their historical type-prefix, type-suffix, and wrapper branches conflate
+absence with nullable values and are not a semantic model for new code.
 
 Compatibility is not permission to extend that design:
 

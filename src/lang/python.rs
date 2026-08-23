@@ -314,8 +314,6 @@ const PY_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::InterfaceImplementation,
     // Attributes = decorators
     TypeCapability::Attributes,
-    // OptionalRecordFields = optional instance fields
-    TypeCapability::OptionalRecordFields,
 ];
 const PY_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Class, PY_CLASS_CAPABILITIES),
@@ -457,6 +455,29 @@ impl CodeLang for Python {
             .with_types(PY_TYPES)
             .with_functions(PY_FUNCTIONS)
             .with_variants(PY_VARIANTS)
+            .with_fields(crate::lang::field_lowering::python::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::python::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::python::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::python::lower(self, fields)
     }
 
     fn lower_variants(

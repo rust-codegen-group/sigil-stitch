@@ -3,5 +3,5 @@ data Person =
   Person {
     personName :: String,
     personAge :: Int,
-    personEmail :: String,
+    personEmail :: String
   }

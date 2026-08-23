@@ -4,10 +4,10 @@ This chapter describes how sigil-stitch carries declaration intent to source
 text. It covers ownership, the materialization and rendering pipeline, and
 import resolution.
 
-The function and enum-variant declaration-lowering seams described here are
-implemented. Some other pre-0.6.8 compatibility paths still let generic spec
-emitters interpret shared syntax configuration. Those paths are transitional
-and must not be expanded. See [Declaration Specs and Language
+The function, field, and enum-variant declaration-lowering seams described here
+are implemented. Some other pre-0.6.8 compatibility paths still let generic
+spec emitters interpret shared syntax configuration. Those paths are
+transitional and must not be expanded. See [Declaration Specs and Language
 Lowering](declaration_lowering.md) for the decision and migration rules.
 
 ## Pipeline and Ownership
@@ -51,7 +51,11 @@ rendering IR passed to import resolution and final rendering.
   the selected adapter, `validate_function()` may add target-local checks to a
   classified `FunctionIntent`. sigil-stitch then constructs a
   `ValidatedFunction`; `lower_function()` accepts that validated read-only view
-  and returns a structured `CodeBlock`. Enum variants follow the same pattern:
+  and returns a structured `CodeBlock`. Fields follow the same pattern at
+  sequence granularity: `validate_fields()` receives `FieldSequenceIntent`,
+  `collect_field_validation_errors()` preserves independent sibling failures,
+  and `lower_fields()` receives `ValidatedFields`. Enum variants likewise use
+  a complete sequence:
   `validate_variants()` sees the owning declaration and complete ordered
   `VariantIntent`; adapters with independent per-variant checks implement the
   additive `collect_variant_validation_errors()` seam. `lower_variants()`
@@ -69,14 +73,16 @@ or C++ lambda `};` semicolons.
 
 The existing `function_syntax()`, `type_decl_syntax()`, and
 `enum_and_annotation()` accessors belong to compatibility lowering paths.
-Private compatibility modules interpret the function and enum-variant portions
-for pre-0.6.8 external adapters; some other specs still interpret the remaining
-legacy fields directly. All three accessors and their configuration types are
-deprecated: existing adapters may retain them while their declaration paths
-are migrated, but new adapters and new syntax dimensions must use
-language-owned lowering. Stable renderer policy and the separately documented
-`TypeName` presentation seam are lower-level concerns, not permission for
-specs to interpret target grammar.
+Private compatibility modules interpret the function, field, and enum-variant
+portions for pre-0.6.8 external adapters; some other specs still interpret the
+remaining legacy fields directly. All three accessors and their configuration
+types are deprecated, as are `doc_before_annotations()`,
+`doc_comment_inside_body()`, and the field-only `optional_field_style()` and
+`OptionalFieldStyle` compatibility API. Existing adapters may retain them while
+their declaration paths are migrated, but new adapters and new syntax
+dimensions must use language-owned lowering. Stable renderer policy and the
+separately documented `TypeName` presentation seam are lower-level concerns,
+not permission for specs to interpret target grammar.
 
 At the macro level, the `MacroLang` enum (`macros/src/parse/lang.rs`) provides compile-time language-aware tokenizer annotations. Languages like Bash, Zsh, Go, and Haskell get specialized spacing rules in `sigil_quote!` without runtime overhead. See [Language-Aware Tokenizer](macrolang.md).
 
@@ -188,6 +194,26 @@ compatibility path; strict built-ins reject ownerless direct emission because
 caller-supplied first/last flags cannot prove valid separators or section
 termination.
 
+Fields are lowered as one `FieldSequenceIntent`. Its `FieldContext`
+distinguishes direct emission, ordinary type members, and variant record
+payloads without carrying punctuation or a new placement policy. The
+`Direct(DeclarationContext)` payload preserves only the pre-0.6.8 direct-field
+placement input as a narrow compatibility exception; it is not a reusable
+target-grammar abstraction. Field capability profiles declare which semantic
+facts each context supports or requires.
+Intrinsic checks run even when the owning type or payload form is unsupported,
+so malformed serialized fields still participate in aggregate validation.
+Adapter-local collection then validates identifiers, emitted-name collisions,
+modifier combinations, annotations, tags, and other target rules. Only the
+crate can construct `ValidatedFields`, and only after the complete sequence has
+passed every phase.
+
+`FieldCapability::OptionalPresence` means that the containing value may omit a
+field. `TypeName::Optional(T)` means that a present field can carry an option or
+null value. Keeping those semantics separate prevents an adapter from silently
+turning absence into nullability. Built-in adapters accept optional presence
+only where the target representation preserves it.
+
 The intended declaration path is:
 
 ```text
@@ -224,7 +250,7 @@ adapters.
 `FileSpec::render(width)` drives everything. It runs three passes over the file's members.
 
 Before materialization, `FileSpec::validate()` checks every `TypeSpec` against
-the type, function, and enum-variant profiles returned by
+the type, function, field, and enum-variant profiles returned by
 `CodeLang::capabilities()`.
 Function validation distinguishes free functions, receiver methods, concrete
 members, and interface members, then selects an ordinary-function, constructor,
@@ -274,14 +300,14 @@ Declaration specs are validated and converted to `CodeBlock`s:
 - `FileMember::Code(CodeBlock)` passes through unchanged
 - `FileMember::RawContent(String)` passes through as-is
 
-The public function and owner-aware variant `emit` paths apply crate-owned
-semantic validation, call the corresponding `CodeLang::validate_*()` method
-for additional target-local checks, construct a `ValidatedFunction` or
-`ValidatedVariants`, and then call the matching `CodeLang::lower_*()` method.
-The defaults delegate to frozen legacy-syntax compatibility modules so
-pre-0.6.8 external adapters remain source compatible. Built-in complete
-lowerers do not consume deprecated declaration configuration for the migrated
-family.
+The public function, field, and owner-aware variant `emit` paths apply
+crate-owned semantic validation, call the corresponding
+`CodeLang::validate_*()` method for additional target-local checks, construct a
+`ValidatedFunction`, `ValidatedFields`, or `ValidatedVariants`, and then call
+the matching `CodeLang::lower_*()` method. The defaults delegate to frozen
+legacy-syntax compatibility modules so pre-0.6.8 external adapters remain
+source compatible. Built-in complete lowerers do not consume deprecated
+declaration configuration for the migrated family.
 
 Language lowering composes structured child blocks and preserves every
 `TypeName` as a `TypeRef`. Construction errors propagate from this pass; they

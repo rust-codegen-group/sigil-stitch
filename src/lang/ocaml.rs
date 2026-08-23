@@ -1,5 +1,6 @@
 //! OCaml language implementation.
 
+use crate::code_block::CodeBlock;
 use crate::code_node::BlockIntent;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
@@ -326,6 +327,29 @@ impl CodeLang for OCaml {
             .with_types(OCAML_TYPES)
             .with_functions(OCAML_FUNCTIONS)
             .with_variants(OCAML_VARIANTS)
+            .with_fields(crate::lang::field_lowering::ocaml::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::ocaml::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::ocaml::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::ocaml::lower(self, fields)
     }
 
     fn validate_variants(
@@ -419,14 +443,18 @@ impl CodeLang for OCaml {
 
     fn type_body_prefix(&self, _name: &str, kind: crate::spec::modifiers::TypeKind) -> String {
         match kind {
-            crate::spec::modifiers::TypeKind::Struct => "{".to_string(),
+            crate::spec::modifiers::TypeKind::Struct | crate::spec::modifiers::TypeKind::Class => {
+                "{".to_string()
+            }
             _ => String::new(),
         }
     }
 
     fn type_body_suffix(&self, _name: &str, kind: crate::spec::modifiers::TypeKind) -> String {
         match kind {
-            crate::spec::modifiers::TypeKind::Struct => "}".to_string(),
+            crate::spec::modifiers::TypeKind::Struct | crate::spec::modifiers::TypeKind::Class => {
+                "}".to_string()
+            }
             _ => String::new(),
         }
     }

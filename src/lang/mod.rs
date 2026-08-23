@@ -48,6 +48,7 @@ pub mod rewrite;
 
 mod cpp_function_lowering;
 mod csharp_function_lowering;
+pub(crate) mod field_lowering;
 mod function_lowering;
 mod kotlin_function_lowering;
 mod typescript_function_lowering;
@@ -61,6 +62,7 @@ use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionContext, FunctionForm, LanguageCapabilities,
 };
 pub use crate::spec::enum_variant_spec::{ValidatedVariants, VariantIntent};
+pub use crate::spec::field_spec::{FieldSequenceIntent, ValidatedFields};
 pub use crate::spec::fun_spec::{FunctionIntent, ValidatedFunction};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
@@ -519,6 +521,39 @@ pub trait CodeLang: RendererLang {
         function_lowering::lower_compatibility(self, function)
     }
 
+    /// Apply additional target-specific validation to one complete field sequence.
+    ///
+    /// Crate-owned modifier, duplicate-name, context, supported-capability, and
+    /// required-capability checks run first. An override can only add local
+    /// rules such as visibility, annotation-form, tag, or identifier checks.
+    fn validate_fields(&self, _fields: FieldSequenceIntent<'_>) -> Result<(), SigilStitchError> {
+        Ok(())
+    }
+
+    /// Collect target-specific failures for one complete field sequence.
+    ///
+    /// The default preserves adapters that implement [`CodeLang::validate_fields`]
+    /// by appending its single result. Built-ins may override this to retain
+    /// independent sibling failures during file validation.
+    fn collect_field_validation_errors(
+        &self,
+        fields: FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        if let Err(error) = self.validate_fields(fields) {
+            errors.push(error);
+        }
+    }
+
+    /// Lower one fully validated field sequence into structured output.
+    ///
+    /// The default is the frozen pre-0.6.8 compatibility implementation for
+    /// permissive external adapters. Built-ins override this complete seam and
+    /// do not interpret shared declaration syntax configuration.
+    fn lower_fields(&self, fields: ValidatedFields<'_>) -> Result<CodeBlock, SigilStitchError> {
+        field_lowering::lower_compatibility(self, fields)
+    }
+
     /// Apply additional target-specific validation to one owner-aware variant sequence.
     ///
     /// Intrinsic and capability validation run against this same adapter before
@@ -687,6 +722,9 @@ pub trait CodeLang: RendererLang {
     /// rather than above the declaration.
     ///
     /// Default: `false`. Python overrides to `true` (docstrings go inside the body).
+    #[deprecated(
+        note = "legacy 0.6.8 preamble grammar; implement complete declaration lowerers instead"
+    )]
     fn doc_comment_inside_body(&self) -> bool {
         false
     }
@@ -694,6 +732,9 @@ pub trait CodeLang: RendererLang {
     /// Whether doc comments should be emitted before annotations/attributes.
     ///
     /// Default: `true`.
+    #[deprecated(
+        note = "legacy 0.6.8 preamble grammar; implement complete declaration lowerers instead"
+    )]
     fn doc_before_annotations(&self) -> bool {
         true
     }
@@ -701,6 +742,7 @@ pub trait CodeLang: RendererLang {
     /// How this language expresses that a field is optional (key may be absent).
     ///
     /// Default: `OptionalFieldStyle::Ignored`.
+    #[deprecated(note = "legacy 0.6.8 field grammar; implement CodeLang::lower_fields instead")]
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::Ignored
     }

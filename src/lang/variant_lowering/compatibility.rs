@@ -97,7 +97,12 @@ pub(crate) fn lower_legacy_into<L: CodeLang + ?Sized>(
         block.add_line();
         block.add("%>", ());
         for field in &variant.fields {
-            block.add_code(field.emit_with(lang, DeclarationContext::Member)?);
+            crate::lang::field_lowering::lower_compatibility_one(
+                block,
+                lang,
+                field,
+                DeclarationContext::Member,
+            )?;
         }
         block.add("%<", ());
         if context.is_last

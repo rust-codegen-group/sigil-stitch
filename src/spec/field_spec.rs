@@ -1,11 +1,105 @@
 //! Field specification for struct fields / class properties.
 
-use crate::code_block::{Arg, CodeBlock};
+use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
-use crate::lang::config::OptionalFieldStyle;
+use crate::lang::capability::{FieldCapability, FieldContext};
 use crate::spec::annotation_spec::AnnotationSpec;
-use crate::spec::modifiers::{DeclarationContext, Modifiers, Visibility};
+use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
 use crate::type_name::TypeName;
+
+/// Read-only semantic intent for one complete field sequence.
+///
+/// The selected context carries owner meaning without exposing target grammar
+/// or caller-supplied separator state.
+#[derive(Debug, Clone, Copy)]
+pub struct FieldSequenceIntent<'a> {
+    fields: &'a [FieldSpec],
+    context: FieldContext,
+    owner_name: Option<&'a str>,
+    variant_name: Option<&'a str>,
+}
+
+impl<'a> FieldSequenceIntent<'a> {
+    fn direct(fields: &'a [FieldSpec], declaration_context: DeclarationContext) -> Self {
+        Self {
+            fields,
+            context: FieldContext::Direct(declaration_context),
+            owner_name: None,
+            variant_name: None,
+        }
+    }
+
+    pub(crate) fn type_members(
+        fields: &'a [FieldSpec],
+        owner_name: &'a str,
+        owner_kind: TypeKind,
+    ) -> Self {
+        Self {
+            fields,
+            context: FieldContext::TypeMember(owner_kind),
+            owner_name: Some(owner_name),
+            variant_name: None,
+        }
+    }
+
+    pub(crate) fn variant_record_payload(
+        fields: &'a [FieldSpec],
+        owner_name: &'a str,
+        owner_kind: TypeKind,
+        variant_name: &'a str,
+    ) -> Self {
+        Self {
+            fields,
+            context: FieldContext::VariantRecordPayload(owner_kind),
+            owner_name: Some(owner_name),
+            variant_name: Some(variant_name),
+        }
+    }
+
+    /// Fields in declaration order.
+    pub fn fields(&self) -> &'a [FieldSpec] {
+        self.fields
+    }
+
+    /// Semantic context for the complete sequence.
+    pub fn context(&self) -> FieldContext {
+        self.context
+    }
+
+    /// Name of the owning type, when the sequence has one.
+    pub fn owner_name(&self) -> Option<&'a str> {
+        self.owner_name
+    }
+
+    /// Name of the owning variant for a record payload.
+    pub fn variant_name(&self) -> Option<&'a str> {
+        self.variant_name
+    }
+}
+
+/// Field-sequence intent whose intrinsic and target validation succeeded.
+///
+/// Only sigil-stitch constructs this wrapper, so lowerers cannot bypass the
+/// selected adapter's capability profile and additive validation.
+#[derive(Debug, Clone)]
+pub struct ValidatedFields<'a> {
+    intent: FieldSequenceIntent<'a>,
+}
+
+impl<'a> ValidatedFields<'a> {
+    fn new(intent: FieldSequenceIntent<'a>) -> Self {
+        Self { intent }
+    }
+}
+
+impl<'a> std::ops::Deref for ValidatedFields<'a> {
+    type Target = FieldSequenceIntent<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.intent
+    }
+}
 
 /// A single field/property in a struct or class.
 ///
@@ -42,8 +136,8 @@ pub struct FieldSpec {
     /// Whether this field is optional (key may be absent from the containing value).
     ///
     /// Distinct from nullability (value may be `null`), which is expressed via
-    /// [`TypeName::Optional`]. Rendering is delegated to
-    /// [`CodeLang::optional_field_style`].
+    /// [`TypeName::Optional`]. The selected language adapter validates and
+    /// lowers this intent in the complete field sequence.
     pub(crate) is_optional: bool,
 }
 
@@ -127,145 +221,174 @@ impl FieldSpec {
         &self,
         lang: &dyn CodeLang,
         ctx: DeclarationContext,
-    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        self.emit_with(lang, ctx)
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let fields = std::slice::from_ref(self);
+        Self::lower_sequence(FieldSequenceIntent::direct(fields, ctx), lang)
     }
 
-    pub(crate) fn emit_with<L: CodeLang + ?Sized>(
+    pub(crate) fn collect_sequence_validation_errors(
+        intent: FieldSequenceIntent<'_>,
+        lang: &dyn CodeLang,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        Self::collect_sequence_intrinsic_validation_errors(intent, errors);
+        Self::collect_sequence_target_validation_errors(intent, lang, errors);
+    }
+
+    pub(crate) fn collect_sequence_intrinsic_validation_errors(
+        intent: FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        let context = intent.context();
+        let mut seen_names = std::collections::HashSet::new();
+        let mut reported_names = std::collections::HashSet::new();
+        for field in intent.fields() {
+            field.collect_intrinsic_validation_errors(context, errors);
+
+            if !seen_names.insert(field.name())
+                && reported_names.insert(field.name())
+                && intent.variant_name().is_none()
+            {
+                errors.push(SigilStitchError::DuplicateFieldName {
+                    type_name: intent.owner_name().unwrap_or("<direct fields>").to_string(),
+                    field_name: field.name().to_string(),
+                });
+            }
+        }
+    }
+
+    fn collect_sequence_target_validation_errors(
+        intent: FieldSequenceIntent<'_>,
+        lang: &dyn CodeLang,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        let context = intent.context();
+        let capabilities = lang.capabilities();
+        if !capabilities.supports_field_context(context) {
+            errors.push(SigilStitchError::UnsupportedFieldContext {
+                language: lang.file_extension().to_string(),
+                context,
+                owner_name: intent.owner_name().map(str::to_string),
+            });
+            return;
+        }
+
+        for field in intent.fields() {
+            let requested = field.requested_capabilities();
+            let unsupported: Vec<_> = requested
+                .iter()
+                .copied()
+                .filter(|capability| !capabilities.supports_field_capability(context, *capability))
+                .collect();
+            if !unsupported.is_empty() {
+                errors.push(SigilStitchError::UnsupportedFieldCapabilities {
+                    language: lang.file_extension().to_string(),
+                    field_name: field.name.clone(),
+                    context,
+                    capabilities: unsupported,
+                });
+            }
+
+            let missing: Vec<_> = capabilities
+                .required_field_capabilities(context)
+                .iter()
+                .copied()
+                .filter(|capability| !requested.contains(capability))
+                .collect();
+            if !missing.is_empty() {
+                errors.push(SigilStitchError::MissingRequiredFieldCapabilities {
+                    language: lang.file_extension().to_string(),
+                    field_name: field.name.clone(),
+                    context,
+                    capabilities: missing,
+                });
+            }
+        }
+
+        lang.collect_field_validation_errors(intent, errors);
+    }
+
+    pub(crate) fn collect_intrinsic_validation_errors(
         &self,
-        lang: &L,
-        ctx: DeclarationContext,
-    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let mut cb = CodeBlock::builder();
-
-        let emit_doc = || -> Option<String> {
-            if self.doc.is_empty() {
-                return None;
-            }
-            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-            Some(lang.render_doc_comment(&doc_lines))
-        };
-
-        if lang.doc_before_annotations()
-            && let Some(doc_str) = emit_doc()
-        {
-            cb.add("%L", doc_str);
-            cb.add_line();
+        context: FieldContext,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        if self.name.is_empty() {
+            errors.push(SigilStitchError::EmptyName {
+                builder: "FieldSpec",
+            });
+        }
+        if self.initializer.as_ref().is_some_and(CodeBlock::is_empty) {
+            errors.push(SigilStitchError::EmptyFieldOperand {
+                field_name: self.name.clone(),
+                context,
+                operand: "initializer",
+            });
         }
 
-        for spec in &self.annotation_specs {
-            cb.add_code(spec.emit_with(lang)?);
-            cb.add_line();
+        let mut invalid_modifiers = Vec::new();
+        if self.modifiers.is_abstract {
+            invalid_modifiers.push("abstract");
         }
-        for ann in &self.annotations {
-            cb.add_code(ann.clone());
-            cb.add_line();
+        if self.modifiers.is_async {
+            invalid_modifiers.push("async");
         }
-
-        if !lang.doc_before_annotations()
-            && let Some(doc_str) = emit_doc()
-        {
-            cb.add("%L", doc_str);
-            cb.add_line();
+        if self.modifiers.is_override {
+            invalid_modifiers.push("override");
         }
+        if self.modifiers.is_constructor {
+            invalid_modifiers.push("constructor");
+        }
+        if !invalid_modifiers.is_empty() {
+            errors.push(SigilStitchError::InvalidFieldModifiers {
+                field_name: self.name.clone(),
+                context,
+                modifiers: invalid_modifiers,
+            });
+        }
+    }
 
-        // Build the field line.
-        let vis = lang.render_visibility(self.modifiers.visibility, ctx);
-        let term = lang.block_syntax().field_terminator;
+    pub(crate) fn validate_sequence<'a>(
+        intent: FieldSequenceIntent<'a>,
+        lang: &dyn CodeLang,
+    ) -> Result<ValidatedFields<'a>, SigilStitchError> {
+        let mut errors = Vec::new();
+        Self::collect_sequence_validation_errors(intent, lang, &mut errors);
+        if let Some(error) = errors.into_iter().next() {
+            return Err(error);
+        }
+        Ok(ValidatedFields::new(intent))
+    }
 
-        let mut fmt = String::new();
-        let mut args: Vec<Arg> = Vec::new();
+    pub(crate) fn lower_sequence(
+        intent: FieldSequenceIntent<'_>,
+        lang: &dyn CodeLang,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        let fields = Self::validate_sequence(intent, lang)?;
+        lang.lower_fields(fields)
+    }
 
-        fmt.push_str(vis);
+    fn requested_capabilities(&self) -> Vec<FieldCapability> {
+        let mut capabilities = Vec::new();
+        if !self.field_type.is_empty() {
+            capabilities.push(FieldCapability::ExplicitType);
+        }
+        if self.initializer.is_some() {
+            capabilities.push(FieldCapability::Initializer);
+        }
+        if !self.annotations.is_empty() || !self.annotation_specs.is_empty() || self.tag.is_some() {
+            capabilities.push(FieldCapability::Attributes);
+        }
         if self.modifiers.is_static {
-            fmt.push_str(lang.function_syntax().static_keyword);
+            capabilities.push(FieldCapability::StaticField);
         }
-
-        // Resolve the optional-field style (only applied when `is_optional` is set).
-        let opt_style = if self.is_optional {
-            lang.optional_field_style()
-        } else {
-            OptionalFieldStyle::Ignored
-        };
-        let type_before = lang.type_decl_syntax().type_before_name;
-
-        let name_suffix: &str = match opt_style {
-            OptionalFieldStyle::NameSuffix(s) => s,
-            _ => "",
-        };
-        let name_prefix: &str = match opt_style {
-            // In type-before-name languages the prefix attaches to the name
-            // position (C: `T *name`).
-            OptionalFieldStyle::TypePrefix(s) if type_before => s,
-            _ => "",
-        };
-        let (type_pre, type_post): (String, String) = match opt_style {
-            OptionalFieldStyle::TypeSuffix(s) => (String::new(), s.to_string()),
-            OptionalFieldStyle::TypeWrap { open, close } => (open.to_string(), close.to_string()),
-            // In name-before-type languages the prefix attaches to the type
-            // position (Go: `name *T`).
-            OptionalFieldStyle::TypePrefix(s) if !type_before => (s.to_string(), String::new()),
-            OptionalFieldStyle::UnionWithNone(sep) => (String::new(), format!("{sep}None")),
-            _ => (String::new(), String::new()),
-        };
-
-        if type_before {
-            // C-style: type name
-            if self.modifiers.is_readonly {
-                fmt.push_str(lang.enum_and_annotation().readonly_keyword);
-            }
-            if !self.field_type.is_empty() {
-                fmt.push_str(&type_pre);
-                fmt.push_str("%T");
-                fmt.push_str(&type_post);
-                args.push(Arg::TypeName(self.field_type.clone()));
-                fmt.push(' ');
-            }
-            fmt.push_str(name_prefix);
-            fmt.push_str(lang.variable_prefix());
-            fmt.push_str(&lang.escape_field_name(&self.name));
-            fmt.push_str(name_suffix);
-        } else {
-            // TS/Rust/Go/Python-style: name sep type
-            if self.modifiers.is_readonly {
-                fmt.push_str(lang.enum_and_annotation().readonly_keyword);
-            } else {
-                let mk = lang.enum_and_annotation().mutable_field_keyword;
-                if !mk.is_empty() {
-                    fmt.push_str(mk);
-                }
-            }
-            fmt.push_str(lang.variable_prefix());
-            fmt.push_str(&lang.escape_field_name(&self.name));
-            fmt.push_str(name_suffix);
-
-            // Skip type annotation when the type is empty (e.g., Python enum members).
-            if !self.field_type.is_empty() {
-                let sep = lang.type_decl_syntax().type_annotation_separator;
-                fmt.push_str(sep);
-                fmt.push_str(&type_pre);
-                fmt.push_str("%T");
-                fmt.push_str(&type_post);
-                args.push(Arg::TypeName(self.field_type.clone()));
-            }
+        if self.modifiers.is_readonly {
+            capabilities.push(FieldCapability::ReadOnly);
         }
-
-        if let Some(init) = &self.initializer {
-            fmt.push_str(" = %L");
-            args.push(Arg::Code(init.clone()));
+        if self.is_optional {
+            capabilities.push(FieldCapability::OptionalPresence);
         }
-
-        if let Some(tag) = &self.tag {
-            fmt.push_str(" `");
-            fmt.push_str(tag);
-            fmt.push('`');
-        }
-
-        fmt.push_str(term);
-        cb.add(&fmt, args);
-        cb.add_line();
-
-        cb.build()
+        capabilities
     }
 }
 
@@ -304,11 +427,8 @@ impl FieldSpecBuilder {
 
     /// Mark this field as optional (the key may be absent from the containing value).
     ///
-    /// Rendering is language-specific and delegates to
-    /// [`CodeLang::optional_field_style`]: TypeScript emits `name?: T`, Rust
-    /// emits `Option<T>`, Go emits `*T`, etc. Languages that cannot express
-    /// optionality (JavaScript, Bash, Zsh) render the field as if it were
-    /// required.
+    /// The selected language adapter must declare and lower this capability;
+    /// unsupported contexts fail validation rather than dropping the intent.
     pub fn is_optional(mut self) -> Self {
         self.is_optional = true;
         self
@@ -348,7 +468,7 @@ impl FieldSpecBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`SigilStitchError::EmptyName`](crate::error::SigilStitchError::EmptyName) if `name` is empty.
+    /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
     pub fn build(self) -> Result<FieldSpec, crate::error::SigilStitchError> {
         snafu::ensure!(
             !self.name.is_empty(),
@@ -367,5 +487,99 @@ impl FieldSpecBuilder {
             tag: self.tag,
             is_optional: self.is_optional,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::dart::Dart;
+
+    fn field_languages() -> Vec<Box<dyn CodeLang>> {
+        vec![
+            Box::new(crate::lang::c::C::new()),
+            Box::new(crate::lang::cpp::Cpp::new()),
+            Box::new(crate::lang::csharp::CSharp::new()),
+            Box::new(crate::lang::dart::Dart::new()),
+            Box::new(crate::lang::go::Go::new()),
+            Box::new(crate::lang::haskell::Haskell::new()),
+            Box::new(crate::lang::java::Java::new()),
+            Box::new(crate::lang::javascript::JavaScript::new()),
+            Box::new(crate::lang::kotlin::Kotlin::new()),
+            Box::new(crate::lang::ocaml::OCaml::new()),
+            Box::new(crate::lang::php::Php::new()),
+            Box::new(crate::lang::python::Python::new()),
+            Box::new(crate::lang::rust::Rust::new()),
+            Box::new(crate::lang::scala::Scala::new()),
+            Box::new(crate::lang::swift::Swift::new()),
+            Box::new(crate::lang::typescript::TypeScript::new()),
+        ]
+    }
+
+    #[test]
+    fn built_in_result_hook_matches_the_additive_field_collector() {
+        let fields = ["first", "second"].map(|name| {
+            FieldSpec::builder(name, TypeName::primitive("String"))
+                .is_static()
+                .is_readonly()
+                .build()
+                .unwrap()
+        });
+        let intent = FieldSequenceIntent::direct(&fields, DeclarationContext::Member);
+        let lang = Dart::new();
+
+        assert!(lang.validate_fields(intent).is_err());
+        let mut errors = Vec::new();
+        lang.collect_field_validation_errors(intent, &mut errors);
+        assert_eq!(errors.len(), 2);
+    }
+
+    #[test]
+    fn every_built_in_result_hook_accepts_valid_and_rejects_invalid_identifiers() {
+        let valid_fields = [FieldSpec::of("valid", TypeName::primitive("Value"))];
+        let valid = FieldSequenceIntent::direct(&valid_fields, DeclarationContext::Member);
+        let mut invalid_field = FieldSpec::of("valid", TypeName::primitive("Value"));
+        invalid_field.name = "bad name".to_string();
+        let invalid_fields = [invalid_field];
+        let invalid = FieldSequenceIntent::direct(&invalid_fields, DeclarationContext::Member);
+
+        for lang in field_languages() {
+            assert!(
+                lang.validate_fields(valid).is_ok(),
+                ".{} rejected a valid field",
+                lang.file_extension()
+            );
+            assert!(
+                lang.validate_fields(invalid).is_err(),
+                ".{} accepted an invalid identifier",
+                lang.file_extension()
+            );
+        }
+    }
+
+    #[test]
+    fn every_built_in_lowers_a_valid_direct_field_sequence() {
+        for lang in field_languages() {
+            let field_type = if lang.file_extension() == "js" {
+                TypeName::primitive("")
+            } else {
+                TypeName::primitive("Value")
+            };
+            let field = FieldSpec::of("valid", field_type);
+            let output = field
+                .emit(lang.as_ref(), DeclarationContext::Member)
+                .and_then(|block| block.render_standalone(lang.as_ref(), 120))
+                .unwrap_or_else(|error| {
+                    panic!(
+                        ".{} failed to lower a valid field: {error}",
+                        lang.file_extension()
+                    )
+                });
+            assert!(
+                output.contains("valid"),
+                ".{}: {output}",
+                lang.file_extension()
+            );
+        }
     }
 }

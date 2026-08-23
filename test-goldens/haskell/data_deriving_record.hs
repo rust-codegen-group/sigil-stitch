@@ -1,6 +1,6 @@
 data Person =
   Person {
     personName :: String,
-    personAge :: Int,
+    personAge :: Int
   }
   deriving (Show, Eq)

@@ -321,8 +321,6 @@ const GO_STRUCT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::StructuralEmbedding,
     // ParametricPolymorphism = type parameters
     TypeCapability::ParametricPolymorphism,
-    // OptionalRecordFields = pointer-typed optional fields
-    TypeCapability::OptionalRecordFields,
 ];
 const GO_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = interface methods
@@ -391,6 +389,29 @@ impl CodeLang for Go {
         LanguageCapabilities::strict()
             .with_types(GO_TYPES)
             .with_functions(GO_FUNCTIONS)
+            .with_fields(crate::lang::field_lowering::go::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::go::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::go::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::go::lower(self, fields)
     }
 
     fn validate_function_type_constraints(

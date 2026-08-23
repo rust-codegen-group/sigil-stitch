@@ -4,7 +4,7 @@
 //! module deliberately contains no rendering policy, keywords, delimiters, or
 //! fallback syntax.
 
-use crate::spec::modifiers::TypeKind;
+use crate::spec::modifiers::{DeclarationContext, TypeKind};
 
 /// A semantic capability of a type declaration.
 ///
@@ -38,8 +38,85 @@ pub enum TypeCapability {
     Variants,
     /// Declaration metadata / attributes.
     Attributes,
-    /// Optional record fields.
-    OptionalRecordFields,
+}
+
+/// The semantic context in which a complete field sequence is emitted.
+///
+/// A context identifies the owning grammar without exposing separators,
+/// first/last flags, or other target syntax to callers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FieldContext {
+    /// A directly emitted field sequence with only legacy declaration placement.
+    Direct(DeclarationContext),
+    /// Fields owned by a complete type declaration.
+    TypeMember(TypeKind),
+    /// Named fields carried by one algebraic variant record payload.
+    VariantRecordPayload(TypeKind),
+}
+
+/// A semantic capability of a field declaration.
+///
+/// These variants describe caller intent, never target spelling, placement,
+/// delimiters, separators, or ordering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum FieldCapability {
+    /// An explicit type annotation.
+    ExplicitType,
+    /// A value initializer.
+    Initializer,
+    /// Structured or opaque metadata, including the legacy Go tag escape hatch.
+    Attributes,
+    /// A type-side or static field.
+    StaticField,
+    /// A field whose declaration promises read-only binding semantics.
+    ReadOnly,
+    /// A field whose key may be absent from its containing value.
+    ///
+    /// This is distinct from [`TypeName::Optional`](crate::type_name::TypeName::Optional),
+    /// which allows a present field to carry a nullable or option-like value.
+    OptionalPresence,
+}
+
+/// Capability profile for one field-sequence context.
+#[derive(Debug, Clone, Copy)]
+pub struct FieldCapabilityProfile<'a> {
+    context: FieldContext,
+    capabilities: &'a [FieldCapability],
+    required_capabilities: &'a [FieldCapability],
+}
+
+impl<'a> FieldCapabilityProfile<'a> {
+    /// Create a field profile for one semantic context.
+    pub const fn new(context: FieldContext, capabilities: &'a [FieldCapability]) -> Self {
+        Self {
+            context,
+            capabilities,
+            required_capabilities: &[],
+        }
+    }
+
+    /// Declare capabilities that every field in this profile must provide.
+    pub const fn with_required_capabilities(mut self, capabilities: &'a [FieldCapability]) -> Self {
+        self.required_capabilities = capabilities;
+        self
+    }
+
+    /// The semantic field context this profile describes.
+    pub const fn context(self) -> FieldContext {
+        self.context
+    }
+
+    /// Whether this profile supports the requested semantic capability.
+    pub fn supports(self, capability: FieldCapability) -> bool {
+        self.capabilities.contains(&capability)
+    }
+
+    /// Capabilities every field in this profile must provide.
+    pub fn required_capabilities(self) -> &'a [FieldCapability] {
+        self.required_capabilities
+    }
 }
 
 /// A semantic capability of an enum-variant sequence.
@@ -332,6 +409,7 @@ pub struct LanguageCapabilities<'a> {
     types: CapabilityProfiles<'a, TypeCapabilityProfile<'a>>,
     functions: CapabilityProfiles<'a, FunctionCapabilityProfile<'a>>,
     variants: CapabilityProfiles<'a, VariantCapabilityProfile<'a>>,
+    fields: CapabilityProfiles<'a, FieldCapabilityProfile<'a>>,
 }
 
 impl<'a> LanguageCapabilities<'a> {
@@ -341,6 +419,7 @@ impl<'a> LanguageCapabilities<'a> {
             types: CapabilityProfiles::Strict(&[]),
             functions: CapabilityProfiles::Strict(&[]),
             variants: CapabilityProfiles::Strict(&[]),
+            fields: CapabilityProfiles::Strict(&[]),
         }
     }
 
@@ -362,12 +441,19 @@ impl<'a> LanguageCapabilities<'a> {
         self
     }
 
+    /// Add strict field-sequence profiles.
+    pub const fn with_fields(mut self, profiles: &'a [FieldCapabilityProfile<'a>]) -> Self {
+        self.fields = CapabilityProfiles::Strict(profiles);
+        self
+    }
+
     /// Compatibility profile for adapters that predate capability validation.
     pub const fn permissive() -> Self {
         Self {
             types: CapabilityProfiles::Permissive,
             functions: CapabilityProfiles::Permissive,
             variants: CapabilityProfiles::Permissive,
+            fields: CapabilityProfiles::Permissive,
         }
     }
 
@@ -536,6 +622,42 @@ impl<'a> LanguageCapabilities<'a> {
 
     pub(crate) fn variant_validation_is_permissive(&self) -> bool {
         matches!(self.variants, CapabilityProfiles::Permissive)
+    }
+
+    /// Whether this language declares a profile for `context`.
+    pub fn supports_field_context(&self, context: FieldContext) -> bool {
+        match self.fields {
+            CapabilityProfiles::Permissive => true,
+            CapabilityProfiles::Strict(profiles) => {
+                profiles.iter().any(|profile| profile.context() == context)
+            }
+        }
+    }
+
+    /// Whether fields in `context` support `capability`.
+    pub fn supports_field_capability(
+        &self,
+        context: FieldContext,
+        capability: FieldCapability,
+    ) -> bool {
+        match self.fields {
+            CapabilityProfiles::Permissive => true,
+            CapabilityProfiles::Strict(profiles) => profiles
+                .iter()
+                .find(|profile| profile.context() == context)
+                .is_some_and(|profile| profile.supports(capability)),
+        }
+    }
+
+    /// Required capabilities for every field in `context`.
+    pub fn required_field_capabilities(&self, context: FieldContext) -> &[FieldCapability] {
+        match self.fields {
+            CapabilityProfiles::Permissive => &[],
+            CapabilityProfiles::Strict(profiles) => profiles
+                .iter()
+                .find(|profile| profile.context() == context)
+                .map_or(&[], |profile| profile.required_capabilities()),
+        }
     }
 }
 

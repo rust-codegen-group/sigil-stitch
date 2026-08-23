@@ -253,8 +253,6 @@ const KOTLIN_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::ConstructorParameters,
     // Attributes = annotations
     TypeCapability::Attributes,
-    // OptionalRecordFields = nullable properties
-    TypeCapability::OptionalRecordFields,
 ];
 const KOTLIN_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // AccessorMethods = get/set accessors
@@ -407,6 +405,29 @@ impl CodeLang for Kotlin {
             .with_types(KOTLIN_TYPES)
             .with_functions(KOTLIN_FUNCTIONS)
             .with_variants(KOTLIN_VARIANTS)
+            .with_fields(crate::lang::field_lowering::kotlin::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::kotlin::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::kotlin::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::kotlin::lower(self, fields)
     }
 
     fn validate_variants(

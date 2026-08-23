@@ -10,7 +10,7 @@ use sigil_stitch::spec::type_spec::TypeSpec;
 use sigil_stitch::type_name::TypeName;
 
 #[test]
-fn test_optional_field() {
+fn test_optional_value_field() {
     let output = FileSpec::builder_with("config.rs", Rust::new())
         .add_type(
             TypeSpec::builder("Config", TypeKind::Struct)
@@ -21,10 +21,12 @@ fn test_optional_field() {
                         .unwrap(),
                 )
                 .add_field(
-                    FieldSpec::builder("description", TypeName::primitive("String"))
-                        .is_optional()
-                        .build()
-                        .unwrap(),
+                    FieldSpec::builder(
+                        "description",
+                        TypeName::optional(TypeName::primitive("String")),
+                    )
+                    .build()
+                    .unwrap(),
                 )
                 .build()
                 .unwrap(),

@@ -1,5 +1,6 @@
 //! Java language implementation.
 
+use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
@@ -166,8 +167,6 @@ const JAVA_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::BoundedPolymorphism,
     // Attributes = annotations
     TypeCapability::Attributes,
-    // OptionalRecordFields = Optional members
-    TypeCapability::OptionalRecordFields,
 ];
 const JAVA_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = methods
@@ -293,6 +292,29 @@ impl CodeLang for Java {
             .with_types(JAVA_TYPES)
             .with_functions(JAVA_FUNCTIONS)
             .with_variants(JAVA_VARIANTS)
+            .with_fields(crate::lang::field_lowering::java::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::java::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::java::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::java::lower(self, fields)
     }
 
     fn validate_variants(

@@ -26,11 +26,45 @@ representable and converts accepted intent into target-language structure. It
 owns detailed declaration grammar such as keyword order, punctuation, and
 metadata placement.
 
+### Target grammar
+
+The language-specific keyword order, punctuation, precedence, escaping, and
+metadata placement used to express accepted declaration intent. Target grammar
+belongs to the language adapter; it is not a general format abstraction or a
+capability.
+
 ### Function intent
 
 A complete function declaration classified by its role and context before
 target-language validation. It remains semantic and does not contain a
 partially rendered signature.
+
+### Field sequence
+
+The ordered fields owned by one type declaration or one record payload,
+considered together in their semantic context. A language adapter handles the
+complete sequence so it can validate collisions and own sequence-level grammar.
+
+### Field context
+
+The semantic role in which a field sequence appears: direct emission, ordinary
+type members, or a variant record payload. It identifies representability; it
+does not prescribe placement, punctuation, or separators. The
+`Direct(DeclarationContext)` payload retains only the pre-0.6.8 direct-emission
+placement input. It is a narrow compatibility exception, not a reusable
+placement or target-grammar model.
+
+### Optional presence
+
+A field semantic in which the containing value may omit the field entirely.
+`FieldSpec::is_optional()` requests this meaning. It is distinct from an
+optional value.
+
+### Optional value
+
+A value semantic in which a present field can carry the target language's
+absence or null representation. `TypeName::Optional` expresses this meaning;
+it does not make the field itself omissible.
 
 ### Variant sequence
 

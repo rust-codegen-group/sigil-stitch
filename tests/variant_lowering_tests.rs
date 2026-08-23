@@ -3,8 +3,8 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::lang::capability::{
-    LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-    VariantCapabilityProfile,
+    FieldCapability, FieldCapabilityProfile, FieldContext, LanguageCapabilities, TypeCapability,
+    TypeCapabilityProfile, VariantCapability, VariantCapabilityProfile,
 };
 use sigil_stitch::lang::config::{EnumAndAnnotationConfig, VariantValueFormat};
 use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedVariants, VariantIntent};
@@ -105,6 +105,17 @@ const SEMANTIC_VARIANTS: &[VariantCapabilityProfile<'_>] = &[VariantCapabilityPr
         VariantCapability::Attributes,
     ],
 )];
+const SEMANTIC_FIELDS: &[FieldCapabilityProfile<'_>] = &[FieldCapabilityProfile::new(
+    FieldContext::VariantRecordPayload(TypeKind::Enum),
+    &[
+        FieldCapability::ExplicitType,
+        FieldCapability::Initializer,
+        FieldCapability::Attributes,
+        FieldCapability::StaticField,
+        FieldCapability::ReadOnly,
+        FieldCapability::OptionalPresence,
+    ],
+)];
 
 impl RendererLang for SemanticViewLang {
     fn file_extension(&self) -> &str {
@@ -121,6 +132,7 @@ impl CodeLang for SemanticViewLang {
         LanguageCapabilities::strict()
             .with_types(SEMANTIC_TYPES)
             .with_variants(SEMANTIC_VARIANTS)
+            .with_fields(SEMANTIC_FIELDS)
     }
 
     fn validate_variants(&self, variants: VariantIntent<'_>) -> Result<(), SigilStitchError> {
@@ -874,9 +886,11 @@ fn adapter_local_record_field_sibling_errors_are_aggregated() {
         };
         assert_eq!(error_count, 2, "{filename}: {errors:#?}");
         assert!(
-            errors
-                .iter()
-                .all(|error| matches!(error, SigilStitchError::InvalidVariantRecordField { .. })),
+            errors.iter().all(|error| matches!(
+                error,
+                SigilStitchError::InvalidField { .. }
+                    | SigilStitchError::UnsupportedFieldCapabilities { .. }
+            )),
             "{filename}: {errors:#?}"
         );
     }
@@ -1048,12 +1062,12 @@ fn haskell_and_ocaml_reject_record_field_names_that_collide_after_escaping() {
 
     assert!(matches!(
         spec("type'").emit(&sigil_stitch::lang::haskell::Haskell::new()),
-        Err(SigilStitchError::InvalidVariantRecordField { field_name, .. })
+        Err(SigilStitchError::InvalidField { field_name, .. })
             if field_name == "type'"
     ));
     assert!(matches!(
         spec("type_").emit(&sigil_stitch::lang::ocaml::OCaml::new()),
-        Err(SigilStitchError::InvalidVariantRecordField { field_name, .. })
+        Err(SigilStitchError::InvalidField { field_name, .. })
             if field_name == "type_"
     ));
 

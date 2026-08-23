@@ -3,7 +3,8 @@
 use snafu::prelude::*;
 
 use crate::lang::capability::{
-    FunctionCapability, FunctionContext, FunctionForm, TypeCapability, VariantCapability,
+    FieldCapability, FieldContext, FunctionCapability, FunctionContext, FunctionForm,
+    TypeCapability, VariantCapability,
 };
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -673,6 +674,88 @@ pub enum SigilStitchError {
         language: String,
         /// The variant carrying the annotation.
         variant_name: String,
+        /// Target-local reason for rejection.
+        reason: String,
+    },
+
+    /// A strict language needs an owning declaration context for field lowering.
+    #[snafu(display(
+        "language {language:?} does not support field sequence context {context:?} for owner {owner_name:?}"
+    ))]
+    UnsupportedFieldContext {
+        /// The language file extension.
+        language: String,
+        /// The rejected semantic field context.
+        context: FieldContext,
+        /// The owning type, when available.
+        owner_name: Option<String>,
+    },
+
+    /// A field requested capabilities the selected context cannot represent.
+    #[snafu(display(
+        "language {language:?} does not support {capabilities:?} for field {field_name:?} in {context:?} context"
+    ))]
+    UnsupportedFieldCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The rejected field.
+        field_name: String,
+        /// The semantic field context.
+        context: FieldContext,
+        /// Unsupported semantic capabilities.
+        capabilities: Vec<FieldCapability>,
+    },
+
+    /// A field omitted capabilities required by the selected context.
+    #[snafu(display(
+        "language {language:?} requires {capabilities:?} for field {field_name:?} in {context:?} context"
+    ))]
+    MissingRequiredFieldCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The rejected field.
+        field_name: String,
+        /// The semantic field context.
+        context: FieldContext,
+        /// Required semantic capabilities omitted by the field.
+        capabilities: Vec<FieldCapability>,
+    },
+
+    /// Deserialized function-only modifiers were attached to a field.
+    #[snafu(display(
+        "field {field_name:?} in {context:?} context cannot use modifiers {modifiers:?}"
+    ))]
+    InvalidFieldModifiers {
+        /// The rejected field.
+        field_name: String,
+        /// The semantic field context.
+        context: FieldContext,
+        /// Invalid function-only modifier names.
+        modifiers: Vec<&'static str>,
+    },
+
+    /// A field operand was present but contained no semantic value.
+    #[snafu(display("field {field_name:?} in {context:?} context has an empty {operand}"))]
+    EmptyFieldOperand {
+        /// The invalid field.
+        field_name: String,
+        /// The field-sequence context.
+        context: FieldContext,
+        /// The empty operand.
+        operand: &'static str,
+    },
+
+    /// A target-local field rule rejected otherwise representable intent.
+    #[snafu(display(
+        "language {language:?} cannot represent field {field_name:?} in {context:?} context: {reason}"
+    ))]
+    InvalidField {
+        /// The language file extension.
+        language: String,
+        /// The rejected field.
+        field_name: String,
+        /// The semantic field context.
+        context: FieldContext,
         /// Target-local reason for rejection.
         reason: String,
     },

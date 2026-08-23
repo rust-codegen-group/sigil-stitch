@@ -158,6 +158,7 @@ impl RendererLang for C {
 
     fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
         crate::lang::config::TypePresentationConfig {
+            optional: crate::type_name::TypePresentation::Postfix { suffix: "*" },
             pointer: crate::type_name::TypePresentation::Postfix { suffix: "*" },
             reference: crate::type_name::TypePresentation::Surround {
                 prefix: "const ",
@@ -197,8 +198,6 @@ const C_RECORD_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::RecordFields,
     // Attributes = __attribute__ annotations
     TypeCapability::Attributes,
-    // OptionalRecordFields = pointer-typed fields
-    TypeCapability::OptionalRecordFields,
 ];
 const C_ENUM_CAPABILITIES: &[TypeCapability] = &[
     // Variants = enumerators
@@ -252,6 +251,29 @@ impl CodeLang for C {
             .with_types(C_TYPES)
             .with_functions(C_FUNCTIONS)
             .with_variants(C_VARIANTS)
+            .with_fields(crate::lang::field_lowering::c::PROFILES)
+    }
+
+    fn validate_fields(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::field_lowering::c::validate(self, fields)
+    }
+
+    fn collect_field_validation_errors(
+        &self,
+        fields: crate::lang::FieldSequenceIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        crate::lang::field_lowering::c::collect_validation_errors(self, fields, errors);
+    }
+
+    fn lower_fields(
+        &self,
+        fields: crate::lang::ValidatedFields<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        crate::lang::field_lowering::c::lower(self, fields)
     }
 
     fn lower_variants(

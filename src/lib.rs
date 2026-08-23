@@ -113,9 +113,10 @@ pub mod prelude {
     pub use crate::code_template::{CodeTemplate, ParamKind};
     pub use crate::error::SigilStitchError;
     pub use crate::lang::capability::{
-        FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-        FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
-        VariantCapability, VariantCapabilityProfile,
+        FieldCapability, FieldCapabilityProfile, FieldContext, FunctionBodyPolicy,
+        FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
+        LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+        VariantCapabilityProfile,
     };
     pub use crate::lang::{CodeLang, RendererLang};
     pub use crate::spec::annotation_spec::AnnotationSpec;

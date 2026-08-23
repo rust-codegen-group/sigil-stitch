@@ -1,4 +1,5 @@
 use sigil_stitch::code_renderer::CodeRenderer;
+use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::ImportGroup;
 use sigil_stitch::lang::CodeLang;
 use sigil_stitch::lang::rust::Rust;
@@ -97,92 +98,82 @@ fn test_ts_optional_field_uses_name_suffix() {
 }
 
 #[test]
-fn test_rust_optional_field_wraps_with_option() {
-    let field = optional_field(TypeName::primitive("String"));
-    let out = emit_for(&Rust::new(), &field, DeclarationContext::Member);
-    assert_eq!(out.trim(), "name: Option<String>,");
+fn optional_presence_is_rejected_when_only_nullable_values_are_supported() {
+    let languages: Vec<Box<dyn CodeLang>> = vec![
+        Box::new(Rust::new()),
+        Box::new(sigil_stitch::lang::c::C::new()),
+        Box::new(sigil_stitch::lang::cpp::Cpp::new()),
+        Box::new(sigil_stitch::lang::csharp::CSharp::new()),
+        Box::new(sigil_stitch::lang::dart::Dart::new()),
+        Box::new(sigil_stitch::lang::go::Go::new()),
+        Box::new(sigil_stitch::lang::haskell::Haskell::new()),
+        Box::new(sigil_stitch::lang::java::Java::new()),
+        Box::new(sigil_stitch::lang::javascript::JavaScript::new()),
+        Box::new(sigil_stitch::lang::kotlin::Kotlin::new()),
+        Box::new(sigil_stitch::lang::ocaml::OCaml::new()),
+        Box::new(sigil_stitch::lang::php::Php::new()),
+        Box::new(sigil_stitch::lang::python::Python::new()),
+        Box::new(sigil_stitch::lang::scala::Scala::new()),
+        Box::new(sigil_stitch::lang::swift::Swift::new()),
+    ];
+    let field = optional_field(TypeName::primitive("Value"));
+
+    for lang in languages {
+        assert!(matches!(
+            field.emit(lang.as_ref(), DeclarationContext::Member),
+            Err(SigilStitchError::UnsupportedFieldCapabilities { capabilities, .. })
+                if capabilities.contains(
+                    &sigil_stitch::lang::capability::FieldCapability::OptionalPresence
+                )
+        ));
+    }
 }
 
 #[test]
-fn test_go_optional_field_prefixes_type_with_pointer() {
-    use sigil_stitch::lang::go::Go;
-    let field = optional_field(TypeName::primitive("string"));
-    let out = emit_for(&Go::new(), &field, DeclarationContext::Member);
-    assert_eq!(out.trim(), "name *string");
-}
+fn optional_value_types_do_not_make_fields_omissible() {
+    let cases: Vec<(Box<dyn CodeLang>, TypeName, &str)> = vec![
+        (
+            Box::new(Rust::new()),
+            TypeName::primitive("String"),
+            "name: Option<String>,",
+        ),
+        (
+            Box::new(sigil_stitch::lang::c::C::new()),
+            TypeName::primitive("int"),
+            "int* name;",
+        ),
+        (
+            Box::new(sigil_stitch::lang::cpp::Cpp::new()),
+            TypeName::primitive("int"),
+            "std::optional<int> name;",
+        ),
+        (
+            Box::new(sigil_stitch::lang::go::Go::new()),
+            TypeName::primitive("string"),
+            "name *string",
+        ),
+        (
+            Box::new(sigil_stitch::lang::java::Java::new()),
+            TypeName::primitive("String"),
+            "Optional<String> name;",
+        ),
+        (
+            Box::new(sigil_stitch::lang::python::Python::new()),
+            TypeName::primitive("str"),
+            "name: str | None",
+        ),
+        (
+            Box::new(sigil_stitch::lang::swift::Swift::new()),
+            TypeName::primitive("String"),
+            "var name: String?",
+        ),
+    ];
 
-#[test]
-fn test_python_optional_field_unions_with_none() {
-    use sigil_stitch::lang::python::Python;
-    let field = optional_field(TypeName::primitive("str"));
-    let out = emit_for(&Python::new(), &field, DeclarationContext::Member);
-    assert_eq!(out.trim(), "name: str | None");
-}
-
-#[test]
-fn test_java_optional_field_wraps_with_optional() {
-    use sigil_stitch::lang::java::Java;
-    let field = optional_field(TypeName::primitive("String"));
-    let out = emit_for(&Java::new(), &field, DeclarationContext::Member);
-    assert_eq!(out.trim(), "Optional<String> name;");
-}
-
-#[test]
-fn test_kotlin_optional_field_suffixes_type() {
-    use sigil_stitch::lang::kotlin::Kotlin;
-    let field = optional_field(TypeName::primitive("String"));
-    let out = emit_for(&Kotlin::new(), &field, DeclarationContext::Member);
-    assert!(
-        out.contains("name: String?"),
-        "expected type suffix '?', got {out:?}"
-    );
-}
-
-#[test]
-fn test_swift_optional_field_suffixes_type() {
-    use sigil_stitch::lang::swift::Swift;
-    let field = optional_field(TypeName::primitive("String"));
-    let out = emit_for(&Swift::new(), &field, DeclarationContext::Member);
-    assert!(
-        out.contains("name: String?"),
-        "expected type suffix '?', got {out:?}"
-    );
-}
-
-#[test]
-fn test_dart_optional_field_suffixes_type() {
-    use sigil_stitch::lang::dart::Dart;
-    let field = optional_field(TypeName::primitive("String"));
-    let out = emit_for(&Dart::new(), &field, DeclarationContext::Member);
-    assert_eq!(out.trim(), "String? name;");
-}
-
-#[test]
-fn test_c_optional_field_prefixes_name_with_pointer() {
-    use sigil_stitch::lang::c::C;
-    let field = optional_field(TypeName::primitive("int"));
-    let out = emit_for(&C::new(), &field, DeclarationContext::Member);
-    assert_eq!(out.trim(), "int *name;");
-}
-
-#[test]
-fn test_cpp_optional_field_wraps_with_std_optional() {
-    use sigil_stitch::lang::cpp::Cpp;
-    let field = optional_field(TypeName::primitive("int"));
-    let out = emit_for(&Cpp::new(), &field, DeclarationContext::Member);
-    assert_eq!(out.trim(), "std::optional<int> name;");
-}
-
-#[test]
-fn test_javascript_optional_field_is_ignored() {
-    use sigil_stitch::lang::javascript::JavaScript;
-    let field = optional_field(TypeName::primitive("any"));
-    let out = emit_for(&JavaScript::new(), &field, DeclarationContext::Member);
-    assert!(out.contains("name"), "expected name in output, got {out:?}");
-    assert!(
-        !out.contains("?"),
-        "JS output must not contain '?': {out:?}"
-    );
+    for (lang, inner, expected) in cases {
+        let field = FieldSpec::of("name", TypeName::optional(inner));
+        let out = emit_for(lang.as_ref(), &field, DeclarationContext::Member);
+        assert_eq!(out.trim(), expected, "{}", lang.file_extension());
+    }
 }
 
 #[test]

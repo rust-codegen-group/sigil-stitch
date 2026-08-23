@@ -143,8 +143,6 @@ impl RendererLang for Ruby {
 }
 
 const RUBY_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = instance variables
-    TypeCapability::RecordFields,
     // Methods = methods
     TypeCapability::Methods,
     // NominalSubtyping = `<`
