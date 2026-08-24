@@ -4,7 +4,11 @@ This chapter covers type declarations (classes, structs, interfaces, enums, type
 
 ## TypeSpec
 
-The largest spec. Models type declarations: struct, class, interface, trait, enum, type alias, or newtype wrapper. Takes a `TypeKind` to select the declaration form.
+The largest spec. Models type declarations: struct, class, interface, trait,
+enum, type alias, or newtype wrapper. Takes a `TypeKind` to select the semantic
+declaration kind. At emission, sigil-stitch validates the complete type and its
+children, constructs `ValidatedType`, and delegates the entire declaration to
+the selected adapter's `lower_type()` implementation.
 
 `.build()` returns `Err(SigilStitchError::DuplicateFieldName { type_name, field_name })` when two fields in the same type share a name.
 
@@ -118,6 +122,20 @@ let type_spec = TypeSpec::builder("AdminService", TypeKind::Class)
 # }
 ```
 
+Keep nominal inheritance in `.extends()` and implemented contracts in
+`.implements()` even when the target writes both in one punctuation-delimited
+list. Single-inheritance adapters reject a second nominal superclass instead
+of silently reinterpreting or dropping it.
+
+Kotlin initializes a superclass in the type header with a zero-argument call
+when the declaration has an implicit or explicit primary constructor, so
+`.extends(BaseService)` becomes `: BaseService()`. A class with only secondary
+constructors keeps the bare superclass in the header and each secondary
+constructor must provide a `this(...)` or `super(...)` delegation. Superclass
+constructor arguments for a primary constructor are not part of the current
+semantic vocabulary; use a target-local declaration when a nonzero-argument
+header call is required.
+
 ### Embedded types (Go struct composition)
 
 Use `add_embedded(TypeName)` for unnamed type references inside a struct body. This models Go's embedded field pattern where a type is included by name without a field identifier:
@@ -145,7 +163,9 @@ let type_spec = TypeSpec::builder("UserAdmin", TypeKind::Struct)
 # }
 ```
 
-Embedded types render before regular fields. If the embedded type is `TypeName::importable(...)`, its import is tracked automatically via `%T`. This works across languages — for Go interfaces, embedded types produce interface composition:
+The Go adapter renders embedded types before regular fields. If an embedded
+type is `TypeName::importable(...)`, its import is tracked automatically via
+`%T`. Go interfaces use the same semantic input for interface composition:
 
 ```rust
 # extern crate sigil_stitch;
@@ -166,6 +186,12 @@ let type_spec = TypeSpec::builder("ReadWriter", TypeKind::Interface)
 // }
 # }
 ```
+
+Go is currently the built-in adapter that advertises structural embedding.
+Python, Rust, and TypeScript reject this capability because their previous
+generic output was invalid or did not preserve composition semantics. Use a
+nominal supertype, implemented contract, named field, or explicit target-local
+member instead.
 
 ### Type aliases
 
@@ -254,11 +280,45 @@ do in ordinary `%T` slots:
 - Go: `type Meters float64` (distinct type)
 - Kotlin: `value class Meters(val value: f64)` (inline class)
 - Python: `Meters = NewType("Meters", float)` (typing.NewType)
-- C: `typedef float Meters;` (typedef)
 
 Rust, Go, Haskell, Kotlin, and Scala adapters emit supported type parameters
-and bounds. C, PHP, and Python omit them because their native wrapper forms do
-not support declaration-site generic parameters.
+and bounds. C, PHP, and Python reject generic newtype intent because their
+supported wrapper forms do not preserve declaration-site generic parameters.
+
+### Primary constructors
+
+Kotlin and Scala accept primary-constructor parameters on the type declaration.
+Pass the identifier as the parameter name and use semantic promotion flags:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let type_spec = TypeSpec::builder("User", TypeKind::Struct)
+    .add_primary_constructor_param(
+        ParameterSpec::builder("name", TypeName::primitive("String"))
+            .is_property()
+            .build()
+            .unwrap(),
+    )
+    .add_primary_constructor_param(
+        ParameterSpec::builder("age", TypeName::primitive("Int"))
+            .is_mutable_property()
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
+// Kotlin: data class User(val name: String, var age: Int) { ... }
+# }
+```
+
+Do not put `val` or `var` in the name. Strict adapters reject such syntax in an
+identifier. A Kotlin `TypeKind::Struct` is a data class, so it requires at
+least one primary-constructor parameter and every such parameter must request
+an immutable or mutable property. Haskell and OCaml algebraic constructor data
+uses variant positional or record payloads instead; it is not modeled as a
+primary constructor.
 
 ### Enums with EnumVariantSpec
 
@@ -372,6 +432,10 @@ Structured annotations that render with language-appropriate syntax. The prefix 
 | Rust           | `#[name(args)]`                 |
 | C++            | `[[name(args)]]`                |
 | C              | `__attribute__((name(args)))`   |
+
+Attribute support is declaration-kind specific. For example, TypeScript
+decorators are accepted on class-backed declarations but rejected on
+interfaces, where decorator syntax cannot be emitted.
 
 ```rust
 # extern crate sigil_stitch;

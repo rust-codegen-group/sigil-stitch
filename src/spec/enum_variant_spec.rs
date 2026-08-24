@@ -59,26 +59,26 @@ impl ConstructorArity {
 
 #[derive(Debug, Clone)]
 pub(crate) struct VariantOwnerContext {
-    has_following_members: bool,
+    has_non_variant_members: bool,
     constructor_arities: Vec<ConstructorArity>,
     has_opaque_members: bool,
 }
 
 impl VariantOwnerContext {
     pub(crate) fn new(
-        has_following_members: bool,
+        has_non_variant_members: bool,
         constructor_arities: Vec<ConstructorArity>,
         has_opaque_members: bool,
     ) -> Self {
         Self {
-            has_following_members,
+            has_non_variant_members,
             constructor_arities,
             has_opaque_members,
         }
     }
 
-    fn has_following_members(&self) -> bool {
-        self.has_following_members
+    fn has_non_variant_members(&self) -> bool {
+        self.has_non_variant_members
     }
 
     fn has_declared_constructor(&self) -> bool {
@@ -135,9 +135,9 @@ impl<'a> VariantIntent<'a> {
         self.variants
     }
 
-    /// Whether fields, properties, methods, or explicit members follow the sequence.
-    pub fn has_following_members(&self) -> bool {
-        self.owner_context.has_following_members()
+    /// Whether the owner also declares fields, properties, methods, embedded types, or opaque members.
+    pub fn has_non_variant_members(&self) -> bool {
+        self.owner_context.has_non_variant_members()
     }
 
     /// Whether the owner declares a primary or structured constructor.
@@ -470,18 +470,6 @@ impl EnumVariantSpec {
         }
 
         lang.collect_variant_validation_errors(intent, errors);
-    }
-
-    pub(crate) fn lower_sequence(
-        owner_name: &str,
-        owner_kind: TypeKind,
-        variants: &[Self],
-        owner_context: VariantOwnerContext,
-        lang: &dyn CodeLang,
-    ) -> Result<CodeBlock, SigilStitchError> {
-        let variants =
-            Self::validate_sequence(owner_name, owner_kind, variants, owner_context, lang)?;
-        lang.lower_variants(variants)
     }
 
     fn requested_capabilities(&self) -> Vec<VariantCapability> {

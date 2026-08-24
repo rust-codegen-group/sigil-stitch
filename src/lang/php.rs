@@ -341,6 +341,17 @@ impl CodeLang for Php {
             .with_properties(crate::lang::property_lowering::php::PROFILES)
     }
 
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::php::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::php::lower(self, type_)
+    }
+
     fn lower_function(
         &self,
         function: crate::spec::fun_spec::ValidatedFunction<'_>,

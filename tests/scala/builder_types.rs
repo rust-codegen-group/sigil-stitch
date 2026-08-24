@@ -76,7 +76,7 @@ fn test_class_extends() {
     let body = CodeBlock::of("true", ()).unwrap();
     let ts = TypeSpec::builder("AdminService", TypeKind::Class)
         .extends(base)
-        .extends(serial)
+        .implements(serial)
         .add_method(
             FunSpec::builder("isAdmin")
                 .returns(TypeName::primitive("Boolean"))
@@ -100,8 +100,8 @@ fn test_class_extends() {
 fn test_class_extends_multiple() {
     let ts = TypeSpec::builder("Worker", TypeKind::Class)
         .extends(TypeName::primitive("Actor"))
-        .extends(TypeName::primitive("Logging"))
-        .extends(TypeName::primitive("Serializable"))
+        .implements(TypeName::primitive("Logging"))
+        .implements(TypeName::primitive("Serializable"))
         .build()
         .unwrap();
 

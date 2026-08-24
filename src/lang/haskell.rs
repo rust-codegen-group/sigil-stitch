@@ -294,8 +294,6 @@ const HASKELL_DATA_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = class contexts / constraints
     TypeCapability::BoundedPolymorphism,
-    // ConstructorParameters = data constructor arguments
-    TypeCapability::ConstructorParameters,
     // Variants = data constructors
     TypeCapability::Variants,
     // impl_types render as `deriving (...)`.
@@ -323,8 +321,6 @@ const HASKELL_TYPES: &[TypeCapabilityProfile] = &[
             TypeCapability::ParametricPolymorphism,
             // BoundedPolymorphism = class contexts / constraints
             TypeCapability::BoundedPolymorphism,
-            // ConstructorParameters = data constructor arguments
-            TypeCapability::ConstructorParameters,
             // Variants = data constructors
             TypeCapability::Variants,
             TypeCapability::InterfaceImplementation,
@@ -397,6 +393,17 @@ impl CodeLang for Haskell {
             .with_functions(HASKELL_FUNCTIONS)
             .with_variants(HASKELL_VARIANTS)
             .with_fields(crate::lang::field_lowering::haskell::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::haskell::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::haskell::lower(self, type_)
     }
 
     fn lower_function(

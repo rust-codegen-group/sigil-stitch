@@ -46,10 +46,10 @@ syntax.
 
 ## Current Migration State
 
-Functions, field sequences, computed properties, and enum-variant sequences use
-complete language-owned lowering for every built-in adapter. `TypeSpec` is the
-remaining transitional family: its generic emitter still reads selected legacy
-type-declaration configuration while complete type lowering is designed.
+Types, functions, field sequences, computed properties, and enum-variant
+sequences use complete language-owned lowering for every built-in adapter.
+`TypeSpec` validates one complete declaration, constructs `ValidatedType` with
+validated children, and delegates once to `CodeLang::lower_type()`.
 
 The provided external-adapter lowerers remain private implementation details.
 They freeze 0.6.8 behavior; they are not examples for new adapters.
@@ -60,8 +60,9 @@ They freeze 0.6.8 behavior; they are not examples for new adapters.
 |--------|----------------|------------------------|---------------------|
 | Capabilities | No `capabilities()` override | External adapters receive `LanguageCapabilities::permissive()` | Return a strict matrix with exact family profiles |
 | Functions | `function_syntax()`, `FunctionSyntaxConfig`, `ParamListStyle`, `FunctionSignatureStyle`, `ConstructorDelegationStyle`, `WhereClauseStyle` | The provided `lower_function()` interprets them for external adapters | `validate_function()` and complete `lower_function()` |
-| Types | `type_decl_syntax()`, selected `enum_and_annotation()` fields, `methods_inside_type_body()` | The transitional generic `TypeSpec` emitter still reads them | Keep existing overrides only until complete type lowering exists; do not add new fields |
-| Preambles | `doc_before_annotations()`, `doc_comment_inside_body()` | Frozen lowerers and the transitional type emitter may read them | Emit documentation and attributes in each complete lowerer |
+| Types | `type_keyword()`, `methods_inside_type_body()`, `type_kind_suffix()`, `emit_newtype_decl()`, `type_header_block_open()`, `type_body_prefix()` / `type_body_suffix()`, `emit_type_close_suffix()`, `abstract_type_modifier_is_valid()`, `type_decl_syntax()`, and type-emitter reads of `function_syntax()` / `enum_and_annotation()` | The provided `lower_type()` interprets them only for permissive external adapters | `validate_type()` and complete `lower_type()` |
+| Type parameters | `ParameterSpec::emit_into()` | Frozen compatibility code and direct compatibility tests may retain it | Read semantic parameter accessors inside complete function or type lowering |
+| Preambles | `doc_before_annotations()`, `doc_comment_inside_body()` | Frozen compatibility lowerers may read them | Emit documentation and attributes in each complete lowerer |
 | Fields | `optional_field_style()`, `OptionalFieldStyle` | The provided `lower_fields()` freezes the old field emitter | `FieldCapability`, `FieldContext`, `TypeName::Optional`, and complete `lower_fields()` |
 | Properties | `property_style()`, `property_getter_keyword()`, `PropertyStyle` | The provided `lower_property()` freezes the old property emitter | `PropertyContext`, property capabilities, and complete `lower_property()` |
 | Variants | `VariantContext`, `.value()`, `VariantValueFormat`, `variants_before_fields` | Only permissive external adapters retain ownerless positional lowering; strict built-ins require an owner and complete sequence | Add variants to `TypeSpec`; use `.discriminant()` or `.constructor_argument()` |
@@ -100,16 +101,16 @@ this table.
 
 ### `TypeDeclSyntaxConfig`
 
-| Field | Transitional meaning |
+| Field | Frozen compatibility meaning |
 |-------|----------------------|
-| `type_before_name`, `return_type_is_prefix`, `type_annotation_separator` | Type/name ordering still used by the generic type emitter and some nested compatibility fragments |
+| `type_before_name`, `return_type_is_prefix`, `type_annotation_separator` | Type/name ordering used by compatibility lowerers |
 | `super_type_keyword`, `super_type_separator`, `super_type_subsequent_separator` | Base-type grammar |
 | `implements_keyword` | Implemented-interface grammar |
 | `type_alias_target_first` | Alias target/name ordering |
-| `supports_primary_constructor` | Transitional primary-constructor switch |
+| `supports_primary_constructor` | Legacy primary-constructor switch |
 
-These fields may be used only where `TypeSpec` has not yet moved behind a
-complete lowering seam.
+These fields may be read only by frozen compatibility lowerers. New adapters
+implement complete declaration lowering instead.
 
 ### `EnumAndAnnotationConfig`
 
@@ -117,7 +118,7 @@ complete lowering seam.
 |-------|----------------------------------------|
 | `variant_prefix`, `variant_prefix_first`, `variant_separator`, `variant_trailing_separator`, `variants_before_fields`, `variant_value_format` | Frozen external-adapter variant grammar |
 | `annotation_prefix`, `annotation_suffix` | Legacy annotation spelling; complete lowerers use local structured emission |
-| `readonly_keyword`, `mutable_field_keyword` | Frozen parameter/property-promotion fragments and transitional type behavior |
+| `readonly_keyword`, `mutable_field_keyword` | Frozen parameter/property-promotion fragments |
 
 ## Builder Migration Recipes
 
@@ -148,6 +149,18 @@ the target's owning type or member namespaces affect validity. New adapters
 lower read and write behavior from `PropertyIntent`; they do not select an
 accessor model through `PropertyStyle`.
 
+### Primary constructor parameters
+
+Pass only an identifier to `ParameterSpec`. For Kotlin and Scala, use
+`.is_property()` for an immutable promoted property and
+`.is_mutable_property()` for a mutable one. Do not encode `val` or `var` in the
+parameter name. Complete language lowerers own that spelling; unsupported
+languages reject primary-constructor intent instead of ignoring it.
+
+Haskell and OCaml constructor data is not a primary constructor. Model it with
+enum-variant positional or record payloads so the algebraic-data adapter sees
+the payload semantics directly.
+
 ### C++ static member initializers
 
 For class and struct members, the C++ adapter preserves the pre-C++17
@@ -176,8 +189,7 @@ Migrate one declaration family at a time:
    `TypeName` as a `%T` reference and every nested block as structured `%L`.
 4. Cover direct and owner-aware success and failure paths, import aliases, and
    both direct and pretty renderer paths where soft breaks are reachable.
-5. Remove migrated-family reads of deprecated grammar from the adapter. Leave
-   only the temporary type-declaration overrides still required by `TypeSpec`.
+5. Remove migrated-family reads of deprecated grammar from the adapter.
 
 Keep rendered-output fixtures while migrating. A provided default is a
 compatibility bridge, not evidence that an adapter has completed the new seam.

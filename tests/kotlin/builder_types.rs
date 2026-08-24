@@ -168,8 +168,8 @@ fn test_class_extends_implements() {
     // Kotlin uses `:` for both extends and implements.
     let ts = TypeSpec::builder("AdminService", TypeKind::Class)
         .extends(base)
-        .extends(auth)
-        .extends(serial)
+        .implements(auth)
+        .implements(serial)
         .add_method(
             FunSpec::builder("isAdmin")
                 .returns(TypeName::primitive("Boolean"))

@@ -39,11 +39,13 @@ use crate::type_name::TypeName;
 ///
 /// # Inheritance
 ///
-/// Kotlin uses `:` for both superclass and interfaces. Put all supertypes
-/// into `super_types()` (not `impl_types()`):
+/// Kotlin uses one `:`-delimited supertype list, but the semantic inputs remain
+/// distinct: use `extends()` for the optional superclass and `implements()`
+/// for interfaces:
 /// ```text
-/// tb.super_type(TypeName::primitive("Base"));
-/// tb.super_type(TypeName::primitive("Serializable"));
+/// let tb = TypeSpec::builder("Foo", TypeKind::Class)
+///     .extends(TypeName::primitive("Base"))
+///     .implements(TypeName::primitive("Serializable"));
 /// // Emits: class Foo : Base, Serializable {
 /// ```
 ///
@@ -60,8 +62,12 @@ use crate::type_name::TypeName;
 /// Use `add_primary_constructor_param()` on `TypeSpecBuilder`:
 /// ```text
 /// let mut tb = TypeSpec::builder("Person", TypeKind::Class);
-/// tb.add_primary_constructor_param(ParameterSpec::new("val name", TypeName::primitive("String")));
-/// tb.add_primary_constructor_param(ParameterSpec::new("val age", TypeName::primitive("Int")));
+/// tb.add_primary_constructor_param(
+///     ParameterSpec::builder("name", TypeName::primitive("String")).is_property().build()?
+/// );
+/// tb.add_primary_constructor_param(
+///     ParameterSpec::builder("age", TypeName::primitive("Int")).is_property().build()?
+/// );
 /// // Emits: class Person(val name: String, val age: Int) {
 /// ```
 ///
@@ -245,12 +251,14 @@ const KOTLIN_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::Methods,
     // NominalSubtyping = supertypes (`:`)
     TypeCapability::NominalSubtyping,
+    // InterfaceImplementation = interfaces in the same supertype list
+    TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = generic type parameters
     TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints
     TypeCapability::BoundedPolymorphism,
-    // ConstructorParameters = primary constructor parameters
-    TypeCapability::ConstructorParameters,
+    // PrimaryConstructorParameters = primary constructor parameters
+    TypeCapability::PrimaryConstructorParameters,
     // Attributes = annotations
     TypeCapability::Attributes,
 ];
@@ -284,8 +292,10 @@ const KOTLIN_TYPES: &[TypeCapabilityProfile] = &[
             TypeCapability::AccessorMethods,
             // Methods = member functions
             TypeCapability::Methods,
-            // ConstructorParameters = primary constructor parameters
-            TypeCapability::ConstructorParameters,
+            // InterfaceImplementation = implemented interfaces in the supertype list
+            TypeCapability::InterfaceImplementation,
+            // PrimaryConstructorParameters = primary constructor parameters
+            TypeCapability::PrimaryConstructorParameters,
             // Attributes = annotations
             TypeCapability::Attributes,
             // Variants = enum entries
@@ -304,6 +314,8 @@ const KOTLIN_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // ParametricPolymorphism = generic type parameters
             TypeCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = upper bounds on value-class parameters
+            TypeCapability::BoundedPolymorphism,
             // Attributes = annotations
             TypeCapability::Attributes,
         ],
@@ -407,6 +419,17 @@ impl CodeLang for Kotlin {
             .with_variants(KOTLIN_VARIANTS)
             .with_fields(crate::lang::field_lowering::kotlin::PROFILES)
             .with_properties(crate::lang::property_lowering::kotlin::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::kotlin::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::kotlin::lower(self, type_)
     }
 
     fn validate_fields(

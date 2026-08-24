@@ -1,9 +1,10 @@
 # Declaration Specs and Language Lowering
 
-This chapter defines the ownership model for structured declarations. It is the
-accepted design direction for `spec/*` and `lang/*`; pre-0.6.8 compatibility
-paths that do not yet follow it are described in [0.6.8 Legacy Compatibility
-and Migration](legacy_compatibility_and_migration.md).
+This chapter defines the implemented ownership model for structured
+declarations in `spec/*` and the built-in `lang/*` adapters. Frozen pre-0.6.8
+compatibility paths for external adapters and legacy direct facades are
+described in [0.6.8 Legacy Compatibility and
+Migration](legacy_compatibility_and_migration.md).
 
 ## Decision
 
@@ -123,6 +124,31 @@ a complete validated declaration into a structured block:
 # extern crate sigil_stitch;
 # use sigil_stitch::code_block::CodeBlock;
 # use sigil_stitch::error::SigilStitchError;
+# use sigil_stitch::lang::{TypeIntent, ValidatedType};
+# trait Example {
+fn validate_type(
+    &self,
+    type_: TypeIntent<'_>,
+) -> Result<(), SigilStitchError>;
+fn collect_type_validation_errors(
+    &self,
+    type_: TypeIntent<'_>,
+    errors: &mut Vec<SigilStitchError>,
+);
+fn lower_type(
+    &self,
+    type_: ValidatedType<'_>,
+) -> Result<Vec<CodeBlock>, SigilStitchError>;
+# }
+```
+
+The vector return is target grammar: an adapter may produce one declaration or
+several related blocks, such as a Rust definition and `impl`.
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::code_block::CodeBlock;
+# use sigil_stitch::error::SigilStitchError;
 # use sigil_stitch::lang::{FunctionIntent, ValidatedFunction};
 # trait Example {
 fn validate_function(
@@ -227,11 +253,24 @@ adapter's additional validation succeeds. `FunSpec::emit()` remains the
 convenience facade: it delegates validation and lowering without interpreting
 target grammar switches itself.
 
+`TypeIntent` provides one complete declaration before target-local validation:
+kind, semantic modifiers, preamble data, type parameters and constraints,
+nominal relationships, primary-constructor parameters, variants, and member
+families. `ValidatedType` is constructed only after type-level and child
+validation succeeds. It exposes fields, properties, methods, and variants
+through their validated wrappers so `lower_type()` can own member order and
+declaration shape while reusing each child's complete lowerer. The type adapter
+also owns alias/newtype forms, empty-body behavior, and whether output is inline
+or split; it must return one or more non-empty blocks. None of those choices
+lives in `TypeSpec`.
+
 `VariantIntent` provides the owner name and kind, every variant in declaration
-order, whether ordinary members follow, structured-constructor arity evidence,
-and whether opaque members may provide target-specific constructor syntax. The
-adapter derives first/last position and owns preambles, payload grammar,
-separators, and section termination for the complete sequence. Variant
+order, a `has_non_variant_members()` fact covering fields, properties, methods,
+embedded types, and opaque members, structured-constructor arity evidence, and
+separate evidence that opaque members may provide target-specific constructor
+syntax. The variant adapter derives first/last position and owns preambles,
+payload grammar, separators, and section termination for the complete
+sequence. The type adapter chooses the sequence's position. Variant
 capabilities name semantic forms—discriminant, constructor arguments,
 positional payload, record payload, and attributes—not their spelling. The
 additive collector reports independent sibling failures; `ValidatedVariants`
@@ -297,13 +336,14 @@ not permission to extend that design:
   seam.
 - Concepts introduced after 0.6.8 may be changed or removed instead of being
   preserved as another compatibility layer.
-- Existing built-in adapters should migrate incrementally, with rendered-output
-  tests at the adapter seam and parity coverage across direct and pretty paths.
+- External adapters can migrate one declaration family at a time, with
+  rendered-output tests at the adapter seam and parity coverage across direct
+  and pretty paths. Built-in adapters already use complete lowerers.
 
 Compatibility is bounded by validity: a built-in adapter may restrict an old
 entry point rather than emit malformed or unverifiable target code. The full
-version boundary, deprecated-surface matrix, builder recipes, external-adapter
-sequence, and remaining type-lowering transition are centralized in [0.6.8
+version boundary, deprecated-surface matrix, builder recipes, and
+external-adapter sequence are centralized in [0.6.8
 Legacy Compatibility and Migration](legacy_compatibility_and_migration.md).
 
 ## Scope of This Decision

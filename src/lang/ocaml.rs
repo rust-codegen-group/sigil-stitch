@@ -284,8 +284,6 @@ const OCAML_RECORD_CAPABILITIES: &[TypeCapability] = &[
 const OCAML_VARIANT_CAPABILITIES: &[TypeCapability] = &[
     // ParametricPolymorphism = type parameters
     TypeCapability::ParametricPolymorphism,
-    // ConstructorParameters = constructor arguments
-    TypeCapability::ConstructorParameters,
     // Variants = constructors
     TypeCapability::Variants,
 ];
@@ -328,6 +326,17 @@ impl CodeLang for OCaml {
             .with_functions(OCAML_FUNCTIONS)
             .with_variants(OCAML_VARIANTS)
             .with_fields(crate::lang::field_lowering::ocaml::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::ocaml::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::ocaml::lower(self, type_)
     }
 
     fn lower_function(

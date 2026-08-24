@@ -1,4 +1,6 @@
 use sigil_stitch::code_block::{CodeBlock, NameArg};
+use sigil_stitch::error::SigilStitchError;
+use sigil_stitch::lang::capability::TypeCapability;
 use sigil_stitch::lang::python::Python;
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
@@ -119,23 +121,23 @@ fn test_name_escape_in_assignment() {
 // ── Embedded fields in Python ───────────────────────────
 
 #[test]
-fn test_embedded_types_in_python_class() {
-    let file = FileSpec::builder_with("models.py", Python::new())
-        .add_type(
-            TypeSpec::builder("AdminUser", TypeKind::Class)
-                .add_embedded(TypeName::primitive("User"))
-                .add_embedded(TypeName::primitive("Admin"))
-                .add_field(
-                    FieldSpec::builder("role", TypeName::primitive("str"))
-                        .build()
-                        .unwrap(),
-                )
+fn test_embedded_types_in_python_class_fail_closed() {
+    let type_ = TypeSpec::builder("AdminUser", TypeKind::Class)
+        .add_embedded(TypeName::primitive("User"))
+        .add_embedded(TypeName::primitive("Admin"))
+        .add_field(
+            FieldSpec::builder("role", TypeName::primitive("str"))
                 .build()
                 .unwrap(),
         )
         .build()
         .unwrap();
-
-    let output = file.render(80).unwrap();
-    golden::assert_golden("python/embedded_types.py", &output);
+    let error = type_.emit(&Python::new()).unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::UnsupportedTypeCapabilities {
+            ref capabilities,
+            ..
+        } if capabilities == &[TypeCapability::StructuralEmbedding]
+    ));
 }

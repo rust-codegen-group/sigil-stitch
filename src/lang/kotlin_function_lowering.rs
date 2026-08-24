@@ -4,6 +4,7 @@
 
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
+use crate::lang::capability::FunctionForm;
 use crate::lang::function_lowering::{
     SignatureBuilder, tupled_parameter_list, type_params_with_inline_constraints,
 };
@@ -39,7 +40,7 @@ pub(crate) fn lower(
         signature.push_literal("suspend ");
     }
 
-    if !function.modifiers().is_constructor {
+    if function.form() != FunctionForm::Constructor {
         signature.push_literal("fun ");
     }
     let type_params = type_params_with_inline_constraints(function, lang.file_extension())?;

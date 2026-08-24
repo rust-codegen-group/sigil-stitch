@@ -321,6 +321,8 @@ const GO_STRUCT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::StructuralEmbedding,
     // ParametricPolymorphism = type parameters
     TypeCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = constraints in type parameter declarations
+    TypeCapability::BoundedPolymorphism,
 ];
 const GO_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     // Methods = interface methods
@@ -341,6 +343,8 @@ const GO_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // ParametricPolymorphism = type parameters
             TypeCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = constraints in type parameter declarations
+            TypeCapability::BoundedPolymorphism,
         ],
     ),
 ];
@@ -390,6 +394,17 @@ impl CodeLang for Go {
             .with_types(GO_TYPES)
             .with_functions(GO_FUNCTIONS)
             .with_fields(crate::lang::field_lowering::go::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::go::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::go::lower(self, type_)
     }
 
     fn lower_function(

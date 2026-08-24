@@ -641,10 +641,16 @@ fn test_kotlin_primary_constructor() {
     let output = render_type(
         &TypeSpec::builder("Person", TypeKind::Class)
             .add_primary_constructor_param(
-                ParameterSpec::new("val name", TypeName::primitive("String")).unwrap(),
+                ParameterSpec::builder("name", TypeName::primitive("String"))
+                    .is_property()
+                    .build()
+                    .unwrap(),
             )
             .add_primary_constructor_param(
-                ParameterSpec::new("val age", TypeName::primitive("Int")).unwrap(),
+                ParameterSpec::builder("age", TypeName::primitive("Int"))
+                    .is_property()
+                    .build()
+                    .unwrap(),
             )
             .build()
             .unwrap(),
@@ -659,17 +665,23 @@ fn test_kotlin_primary_constructor_with_super() {
     let output = render_type(
         &TypeSpec::builder("Student", TypeKind::Class)
             .add_primary_constructor_param(
-                ParameterSpec::new("val name", TypeName::primitive("String")).unwrap(),
+                ParameterSpec::builder("name", TypeName::primitive("String"))
+                    .is_property()
+                    .build()
+                    .unwrap(),
             )
             .add_primary_constructor_param(
-                ParameterSpec::new("val grade", TypeName::primitive("Int")).unwrap(),
+                ParameterSpec::builder("grade", TypeName::primitive("Int"))
+                    .is_property()
+                    .build()
+                    .unwrap(),
             )
             .extends(TypeName::primitive("Person"))
             .build()
             .unwrap(),
         &kt,
     );
-    assert!(output.contains("class Student(val name: String, val grade: Int) : Person {"));
+    assert!(output.contains("class Student(val name: String, val grade: Int) : Person() {"));
 }
 
 #[test]
@@ -678,10 +690,16 @@ fn test_kotlin_data_class_primary_constructor() {
     let output = render_type(
         &TypeSpec::builder("Point", TypeKind::Struct)
             .add_primary_constructor_param(
-                ParameterSpec::new("val x", TypeName::primitive("Int")).unwrap(),
+                ParameterSpec::builder("x", TypeName::primitive("Int"))
+                    .is_property()
+                    .build()
+                    .unwrap(),
             )
             .add_primary_constructor_param(
-                ParameterSpec::new("val y", TypeName::primitive("Int")).unwrap(),
+                ParameterSpec::builder("y", TypeName::primitive("Int"))
+                    .is_property()
+                    .build()
+                    .unwrap(),
             )
             .build()
             .unwrap(),
@@ -696,10 +714,16 @@ fn test_kotlin_primary_constructor_with_secondary() {
     // Secondary constructor delegates to primary
     let tb = TypeSpec::builder("Config", TypeKind::Class)
         .add_primary_constructor_param(
-            ParameterSpec::new("val name", TypeName::primitive("String")).unwrap(),
+            ParameterSpec::builder("name", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
         )
         .add_primary_constructor_param(
-            ParameterSpec::new("val value", TypeName::primitive("Int")).unwrap(),
+            ParameterSpec::builder("value", TypeName::primitive("Int"))
+                .is_property()
+                .build()
+                .unwrap(),
         )
         .add_method(
             FunSpec::builder("constructor")
@@ -734,7 +758,7 @@ fn test_ts_rejects_primary_constructor() {
             sigil_stitch::error::SigilStitchError::UnsupportedTypeCapabilities {
                 ref capabilities,
                 ..
-            } if capabilities.contains(&TypeCapability::ConstructorParameters)
+            } if capabilities.contains(&TypeCapability::PrimaryConstructorParameters)
         ),
         "{error}"
     );

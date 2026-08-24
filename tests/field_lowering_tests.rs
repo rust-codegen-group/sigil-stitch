@@ -182,7 +182,12 @@ fn escaped_and_normalized_field_name_collisions_are_rejected() {
             "Ａ",
         ),
     ] {
-        let ty = TypeSpec::builder("Collision", TypeKind::Struct)
+        let type_name = if lang.file_extension() == "ml" {
+            "collision"
+        } else {
+            "Collision"
+        };
+        let ty = TypeSpec::builder(type_name, TypeKind::Struct)
             .add_field(field(first, TypeName::primitive("Value")))
             .add_field(field(second, TypeName::primitive("Value")))
             .build()
@@ -1027,7 +1032,12 @@ fn record_payload_field_rules_see_docs_and_multiple_fields() {
         Box::new(sigil_stitch::lang::haskell::Haskell::new()) as Box<dyn CodeLang>,
         Box::new(sigil_stitch::lang::ocaml::OCaml::new()) as Box<dyn CodeLang>,
     ] {
-        let documented = TypeSpec::builder("Message", TypeKind::Enum)
+        let type_name = if lang.file_extension() == "ml" {
+            "message"
+        } else {
+            "Message"
+        };
+        let documented = TypeSpec::builder(type_name, TypeKind::Enum)
             .add_variant(
                 EnumVariantSpec::builder("Payload")
                     .record_payload_field(
@@ -1043,7 +1053,7 @@ fn record_payload_field_rules_see_docs_and_multiple_fields() {
             .unwrap();
         assert!(documented.validate(lang.as_ref()).is_err());
 
-        let payload = TypeSpec::builder("Message", TypeKind::Enum)
+        let payload = TypeSpec::builder(type_name, TypeKind::Enum)
             .add_variant(
                 EnumVariantSpec::builder("Payload")
                     .record_payload_field(field("first", TypeName::primitive("String")))

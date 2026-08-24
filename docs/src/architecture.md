@@ -4,11 +4,10 @@ This chapter describes how sigil-stitch carries declaration intent to source
 text. It covers ownership, the materialization and rendering pipeline, and
 import resolution.
 
-The function, field, property, and enum-variant declaration-lowering seams
-described here are implemented for every built-in language. Type declarations
-still have a pre-0.6.8 compatibility path in which the generic spec emitter
-interprets shared syntax configuration. That path is transitional and must not
-be expanded. See [Declaration Specs and Language
+The type, function, field, property, and enum-variant declaration-lowering
+seams described here are implemented for every built-in language. External
+adapters that retain permissive capabilities may still use frozen pre-0.6.8
+compatibility lowerers. See [Declaration Specs and Language
 Lowering](declaration_lowering.md) for the ownership decision and [0.6.8 Legacy
 Compatibility and Migration](legacy_compatibility_and_migration.md) for the
 versioned compatibility contract.
@@ -50,7 +49,15 @@ rendering IR passed to import resolution and final rendering.
   final-rendering policy. Implementing it is sufficient for direct
   `CodeBlock` rendering.
 - **`CodeLang: RendererLang`** adds declaration representability, lowering,
-  imports, and spec-level documentation. After crate-owned validation against
+  imports, and spec-level documentation. A complete type crosses
+  `validate_type()` / `collect_type_validation_errors()` and then
+  `lower_type(ValidatedType) -> Vec<CodeBlock>`. The result contains one or
+  more non-empty blocks; an empty vector or block fails closed. The validated
+  view contains crate-validated child wrappers, so the type adapter owns the
+  declaration's preamble, header, relationships, body order, primary
+  constructor, close, and output cardinality while reusing complete child
+  lowerers for child grammar.
+  After crate-owned validation against
   the selected adapter, `validate_function()` may add target-local checks to a
   classified `FunctionIntent`. sigil-stitch then constructs a
   `ValidatedFunction`; `lower_function()` accepts that validated read-only view
@@ -68,8 +75,9 @@ rendering IR passed to import resolution and final rendering.
   `validate_type_members()` and its additive collector. This seam handles
   cross-family relationships and has no lowering counterpart. Enum variants
   likewise use a complete sequence:
-  `validate_variants()` sees the owning declaration and complete ordered
-  `VariantIntent`; adapters with independent per-variant checks implement the
+  `validate_variants()` sees the owning declaration, complete ordered
+  `VariantIntent`, and whether non-variant members exist; adapters with
+  independent per-variant checks implement the
   additive `collect_variant_validation_errors()` seam. `lower_variants()`
   receives `ValidatedVariants` and owns preambles, payload spelling,
   separators, and section termination. Callers do not assemble target
@@ -84,7 +92,7 @@ Each supported language implements both traits in its own module
 or C++ lambda `};` semicolons.
 
 Deprecated declaration-grammar accessors remain only at compatibility
-boundaries for external adapters and the transitional `TypeSpec` emitter. New
+boundaries for external adapters and direct compatibility facades. New
 adapters and new syntax dimensions use language-owned lowering. The complete
 inventory and migration replacements are in [0.6.8 Legacy Compatibility and
 Migration](legacy_compatibility_and_migration.md). Stable renderer policy and
@@ -192,10 +200,12 @@ semantic `TypeName` references survive import collection and alias resolution.
 
 An enum is lowered as one owner-aware variant sequence. `VariantIntent`
 contains the owner name and kind, all variants in declaration order, whether
-ordinary members follow, the accepted arity ranges of structured constructors,
-and whether opaque members may provide target-specific constructor syntax. A
-language profile distinguishes discriminants, enum-entry constructor arguments,
-positional payloads, record payloads, and attributes. `VariantContext` is only
+non-variant members exist, the accepted arity ranges of structured
+constructors, and whether opaque members may provide target-specific
+constructor syntax. The type lowerer chooses where the sequence appears. A
+language profile distinguishes discriminants, enum-entry constructor
+arguments, positional payloads, record payloads, and attributes.
+`VariantContext` is only
 the deprecated positional input to the permissive external-adapter
 compatibility path; strict built-ins reject ownerless direct emission because
 caller-supplied first/last flags cannot prove valid separators or section
@@ -272,11 +282,6 @@ recognizes the documented 0.6.8 `is_static` plus decorator pattern solely as a
 frozen adapter-local compatibility exception. New semantics must not extend
 that recognizer or add a shared syntax hook.
 
-The current type compatibility emitter still reads pre-0.6.8 syntax
-configuration inside `TypeSpec`. Complete type-declaration migration will move
-that grammar behind the language adapter while preserving a frozen default for
-existing external adapters.
-
 ## Three-Pass Rendering Pipeline
 
 `FileSpec::render(width)` drives everything. It runs three passes over the file's members.
@@ -335,23 +340,26 @@ Declaration specs are validated and converted to `CodeBlock`s:
 - `FileMember::Code(CodeBlock)` passes through unchanged
 - `FileMember::RawContent(String)` passes through as-is
 
-The public function, field, property, and owner-aware variant `emit` paths apply
-crate-owned semantic validation, call the corresponding
+The public type, function, field, property, and owner-aware variant `emit`
+paths apply crate-owned semantic validation, call the corresponding
 `CodeLang::validate_*()` method for additional target-local checks, construct a
-`ValidatedFunction`, `ValidatedFields`, `ValidatedProperty`, or
-`ValidatedVariants`, and then call the matching `CodeLang::lower_*()` method.
-The defaults delegate to frozen legacy-syntax compatibility modules so
-pre-0.6.8 external adapters remain source compatible. Built-in complete
-lowerers do not consume deprecated declaration configuration for the migrated
-family.
+`ValidatedType`, `ValidatedFunction`, `ValidatedFields`,
+`ValidatedProperty`, or `ValidatedVariants`, and then call the matching
+`CodeLang::lower_*()` method. `ValidatedType` contains the validated child
+wrappers produced against that same adapter and deliberately does not
+dereference to unvalidated `TypeIntent`. The defaults delegate to frozen
+legacy-syntax compatibility modules so pre-0.6.8 external adapters remain
+source compatible. Built-in complete lowerers do not consume deprecated
+declaration configuration.
 
 `TypeMembersIntent` is validation evidence only. Its pass runs after the
 per-family checks and creates neither a validated wrapper nor a `CodeBlock`.
 
 Language lowering composes structured child blocks and preserves every
 `TypeName` as a `TypeRef`. Construction errors propagate from this pass; they
-are never converted to empty output. After materialization, everything is
-either a `CodeBlock` or explicitly raw content.
+are never converted to empty output, and complete type lowering rejects empty
+vectors or blocks. After materialization, everything is either a `CodeBlock`
+or explicitly raw content.
 
 ### Pass 1: Collect Imports
 

@@ -214,7 +214,6 @@ const C_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Trait, C_RECORD_CAPABILITIES),
     TypeCapabilityProfile::new(TypeKind::Enum, C_ENUM_CAPABILITIES),
     TypeCapabilityProfile::new(TypeKind::TypeAlias, &[]),
-    TypeCapabilityProfile::new(TypeKind::Newtype, &[]),
 ];
 
 const C_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
@@ -252,6 +251,17 @@ impl CodeLang for C {
             .with_functions(C_FUNCTIONS)
             .with_variants(C_VARIANTS)
             .with_fields(crate::lang::field_lowering::c::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::c::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::c::lower(self, type_)
     }
 
     fn lower_function(

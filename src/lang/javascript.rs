@@ -1,6 +1,7 @@
 //! JavaScript language implementation.
 
 use crate::code_block::CodeBlock;
+use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
@@ -304,6 +305,17 @@ impl CodeLang for JavaScript {
             .with_variants(JS_VARIANTS)
             .with_fields(crate::lang::field_lowering::javascript::PROFILES)
             .with_properties(crate::lang::property_lowering::javascript::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::javascript::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::javascript::lower(self, type_)
     }
 
     fn lower_function(

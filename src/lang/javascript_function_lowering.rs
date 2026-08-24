@@ -4,6 +4,7 @@
 
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
+use crate::lang::capability::FunctionForm;
 use crate::lang::function_lowering::{SignatureBuilder, tupled_parameter_list};
 use crate::lang::javascript::JavaScript;
 use crate::lang::{CodeLang, RendererLang};
@@ -29,7 +30,7 @@ pub(crate) fn lower(
     if function.modifiers().is_async {
         signature.push_literal("async ");
     }
-    if !function.modifiers().is_constructor
+    if function.form() != FunctionForm::Constructor
         && function.declaration_context() == DeclarationContext::TopLevel
     {
         signature.push_literal("function ");

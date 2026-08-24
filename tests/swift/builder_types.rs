@@ -171,8 +171,8 @@ fn test_class_extends_implements() {
     // Swift uses `:` for both superclass and protocol conformance.
     let ts = TypeSpec::builder("AdminService", TypeKind::Class)
         .extends(base)
-        .extends(codable)
-        .extends(hashable)
+        .implements(codable)
+        .implements(hashable)
         .add_method(
             FunSpec::builder("isAdmin")
                 .returns(TypeName::primitive("Bool"))

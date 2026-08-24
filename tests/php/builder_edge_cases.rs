@@ -37,6 +37,7 @@ fn test_name_escapes_php_keywords() {
 }
 
 #[test]
+#[allow(deprecated)] // Direct coverage for the frozen type-hook compatibility surface.
 fn test_newtype_line() {
     let php = Php::new();
     let line = php

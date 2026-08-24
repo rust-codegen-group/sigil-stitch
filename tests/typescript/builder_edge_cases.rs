@@ -329,26 +329,28 @@ fn test_name_escape_multiple_in_one_line() {
 // ── Embedded types in TypeScript interface ───────────────
 
 #[test]
-fn test_embedded_in_ts_interface() {
-    let file = FileSpec::builder("models.ts")
-        .add_type(
-            TypeSpec::builder("AdminUser", TypeKind::Interface)
-                .visibility(Visibility::Public)
-                .add_embedded(TypeName::importable_type("./base", "BaseUser"))
-                .add_embedded(TypeName::importable_type("./roles", "AdminRole"))
-                .add_field(
-                    FieldSpec::builder("permissions", TypeName::primitive("string[]"))
-                        .build()
-                        .unwrap(),
-                )
+fn test_embedded_in_ts_interface_fails_closed() {
+    let type_ = TypeSpec::builder("AdminUser", TypeKind::Interface)
+        .visibility(Visibility::Public)
+        .add_embedded(TypeName::importable_type("./base", "BaseUser"))
+        .add_embedded(TypeName::importable_type("./roles", "AdminRole"))
+        .add_field(
+            FieldSpec::builder("permissions", TypeName::primitive("string[]"))
                 .build()
                 .unwrap(),
         )
         .build()
         .unwrap();
-
-    let output = file.render(80).unwrap();
-    golden::assert_golden("typescript/embedded_interface.ts", &output);
+    let error = type_
+        .emit(&sigil_stitch::lang::typescript::TypeScript::new())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::UnsupportedTypeCapabilities {
+            ref capabilities,
+            ..
+        } if capabilities == &[sigil_stitch::lang::capability::TypeCapability::StructuralEmbedding]
+    ));
 }
 
 // ── %W wrap point produces single space, not double ───────────────

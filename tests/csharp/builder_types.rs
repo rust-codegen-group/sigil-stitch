@@ -105,8 +105,8 @@ fn test_class_extends_implements() {
     let ts = TypeSpec::builder("UserService", TypeKind::Class)
         .visibility(Visibility::Public)
         .extends(TypeName::primitive("BaseService"))
-        .extends(TypeName::primitive("IUserService"))
-        .extends(TypeName::primitive("IDisposable"))
+        .implements(TypeName::primitive("IUserService"))
+        .implements(TypeName::primitive("IDisposable"))
         .add_method(
             FunSpec::builder("Dispose")
                 .visibility(Visibility::Public)

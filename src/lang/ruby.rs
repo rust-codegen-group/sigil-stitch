@@ -24,6 +24,7 @@
 //! Ruby uses `end` to close blocks, same as Lua. Braces `{ }` in
 //! `sigil_quote!` map to indent/dedent + `end` in the output.
 
+use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
@@ -226,6 +227,17 @@ impl CodeLang for Ruby {
             .with_types(RUBY_TYPES)
             .with_functions(RUBY_FUNCTIONS)
             .with_variants(RUBY_VARIANTS)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::ruby::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::ruby::lower(self, type_)
     }
 
     fn lower_function(

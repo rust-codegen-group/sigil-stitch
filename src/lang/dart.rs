@@ -204,6 +204,8 @@ const DART_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = generic type parameters
     TypeCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = `T extends Bound`
+    TypeCapability::BoundedPolymorphism,
     // Attributes = metadata annotations
     TypeCapability::Attributes,
 ];
@@ -216,6 +218,8 @@ const DART_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = generic type parameters
     TypeCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = `T extends Bound`
+    TypeCapability::BoundedPolymorphism,
     // Attributes = metadata annotations
     TypeCapability::Attributes,
 ];
@@ -238,6 +242,8 @@ const DART_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // ParametricPolymorphism = generic type parameters
             TypeCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = `T extends Bound`
+            TypeCapability::BoundedPolymorphism,
         ],
     ),
 ];
@@ -341,6 +347,17 @@ impl CodeLang for Dart {
             .with_functions(DART_FUNCTIONS)
             .with_variants(DART_VARIANTS)
             .with_fields(crate::lang::field_lowering::dart::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::dart::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::dart::lower(self, type_)
     }
 
     fn lower_function(

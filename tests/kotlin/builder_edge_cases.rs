@@ -46,7 +46,7 @@ fn test_full_module() {
 
     // Implementation class.
     let cls = TypeSpec::builder("InMemoryUserRepository", TypeKind::Class);
-    let cls = cls.extends(TypeName::primitive("UserRepository"));
+    let cls = cls.implements(TypeName::primitive("UserRepository"));
     let cls = cls.doc("In-memory implementation of UserRepository.");
 
     let cls = cls.add_field(

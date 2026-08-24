@@ -16,9 +16,10 @@ const ALL_FORMS: [FunctionForm; 3] = [
     FunctionForm::Destructor,
 ];
 
-const ALL_CAPABILITIES: [FunctionCapability; 16] = [
+const ALL_CAPABILITIES: [FunctionCapability; 17] = [
     FunctionCapability::ParametricPolymorphism,
     FunctionCapability::BoundedPolymorphism,
+    FunctionCapability::HigherKindedPolymorphism,
     FunctionCapability::Attributes,
     FunctionCapability::ExplicitReturnType,
     FunctionCapability::TypedParameters,
@@ -1171,6 +1172,7 @@ fn scala_matrix() {
         FunctionCapability::ExplicitReturnType,
         FunctionCapability::TypedParameters,
         FunctionCapability::ParametricPolymorphism,
+        FunctionCapability::HigherKindedPolymorphism,
     ];
     let member = &[
         FunctionCapability::AbstractMethod,
@@ -1181,6 +1183,7 @@ fn scala_matrix() {
         FunctionCapability::TypedParameters,
         FunctionCapability::Override,
         FunctionCapability::ParametricPolymorphism,
+        FunctionCapability::HigherKindedPolymorphism,
     ];
     assert_function_matrix(
         &sigil_stitch::lang::scala::Scala::new(),

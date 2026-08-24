@@ -7,7 +7,7 @@ use sigil_stitch::lang::capability::{
     TypeCapabilityProfile, VariantCapability, VariantCapabilityProfile,
 };
 use sigil_stitch::lang::config::{EnumAndAnnotationConfig, VariantValueFormat};
-use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedVariants, VariantIntent};
+use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedType, ValidatedVariants, VariantIntent};
 use sigil_stitch::spec::annotation_spec::{AnnotationNameRef, AnnotationSpec};
 use sigil_stitch::spec::enum_variant_spec::{EnumVariantSpec, VariantContext};
 use sigil_stitch::spec::field_spec::FieldSpec;
@@ -91,6 +91,58 @@ impl CodeLang for LegacyRichSyntaxLang {
 #[derive(Debug)]
 struct SemanticViewLang;
 
+#[derive(Debug)]
+struct EmbeddedMemberViewLang;
+
+const EMBEDDED_MEMBER_TYPES: &[TypeCapabilityProfile<'_>] = &[TypeCapabilityProfile::new(
+    TypeKind::Enum,
+    &[
+        TypeCapability::Variants,
+        TypeCapability::StructuralEmbedding,
+    ],
+)];
+const EMBEDDED_MEMBER_VARIANTS: &[VariantCapabilityProfile<'_>] =
+    &[VariantCapabilityProfile::new(TypeKind::Enum, &[])];
+
+impl RendererLang for EmbeddedMemberViewLang {
+    fn file_extension(&self) -> &str {
+        "embedded-member-view"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+}
+
+impl CodeLang for EmbeddedMemberViewLang {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::strict()
+            .with_types(EMBEDDED_MEMBER_TYPES)
+            .with_variants(EMBEDDED_MEMBER_VARIANTS)
+    }
+
+    fn validate_variants(&self, variants: VariantIntent<'_>) -> Result<(), SigilStitchError> {
+        assert!(variants.has_non_variant_members());
+        Ok(())
+    }
+
+    fn lower_variants(
+        &self,
+        _variants: ValidatedVariants<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        CodeBlock::of("Variant", ())
+    }
+
+    fn lower_type(&self, type_: ValidatedType<'_>) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        let mut block = CodeBlock::builder();
+        block.add_code(self.lower_variants(type_.variants().unwrap().clone())?);
+        for embedded in type_.embedded_types() {
+            block.add(" %T", embedded.clone());
+        }
+        Ok(vec![block.build()?])
+    }
+}
+
 const SEMANTIC_TYPES: &[TypeCapabilityProfile<'_>] = &[TypeCapabilityProfile::new(
     TypeKind::Enum,
     &[TypeCapability::Variants],
@@ -138,7 +190,7 @@ impl CodeLang for SemanticViewLang {
     fn validate_variants(&self, variants: VariantIntent<'_>) -> Result<(), SigilStitchError> {
         assert_eq!(variants.owner_name(), "Semantic");
         assert_eq!(variants.owner_kind(), TypeKind::Enum);
-        assert!(variants.has_following_members());
+        assert!(variants.has_non_variant_members());
         assert_eq!(variants.variants().len(), 4);
 
         let discriminated = &variants.variants()[0];
@@ -182,6 +234,17 @@ impl CodeLang for SemanticViewLang {
     ) -> Result<CodeBlock, SigilStitchError> {
         assert_eq!(variants.owner_name(), "Semantic");
         CodeBlock::of("semantic variants", ())
+    }
+
+    fn lower_type(&self, type_: ValidatedType<'_>) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        let mut block = CodeBlock::builder();
+        if let Some(variants) = type_.variants() {
+            block.add_code(self.lower_variants(variants.clone())?);
+        }
+        for member in type_.extra_members() {
+            block.add_code(member.clone());
+        }
+        Ok(vec![block.build()?])
     }
 }
 
@@ -544,7 +607,12 @@ fn ambiguous_legacy_values_are_rejected_when_no_valid_local_meaning_exists() {
     ];
 
     for lang in languages {
-        let spec = TypeSpec::builder("Legacy", TypeKind::Enum)
+        let type_name = if lang.file_extension() == "ml" {
+            "legacy"
+        } else {
+            "Legacy"
+        };
+        let spec = TypeSpec::builder(type_name, TypeKind::Enum)
             .add_variant(
                 EnumVariantSpec::builder("Legacy")
                     .value(CodeBlock::of("1", ()).unwrap())
@@ -639,6 +707,18 @@ fn adapter_validation_receives_the_complete_read_only_sequence() {
         .unwrap();
 
     let blocks = spec.emit(&SemanticViewLang).unwrap();
+    assert!(!blocks.is_empty());
+}
+
+#[test]
+fn embedded_types_count_as_non_variant_members() {
+    let spec = TypeSpec::builder("Semantic", TypeKind::Enum)
+        .add_variant(EnumVariantSpec::new("Variant").unwrap())
+        .add_embedded(TypeName::primitive("Embedded"))
+        .build()
+        .unwrap();
+
+    let blocks = spec.emit(&EmbeddedMemberViewLang).unwrap();
     assert!(!blocks.is_empty());
 }
 
@@ -866,7 +946,12 @@ fn adapter_local_record_field_sibling_errors_are_aggregated() {
                 .build()
                 .unwrap()
         };
-        let invalid = TypeSpec::builder("Invalid", TypeKind::Enum)
+        let type_name = if filename.ends_with(".ml") {
+            "invalid"
+        } else {
+            "Invalid"
+        };
+        let invalid = TypeSpec::builder(type_name, TypeKind::Enum)
             .add_variant(invalid_field("First", "first"))
             .add_variant(invalid_field("Second", "second"))
             .build()
@@ -993,7 +1078,7 @@ fn haskell_parenthesizes_compound_positional_payload_types() {
 #[test]
 fn ocaml_parenthesizes_each_compound_positional_payload_type() {
     let ocaml = render_type(
-        &TypeSpec::builder("Payload", TypeKind::Enum)
+        &TypeSpec::builder("payload", TypeKind::Enum)
             .add_variant(
                 EnumVariantSpec::builder("Tupled")
                     .positional_payload(TypeName::tuple(vec![
@@ -1026,8 +1111,8 @@ fn ocaml_parenthesizes_each_compound_positional_payload_type() {
 
 #[test]
 fn haskell_and_ocaml_escape_record_payload_field_names() {
-    let spec = || {
-        TypeSpec::builder("Payload", TypeKind::Enum)
+    let spec = |type_name: &str| {
+        TypeSpec::builder(type_name, TypeKind::Enum)
             .add_variant(
                 EnumVariantSpec::builder("Record")
                     .record_payload_field(FieldSpec::of("type", TypeName::primitive("Value")))
@@ -1038,17 +1123,20 @@ fn haskell_and_ocaml_escape_record_payload_field_names() {
             .unwrap()
     };
 
-    let haskell = render_type(&spec(), &sigil_stitch::lang::haskell::Haskell::new());
+    let haskell = render_type(
+        &spec("Payload"),
+        &sigil_stitch::lang::haskell::Haskell::new(),
+    );
     assert!(haskell.contains("type' :: Value"), "{haskell}");
 
-    let ocaml = render_type(&spec(), &sigil_stitch::lang::ocaml::OCaml::new());
+    let ocaml = render_type(&spec("payload"), &sigil_stitch::lang::ocaml::OCaml::new());
     assert!(ocaml.contains("type_ : Value"), "{ocaml}");
 }
 
 #[test]
 fn haskell_and_ocaml_reject_record_field_names_that_collide_after_escaping() {
-    let spec = |escaped_name: &str| {
-        TypeSpec::builder("Payload", TypeKind::Enum)
+    let spec = |type_name: &str, escaped_name: &str| {
+        TypeSpec::builder(type_name, TypeKind::Enum)
             .add_variant(
                 EnumVariantSpec::builder("Record")
                     .record_payload_field(FieldSpec::of("type", TypeName::primitive("Value")))
@@ -1061,12 +1149,12 @@ fn haskell_and_ocaml_reject_record_field_names_that_collide_after_escaping() {
     };
 
     assert!(matches!(
-        spec("type'").emit(&sigil_stitch::lang::haskell::Haskell::new()),
+        spec("Payload", "type'").emit(&sigil_stitch::lang::haskell::Haskell::new()),
         Err(SigilStitchError::InvalidField { field_name, .. })
             if field_name == "type'"
     ));
     assert!(matches!(
-        spec("type_").emit(&sigil_stitch::lang::ocaml::OCaml::new()),
+        spec("payload", "type_").emit(&sigil_stitch::lang::ocaml::OCaml::new()),
         Err(SigilStitchError::InvalidField { field_name, .. })
             if field_name == "type_"
     ));

@@ -3,9 +3,9 @@
 sigil-stitch supports new languages by implementing two traits: `RendererLang` (renderer-only methods) and `CodeLang` (spec-layer methods). `CodeLang` extends `RendererLang`, so implementing `CodeLang` requires both. If you only need `CodeBlock`-level rendering without specs, `RendererLang` alone is sufficient.
 
 `RendererLang` covers rendering essentials. `CodeLang` adds declaration
-validation, materialization, and file-level behavior. The current trait also
-contains pre-0.6.8 syntax configuration and structured emission hooks with
-compatibility defaults.
+validation, materialization, and file-level behavior. The trait retains
+deprecated pre-0.6.8 grammar hooks only so existing external adapters can use
+the frozen compatibility lowerers.
 
 Do not treat those declaration syntax structs as an extensible universal
 grammar. New syntax dimensions belong in complete language-local lowering. See
@@ -19,11 +19,11 @@ This guide walks through the process using a hypothetical language, with referen
 
 Adding a language takes five steps:
 
-1. Create `src/lang/your_lang.rs` implementing `CodeLang`
+1. Create `src/lang/your_lang.rs` with exact capabilities, validation, and complete lowerers
 2. Add `pub mod your_lang;` to `src/lang/mod.rs`
 3. Write integration tests in `tests/`
-4. Run `just bless` to generate golden files
-5. Bridge the remaining transitional type-declaration path
+4. Run the full validation suite
+5. Bless and inspect golden files only for intentional output changes
 
 If your language has tokenizer conflicts in `sigil_quote!` that the universal heuristics
 can't handle (e.g., shell flags, Go channel operators), you may also need to add a
@@ -116,6 +116,18 @@ body, or ordinary methods are lowering decisions, not capabilities.
 
 ### Declaration Lowering and Compatibility Methods
 
+`CodeLang::validate_type()` receives one complete, read-only `TypeIntent`.
+Override `collect_type_validation_errors()` when independent target-local
+failures should survive file-level aggregation. `CodeLang::lower_type()` then
+receives a crate-constructed `ValidatedType` whose fields, properties, methods,
+and variants have already passed their own validation against the same
+adapter. It returns `Vec<CodeBlock>` because a target may use one declaration
+or several related blocks. The vector and every returned block must be
+non-empty; sigil-stitch rejects empty output with `EmptyTypeLowering`. The type
+lowerer owns preamble order, alias and newtype forms, headers, inheritance,
+primary constructors, member-family order, empty bodies, closing syntax, and
+output cardinality.
+
 `CodeLang::validate_function()` receives classified, read-only `FunctionIntent`
 after sigil-stitch applies its semantic capability matrix against the actual
 adapter. An override returns `Result<(), SigilStitchError>` and can add
@@ -131,9 +143,12 @@ corresponding complete-sequence seams for enum variants. Adapters that can find
 multiple independent target-local errors override
 `collect_variant_validation_errors()` as the additive validation entry point;
 its default appends the single `validate_variants()` result. `VariantIntent`
-exposes the owner, ordered variants, payloads, annotations, following-member
-state, structured-constructor arity evidence, and the presence of opaque members. The
-lowerer derives position and owns all target grammar. Use
+exposes the owner, ordered variants, payloads, annotations, a
+`has_non_variant_members()` fact covering fields, properties, methods,
+embedded types, and opaque members, structured-constructor arity evidence, and
+separate evidence that opaque members may provide constructor syntax. The
+variant lowerer derives positions and owns its sequence grammar; the type
+lowerer chooses the sequence's placement. Use
 `AnnotationSpec::emit_with_syntax()` when a local annotation spelling must keep
 an importable annotation name as a structured `%T` reference.
 
@@ -175,6 +190,9 @@ absorbed by complete language-local lowering rather than multiplied:
 | Method | Example | Purpose |
 |--------|---------|---------|
 | `capabilities()` | Strict type, function, field, property, and variant profiles | Declare semantic representability by context and form |
+| `validate_type()` | `TypeIntent -> Result<(), _>` | Add target-local checks after crate-owned complete-type validation |
+| `collect_type_validation_errors()` | `TypeIntent + error sink` | Add independent target-local type failures during file validation |
+| `lower_type()` | `ValidatedType -> non-empty Vec<CodeBlock>` | Own complete type-declaration grammar; permissive adapters default to frozen compatibility lowering |
 | `render_visibility()` | `"public "`, `"pub "` | Visibility prefix |
 | `function_keyword()` | `"function"`, `"fn"` | Function declaration keyword |
 | `abstract_modifier_capability()` | `AbstractMethod`, `VirtualMethod` | Semantic meaning of the legacy abstract modifier |
@@ -184,7 +202,6 @@ absorbed by complete language-local lowering rather than multiplied:
 | `constructor_name_with_return_type_is_function()` | `true` / `false` | Let an explicit return type disambiguate an owner-named ordinary method |
 | `constructor_name_is_valid()` | `true` / `false` for name and owner | Reject explicitly marked constructors whose names violate local syntax |
 | `type_member_declaration_context()` | `Member`, `InterfaceMember` | Select concrete or contract member rules for each `TypeKind` |
-| `abstract_type_modifier_is_valid()` | `true` / `false` for one `TypeKind` | Restrict explicit abstract type declarations to valid kinds |
 | `function_parameters_are_typed()` | `true` / `false` for the complete list | Refine required typing for receiver spellings or shared annotations |
 | `function_body_policy()` | `Required`, `Forbidden`, `Optional` | Refine profile body policy when modifiers change the rule |
 | `maximum_function_parameters()` | maximum arity or `None` | Refine profile arity when modifiers change the limit |
@@ -206,13 +223,11 @@ absorbed by complete language-local lowering rather than multiplied:
 | `validate_variants()` | `VariantIntent -> Result<(), _>` | Add target-local checks after crate-owned sequence validation |
 | `collect_variant_validation_errors()` | `VariantIntent + error sink` | Add independent target-local sibling errors during file validation |
 | `lower_variants()` | `ValidatedVariants -> CodeBlock` | Own complete variant-sequence grammar; defaults to frozen compatibility lowering |
-| `type_keyword()` | `"class"`, `"struct"` | Type declaration keyword |
-| `methods_inside_type_body()` | `true` / `false` | Legacy structural switch used by the compatibility type emitter |
 
-`methods_inside_type_body()` is a legacy switch used by the transitional
-`TypeSpec` emitter. Existing adapters may keep an override until complete type
-lowering owns whether methods appear in the declaration body or a separate
-block. New declaration families must not reuse it as a general placement hook.
+Legacy type hooks such as `type_keyword()`,
+`methods_inside_type_body()`, `emit_newtype_decl()`,
+`abstract_type_modifier_is_valid()`, and `type_decl_syntax()` exist only for
+the permissive compatibility lowerer. A new adapter does not implement them.
 See the [legacy surface matrix](legacy_compatibility_and_migration.md#legacy-surface-matrix).
 
 ### Renderer Configuration
@@ -264,22 +279,14 @@ These methods don't belong to a config struct but have sensible defaults you can
   Haskell uses a module-qualified original name when an alias was assigned,
   paired with a `qualified` import for that symbol.
 - `module_separator()` -- returns `Option<&str>`. Default `None`. Override to `Some("::")` (Rust/C++) or `Some(".")` (Go/Python/Java/etc.) to enable `TypeName::qualified()` inline rendering.
-- `type_kind_suffix()` -- suffix after type close for specific type kinds.
-- `emit_newtype_decl()` -- emits a structured `CodeBlock` for a newtype. The
-  default is the Rust tuple struct `struct Name(Inner);`.
 - `fun_block_open()` -- custom block opener for functions.
-- `type_header_block_open()` -- custom block opener for type headers.
 - `emit_type_context()` -- optional structured context for split function
   signatures.
-- `type_body_prefix()` -- content emitted before the type body.
-- `type_body_suffix()` -- content emitted after the type body.
-- `emit_type_close_suffix()` -- optional structured suffix after a type's close
-  delimiter, such as Haskell `deriving`.
 - `render_type_param_kind()` -- how type parameters are annotated with variance.
 - `line_comment_suffix()` -- suffix for line comments (default `""`).
 
-Deprecated standalone declaration hooks such as preamble ordering, optional-
-field style, and property style are listed with their replacements in the
+Deprecated standalone declaration hooks such as type fragments, preamble
+ordering, optional-field style, and property style are listed with their replacements in the
 [legacy surface matrix](legacy_compatibility_and_migration.md#legacy-surface-matrix).
 
 `render_imports()` receives a deduplicated, alias-resolved `ImportGroup` and
@@ -287,15 +294,12 @@ emits the file's import header. `render_doc_comment()` emits spec-level doc
 comments. Study `src/lang/typescript.rs` for ES module imports or
 `src/lang/rust.rs` for `use` paths.
 
-The three `emit_*` type hooks return `Result` so construction failures reach
-`FileSpec::render()`. `emit_type_context()` and
-`emit_type_close_suffix()` return `Ok(None)` when the language has no fragment
-to add. Use `Arg::TypeName` or `%T` for every semantic type and compose child
-blocks structurally; do not render a `TypeName` to a string inside a hook.
-These fragment hooks return blocks without a trailing newline. A complete
-sequence lowerer such as `lower_fields()` instead owns every line boundary its
-sequence requires, including the boundary after its final declaration; the
-caller owns only spacing between declaration families.
+Use `Arg::TypeName` or `%T` for every semantic type and compose child blocks
+structurally; do not render a `TypeName` to a string inside a lowerer. A
+complete sequence lowerer such as `lower_fields()` owns every line boundary
+its sequence requires, including the boundary after its final declaration. The
+complete type lowerer decides spacing and order among child declaration
+families.
 
 ## Step-by-Step Walkthrough
 
@@ -307,19 +311,18 @@ and terminating line boundaries required by their grammar. Hook errors should
 be returned unchanged.
 
 ```rust,ignore
-use sigil_stitch::code_block::{Arg, CodeBlock};
+use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::ImportGroup;
 use sigil_stitch::lang::capability::{
     FieldCapability, FieldCapabilityProfile, FieldContext, LanguageCapabilities,
+    TypeCapability, TypeCapabilityProfile,
 };
-use sigil_stitch::lang::config::{
-    BlockSyntaxConfig, GenericSyntaxConfig, TypeDeclSyntaxConfig,
+use sigil_stitch::lang::config::{BlockSyntaxConfig, GenericSyntaxConfig};
+use sigil_stitch::lang::{
+    CodeLang, RendererLang, TypeIntent, ValidatedFields, ValidatedType,
 };
-use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedFields, ValidatedFunction};
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
-use sigil_stitch::spec::where_spec::{TypeParamSpec, render_type_params};
-use sigil_stitch::type_name::TypeName;
 
 #[derive(Debug, Clone, Default)]
 pub struct YourLang;
@@ -337,6 +340,12 @@ const FIELD_CAPABILITIES: &[FieldCapability] = &[
 ];
 const REQUIRED_FIELD_CAPABILITIES: &[FieldCapability] =
     &[FieldCapability::ExplicitType];
+const TYPE_PROFILES: &[TypeCapabilityProfile<'_>] = &[
+    TypeCapabilityProfile::new(
+        TypeKind::Class,
+        &[TypeCapability::RecordFields],
+    ),
+];
 const FIELD_PROFILES: &[FieldCapabilityProfile<'_>] = &[
     FieldCapabilityProfile::new(
         FieldContext::Direct(DeclarationContext::Member),
@@ -380,7 +389,9 @@ impl RendererLang for YourLang {
 impl CodeLang for YourLang {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         // Add the language's exact type, function, and variant profiles too.
-        LanguageCapabilities::strict().with_fields(FIELD_PROFILES)
+        LanguageCapabilities::strict()
+            .with_types(TYPE_PROFILES)
+            .with_fields(FIELD_PROFILES)
     }
 
     fn render_doc_comment(&self, lines: &[&str]) -> String {
@@ -404,42 +415,64 @@ impl CodeLang for YourLang {
         out
     }
 
-    fn lower_function(
+    fn validate_type(&self, type_: TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        let mut chars = type_.name().chars();
+        let valid_identifier = chars
+            .next()
+            .is_some_and(|first| first == '_' || first.is_ascii_alphabetic())
+            && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric());
+        if !valid_identifier || self.reserved_words().contains(&type_.name()) {
+            return Err(SigilStitchError::InvalidTypeDeclaration {
+                type_name: type_.name().to_string(),
+                reason: "YourLang requires a non-keyword identifier".to_string(),
+            });
+        }
+        if !matches!(
+            type_.modifiers().visibility,
+            Visibility::Inherited | Visibility::Public
+        ) {
+            return Err(SigilStitchError::InvalidTypeDeclaration {
+                type_name: type_.name().to_string(),
+                reason: "YourLang types support only inherited or public visibility".to_string(),
+            });
+        }
+        if type_.modifiers().is_abstract || !type_.extra_members().is_empty() {
+            return Err(SigilStitchError::InvalidTypeDeclaration {
+                type_name: type_.name().to_string(),
+                reason: "YourLang classes do not support abstract or opaque members".to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn lower_type(
         &self,
-        function: ValidatedFunction<'_>,
-    ) -> Result<CodeBlock, SigilStitchError> {
+        type_: ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         let mut block = CodeBlock::builder();
+        if !type_.doc().is_empty() {
+            let lines: Vec<&str> = type_.doc().iter().map(String::as_str).collect();
+            block.add("%L", self.render_doc_comment(&lines));
+            block.add_line();
+        }
         block.add(
-            "%Lfunction %L(",
+            "%Lclass %L {",
             (
                 self.render_visibility(
-                    function.modifiers().visibility,
-                    function.declaration_context(),
+                    type_.modifiers().visibility,
+                    DeclarationContext::TopLevel,
                 ),
-                function.name(),
+                type_.name(),
             ),
         );
-        for (index, parameter) in function.parameters().iter().enumerate() {
-            if index > 0 {
-                block.add(",%W", ());
-            }
-            block.add("%L: %T", (parameter.name(), parameter.param_type().clone()));
+        block.add_line();
+        block.add("%>", ());
+        if let Some(fields) = type_.fields() {
+            block.add_code(self.lower_fields(fields.clone())?);
         }
-        block.add(")", ());
-        if let Some(return_type) = function.return_type() {
-            block.add(": %T", return_type.clone());
-        }
-        if let Some(body) = function.body() {
-            block.add(" {", ());
-            block.add_line();
-            block.add("%>", ());
-            block.add_code(body.clone());
-            block.add_line();
-            block.add("%<}", ());
-        } else {
-            block.add(";", ());
-        }
-        block.build()
+        block.add("%<}", ());
+        block.add_line();
+        Ok(vec![block.build()?])
     }
 
     fn lower_fields(
@@ -483,40 +516,6 @@ impl CodeLang for YourLang {
         }
     }
 
-    fn type_keyword(&self, kind: TypeKind) -> &str {
-        match kind {
-            TypeKind::Class => "class",
-            TypeKind::Interface | TypeKind::Trait => "interface",
-            TypeKind::Enum => "enum",
-            TypeKind::Struct => "class",
-            TypeKind::TypeAlias => "type",
-            TypeKind::Newtype => "class",
-        }
-    }
-    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool { true }
-
-    fn emit_newtype_decl(
-        &self,
-        visibility: &str,
-        name: &str,
-        type_params: &[TypeParamSpec],
-        inner: &TypeName,
-    ) -> Result<CodeBlock, SigilStitchError> {
-        let mut args = Vec::new();
-        let params = render_type_params(type_params, self, &mut args);
-        args.push(Arg::TypeName(inner.clone()));
-        CodeBlock::of(&format!("{visibility}opaque {name}{params} = %T"), args)
-    }
-
-    // Transitional type-declaration compatibility override. Do not add fields
-    // here for new grammar; move complete type lowering behind an adapter seam.
-    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
-        TypeDeclSyntaxConfig {
-            super_type_keyword: " extends ",
-            implements_keyword: " implements ",
-            ..Default::default()
-        }
-    }
 }
 ```
 
@@ -567,27 +566,34 @@ fn test_basic_statement() {
 
 **`tests/your_lang/builder_basic.rs`** -- builder API tests (CodeBlock, TypeSpec, FunSpec, FileSpec).
 
-### 4. Generate golden files
+### 4. Run the full validation suite
+
+Run the repository checks after the adapter's advertised declaration families
+have complete validation and lowering. A strict profile without its matching
+complete lowerer is an implementation error, not a reason to bless output.
+
+```bash
+just check
+```
+
+### 5. Review intentional golden changes
 
 ```bash
 just bless
 ```
 
-This runs all tests with `BLESS=1`, which creates `test-goldens/your_lang/*.yl` files from the actual output. Review them manually, then commit.
+This runs tests with `BLESS=1` and writes `test-goldens/your_lang/*.yl` from the
+actual output. Use it only when the output change is intentional, then inspect
+every changed fixture. A strict adapter that advertises a type profile but
+omits `lower_type()` fails closed with `MissingTypeLowerer`; blessing cannot
+turn an incomplete adapter into a valid one. Returning an empty vector or
+empty block likewise fails with `EmptyTypeLowering`. Follow the [external-adapter
+migration sequence](legacy_compatibility_and_migration.md#external-adapter-migration)
+when migrating an existing adapter family by family.
 
-### 5. Bridge transitional type lowering
-
-Run the full test suite and review golden file output. Implement function,
-field, property, and variant grammar in the corresponding complete lowering
-seams. Type declarations have not yet moved behind a complete language-local
-seam and may still require deprecated syntax accessors. Use existing fields
-only where they already express the target, and do not add a shared field or
-enum for an unseen grammar dimension. Follow the [external-adapter migration
-sequence](legacy_compatibility_and_migration.md#external-adapter-migration).
-Examples of remaining transitional overrides are:
-
-- If types come before names (`int x` instead of `x: int`): override `type_decl_syntax()` to set `type_before_name`, `return_type_is_prefix`
-- If generics use brackets instead of angle brackets: override `generic_syntax()` to set `open`, `close`
+`generic_syntax()` may still describe reusable type-expression presentation,
+such as bracket delimiters. Declaration placement—where type parameters,
+bounds, bases, constructors, and members appear—belongs in `lower_type()`.
 
 ## Reference Implementations
 
