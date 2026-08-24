@@ -36,21 +36,14 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 ///
 /// # Inheritance
 ///
-/// C# uses `:` for both base class and interfaces. Put all supertypes
-/// into `super_types()`:
+/// C# uses one `:`-delimited base list, but the semantic inputs remain
+/// distinct: use `extends()` for the optional base class and `implements()`
+/// for interfaces:
 /// ```text
-/// tb.super_type(TypeName::primitive("BaseClass"));
-/// tb.super_type(TypeName::primitive("ISerializable"));
+/// let tb = TypeSpec::builder("Foo", TypeKind::Class)
+///     .extends(TypeName::primitive("BaseClass"))
+///     .implements(TypeName::primitive("ISerializable"));
 /// // Emits: class Foo : BaseClass, ISerializable {
-/// ```
-///
-/// # Primary constructors (C# 12+)
-///
-/// Use `add_primary_constructor_param()` on `TypeSpecBuilder`:
-/// ```text
-/// let mut tb = TypeSpec::builder("Person", TypeKind::Class);
-/// tb.add_primary_constructor_param(ParameterSpec::new("string name", TypeName::empty()));
-/// // Emits: class Person(string name) {
 /// ```
 #[derive(Debug, Clone)]
 pub struct CSharp {
@@ -194,6 +187,8 @@ const CS_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::Methods,
     // NominalSubtyping = base classes and interfaces (`:`)
     TypeCapability::NominalSubtyping,
+    // InterfaceImplementation = interfaces in the combined base list
+    TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = generic type parameters
     TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints (`where`)
@@ -208,6 +203,10 @@ const CS_STRUCT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::Methods,
     // ParametricPolymorphism = generic type parameters
     TypeCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic constraints (`where`)
+    TypeCapability::BoundedPolymorphism,
+    // InterfaceImplementation = implemented interfaces (`:`)
+    TypeCapability::InterfaceImplementation,
     // Attributes = `[Attribute]`
     TypeCapability::Attributes,
 ];
@@ -334,6 +333,17 @@ impl CodeLang for CSharp {
             .with_functions(CS_FUNCTIONS)
             .with_variants(CS_VARIANTS)
             .with_fields(crate::lang::field_lowering::csharp::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::csharp::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::csharp::lower(self, type_)
     }
 
     fn validate_fields(

@@ -41,11 +41,13 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 ///
 /// # Protocol conformance
 ///
-/// Swift uses `:` for both superclass and protocol conformance. Put all supertypes
-/// into `extends()` (not `implements()`):
+/// Swift uses one `:`-delimited inheritance list, but the semantic inputs
+/// remain distinct: use `extends()` for the optional superclass and
+/// `implements()` for protocol conformances:
 /// ```text
-/// tb.extends(TypeName::primitive("NSObject"));
-/// tb.extends(TypeName::primitive("Codable"));
+/// let tb = TypeSpec::builder("Foo", TypeKind::Class)
+///     .extends(TypeName::primitive("NSObject"))
+///     .implements(TypeName::primitive("Codable"));
 /// // Emits: class Foo: NSObject, Codable {
 /// ```
 ///
@@ -249,6 +251,24 @@ const SWIFT_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::Methods,
     // NominalSubtyping = superclass/protocol inheritance (`:`)
     TypeCapability::NominalSubtyping,
+    // InterfaceImplementation = protocol conformance in the inheritance list
+    TypeCapability::InterfaceImplementation,
+    // ParametricPolymorphism = generic type parameters
+    TypeCapability::ParametricPolymorphism,
+    // BoundedPolymorphism = generic constraints
+    TypeCapability::BoundedPolymorphism,
+    // Attributes = attributes
+    TypeCapability::Attributes,
+];
+const SWIFT_STRUCT_CAPABILITIES: &[TypeCapability] = &[
+    // RecordFields = stored properties
+    TypeCapability::RecordFields,
+    // AccessorMethods = computed properties
+    TypeCapability::AccessorMethods,
+    // Methods = methods
+    TypeCapability::Methods,
+    // InterfaceImplementation = protocol conformance (`:`)
+    TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = generic type parameters
     TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints
@@ -265,7 +285,7 @@ const SWIFT_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
 ];
 const SWIFT_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Class, SWIFT_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Struct, SWIFT_CLASS_CAPABILITIES),
+    TypeCapabilityProfile::new(TypeKind::Struct, SWIFT_STRUCT_CAPABILITIES),
     TypeCapabilityProfile::new(TypeKind::Interface, SWIFT_CONTRACT_CAPABILITIES),
     TypeCapabilityProfile::new(TypeKind::Trait, SWIFT_CONTRACT_CAPABILITIES),
     TypeCapabilityProfile::new(
@@ -273,6 +293,8 @@ const SWIFT_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // Methods = methods
             TypeCapability::Methods,
+            // InterfaceImplementation = protocol conformance
+            TypeCapability::InterfaceImplementation,
             // Attributes = attributes
             TypeCapability::Attributes,
             // Variants = enum cases
@@ -402,6 +424,17 @@ impl CodeLang for Swift {
             .with_variants(SWIFT_VARIANTS)
             .with_fields(crate::lang::field_lowering::swift::PROFILES)
             .with_properties(crate::lang::property_lowering::swift::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::swift::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::swift::lower(self, type_)
     }
 
     fn lower_function(

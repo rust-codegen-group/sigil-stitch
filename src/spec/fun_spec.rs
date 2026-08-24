@@ -99,6 +99,7 @@ pub struct FunctionIntent<'a> {
     declaration_context: DeclarationContext,
     function_context: FunctionContext,
     form: FunctionForm,
+    owner_name: Option<&'a str>,
 }
 
 impl<'a> FunctionIntent<'a> {
@@ -107,12 +108,14 @@ impl<'a> FunctionIntent<'a> {
         declaration_context: DeclarationContext,
         function_context: FunctionContext,
         form: FunctionForm,
+        owner_name: Option<&'a str>,
     ) -> Self {
         Self {
             spec,
             declaration_context,
             function_context,
             form,
+            owner_name,
         }
     }
 
@@ -195,6 +198,11 @@ impl<'a> FunctionIntent<'a> {
     pub fn form(self) -> FunctionForm {
         self.form
     }
+
+    /// Name of the owning type for a member classified by `TypeSpec`.
+    pub fn owner_name(self) -> Option<&'a str> {
+        self.owner_name
+    }
 }
 
 /// Function intent whose intrinsic and target-specific validation succeeded.
@@ -251,53 +259,53 @@ impl FunSpec {
         lang: &dyn CodeLang,
         declaration_context: DeclarationContext,
     ) -> Result<(), SigilStitchError> {
-        self.validate_with_legacy_constructor(lang, declaration_context, true)
-    }
-
-    pub(crate) fn validate_in_type(
-        &self,
-        lang: &dyn CodeLang,
-        declaration_context: DeclarationContext,
-    ) -> Result<(), SigilStitchError> {
-        self.validate_with_legacy_constructor(lang, declaration_context, false)
-    }
-
-    fn validate_with_legacy_constructor(
-        &self,
-        lang: &dyn CodeLang,
-        declaration_context: DeclarationContext,
-        allow_legacy_constructor: bool,
-    ) -> Result<(), SigilStitchError> {
-        if allow_legacy_constructor
-            && (self.is_implicit_direct_constructor(lang, declaration_context)
-                || self.is_legacy_direct_constructor(lang, declaration_context))
-        {
-            let mut constructor = self.clone();
-            constructor.modifiers.is_constructor = true;
-            return constructor
-                .validate_classified(lang, declaration_context)
-                .map(|_| ());
-        }
-        self.validate_classified(lang, declaration_context)
+        self.validate_classified(lang, declaration_context, None, true)
             .map(|_| ())
     }
 
-    fn validate_classified(
-        &self,
+    pub(crate) fn validate_in_type<'a>(
+        &'a self,
         lang: &dyn CodeLang,
         declaration_context: DeclarationContext,
-    ) -> Result<ValidatedFunction<'_>, SigilStitchError> {
-        let intent = self.classify_intent(lang, declaration_context)?;
+        owner_name: &'a str,
+    ) -> Result<ValidatedFunction<'a>, SigilStitchError> {
+        self.validate_classified(lang, declaration_context, Some(owner_name), false)
+    }
+
+    pub(crate) fn intent_in_type<'a>(
+        &'a self,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+        owner_name: &'a str,
+    ) -> Result<FunctionIntent<'a>, SigilStitchError> {
+        self.classify_intent(lang, declaration_context, Some(owner_name), false)
+    }
+
+    fn validate_classified<'a>(
+        &'a self,
+        lang: &dyn CodeLang,
+        declaration_context: DeclarationContext,
+        owner_name: Option<&'a str>,
+        allow_legacy_constructor: bool,
+    ) -> Result<ValidatedFunction<'a>, SigilStitchError> {
+        let intent = self.classify_intent(
+            lang,
+            declaration_context,
+            owner_name,
+            allow_legacy_constructor,
+        )?;
         self.validate_intent_default(lang, intent)?;
         lang.validate_function(intent)?;
         Ok(ValidatedFunction::new(intent))
     }
 
-    fn classify_intent(
-        &self,
+    fn classify_intent<'a>(
+        &'a self,
         lang: &dyn CodeLang,
         declaration_context: DeclarationContext,
-    ) -> Result<FunctionIntent<'_>, SigilStitchError> {
+        owner_name: Option<&'a str>,
+        allow_legacy_constructor: bool,
+    ) -> Result<FunctionIntent<'a>, SigilStitchError> {
         let capabilities = lang.capabilities();
         let permissive_validation = capabilities.function_validation_is_permissive();
 
@@ -318,11 +326,38 @@ impl FunSpec {
             }
         };
 
+        let infer_owner_constructor = owner_name.is_some_and(|owner_name| {
+            !permissive_validation
+                && !self.modifiers.is_constructor
+                && capabilities.supports_function_form(context, FunctionForm::Constructor)
+                && if self.modifiers.is_static {
+                    lang.static_constructor_name_matches(&self.name, None)
+                        || ((self.return_type.is_none()
+                            || !lang.constructor_name_with_return_type_is_function())
+                            && lang.static_constructor_name_matches(&self.name, Some(owner_name)))
+                } else {
+                    lang.constructor_name_matches(&self.name, None)
+                        || ((self.return_type.is_none()
+                            || !lang.constructor_name_with_return_type_is_function())
+                            && lang.constructor_name_matches(&self.name, Some(owner_name)))
+                }
+        });
+        let infer_direct_constructor = owner_name.is_none()
+            && allow_legacy_constructor
+            && (self.is_implicit_direct_constructor(lang, declaration_context)
+                || self.is_legacy_direct_constructor(lang, declaration_context));
+        let form = if infer_owner_constructor || infer_direct_constructor {
+            FunctionForm::Constructor
+        } else {
+            lang.function_form(&self.name, self.modifiers.is_constructor)
+        };
+
         Ok(FunctionIntent::new(
             self,
             declaration_context,
             context,
-            lang.function_form(&self.name, self.modifiers.is_constructor),
+            form,
+            owner_name,
         ))
     }
 
@@ -364,12 +399,24 @@ impl FunSpec {
 
         if !permissive_validation
             && form == FunctionForm::Constructor
-            && !lang.constructor_name_is_valid(&self.name, None)
+            && !lang.constructor_name_is_valid(&self.name, intent.owner_name())
         {
             return Err(SigilStitchError::InvalidConstructorName {
                 language: language.clone(),
-                type_name: None,
+                type_name: intent.owner_name().map(str::to_string),
                 constructor_name: self.name.clone(),
+            });
+        }
+
+        if !permissive_validation
+            && form == FunctionForm::Destructor
+            && let Some(owner_name) = intent.owner_name()
+            && self.name != format!("~{owner_name}")
+        {
+            return Err(SigilStitchError::InvalidDestructorName {
+                language: language.clone(),
+                type_name: owner_name.to_string(),
+                destructor_name: self.name.clone(),
             });
         }
 
@@ -422,7 +469,7 @@ impl FunSpec {
             });
         }
 
-        if !permissive_validation && !self.modifiers.is_constructor {
+        if !permissive_validation && form != FunctionForm::Constructor {
             let mut invalid = Vec::new();
             if self.delegation.is_some() {
                 invalid.push(FunctionCapability::ConstructorDelegation);
@@ -556,6 +603,10 @@ impl FunSpec {
                     .any(|param| !param.bounds.is_empty() || !param.context_bounds.is_empty()),
         );
         request(
+            FunctionCapability::HigherKindedPolymorphism,
+            self.type_params.iter().any(|param| param.kind().is_some()),
+        );
+        request(
             FunctionCapability::Attributes,
             !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
         );
@@ -573,7 +624,7 @@ impl FunSpec {
         );
         request(FunctionCapability::AsyncEffect, self.modifiers.is_async);
         request(
-            if self.modifiers.is_constructor {
+            if form == FunctionForm::Constructor {
                 FunctionCapability::StaticConstructor
             } else {
                 match context {
@@ -682,7 +733,7 @@ impl FunSpec {
         }
 
         if !permissive_validation
-            && self.modifiers.is_constructor
+            && form == FunctionForm::Constructor
             && let Some(return_type) = &self.return_type
             && !lang.constructor_return_type_is_valid(return_type)
         {
@@ -772,40 +823,22 @@ impl FunSpec {
         lang: &dyn CodeLang,
         ctx: DeclarationContext,
     ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        self.emit_with_legacy_constructor(lang, ctx, true)
+        self.emit_classified(lang, ctx, None, true)
     }
 
-    pub(crate) fn emit_in_type(
-        &self,
-        lang: &dyn CodeLang,
-        ctx: DeclarationContext,
-    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        self.emit_with_legacy_constructor(lang, ctx, false)
-    }
-
-    fn emit_with_legacy_constructor(
-        &self,
-        lang: &dyn CodeLang,
-        ctx: DeclarationContext,
-        allow_legacy_constructor: bool,
-    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        if allow_legacy_constructor
-            && (self.is_implicit_direct_constructor(lang, ctx)
-                || self.is_legacy_direct_constructor(lang, ctx))
-        {
-            let mut constructor = self.clone();
-            constructor.modifiers.is_constructor = true;
-            return constructor.emit_classified(lang, ctx);
-        }
-        self.emit_classified(lang, ctx)
-    }
-
-    fn emit_classified(
-        &self,
+    fn emit_classified<'a>(
+        &'a self,
         lang: &dyn CodeLang,
         declaration_context: DeclarationContext,
+        owner_name: Option<&'a str>,
+        allow_legacy_constructor: bool,
     ) -> Result<CodeBlock, SigilStitchError> {
-        let function = self.validate_classified(lang, declaration_context)?;
+        let function = self.validate_classified(
+            lang,
+            declaration_context,
+            owner_name,
+            allow_legacy_constructor,
+        )?;
         lang.lower_function(function)
     }
 }

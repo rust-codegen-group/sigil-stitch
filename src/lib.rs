@@ -87,13 +87,13 @@ pub mod import;
 /// Walks `CodeBlock` trees to extract all import references.
 pub mod import_collector;
 /// Language abstraction trait and per-language implementations.
-// Built-in adapters and compatibility lowering intentionally consume the
-// deprecated 0.6.8 declaration-config accessors until each path is migrated.
+// Frozen compatibility lowerers and legacy-hook implementations intentionally
+// retain the deprecated 0.6.8 declaration-config surface.
 #[allow(deprecated)]
 pub mod lang;
 /// Structural builders (TypeSpec, FunSpec, FileSpec, etc.) that emit `CodeBlock`s.
-// Transitional spec emitters intentionally consume deprecated declaration
-// configuration; downstream adapter code still receives deprecation warnings.
+// Legacy direct-emission facades intentionally retain deprecated compatibility
+// inputs; downstream adapter code still receives deprecation warnings.
 #[allow(deprecated)]
 pub mod spec;
 /// Exact rendered-code assertion helpers for tests.

@@ -7,6 +7,7 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
 use super::golden;
@@ -195,7 +196,7 @@ fn test_virtual_method() {
 #[test]
 fn test_template_class() {
     let tb = TypeSpec::builder("Stack", TypeKind::Class)
-        .annotation(CodeBlock::of("template<typename T>", ()).unwrap())
+        .add_type_param(TypeParamSpec::new("T"))
         .doc("A simple stack container.");
 
     // private: section

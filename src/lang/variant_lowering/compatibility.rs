@@ -25,7 +25,7 @@ pub(crate) fn lower<L: CodeLang + ?Sized>(
             VariantContext {
                 is_first: index == 0,
                 is_last: index + 1 == count,
-                has_trailing_members: variants.has_following_members(),
+                has_trailing_members: variants.has_non_variant_members(),
             },
             &mut block,
         )?;

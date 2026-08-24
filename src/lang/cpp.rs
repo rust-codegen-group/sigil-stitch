@@ -423,6 +423,17 @@ impl CodeLang for Cpp {
             .with_fields(crate::lang::field_lowering::cpp::PROFILES)
     }
 
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::cpp::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::cpp::lower(self, type_)
+    }
+
     fn validate_fields(
         &self,
         fields: crate::lang::FieldSequenceIntent<'_>,

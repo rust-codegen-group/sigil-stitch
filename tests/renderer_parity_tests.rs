@@ -94,14 +94,18 @@ fn function_parameter_builder_indents_wrapped_continuations() {
 #[test]
 fn primary_constructor_builder_indents_wrapped_continuations() {
     let type_spec = TypeSpec::builder("RequestConfiguration", TypeKind::Class)
-        .add_primary_constructor_param(ParameterSpec::of(
-            "val endpointAddress",
-            TypeName::primitive("String"),
-        ))
-        .add_primary_constructor_param(ParameterSpec::of(
-            "val requestTimeout",
-            TypeName::primitive("Duration"),
-        ))
+        .add_primary_constructor_param(
+            ParameterSpec::builder("endpointAddress", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
+        )
+        .add_primary_constructor_param(
+            ParameterSpec::builder("requestTimeout", TypeName::primitive("Duration"))
+                .is_property()
+                .build()
+                .unwrap(),
+        )
         .build()
         .unwrap();
     let output = FileSpec::builder_with(

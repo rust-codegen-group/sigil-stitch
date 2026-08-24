@@ -41,6 +41,23 @@ A complete function declaration classified by its role and context before
 target-language validation. It remains semantic and does not contain a
 partially rendered signature.
 
+### Type intent
+
+One complete type declaration before target-language validation. `TypeIntent`
+exposes its kind, semantic modifiers, documentation, annotations, type
+parameters and constraints, type relationships, primary-constructor
+parameters, variants, and member families without choosing their source order
+or spelling.
+
+### Validated type
+
+A crate-constructed view whose type-level intent and every child declaration
+have passed intrinsic, capability, and target-local validation against the
+same adapter. `ValidatedType` exposes child declarations only through their
+validated wrappers. The adapter lowers the complete declaration and chooses
+whether it produces one block or several; every returned block must be
+non-empty.
+
 ### Field sequence
 
 The ordered fields owned by one type declaration or one record payload,
@@ -102,9 +119,11 @@ it does not make the field itself omissible.
 
 ### Variant sequence
 
-The ordered variants owned by one type declaration, together with the presence
-of members that follow them. A language adapter handles the sequence as a
-whole; first and last positions are derived from that sequence.
+The ordered variants owned by one type declaration, together with the semantic
+presence of non-variant members. A variant lowerer handles the sequence as a
+whole; the owning type lowerer chooses where that sequence appears relative to
+other member families. Non-variant members include fields, properties,
+methods, embedded types, and opaque members.
 
 ## Variant Data
 

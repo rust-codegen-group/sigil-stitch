@@ -246,6 +246,70 @@ pub enum SigilStitchError {
         capabilities: Vec<TypeCapability>,
     },
 
+    /// A strict adapter declared type support but omitted complete type lowering.
+    #[snafu(display(
+        "language {language:?} has no complete lowerer for {kind:?} type {type_name:?}"
+    ))]
+    MissingTypeLowerer {
+        /// The language file extension.
+        language: String,
+        /// The declaration kind.
+        kind: TypeKind,
+        /// The type being emitted.
+        type_name: String,
+    },
+
+    /// A complete type lowerer returned no declaration output.
+    #[snafu(display(
+        "language {language:?} returned empty output for {kind:?} type {type_name:?}"
+    ))]
+    EmptyTypeLowering {
+        /// The language file extension.
+        language: String,
+        /// The declaration kind.
+        kind: TypeKind,
+        /// The type being emitted.
+        type_name: String,
+    },
+
+    /// A type declaration used modifiers that have no type-level meaning.
+    #[snafu(display("type {type_name:?} cannot use modifiers {modifiers:?}"))]
+    InvalidTypeModifiers {
+        /// The type being validated.
+        type_name: String,
+        /// Rejected modifier names.
+        modifiers: Vec<&'static str>,
+    },
+
+    /// A type declaration contains malformed semantic input.
+    #[snafu(display("invalid type {type_name:?}: {reason}"))]
+    InvalidTypeDeclaration {
+        /// The type being validated.
+        type_name: String,
+        /// Why the declaration is invalid.
+        reason: String,
+    },
+
+    /// A type parameter name was declared more than once.
+    #[snafu(display("duplicate type parameter name {parameter_name:?} in type {type_name:?}"))]
+    DuplicateTypeParameterName {
+        /// The owning type.
+        type_name: String,
+        /// The duplicated parameter name.
+        parameter_name: String,
+    },
+
+    /// A type parameter or constraint is malformed.
+    #[snafu(display("invalid type parameter {parameter_name:?} on type {type_name:?}: {reason}"))]
+    InvalidTypeParameter {
+        /// The owning type.
+        type_name: String,
+        /// The parameter or constraint subject.
+        parameter_name: String,
+        /// Why the declaration is invalid.
+        reason: String,
+    },
+
     /// A FileSpec contains one or more invalid spec members.
     ///
     /// Validation is collected rather than fail-fast: every invalid
@@ -344,6 +408,21 @@ pub enum SigilStitchError {
         function_name: String,
         /// The constraint subject that could not be attached to a declared type parameter.
         subject: String,
+    },
+
+    /// A target language cannot represent a function type parameter.
+    #[snafu(display(
+        "language {language:?} rejects type parameter {parameter_name:?} on function {function_name:?}: {reason}"
+    ))]
+    InvalidFunctionTypeParameter {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The rejected parameter name.
+        parameter_name: String,
+        /// Why the parameter cannot be represented.
+        reason: String,
     },
 
     /// A language does not support the requested function context.

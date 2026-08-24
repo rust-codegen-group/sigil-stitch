@@ -1,30 +1,30 @@
 //! Type specification for structs, classes, interfaces, traits, enums.
 
-use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
+use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
 use crate::lang::capability::{FunctionCapability, FunctionForm, TypeCapability};
-use crate::spec::annotation_spec::AnnotationSpec;
-use crate::spec::enum_variant_spec::{ConstructorArity, EnumVariantSpec, VariantOwnerContext};
-use crate::spec::field_spec::{FieldSequenceIntent, FieldSpec};
-use crate::spec::fun_spec::FunSpec;
-use crate::spec::modifiers::{DeclarationContext, Modifiers, TypeKind, Visibility};
-use crate::spec::parameter_spec::ParameterSpec;
-use crate::spec::property_spec::{PropertyIntent, PropertySpec};
-use crate::spec::type_members_intent::TypeMembersIntent;
-use crate::spec::where_spec::{
-    TypeParamSpec, WhereClauseStyle, WhereConstraint, emit_separate_where_block, emit_where_block,
-    render_type_params,
+use crate::spec::annotation_spec::{AnnotationNameRef, AnnotationSpec};
+use crate::spec::enum_variant_spec::{
+    ConstructorArity, EnumVariantSpec, ValidatedVariants, VariantOwnerContext,
 };
+use crate::spec::field_spec::{FieldSequenceIntent, FieldSpec, ValidatedFields};
+use crate::spec::fun_spec::{FunSpec, ValidatedFunction};
+use crate::spec::modifiers::{Modifiers, TypeKind, Visibility};
+use crate::spec::parameter_spec::ParameterSpec;
+use crate::spec::property_spec::{PropertyIntent, PropertySpec, ValidatedProperty};
+use crate::spec::type_members_intent::TypeMembersIntent;
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
 use crate::type_name::TypeName;
 
 /// A type declaration (struct, class, interface, trait, enum).
 ///
 /// `TypeSpec` models a complete type declaration with fields, methods, properties,
 /// type parameters, supertype relationships, annotations, and enum variants.
-/// It emits one or more `CodeBlock`s depending on the language: TypeScript classes
-/// produce a single block, while Rust structs produce separate struct + impl blocks
-/// (controlled by [`CodeLang::methods_inside_type_body()`](crate::lang::CodeLang::methods_inside_type_body)).
+/// It emits one or more non-empty `CodeBlock`s through the selected language's
+/// complete [`CodeLang::lower_type()`] implementation. TypeScript classes
+/// produce a single block, while Rust may produce a declaration plus an `impl`
+/// block.
 ///
 /// Use [`TypeSpec::builder()`] to construct, then add to a
 /// [`FileSpec`](crate::spec::file_spec::FileSpec) with `add_type()`.
@@ -72,6 +72,239 @@ pub struct TypeSpec {
     /// Where-clause constraints (e.g., Rust `where T: Clone + Send`).
     #[serde(default)]
     pub(crate) where_constraints: Vec<WhereConstraint>,
+}
+
+/// Read-only semantic intent for one complete type declaration.
+///
+/// Only `TypeSpec` constructs this view. It exposes declaration facts without
+/// target keywords, placement choices, ordering flags, or rendered type names.
+#[derive(Debug, Clone, Copy)]
+pub struct TypeIntent<'a> {
+    spec: &'a TypeSpec,
+}
+
+impl<'a> TypeIntent<'a> {
+    fn new(spec: &'a TypeSpec) -> Self {
+        Self { spec }
+    }
+
+    /// Declaration name.
+    pub fn name(self) -> &'a str {
+        &self.spec.name
+    }
+
+    /// Semantic declaration kind.
+    pub fn kind(self) -> TypeKind {
+        self.spec.kind
+    }
+
+    /// Type-level semantic modifiers.
+    pub fn modifiers(self) -> &'a Modifiers {
+        &self.spec.modifiers
+    }
+
+    /// Documentation lines supplied by the caller.
+    pub fn doc(self) -> &'a [String] {
+        &self.spec.doc
+    }
+
+    /// Structurally embedded types.
+    pub fn embedded_types(self) -> &'a [TypeName] {
+        &self.spec.embedded_types
+    }
+
+    /// Declared fields.
+    pub fn fields(self) -> &'a [FieldSpec] {
+        &self.spec.fields
+    }
+
+    /// Declared computed properties.
+    pub fn properties(self) -> &'a [PropertySpec] {
+        &self.spec.properties
+    }
+
+    /// Declared methods before owner-aware classification.
+    pub fn methods(self) -> &'a [FunSpec] {
+        &self.spec.methods
+    }
+
+    /// Declared type parameters.
+    pub fn type_params(self) -> &'a [TypeParamSpec] {
+        &self.spec.type_params
+    }
+
+    /// Alias or newtype target, when this declaration has one.
+    pub fn target_type(self) -> Option<&'a TypeName> {
+        matches!(self.spec.kind, TypeKind::TypeAlias | TypeKind::Newtype)
+            .then(|| self.spec.super_types.first())
+            .flatten()
+    }
+
+    /// Nominal supertypes. Alias/newtype backing storage is excluded.
+    pub fn nominal_super_types(self) -> &'a [TypeName] {
+        if matches!(self.spec.kind, TypeKind::TypeAlias | TypeKind::Newtype) {
+            &[]
+        } else {
+            &self.spec.super_types
+        }
+    }
+
+    /// Implemented contracts or derived classes.
+    pub fn implemented_types(self) -> &'a [TypeName] {
+        &self.spec.impl_types
+    }
+
+    /// Opaque annotation blocks supplied through the escape hatch.
+    pub fn annotations(self) -> &'a [CodeBlock] {
+        &self.spec.annotations
+    }
+
+    /// Structured annotation declarations.
+    pub fn annotation_specs(self) -> &'a [AnnotationSpec] {
+        &self.spec.annotation_specs
+    }
+
+    /// Opaque member blocks supplied through the escape hatch.
+    pub fn extra_members(self) -> &'a [CodeBlock] {
+        &self.spec.extra_members
+    }
+
+    /// Declared variants.
+    pub fn variants(self) -> &'a [EnumVariantSpec] {
+        &self.spec.variants
+    }
+
+    /// Primary-constructor parameters.
+    pub fn primary_constructor_parameters(self) -> &'a [ParameterSpec] {
+        &self.spec.primary_constructor
+    }
+
+    /// Explicit declaration constraints.
+    pub fn where_constraints(self) -> &'a [WhereConstraint] {
+        &self.spec.where_constraints
+    }
+}
+
+/// Complete type intent whose type-level and child validation succeeded.
+///
+/// Unlike smaller validated wrappers, this type deliberately does not
+/// dereference to `TypeIntent`: complete type lowerers must compose the
+/// validated child declarations exposed here.
+#[derive(Debug, Clone)]
+pub struct ValidatedType<'a> {
+    intent: TypeIntent<'a>,
+    fields: Option<ValidatedFields<'a>>,
+    properties: Vec<ValidatedProperty<'a>>,
+    methods: Vec<ValidatedFunction<'a>>,
+    variants: Option<ValidatedVariants<'a>>,
+}
+
+impl<'a> ValidatedType<'a> {
+    fn new(
+        intent: TypeIntent<'a>,
+        fields: Option<ValidatedFields<'a>>,
+        properties: Vec<ValidatedProperty<'a>>,
+        methods: Vec<ValidatedFunction<'a>>,
+        variants: Option<ValidatedVariants<'a>>,
+    ) -> Self {
+        Self {
+            intent,
+            fields,
+            properties,
+            methods,
+            variants,
+        }
+    }
+
+    /// Declaration name.
+    pub fn name(&self) -> &'a str {
+        self.intent.name()
+    }
+
+    /// Semantic declaration kind.
+    pub fn kind(&self) -> TypeKind {
+        self.intent.kind()
+    }
+
+    /// Type-level semantic modifiers.
+    pub fn modifiers(&self) -> &'a Modifiers {
+        self.intent.modifiers()
+    }
+
+    /// Documentation lines supplied by the caller.
+    pub fn doc(&self) -> &'a [String] {
+        self.intent.doc()
+    }
+
+    /// Structurally embedded types.
+    pub fn embedded_types(&self) -> &'a [TypeName] {
+        self.intent.embedded_types()
+    }
+
+    /// Validated field sequence, when non-empty.
+    pub fn fields(&self) -> Option<&ValidatedFields<'a>> {
+        self.fields.as_ref()
+    }
+
+    /// Validated computed properties in declaration order.
+    pub fn properties(&self) -> &[ValidatedProperty<'a>] {
+        &self.properties
+    }
+
+    /// Validated, owner-classified methods in declaration order.
+    pub fn methods(&self) -> &[ValidatedFunction<'a>] {
+        &self.methods
+    }
+
+    /// Declared type parameters.
+    pub fn type_params(&self) -> &'a [TypeParamSpec] {
+        self.intent.type_params()
+    }
+
+    /// Alias or newtype target, when present.
+    pub fn target_type(&self) -> Option<&'a TypeName> {
+        self.intent.target_type()
+    }
+
+    /// Nominal supertypes, excluding alias/newtype backing storage.
+    pub fn nominal_super_types(&self) -> &'a [TypeName] {
+        self.intent.nominal_super_types()
+    }
+
+    /// Implemented contracts or derived classes.
+    pub fn implemented_types(&self) -> &'a [TypeName] {
+        self.intent.implemented_types()
+    }
+
+    /// Opaque annotation blocks supplied through the escape hatch.
+    pub fn annotations(&self) -> &'a [CodeBlock] {
+        self.intent.annotations()
+    }
+
+    /// Structured annotation declarations.
+    pub fn annotation_specs(&self) -> &'a [AnnotationSpec] {
+        self.intent.annotation_specs()
+    }
+
+    /// Opaque member blocks supplied through the escape hatch.
+    pub fn extra_members(&self) -> &'a [CodeBlock] {
+        self.intent.extra_members()
+    }
+
+    /// Validated variant sequence, when non-empty.
+    pub fn variants(&self) -> Option<&ValidatedVariants<'a>> {
+        self.variants.as_ref()
+    }
+
+    /// Primary-constructor parameters.
+    pub fn primary_constructor_parameters(&self) -> &'a [ParameterSpec] {
+        self.intent.primary_constructor_parameters()
+    }
+
+    /// Explicit declaration constraints.
+    pub fn where_constraints(&self) -> &'a [WhereConstraint] {
+        self.intent.where_constraints()
+    }
 }
 
 impl TypeSpec {
@@ -128,20 +361,22 @@ impl TypeSpec {
         lang: &dyn CodeLang,
         errors: &mut Vec<SigilStitchError>,
     ) {
-        if let Err(error) = self.validate_type(lang) {
-            errors.push(error);
-        }
+        let intent = TypeIntent::new(self);
+        self.collect_intrinsic_type_validation_errors(errors);
+        self.collect_type_capability_errors(lang, errors);
+        lang.collect_type_validation_errors(intent, errors);
 
         if !self.variants.is_empty() {
-            let has_following_members = !self.fields.is_empty()
+            let has_non_variant_members = !self.fields.is_empty()
                 || !self.properties.is_empty()
                 || !self.methods.is_empty()
+                || !self.embedded_types.is_empty()
                 || !self.extra_members.is_empty();
             EnumVariantSpec::collect_sequence_validation_errors(
                 &self.name,
                 self.kind,
                 &self.variants,
-                self.variant_owner_context(lang, has_following_members),
+                self.variant_owner_context(lang, has_non_variant_members),
                 lang,
                 errors,
             );
@@ -173,48 +408,29 @@ impl TypeSpec {
 
         let declaration_context = lang.type_member_declaration_context(self.kind);
         for method in &self.methods {
-            let method = self.method_for_context(method, lang, declaration_context);
-            let capabilities = lang.capabilities();
-            if !capabilities.function_validation_is_permissive() {
-                let form = lang.function_form(&method.name, method.modifiers.is_constructor);
-                if form == FunctionForm::Constructor
-                    && !lang.constructor_name_is_valid(&method.name, Some(&self.name))
-                {
-                    errors.push(SigilStitchError::InvalidConstructorName {
-                        language: lang.file_extension().to_string(),
-                        type_name: Some(self.name.clone()),
-                        constructor_name: method.name.clone(),
-                    });
-                    continue;
+            match method.validate_in_type(lang, declaration_context, &self.name) {
+                Ok(method) => {
+                    let capabilities = lang.capabilities();
+                    let form = method.form();
+                    if !capabilities.function_validation_is_permissive()
+                        && !matches!(self.kind, TypeKind::Interface | TypeKind::Trait)
+                        && !self.modifiers.is_abstract
+                        && method.modifiers().is_abstract
+                        && lang.abstract_modifier_capability() == FunctionCapability::AbstractMethod
+                        && capabilities.supports_function_capability(
+                            crate::lang::capability::FunctionContext::Member,
+                            form,
+                            FunctionCapability::AbstractMethod,
+                        )
+                    {
+                        errors.push(SigilStitchError::AbstractMethodInConcreteType {
+                            language: lang.file_extension().to_string(),
+                            type_name: self.name.clone(),
+                            function_name: method.name().to_string(),
+                        });
+                    }
                 }
-                if form == FunctionForm::Destructor && method.name != format!("~{}", self.name) {
-                    errors.push(SigilStitchError::InvalidDestructorName {
-                        language: lang.file_extension().to_string(),
-                        type_name: self.name.clone(),
-                        destructor_name: method.name.clone(),
-                    });
-                    continue;
-                }
-                if !matches!(self.kind, TypeKind::Interface | TypeKind::Trait)
-                    && !self.modifiers.is_abstract
-                    && method.modifiers.is_abstract
-                    && lang.abstract_modifier_capability() == FunctionCapability::AbstractMethod
-                    && capabilities.supports_function_capability(
-                        crate::lang::capability::FunctionContext::Member,
-                        form,
-                        FunctionCapability::AbstractMethod,
-                    )
-                {
-                    errors.push(SigilStitchError::AbstractMethodInConcreteType {
-                        language: lang.file_extension().to_string(),
-                        type_name: self.name.clone(),
-                        function_name: method.name.clone(),
-                    });
-                    continue;
-                }
-            }
-            if let Err(error) = method.validate_in_type(lang, declaration_context) {
-                errors.push(error);
+                Err(error) => errors.push(error),
             }
         }
 
@@ -223,49 +439,54 @@ impl TypeSpec {
         lang.collect_type_members_validation_errors(members, errors);
     }
 
-    /// Preserve the pre-capability behavior for constructor-shaped members.
-    ///
-    /// Before strict validation, a Java/C#/C++ member whose name matched its
-    /// declaring type and omitted a return type naturally rendered as a
-    /// constructor. The capability matrix gives us enough information to
-    /// recognize exactly those profiles without weakening missing-return-type
-    /// validation for ordinary methods.
-    fn method_for_context<'a>(
-        &self,
-        method: &'a FunSpec,
+    pub(crate) fn validate_complete<'a>(
+        &'a self,
         lang: &dyn CodeLang,
-        declaration_context: DeclarationContext,
-    ) -> std::borrow::Cow<'a, FunSpec> {
-        let capabilities = lang.capabilities();
-        let function_context = match declaration_context {
-            DeclarationContext::TopLevel => crate::lang::capability::FunctionContext::TopLevel,
-            DeclarationContext::Member => crate::lang::capability::FunctionContext::Member,
-            DeclarationContext::InterfaceMember => {
-                crate::lang::capability::FunctionContext::InterfaceMember
-            }
-        };
-        let infer_constructor = !capabilities.function_validation_is_permissive()
-            && !method.modifiers.is_constructor
-            && capabilities.supports_function_form(function_context, FunctionForm::Constructor)
-            && if method.modifiers.is_static {
-                lang.static_constructor_name_matches(&method.name, None)
-                    || ((method.return_type.is_none()
-                        || !lang.constructor_name_with_return_type_is_function())
-                        && lang.static_constructor_name_matches(&method.name, Some(&self.name)))
-            } else {
-                lang.constructor_name_matches(&method.name, None)
-                    || ((method.return_type.is_none()
-                        || !lang.constructor_name_with_return_type_is_function())
-                        && lang.constructor_name_matches(&method.name, Some(&self.name)))
-            };
-
-        if infer_constructor {
-            let mut method = method.clone();
-            method.modifiers.is_constructor = true;
-            std::borrow::Cow::Owned(method)
-        } else {
-            std::borrow::Cow::Borrowed(method)
+    ) -> Result<ValidatedType<'a>, SigilStitchError> {
+        let mut errors = Vec::new();
+        self.collect_validation_errors(lang, &mut errors);
+        if let Some(error) = errors.into_iter().next() {
+            return Err(error);
         }
+
+        let fields = (!self.fields.is_empty())
+            .then(|| FieldSpec::validate_sequence(self.field_intent(), lang))
+            .transpose()?;
+        let properties = self
+            .properties
+            .iter()
+            .map(|property| PropertySpec::validate_intent(self.property_intent(property), lang))
+            .collect::<Result<Vec<_>, _>>()?;
+        let declaration_context = lang.type_member_declaration_context(self.kind);
+        let methods = self
+            .methods
+            .iter()
+            .map(|method| method.validate_in_type(lang, declaration_context, &self.name))
+            .collect::<Result<Vec<_>, _>>()?;
+        let has_non_variant_members = !self.fields.is_empty()
+            || !self.properties.is_empty()
+            || !self.methods.is_empty()
+            || !self.embedded_types.is_empty()
+            || !self.extra_members.is_empty();
+        let variants = (!self.variants.is_empty())
+            .then(|| {
+                EnumVariantSpec::validate_sequence(
+                    &self.name,
+                    self.kind,
+                    &self.variants,
+                    self.variant_owner_context(lang, has_non_variant_members),
+                    lang,
+                )
+            })
+            .transpose()?;
+
+        Ok(ValidatedType::new(
+            TypeIntent::new(self),
+            fields,
+            properties,
+            methods,
+            variants,
+        ))
     }
 
     /// Structured constructor arities that enum-entry lowering may rely on.
@@ -277,9 +498,9 @@ impl TypeSpec {
 
         let declaration_context = lang.type_member_declaration_context(self.kind);
         for method in &self.methods {
-            let method = self.method_for_context(method, lang, declaration_context);
-            if lang.function_form(&method.name, method.modifiers.is_constructor)
-                == FunctionForm::Constructor
+            if method
+                .intent_in_type(lang, declaration_context, &self.name)
+                .is_ok_and(|intent| intent.form() == FunctionForm::Constructor)
             {
                 arities.push(ConstructorArity::from_parameters(&method.params));
             }
@@ -290,10 +511,10 @@ impl TypeSpec {
     fn variant_owner_context(
         &self,
         lang: &dyn CodeLang,
-        has_following_members: bool,
+        has_non_variant_members: bool,
     ) -> VariantOwnerContext {
         VariantOwnerContext::new(
-            has_following_members,
+            has_non_variant_members,
             self.variant_constructor_arities(lang),
             !self.extra_members.is_empty(),
         )
@@ -301,10 +522,6 @@ impl TypeSpec {
 
     fn field_intent(&self) -> FieldSequenceIntent<'_> {
         FieldSequenceIntent::type_members(&self.fields, &self.name, self.kind)
-    }
-
-    fn emit_fields(&self, lang: &dyn CodeLang) -> Result<CodeBlock, SigilStitchError> {
-        FieldSpec::lower_sequence(self.field_intent(), lang)
     }
 
     fn property_intent<'a>(&'a self, property: &'a PropertySpec) -> PropertyIntent<'a> {
@@ -321,38 +538,199 @@ impl TypeSpec {
         )
     }
 
-    fn emit_property(
-        &self,
-        property: &PropertySpec,
-        lang: &dyn CodeLang,
-    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
-        PropertySpec::lower_intent(self.property_intent(property), lang)
+    fn collect_intrinsic_type_validation_errors(&self, errors: &mut Vec<SigilStitchError>) {
+        if self.name.is_empty() {
+            errors.push(SigilStitchError::EmptyName {
+                builder: "TypeSpec",
+            });
+        }
+
+        let mut invalid_modifiers = Vec::new();
+        if self.modifiers.is_static {
+            invalid_modifiers.push("static");
+        }
+        if self.modifiers.is_readonly {
+            invalid_modifiers.push("readonly");
+        }
+        if self.modifiers.is_async {
+            invalid_modifiers.push("async");
+        }
+        if self.modifiers.is_override {
+            invalid_modifiers.push("override");
+        }
+        if self.modifiers.is_constructor {
+            invalid_modifiers.push("constructor");
+        }
+        if !invalid_modifiers.is_empty() {
+            errors.push(SigilStitchError::InvalidTypeModifiers {
+                type_name: self.name.clone(),
+                modifiers: invalid_modifiers,
+            });
+        }
+
+        for (index, annotation) in self.annotations.iter().enumerate() {
+            if annotation.is_empty() {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: self.name.clone(),
+                    reason: format!("opaque annotation {index} is empty"),
+                });
+            }
+        }
+        for (index, annotation) in self.annotation_specs.iter().enumerate() {
+            let name_is_empty = match annotation.name() {
+                AnnotationNameRef::Simple(name) => name.is_empty(),
+                AnnotationNameRef::Importable(type_name) => type_name.is_empty(),
+            };
+            if name_is_empty {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: self.name.clone(),
+                    reason: format!("structured annotation {index} has an empty name"),
+                });
+            }
+        }
+        for (index, member) in self.extra_members.iter().enumerate() {
+            if member.is_empty() {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: self.name.clone(),
+                    reason: format!("opaque extra member {index} is empty"),
+                });
+            }
+        }
+
+        let mut seen_type_params = std::collections::HashSet::new();
+        let mut reported_type_params = std::collections::HashSet::new();
+        for parameter in &self.type_params {
+            if parameter.name().is_empty() {
+                errors.push(SigilStitchError::InvalidTypeParameter {
+                    type_name: self.name.clone(),
+                    parameter_name: String::new(),
+                    reason: "parameter name is empty".to_string(),
+                });
+            }
+            if !seen_type_params.insert(parameter.name())
+                && reported_type_params.insert(parameter.name())
+            {
+                errors.push(SigilStitchError::DuplicateTypeParameterName {
+                    type_name: self.name.clone(),
+                    parameter_name: parameter.name().to_string(),
+                });
+            }
+            if parameter.bounds().iter().any(TypeName::is_empty)
+                || parameter.context_bounds().iter().any(TypeName::is_empty)
+            {
+                errors.push(SigilStitchError::InvalidTypeParameter {
+                    type_name: self.name.clone(),
+                    parameter_name: parameter.name().to_string(),
+                    reason: "bounds must not contain an empty type".to_string(),
+                });
+            }
+        }
+        for constraint in &self.where_constraints {
+            if constraint.subject().is_empty() || constraint.bounds().is_empty() {
+                errors.push(SigilStitchError::InvalidTypeParameter {
+                    type_name: self.name.clone(),
+                    parameter_name: format!("{:?}", constraint.subject()),
+                    reason: "where constraints require a non-empty subject and at least one bound"
+                        .to_string(),
+                });
+            } else if constraint.bounds().iter().any(TypeName::is_empty) {
+                errors.push(SigilStitchError::InvalidTypeParameter {
+                    type_name: self.name.clone(),
+                    parameter_name: format!("{:?}", constraint.subject()),
+                    reason: "where-constraint bounds must not contain an empty type".to_string(),
+                });
+            }
+        }
+
+        if matches!(self.kind, TypeKind::TypeAlias | TypeKind::Newtype) {
+            let kind = if self.kind == TypeKind::TypeAlias {
+                "TypeAlias"
+            } else {
+                "Newtype"
+            };
+            if self.super_types.len() != 1
+                || self.super_types.first().is_some_and(TypeName::is_empty)
+            {
+                errors.push(SigilStitchError::InvalidTypeAlias {
+                    kind,
+                    type_name: self.name.clone(),
+                    reason: format!(
+                        "expected exactly one non-empty target type, got {}",
+                        self.super_types.len()
+                    ),
+                });
+            }
+
+            let mut forbidden = Vec::new();
+            if !self.embedded_types.is_empty() {
+                forbidden.push("embedded types");
+            }
+            if !self.fields.is_empty() {
+                forbidden.push("fields");
+            }
+            if !self.properties.is_empty() {
+                forbidden.push("properties");
+            }
+            if !self.methods.is_empty() {
+                forbidden.push("methods");
+            }
+            if !self.variants.is_empty() {
+                forbidden.push("variants");
+            }
+            if !self.primary_constructor.is_empty() {
+                forbidden.push("primary-constructor parameters");
+            }
+            if !self.extra_members.is_empty() {
+                forbidden.push("opaque members");
+            }
+            if self.kind == TypeKind::TypeAlias && !self.impl_types.is_empty() {
+                forbidden.push("implemented contracts");
+            }
+            if !forbidden.is_empty() {
+                errors.push(SigilStitchError::InvalidTypeAlias {
+                    kind,
+                    type_name: self.name.clone(),
+                    reason: format!("must not declare {}", forbidden.join(", ")),
+                });
+            }
+        }
+
+        if self.kind == TypeKind::Enum && !self.primary_constructor.is_empty() {
+            let constructor_arity = ConstructorArity::from_parameters(&self.primary_constructor);
+            for variant in &self.variants {
+                let argument_count = if variant.constructor_arguments().is_empty() {
+                    usize::from(variant.legacy_value().is_some())
+                } else {
+                    variant.constructor_arguments().len()
+                };
+                if !constructor_arity.accepts(argument_count) {
+                    errors.push(SigilStitchError::InvalidEnum {
+                        type_name: self.name.clone(),
+                        reason: format!(
+                            "variant {:?} has a constructor-argument count incompatible with the primary constructor",
+                            variant.name()
+                        ),
+                    });
+                }
+            }
+        }
     }
 
-    fn validate_type(&self, lang: &dyn CodeLang) -> Result<(), crate::error::SigilStitchError> {
+    fn collect_type_capability_errors(
+        &self,
+        lang: &dyn CodeLang,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
         let capabilities = lang.capabilities();
         let language = lang.file_extension().to_string();
 
         if !capabilities.supports_type_kind(self.kind) {
-            return Err(SigilStitchError::UnsupportedTypeKind {
+            errors.push(SigilStitchError::UnsupportedTypeKind {
                 language,
                 kind: self.kind,
                 type_name: self.name.clone(),
             });
-        }
-
-        if self.modifiers.is_abstract && !lang.abstract_type_modifier_is_valid(self.kind) {
-            return Err(SigilStitchError::InvalidAbstractType {
-                language,
-                kind: self.kind,
-                type_name: self.name.clone(),
-            });
-        }
-
-        // TypeAlias/Newtype shape is already validated by the builder; their
-        // `super_types` field is the target type, not nominal subtyping.
-        if matches!(self.kind, TypeKind::TypeAlias | TypeKind::Newtype) {
-            return Ok(());
+            return;
         }
 
         let mut missing = Vec::new();
@@ -384,7 +762,8 @@ impl TypeSpec {
         );
         require(
             TypeCapability::NominalSubtyping,
-            !self.super_types.is_empty(),
+            !matches!(self.kind, TypeKind::TypeAlias | TypeKind::Newtype)
+                && !self.super_types.is_empty(),
             &mut missing,
         );
         require(
@@ -399,11 +778,20 @@ impl TypeSpec {
         );
         require(
             TypeCapability::BoundedPolymorphism,
-            !self.where_constraints.is_empty(),
+            !self.where_constraints.is_empty()
+                || self
+                    .type_params
+                    .iter()
+                    .any(|param| !param.bounds().is_empty() || !param.context_bounds().is_empty()),
             &mut missing,
         );
         require(
-            TypeCapability::ConstructorParameters,
+            TypeCapability::HigherKindedPolymorphism,
+            self.type_params.iter().any(|param| param.kind().is_some()),
+            &mut missing,
+        );
+        require(
+            TypeCapability::PrimaryConstructorParameters,
             !self.primary_constructor.is_empty(),
             &mut missing,
         );
@@ -417,603 +805,30 @@ impl TypeSpec {
             !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
             &mut missing,
         );
-        if missing.is_empty() {
-            Ok(())
-        } else {
-            Err(SigilStitchError::UnsupportedTypeCapabilities {
+        if !missing.is_empty() {
+            errors.push(SigilStitchError::UnsupportedTypeCapabilities {
                 language,
                 type_name: self.name.clone(),
                 capabilities: missing,
-            })
+            });
         }
     }
 
-    /// Emit this type as one or more CodeBlocks.
-    ///
-    /// Returns a `Vec` because Rust struct + impl = two separate blocks,
-    /// while TypeScript class = one block.
+    /// Emit this type through the selected language's complete type lowerer.
     pub fn emit(
         &self,
         lang: &dyn CodeLang,
     ) -> Result<Vec<CodeBlock>, crate::error::SigilStitchError> {
-        self.validate(lang)?;
-        match self.kind {
-            TypeKind::TypeAlias => return Ok(vec![self.emit_type_alias(lang)?]),
-            TypeKind::Newtype => return Ok(vec![self.emit_newtype(lang)?]),
-            _ => {}
+        let type_ = self.validate_complete(lang)?;
+        let blocks = lang.lower_type(type_)?;
+        if blocks.is_empty() || blocks.iter().any(CodeBlock::is_empty) {
+            return Err(SigilStitchError::EmptyTypeLowering {
+                language: lang.file_extension().to_string(),
+                kind: self.kind,
+                type_name: self.name.clone(),
+            });
         }
-        if lang.methods_inside_type_body(self.kind) {
-            Ok(vec![self.emit_inline(lang)?])
-        } else {
-            self.emit_split(lang)
-        }
-    }
-
-    /// Emit as a single block with methods inside the body (TypeScript class/interface, Rust trait).
-    fn emit_inline(
-        &self,
-        lang: &dyn CodeLang,
-    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let mut cb = CodeBlock::builder();
-
-        // Use InterfaceMember context for interface/trait bodies so that
-        // languages can suppress visibility modifiers and async keywords.
-        let member_ctx = lang.type_member_declaration_context(self.kind);
-
-        self.emit_preamble(&mut cb, lang)?;
-        self.emit_header(&mut cb, lang)?;
-
-        // Body.
-        cb.add("%>", ());
-        // Type body prefix (e.g., Haskell record braces: "Person {").
-        let body_prefix = lang.type_body_prefix(&self.name, self.kind);
-        let has_body_prefix = !body_prefix.is_empty();
-        if has_body_prefix {
-            cb.add("%L", body_prefix);
-            cb.add_line();
-            cb.add("%>", ());
-        }
-        // Docstring inside body (Python).
-        if !self.doc.is_empty() && lang.doc_comment_inside_body() {
-            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-            let doc_str = lang.render_doc_comment(&doc_lines);
-            cb.add("%L", doc_str);
-            cb.add_line();
-        }
-        let has_trailing_members = !self.fields.is_empty()
-            || !self.properties.is_empty()
-            || !self.methods.is_empty()
-            || !self.extra_members.is_empty();
-
-        // Embedded types (Go struct composition: unnamed type references).
-        for embedded in &self.embedded_types {
-            let term = lang.block_syntax().field_terminator;
-            cb.add(&format!("%T{term}"), embedded.clone());
-            cb.add_line();
-        }
-
-        if crate::lang::variant_lowering::variants_precede_fields(lang, true) {
-            // Built-ins use the canonical semantic body order. The selected
-            // adapter owns all grammar within the variant sequence, including
-            // separators and section termination.
-            if !self.variants.is_empty() {
-                self.emit_variants(&mut cb, lang, has_trailing_members)?;
-            }
-            if !self.fields.is_empty() {
-                if !self.variants.is_empty() {
-                    cb.add_line();
-                }
-                cb.add_code(self.emit_fields(lang)?);
-            }
-        } else {
-            // Preserve pre-0.6.8 external-adapter placement through the
-            // private compatibility lowerer.
-            if !self.fields.is_empty() {
-                cb.add_code(self.emit_fields(lang)?);
-            }
-            if !self.variants.is_empty() {
-                if !self.fields.is_empty() {
-                    cb.add_line();
-                }
-                self.emit_variants(&mut cb, lang, has_trailing_members)?;
-            }
-        }
-        let has_body_above =
-            !self.embedded_types.is_empty() || !self.fields.is_empty() || !self.variants.is_empty();
-        // Properties (after fields, before methods).
-        if !self.properties.is_empty() {
-            if has_body_above {
-                cb.add_line();
-            }
-            for (i, prop) in self.properties.iter().enumerate() {
-                if i > 0 {
-                    cb.add_line();
-                }
-                for block in self.emit_property(prop, lang)? {
-                    cb.add_code(block);
-                }
-            }
-        }
-        let has_body_above = has_body_above || !self.properties.is_empty();
-        if has_body_above && !self.methods.is_empty() {
-            cb.add_line();
-        }
-        for (i, method) in self.methods.iter().enumerate() {
-            if i > 0 {
-                cb.add_line();
-            }
-            cb.add_code(
-                self.method_for_context(method, lang, member_ctx)
-                    .emit_in_type(lang, member_ctx)?,
-            );
-        }
-        for extra in &self.extra_members {
-            cb.add_code(extra.clone());
-        }
-        // Type body suffix (e.g., Haskell record closing brace: "}").
-        if has_body_prefix {
-            cb.add("%<", ());
-        }
-        let body_suffix = lang.type_body_suffix(&self.name, self.kind);
-        if !body_suffix.is_empty() {
-            cb.add("%L", body_suffix);
-            cb.add_line();
-        }
-        self.emit_type_close(&mut cb, lang)?;
-
-        cb.build()
-    }
-
-    /// Emit as separate struct + impl blocks (Rust struct/enum).
-    fn emit_split(
-        &self,
-        lang: &dyn CodeLang,
-    ) -> Result<Vec<CodeBlock>, crate::error::SigilStitchError> {
-        let mut blocks = Vec::new();
-
-        // Block 1: struct/enum definition.
-        let mut cb = CodeBlock::builder();
-        self.emit_preamble(&mut cb, lang)?;
-        self.emit_header(&mut cb, lang)?;
-
-        cb.add("%>", ());
-        // Type body prefix (e.g., Haskell record braces).
-        let body_prefix = lang.type_body_prefix(&self.name, self.kind);
-        let has_body_prefix = !body_prefix.is_empty();
-        if has_body_prefix {
-            cb.add("%L", body_prefix);
-            cb.add_line();
-            cb.add("%>", ());
-        }
-        // Embedded types (Go struct composition).
-        for embedded in &self.embedded_types {
-            let term = lang.block_syntax().field_terminator;
-            cb.add(&format!("%T{term}"), embedded.clone());
-            cb.add_line();
-        }
-        let has_trailing = !self.fields.is_empty() || !self.extra_members.is_empty();
-        if crate::lang::variant_lowering::variants_precede_fields(lang, false) {
-            if !self.variants.is_empty() {
-                self.emit_variants(&mut cb, lang, has_trailing)?;
-            }
-            if !self.fields.is_empty() {
-                if !self.variants.is_empty() {
-                    cb.add_line();
-                }
-                cb.add_code(self.emit_fields(lang)?);
-            }
-        } else {
-            if !self.fields.is_empty() {
-                cb.add_code(self.emit_fields(lang)?);
-            }
-            if !self.variants.is_empty() {
-                if !self.fields.is_empty() {
-                    cb.add_line();
-                }
-                self.emit_variants(&mut cb, lang, !self.extra_members.is_empty())?;
-            }
-        }
-        for extra in &self.extra_members {
-            cb.add_code(extra.clone());
-        }
-        // Type body suffix (e.g., Haskell record closing brace).
-        if has_body_prefix {
-            cb.add("%<", ());
-        }
-        let body_suffix = lang.type_body_suffix(&self.name, self.kind);
-        if !body_suffix.is_empty() {
-            cb.add("%L", body_suffix);
-            cb.add_line();
-        }
-        self.emit_type_close(&mut cb, lang)?;
-        blocks.push(cb.build()?);
-
-        // Block 2: impl block (only if methods or properties are non-empty).
-        if !self.methods.is_empty() || !self.properties.is_empty() {
-            let mut impl_cb = CodeBlock::builder();
-            let mut impl_fmt = String::from("impl");
-            let mut impl_args: Vec<Arg> = Vec::new();
-
-            // Type params on impl.
-            let tp_str = render_type_params(&self.type_params, lang, &mut impl_args);
-            impl_fmt.push_str(&tp_str);
-            impl_fmt.push(' ');
-            impl_fmt.push_str(&self.name);
-            // Repeat bare type param names.
-            let gen_syn = lang.generic_syntax();
-            if !self.type_params.is_empty() {
-                impl_fmt.push_str(gen_syn.open);
-                for (i, tp) in self.type_params.iter().enumerate() {
-                    if i > 0 {
-                        impl_fmt.push_str(", ");
-                    }
-                    impl_fmt.push_str(&tp.name);
-                }
-                impl_fmt.push_str(gen_syn.close);
-            }
-            // Where clause on impl block.
-            if !self.where_constraints.is_empty() {
-                let style = lang.function_syntax().where_clause_style;
-                match style {
-                    WhereClauseStyle::WhereBlock => {
-                        emit_where_block(
-                            &mut impl_fmt,
-                            &mut impl_args,
-                            &self.where_constraints,
-                            lang,
-                        );
-                        impl_fmt.push_str("\n{");
-                    }
-                    WhereClauseStyle::SeparateWhere => {
-                        emit_separate_where_block(
-                            &mut impl_fmt,
-                            &mut impl_args,
-                            &self.where_constraints,
-                            lang,
-                        );
-                        impl_fmt.push_str("\n{");
-                    }
-                    WhereClauseStyle::Inline => {
-                        impl_fmt.push_str(lang.block_syntax().block_open);
-                    }
-                }
-            } else {
-                impl_fmt.push_str(lang.block_syntax().block_open);
-            }
-            impl_cb.add(&impl_fmt, impl_args);
-            impl_cb.add_line();
-
-            impl_cb.add("%>", ());
-            // Properties before methods.
-            for (i, prop) in self.properties.iter().enumerate() {
-                if i > 0 {
-                    impl_cb.add_line();
-                }
-                for block in self.emit_property(prop, lang)? {
-                    impl_cb.add_code(block);
-                }
-            }
-            if !self.properties.is_empty() && !self.methods.is_empty() {
-                impl_cb.add_line();
-            }
-            for (i, method) in self.methods.iter().enumerate() {
-                if i > 0 {
-                    impl_cb.add_line();
-                }
-                impl_cb.add_code(
-                    self.method_for_context(method, lang, DeclarationContext::Member)
-                        .emit_in_type(lang, DeclarationContext::Member)?,
-                );
-            }
-            impl_cb.add("%<", ());
-            let close = lang.block_syntax().block_close;
-            if !close.is_empty() {
-                impl_cb.add(close, ());
-                impl_cb.add_line();
-            }
-
-            blocks.push(impl_cb.build()?);
-        }
-
         Ok(blocks)
-    }
-
-    /// Emit a type alias declaration: `type Name = Target;`.
-    fn emit_type_alias(
-        &self,
-        lang: &dyn CodeLang,
-    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let mut cb = CodeBlock::builder();
-        let mut args: Vec<Arg> = Vec::new();
-
-        self.emit_preamble(&mut cb, lang)?;
-
-        let vis = lang.render_visibility(self.modifiers.visibility, DeclarationContext::TopLevel);
-        let kw = lang.type_keyword(self.kind);
-        let tp_str = render_type_params(&self.type_params, lang, &mut args);
-
-        let target = self
-            .super_types
-            .first()
-            .cloned()
-            .unwrap_or_else(|| TypeName::primitive(""));
-
-        let semi = if lang.block_syntax().uses_semicolons {
-            ";"
-        } else {
-            ""
-        };
-
-        let fmt = if lang.type_decl_syntax().type_alias_target_first {
-            // C function pointer typedef: `typedef void (*Name)(int, char*);`
-            if let TypeName::Function {
-                params,
-                return_type,
-            } = &target
-            {
-                args.push(Arg::TypeName((**return_type).clone()));
-                for p in params {
-                    args.push(Arg::TypeName(p.clone()));
-                }
-                let param_placeholders: Vec<&str> = params.iter().map(|_| "%T").collect();
-                let params_str = param_placeholders.join(", ");
-                format!("{kw} %T (*{}{tp_str})({params_str}){semi}", self.name)
-            } else {
-                // Normal C typedef: `typedef target name;`
-                args.push(Arg::TypeName(target));
-                format!("{kw} %T {}{tp_str}{semi}", self.name)
-            }
-        } else {
-            // Normal: `{vis}type name<params> = target;`
-            args.push(Arg::TypeName(target));
-            format!("{vis}{kw} {}{tp_str} = %T{semi}", self.name)
-        };
-
-        cb.add(&fmt, args);
-        cb.add_line();
-        cb.build()
-    }
-
-    /// Emit a newtype wrapper declaration.
-    fn emit_newtype(
-        &self,
-        lang: &dyn CodeLang,
-    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let mut cb = CodeBlock::builder();
-
-        self.emit_preamble(&mut cb, lang)?;
-
-        let vis = lang.render_visibility(self.modifiers.visibility, DeclarationContext::TopLevel);
-        let target = self
-            .super_types
-            .first()
-            .cloned()
-            .unwrap_or_else(|| TypeName::primitive(""));
-
-        let declaration = lang.emit_newtype_decl(vis, &self.name, &self.type_params, &target)?;
-        cb.add_code(declaration);
-        cb.add_line();
-
-        if let Some(suffix) = lang.emit_type_close_suffix(self.kind, &self.impl_types)? {
-            cb.add("%>", ());
-            cb.add("%>", ());
-            cb.add_code(suffix);
-            cb.add_line();
-            cb.add("%<", ());
-            cb.add("%<", ());
-        }
-
-        cb.build()
-    }
-
-    /// Emit one owner-aware enum-variant sequence.
-    fn emit_variants(
-        &self,
-        cb: &mut CodeBlockBuilder,
-        lang: &dyn CodeLang,
-        has_trailing_members: bool,
-    ) -> Result<(), crate::error::SigilStitchError> {
-        cb.add_code(EnumVariantSpec::lower_sequence(
-            &self.name,
-            self.kind,
-            &self.variants,
-            self.variant_owner_context(lang, has_trailing_members),
-            lang,
-        )?);
-        Ok(())
-    }
-
-    fn emit_type_close(
-        &self,
-        cb: &mut CodeBlockBuilder,
-        lang: &dyn CodeLang,
-    ) -> Result<(), crate::error::SigilStitchError> {
-        cb.add("%<", ());
-        let block_syntax = lang.block_syntax();
-        let close = block_syntax.block_close;
-        let suffix = lang.emit_type_close_suffix(self.kind, &self.impl_types)?;
-
-        if !close.is_empty() {
-            cb.add(
-                &format!("{close}{}", block_syntax.type_close_terminator),
-                (),
-            );
-            if let Some(suffix) = suffix {
-                cb.add(" ", ());
-                cb.add_code(suffix);
-            }
-            cb.add_line();
-        } else if let Some(suffix) = suffix {
-            cb.add("%>", ());
-            cb.add_code(suffix);
-            cb.add_line();
-            cb.add("%<", ());
-        }
-
-        Ok(())
-    }
-
-    /// Emit annotations and doc comment.
-    fn emit_preamble(
-        &self,
-        cb: &mut CodeBlockBuilder,
-        lang: &dyn CodeLang,
-    ) -> Result<(), crate::error::SigilStitchError> {
-        let emit_doc = || -> Option<String> {
-            if self.doc.is_empty() || lang.doc_comment_inside_body() {
-                return None;
-            }
-            let doc_lines: Vec<&str> = self.doc.iter().map(|s| s.as_str()).collect();
-            Some(lang.render_doc_comment(&doc_lines))
-        };
-
-        if lang.doc_before_annotations()
-            && let Some(doc_str) = emit_doc()
-        {
-            cb.add("%L", doc_str);
-            cb.add_line();
-        }
-
-        for spec in &self.annotation_specs {
-            cb.add_code(spec.emit(lang)?);
-            cb.add_line();
-        }
-        for ann in &self.annotations {
-            cb.add_code(ann.clone());
-            cb.add_line();
-        }
-
-        if !lang.doc_before_annotations()
-            && let Some(doc_str) = emit_doc()
-        {
-            cb.add("%L", doc_str);
-            cb.add_line();
-        }
-
-        Ok(())
-    }
-
-    /// Emit the type header line: `{vis}{keyword} {name}<params>(primary ctor){extends}{implements} {`.
-    fn emit_header(
-        &self,
-        cb: &mut CodeBlockBuilder,
-        lang: &dyn CodeLang,
-    ) -> Result<(), crate::error::SigilStitchError> {
-        let vis = lang.render_visibility(self.modifiers.visibility, DeclarationContext::TopLevel);
-        let kw = lang.type_keyword(self.kind);
-
-        let mut fmt = String::new();
-        let mut args: Vec<Arg> = Vec::new();
-
-        fmt.push_str(vis);
-        if self.modifiers.is_abstract {
-            fmt.push_str("abstract ");
-        }
-        fmt.push_str(kw);
-        fmt.push(' ');
-        fmt.push_str(&self.name);
-
-        // Type parameters.
-        let tp_str = render_type_params(&self.type_params, lang, &mut args);
-        fmt.push_str(&tp_str);
-
-        let tds = lang.type_decl_syntax();
-
-        // Primary constructor parameters (Kotlin: `class Foo(val x: Int, val y: String)`).
-        if !self.primary_constructor.is_empty() && tds.supports_primary_constructor {
-            fmt.push('(');
-            fmt.push_str("%L");
-            let params_block = self.build_primary_constructor_block(lang)?;
-            args.push(Arg::Code(params_block));
-            fmt.push(')');
-        }
-
-        // Super types (extends).
-        if !self.super_types.is_empty() {
-            let super_kw = tds.super_type_keyword;
-            if !super_kw.is_empty() {
-                fmt.push_str(super_kw);
-                let sep = tds.super_type_separator;
-                let subsequent_sep = tds.super_type_subsequent_separator;
-                for (i, st) in self.super_types.iter().enumerate() {
-                    if i > 0 {
-                        fmt.push_str(subsequent_sep.unwrap_or(sep));
-                    }
-                    fmt.push_str("%T");
-                    args.push(Arg::TypeName(st.clone()));
-                }
-            }
-        }
-
-        // Implements.
-        if !self.impl_types.is_empty() {
-            let impl_kw = tds.implements_keyword;
-            if !impl_kw.is_empty() {
-                fmt.push_str(impl_kw);
-                for (i, it) in self.impl_types.iter().enumerate() {
-                    if i > 0 {
-                        fmt.push_str(", ");
-                    }
-                    fmt.push_str("%T");
-                    args.push(Arg::TypeName(it.clone()));
-                }
-            }
-        }
-
-        // Kind suffix (e.g., Go: "type Foo struct").
-        let suffix = lang.type_kind_suffix(self.kind);
-        if !suffix.is_empty() {
-            fmt.push(' ');
-            fmt.push_str(suffix);
-        }
-
-        // Close bases list (e.g., Python: ")").
-        if !self.super_types.is_empty() || !self.impl_types.is_empty() {
-            let bases_close = lang.block_syntax().bases_close;
-            if !bases_close.is_empty() {
-                fmt.push_str(bases_close);
-            }
-        }
-
-        // Where clause (Rust/C#-style).
-        if !self.where_constraints.is_empty() {
-            let style = lang.function_syntax().where_clause_style;
-            match style {
-                WhereClauseStyle::WhereBlock => {
-                    emit_where_block(&mut fmt, &mut args, &self.where_constraints, lang);
-                    fmt.push_str("\n{");
-                }
-                WhereClauseStyle::SeparateWhere => {
-                    emit_separate_where_block(&mut fmt, &mut args, &self.where_constraints, lang);
-                    fmt.push_str("\n{");
-                }
-                WhereClauseStyle::Inline => {
-                    fmt.push_str(lang.type_header_block_open(self.kind));
-                }
-            }
-        } else {
-            fmt.push_str(lang.type_header_block_open(self.kind));
-        }
-        cb.add(&fmt, args);
-        cb.add_line();
-        Ok(())
-    }
-
-    /// Build a CodeBlock for primary constructor parameters.
-    fn build_primary_constructor_block(
-        &self,
-        lang: &dyn CodeLang,
-    ) -> Result<CodeBlock, crate::error::SigilStitchError> {
-        let mut pb = CodeBlock::builder();
-        pb.add("%>", ());
-        for (i, param) in self.primary_constructor.iter().enumerate() {
-            if i > 0 {
-                pb.add(",%W", ());
-            }
-            param.emit_into(&mut pb, lang);
-        }
-        pb.add("%<", ());
-        pb.build()
     }
 }
 
@@ -1134,11 +949,13 @@ impl TypeSpecBuilder {
 
     /// Add a primary constructor parameter.
     ///
-    /// When the language supports primary constructors (`supports_primary_constructor()`),
-    /// these parameters are rendered in the type header after the name:
-    /// `class Foo(val x: Int, val y: String)`.
-    ///
-    /// For languages that don't support primary constructors, these are ignored.
+    /// Kotlin and Scala lower these parameters in the type header. Use
+    /// [`ParameterSpecBuilder::is_property()`](crate::spec::parameter_spec::ParameterSpecBuilder::is_property)
+    /// or
+    /// [`ParameterSpecBuilder::is_mutable_property()`](crate::spec::parameter_spec::ParameterSpecBuilder::is_mutable_property)
+    /// to request property promotion; the parameter name itself must contain
+    /// only the identifier. Languages without primary constructors reject the
+    /// capability instead of ignoring it.
     pub fn add_primary_constructor_param(mut self, param: ParameterSpec) -> Self {
         self.primary_constructor.push(param);
         self
@@ -1157,6 +974,8 @@ impl TypeSpecBuilder {
     ///
     /// Returns [`SigilStitchError::EmptyName`] if `name` is empty.
     /// Returns [`SigilStitchError::DuplicateFieldName`] if any two fields share the same name.
+    /// Basic alias and newtype target/member-shape errors are also rejected
+    /// eagerly; complete intrinsic and target validation runs at emission.
     pub fn build(self) -> Result<TypeSpec, crate::error::SigilStitchError> {
         snafu::ensure!(
             !self.name.is_empty(),

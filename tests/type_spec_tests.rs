@@ -1,11 +1,23 @@
+#![allow(deprecated)]
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::code_renderer::CodeRenderer;
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::ImportGroup;
-use sigil_stitch::lang::CodeLang;
-use sigil_stitch::lang::capability::TypeCapability;
+use sigil_stitch::lang::capability::{
+    FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
+    TypeCapabilityProfile,
+};
+use sigil_stitch::lang::config::{
+    BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, TypeDeclSyntaxConfig,
+};
 use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::typescript::TypeScript;
+use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedType};
+use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::field_spec::FieldSpec;
@@ -13,9 +25,321 @@ use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
+use sigil_stitch::spec::property_spec::PropertySpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
-use sigil_stitch::spec::where_spec::TypeParamSpec;
+use sigil_stitch::spec::where_spec::{TypeParamSpec, WhereClauseStyle};
 use sigil_stitch::type_name::TypeName;
+
+#[derive(Debug)]
+struct LegacyTypeLang;
+
+impl RendererLang for LegacyTypeLang {
+    fn file_extension(&self) -> &str {
+        "legacy-type"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+}
+
+impl CodeLang for LegacyTypeLang {
+    fn type_keyword(&self, _kind: TypeKind) -> &str {
+        "legacy_type"
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RichLegacyMode {
+    Inline,
+    Split,
+    TargetFirstAlias,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RichLegacyTypeLang(RichLegacyMode);
+
+impl RendererLang for RichLegacyTypeLang {
+    fn file_extension(&self) -> &str {
+        match self.0 {
+            RichLegacyMode::Inline => "legacy-inline",
+            RichLegacyMode::Split => "legacy-split",
+            RichLegacyMode::TargetFirstAlias => "legacy-target-first",
+        }
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+        if self.0 == RichLegacyMode::Split {
+            BlockSyntaxConfig {
+                block_open: " =",
+                block_close: "",
+                uses_semicolons: false,
+                field_terminator: ";",
+                ..Default::default()
+            }
+        } else {
+            BlockSyntaxConfig::default()
+        }
+    }
+}
+
+#[allow(deprecated)]
+impl CodeLang for RichLegacyTypeLang {
+    fn render_visibility(
+        &self,
+        _visibility: Visibility,
+        _context: sigil_stitch::spec::modifiers::DeclarationContext,
+    ) -> &str {
+        "public "
+    }
+
+    fn function_keyword(
+        &self,
+        _context: sigil_stitch::spec::modifiers::DeclarationContext,
+    ) -> &str {
+        "fn"
+    }
+
+    fn type_keyword(&self, kind: TypeKind) -> &str {
+        match kind {
+            TypeKind::TypeAlias => "alias",
+            TypeKind::Newtype => "newtype",
+            TypeKind::Enum => "legacy_enum",
+            _ => "legacy_type",
+        }
+    }
+
+    fn methods_inside_type_body(&self, _kind: TypeKind) -> bool {
+        self.0 != RichLegacyMode::Split
+    }
+
+    fn type_kind_suffix(&self, kind: TypeKind) -> &str {
+        if matches!(kind, TypeKind::TypeAlias | TypeKind::Newtype) {
+            ""
+        } else {
+            "kind_suffix"
+        }
+    }
+
+    fn type_header_block_open(&self, _kind: TypeKind) -> &str {
+        if self.0 == RichLegacyMode::Split {
+            " ="
+        } else {
+            " {"
+        }
+    }
+
+    fn doc_comment_inside_body(&self) -> bool {
+        self.0 == RichLegacyMode::Inline
+    }
+
+    fn doc_before_annotations(&self) -> bool {
+        self.0 != RichLegacyMode::Split
+    }
+
+    fn type_body_prefix(&self, name: &str, _kind: TypeKind) -> String {
+        if self.0 == RichLegacyMode::TargetFirstAlias {
+            String::new()
+        } else {
+            format!("{name}_body {{")
+        }
+    }
+
+    fn type_body_suffix(&self, name: &str, _kind: TypeKind) -> String {
+        if self.0 == RichLegacyMode::TargetFirstAlias {
+            String::new()
+        } else {
+            format!("}} {name}_body_end")
+        }
+    }
+
+    fn emit_type_close_suffix(
+        &self,
+        _kind: TypeKind,
+        implemented: &[TypeName],
+    ) -> Result<Option<CodeBlock>, SigilStitchError> {
+        Ok(Some(CodeBlock::of(
+            &format!("closing_suffix_{}", implemented.len()),
+            (),
+        )?))
+    }
+
+    fn variable_prefix(&self) -> &str {
+        "$"
+    }
+
+    fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
+        FunctionSyntaxConfig {
+            where_clause_style: if self.0 == RichLegacyMode::Split {
+                WhereClauseStyle::SeparateWhere
+            } else {
+                WhereClauseStyle::WhereBlock
+            },
+            ..Default::default()
+        }
+    }
+
+    fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
+        TypeDeclSyntaxConfig {
+            type_before_name: self.0 == RichLegacyMode::Split,
+            super_type_keyword: " extends ",
+            super_type_separator: ", ",
+            super_type_subsequent_separator: Some(" plus "),
+            implements_keyword: " implements ",
+            type_alias_target_first: self.0 == RichLegacyMode::TargetFirstAlias,
+            supports_primary_constructor: self.0 != RichLegacyMode::TargetFirstAlias,
+            ..Default::default()
+        }
+    }
+
+    fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
+        EnumAndAnnotationConfig {
+            variants_before_fields: self.0 == RichLegacyMode::Inline,
+            variant_prefix_first: Some("first "),
+            variant_prefix: "next ",
+            variant_trailing_separator: true,
+            variant_section_terminator: ";",
+            readonly_keyword: "val ",
+            mutable_field_keyword: "var ",
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug)]
+struct StrictMissingTypeLang;
+
+impl RendererLang for StrictMissingTypeLang {
+    fn file_extension(&self) -> &str {
+        "strict-missing-type"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+}
+
+const STRICT_MISSING_TYPES: &[TypeCapabilityProfile<'_>] =
+    &[TypeCapabilityProfile::new(TypeKind::Class, &[])];
+
+impl CodeLang for StrictMissingTypeLang {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::strict().with_types(STRICT_MISSING_TYPES)
+    }
+}
+
+#[derive(Debug)]
+struct StrictEmptyTypeLang;
+
+impl RendererLang for StrictEmptyTypeLang {
+    fn file_extension(&self) -> &str {
+        "strict-empty-type"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+}
+
+impl CodeLang for StrictEmptyTypeLang {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::strict().with_types(STRICT_MISSING_TYPES)
+    }
+
+    fn lower_type(&self, _type_: ValidatedType<'_>) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        Ok(Vec::new())
+    }
+}
+
+#[derive(Debug)]
+struct StrictEmptyBlockTypeLang;
+
+impl RendererLang for StrictEmptyBlockTypeLang {
+    fn file_extension(&self) -> &str {
+        "strict-empty-block-type"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+}
+
+impl CodeLang for StrictEmptyBlockTypeLang {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::strict().with_types(STRICT_MISSING_TYPES)
+    }
+
+    fn lower_type(&self, _type_: ValidatedType<'_>) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        Ok(vec![CodeBlock::builder().build()?])
+    }
+}
+
+#[derive(Debug, Clone)]
+struct TypeProbeLang {
+    calls: Arc<AtomicUsize>,
+}
+
+impl TypeProbeLang {
+    fn new() -> Self {
+        Self {
+            calls: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+}
+
+impl RendererLang for TypeProbeLang {
+    fn file_extension(&self) -> &str {
+        "type-probe"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+}
+
+const PROBE_TYPES: &[TypeCapabilityProfile<'_>] = &[TypeCapabilityProfile::new(
+    TypeKind::Class,
+    &[TypeCapability::Methods],
+)];
+const PROBE_FUNCTIONS: &[FunctionCapabilityProfile<'_>] = &[FunctionCapabilityProfile::new(
+    FunctionContext::Member,
+    FunctionForm::Constructor,
+    &[],
+)];
+
+impl CodeLang for TypeProbeLang {
+    fn capabilities(&self) -> LanguageCapabilities<'_> {
+        LanguageCapabilities::strict()
+            .with_types(PROBE_TYPES)
+            .with_functions(PROBE_FUNCTIONS)
+    }
+
+    fn constructor_name_matches(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        declaring_type == Some(name)
+    }
+
+    fn constructor_name_is_valid(&self, name: &str, declaring_type: Option<&str>) -> bool {
+        declaring_type == Some(name)
+    }
+
+    fn lower_type(&self, type_: ValidatedType<'_>) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(type_.name(), "Widget");
+        assert_eq!(type_.methods().len(), 1);
+        let constructor = type_.methods()[0];
+        assert_eq!(constructor.form(), FunctionForm::Constructor);
+        assert_eq!(constructor.owner_name(), Some("Widget"));
+        assert!(!constructor.modifiers().is_constructor);
+        Ok(vec![
+            CodeBlock::of("first", ())?,
+            CodeBlock::of("second", ())?,
+        ])
+    }
+}
 
 fn render_blocks_ts(blocks: &[CodeBlock]) -> String {
     let lang = TypeScript::new();
@@ -75,6 +399,412 @@ fn render_generic_newtype_file(
         .unwrap()
         .render(80)
         .unwrap()
+}
+
+#[test]
+fn permissive_external_adapter_uses_frozen_type_compatibility_lowering() {
+    let blocks = TypeSpec::builder("Legacy", TypeKind::Class)
+        .build()
+        .unwrap()
+        .emit(&LegacyTypeLang)
+        .unwrap();
+    assert_eq!(blocks.len(), 1);
+
+    let imports = ImportGroup::new();
+    let mut renderer = CodeRenderer::new(&LegacyTypeLang, &imports, 80);
+    let rendered = renderer.render(&blocks[0]).unwrap();
+    assert!(rendered.starts_with("legacy_type Legacy"), "{rendered}");
+}
+
+fn render_legacy_type(lang: &dyn CodeLang, type_: TypeSpec) -> String {
+    let blocks = type_.emit(lang).unwrap();
+    let imports = ImportGroup::new();
+    blocks
+        .iter()
+        .map(|block| CodeRenderer::new(lang, &imports, 80).render(block).unwrap())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn legacy_property(name: &str) -> PropertySpec {
+    PropertySpec::builder(name, TypeName::primitive("Value"))
+        .getter(CodeBlock::of("return stored", ()).unwrap())
+        .setter("next", CodeBlock::of("stored = next", ()).unwrap())
+        .build()
+        .unwrap()
+}
+
+fn legacy_method(name: &str) -> FunSpec {
+    FunSpec::builder(name)
+        .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
+        .returns(TypeName::primitive("Value"))
+        .body(CodeBlock::of("return value", ()).unwrap())
+        .build()
+        .unwrap()
+}
+
+#[test]
+fn compatibility_inline_lowering_preserves_the_complete_legacy_surface() {
+    let type_ = TypeSpec::builder("Inline", TypeKind::Class)
+        .visibility(Visibility::Public)
+        .is_abstract()
+        .doc("Inline documentation.")
+        .add_embedded(TypeName::primitive("Embedded"))
+        .add_field(
+            FieldSpec::builder("field", TypeName::primitive("Value"))
+                .build()
+                .unwrap(),
+        )
+        .add_property(legacy_property("first_property"))
+        .add_property(legacy_property("second_property"))
+        .add_method(legacy_method("first_method"))
+        .add_method(legacy_method("second_method"))
+        .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("Direct")))
+        .add_type_param(TypeParamSpec::new("U"))
+        .extends(TypeName::primitive("FirstBase"))
+        .extends(TypeName::primitive("SecondBase"))
+        .implements(TypeName::primitive("FirstContract"))
+        .implements(TypeName::primitive("SecondContract"))
+        .annotation(CodeBlock::of("@raw", ()).unwrap())
+        .annotate(AnnotationSpec::new("structured"))
+        .extra_member(CodeBlock::of("opaque_member", ()).unwrap())
+        .add_primary_constructor_param(
+            ParameterSpec::builder("values", TypeName::primitive("Value"))
+                .variadic()
+                .is_property()
+                .build()
+                .unwrap(),
+        )
+        .add_primary_constructor_param(
+            ParameterSpec::builder("count", TypeName::primitive("Count"))
+                .is_mutable_property()
+                .default_value(CodeBlock::of("1", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_where_constraint(
+            TypeName::primitive("T"),
+            vec![
+                TypeName::primitive("ExplicitOne"),
+                TypeName::primitive("ExplicitTwo"),
+            ],
+        )
+        .build()
+        .unwrap();
+
+    let output = render_legacy_type(&RichLegacyTypeLang(RichLegacyMode::Inline), type_);
+    assert!(
+        output.contains("abstract legacy_type Inline<T: Direct, U>"),
+        "{output}"
+    );
+    assert!(output.contains("Inline_body"), "{output}");
+    assert!(output.contains("Inline documentation."), "{output}");
+    assert!(output.contains("first_property"), "{output}");
+    assert!(output.contains("second_method"), "{output}");
+    assert!(output.contains("opaque_member"), "{output}");
+    assert!(output.contains("closing_suffix_2"), "{output}");
+}
+
+#[test]
+fn compatibility_inline_lowering_keeps_variants_before_fields() {
+    let type_ = TypeSpec::builder("InlineEnum", TypeKind::Enum)
+        .add_variant(
+            EnumVariantSpec::builder("First")
+                .doc("First variant.")
+                .annotate(AnnotationSpec::new("variant"))
+                .discriminant(CodeBlock::of("1", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_variant(
+            EnumVariantSpec::builder("Second")
+                .record_payload_field(
+                    FieldSpec::builder("payload", TypeName::primitive("Value"))
+                        .build()
+                        .unwrap(),
+                )
+                .build()
+                .unwrap(),
+        )
+        .add_field(
+            FieldSpec::builder("field", TypeName::primitive("Value"))
+                .build()
+                .unwrap(),
+        )
+        .add_property(legacy_property("property"))
+        .add_method(legacy_method("method"))
+        .extra_member(CodeBlock::of("opaque_member", ()).unwrap())
+        .build()
+        .unwrap();
+
+    let output = render_legacy_type(&RichLegacyTypeLang(RichLegacyMode::Inline), type_);
+    let variant = output.find("first First").unwrap();
+    let field = output.find("field").unwrap();
+    assert!(variant < field, "{output}");
+    assert!(output.contains("Second"), "{output}");
+    assert!(output.contains("property"), "{output}");
+}
+
+#[test]
+fn compatibility_split_lowering_preserves_declaration_and_impl_members() {
+    let type_ = TypeSpec::builder("Split", TypeKind::Class)
+        .doc("Split documentation.")
+        .annotation(CodeBlock::of("@raw", ()).unwrap())
+        .annotate(AnnotationSpec::new("structured"))
+        .add_embedded(TypeName::primitive("Embedded"))
+        .add_field(
+            FieldSpec::builder("field", TypeName::primitive("Value"))
+                .build()
+                .unwrap(),
+        )
+        .add_property(legacy_property("first_property"))
+        .add_property(legacy_property("second_property"))
+        .add_method(legacy_method("first_method"))
+        .add_method(legacy_method("second_method"))
+        .add_type_param(TypeParamSpec::new("T"))
+        .add_type_param(TypeParamSpec::new("U"))
+        .add_where_constraint(TypeName::primitive("T"), vec![TypeName::primitive("Bound")])
+        .extends(TypeName::primitive("FirstBase"))
+        .extends(TypeName::primitive("SecondBase"))
+        .implements(TypeName::primitive("Contract"))
+        .extra_member(CodeBlock::of("opaque_member", ()).unwrap())
+        .add_primary_constructor_param(
+            ParameterSpec::builder("readonly", TypeName::primitive("Value"))
+                .is_property()
+                .build()
+                .unwrap(),
+        )
+        .add_primary_constructor_param(
+            ParameterSpec::builder("mutable", TypeName::primitive("Value"))
+                .is_mutable_property()
+                .default_value(CodeBlock::of("default_value", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let output = render_legacy_type(&RichLegacyTypeLang(RichLegacyMode::Split), type_);
+    assert!(output.contains("Split documentation."), "{output}");
+    assert!(output.contains("Value val $readonly"), "{output}");
+    assert!(
+        output.contains("Value var $mutable = default_value"),
+        "{output}"
+    );
+    assert!(output.contains("impl<T, U> Split<T, U>"), "{output}");
+    assert!(output.contains("first_property"), "{output}");
+    assert!(output.contains("second_method"), "{output}");
+    assert!(output.contains("closing_suffix_1"), "{output}");
+}
+
+#[test]
+fn compatibility_split_lowering_keeps_fields_before_variants() {
+    let type_ = TypeSpec::builder("SplitEnum", TypeKind::Enum)
+        .add_field(
+            FieldSpec::builder("field", TypeName::primitive("Value"))
+                .build()
+                .unwrap(),
+        )
+        .add_variant(EnumVariantSpec::new("First").unwrap())
+        .add_variant(EnumVariantSpec::new("Second").unwrap())
+        .add_property(legacy_property("property"))
+        .add_method(legacy_method("method"))
+        .extra_member(CodeBlock::of("opaque_member", ()).unwrap())
+        .build()
+        .unwrap();
+
+    let output = render_legacy_type(&RichLegacyTypeLang(RichLegacyMode::Split), type_);
+    let field = output.find("field").unwrap();
+    let variant = output.find("first First").unwrap();
+    assert!(field < variant, "{output}");
+    assert!(output.contains("opaque_member"), "{output}");
+    assert!(output.contains("impl SplitEnum"), "{output}");
+}
+
+#[test]
+fn compatibility_alias_and_newtype_branches_keep_legacy_shapes() {
+    let target_first = RichLegacyTypeLang(RichLegacyMode::TargetFirstAlias);
+    let primitive = TypeSpec::builder("PrimitiveAlias", TypeKind::TypeAlias)
+        .extends(TypeName::primitive("Value"))
+        .build()
+        .unwrap();
+    let function = TypeSpec::builder("Callback", TypeKind::TypeAlias)
+        .add_type_param(TypeParamSpec::new("T"))
+        .extends(TypeName::function(
+            vec![TypeName::primitive("Input"), TypeName::primitive("T")],
+            TypeName::primitive("Output"),
+        ))
+        .build()
+        .unwrap();
+    let ordinary = TypeSpec::builder("OrdinaryAlias", TypeKind::TypeAlias)
+        .visibility(Visibility::Public)
+        .extends(TypeName::primitive("Value"))
+        .build()
+        .unwrap();
+    let newtype = TypeSpec::builder("Wrapper", TypeKind::Newtype)
+        .extends(TypeName::primitive("Value"))
+        .implements(TypeName::primitive("Contract"))
+        .build()
+        .unwrap();
+
+    let primitive = render_legacy_type(&target_first, primitive);
+    let function = render_legacy_type(&target_first, function);
+    let ordinary = render_legacy_type(&RichLegacyTypeLang(RichLegacyMode::Inline), ordinary);
+    let newtype = render_legacy_type(&RichLegacyTypeLang(RichLegacyMode::Inline), newtype);
+
+    assert!(
+        primitive.contains("alias Value PrimitiveAlias;"),
+        "{primitive}"
+    );
+    assert!(
+        function.contains("alias Output (*Callback<T>)(Input, T);"),
+        "{function}"
+    );
+    assert!(
+        ordinary.contains("public alias OrdinaryAlias = Value;"),
+        "{ordinary}"
+    );
+    assert!(newtype.contains("struct Wrapper(Value);"), "{newtype}");
+    assert!(newtype.contains("closing_suffix_1"), "{newtype}");
+}
+
+#[test]
+fn strict_adapter_without_complete_type_lowerer_fails_closed() {
+    let error = TypeSpec::builder("Missing", TypeKind::Class)
+        .build()
+        .unwrap()
+        .emit(&StrictMissingTypeLang)
+        .unwrap_err();
+    assert!(matches!(error, SigilStitchError::MissingTypeLowerer { .. }));
+}
+
+#[test]
+fn complete_type_lowering_rejects_empty_output() {
+    for lang in [
+        &StrictEmptyTypeLang as &dyn CodeLang,
+        &StrictEmptyBlockTypeLang as &dyn CodeLang,
+    ] {
+        let error = TypeSpec::builder("Missing", TypeKind::Class)
+            .build()
+            .unwrap()
+            .emit(lang)
+            .unwrap_err();
+        assert!(matches!(error, SigilStitchError::EmptyTypeLowering { .. }));
+    }
+}
+
+#[test]
+fn complete_intrinsic_validation_reports_every_invalid_type_shape() {
+    let empty = || CodeBlock::builder().build().unwrap();
+    let seed = TypeSpec::builder("Broken", TypeKind::Class)
+        .add_embedded(TypeName::primitive("Embedded"))
+        .add_field(
+            FieldSpec::builder("field", TypeName::primitive("Value"))
+                .build()
+                .unwrap(),
+        )
+        .add_property(legacy_property("property"))
+        .add_method(legacy_method("method"))
+        .add_type_param(TypeParamSpec::new(""))
+        .add_type_param(TypeParamSpec::new("T"))
+        .add_type_param(TypeParamSpec::new("T"))
+        .add_type_param(TypeParamSpec::new("U").with_bound(TypeName::primitive("")))
+        .extends(TypeName::primitive("FirstTarget"))
+        .extends(TypeName::primitive("SecondTarget"))
+        .implements(TypeName::primitive("Contract"))
+        .annotation(empty())
+        .annotate(AnnotationSpec::new(""))
+        .extra_member(empty())
+        .add_variant(EnumVariantSpec::new("Variant").unwrap())
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("Value"))
+                .default_value(CodeBlock::of("default", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .add_where_constraint(TypeName::primitive(""), Vec::new())
+        .add_where_constraint(TypeName::primitive("U"), vec![TypeName::primitive("")])
+        .build()
+        .unwrap();
+    let mut serialized = serde_json::to_value(seed).unwrap();
+    serialized["name"] = serde_json::json!("");
+    serialized["kind"] = serde_json::json!("TypeAlias");
+    for modifier in [
+        "is_static",
+        "is_readonly",
+        "is_async",
+        "is_override",
+        "is_constructor",
+    ] {
+        serialized["modifiers"][modifier] = serde_json::json!(true);
+    }
+    let invalid: TypeSpec = serde_json::from_value(serialized).unwrap();
+    let file = FileSpec::builder_with("invalid.legacy-type", LegacyTypeLang)
+        .add_type(invalid)
+        .build()
+        .unwrap();
+    let SigilStitchError::FileSpecValidation { errors, .. } = file.validate().unwrap_err() else {
+        panic!("expected aggregate intrinsic validation errors");
+    };
+
+    assert!(
+        errors
+            .iter()
+            .any(|error| matches!(error, SigilStitchError::EmptyName { .. }))
+    );
+    assert!(errors.iter().any(|error| matches!(
+        error,
+        SigilStitchError::InvalidTypeModifiers { modifiers, .. }
+            if modifiers == &["static", "readonly", "async", "override", "constructor"]
+    )));
+    assert!(errors.iter().any(|error| matches!(
+        error,
+        SigilStitchError::DuplicateTypeParameterName { parameter_name, .. } if parameter_name == "T"
+    )));
+    assert!(
+        errors
+            .iter()
+            .filter(|error| matches!(error, SigilStitchError::InvalidTypeAlias { .. }))
+            .count()
+            >= 2
+    );
+    assert!(
+        errors
+            .iter()
+            .filter(|error| matches!(error, SigilStitchError::InvalidTypeDeclaration { .. }))
+            .count()
+            >= 3
+    );
+    assert!(
+        errors
+            .iter()
+            .filter(|error| matches!(error, SigilStitchError::InvalidTypeParameter { .. }))
+            .count()
+            >= 4
+    );
+}
+
+#[test]
+fn complete_type_lowerer_receives_owner_classified_children_once_and_preserves_block_order() {
+    let lang = TypeProbeLang::new();
+    let blocks = TypeSpec::builder("Widget", TypeKind::Class)
+        .add_method(FunSpec::builder("Widget").build().unwrap())
+        .build()
+        .unwrap()
+        .emit(&lang)
+        .unwrap();
+
+    assert_eq!(lang.calls.load(Ordering::SeqCst), 1);
+    let imports = ImportGroup::new();
+    let rendered = blocks
+        .iter()
+        .map(|block| {
+            CodeRenderer::new(&lang, &imports, 80)
+                .render(block)
+                .unwrap()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(rendered, ["first", "second"]);
 }
 
 #[test]
@@ -402,7 +1132,6 @@ fn test_newtype_python() {
 
 #[test]
 fn test_newtype_imports_survive_every_structured_hook() {
-    use sigil_stitch::lang::c::C;
     use sigil_stitch::lang::go::Go;
     use sigil_stitch::lang::haskell::Haskell;
     use sigil_stitch::lang::kotlin::Kotlin;
@@ -417,14 +1146,6 @@ fn test_newtype_imports_survive_every_structured_hook() {
     );
     assert!(rust.contains("use crate::models::External;"), "{rust}");
     assert!(rust.contains("struct Wrapper(Option<External>);"), "{rust}");
-
-    let c = render_newtype_file(
-        C::new(),
-        "wrapper.c",
-        TypeName::pointer(TypeName::importable("external.h", "External")),
-    );
-    assert!(c.contains("#include <external.h>"), "{c}");
-    assert!(c.contains("typedef External* Wrapper;"), "{c}");
 
     let go = render_newtype_file(
         Go::new(),
@@ -501,12 +1222,9 @@ fn test_newtype_imports_survive_every_structured_hook() {
 
 #[test]
 fn test_newtype_type_params_are_owned_by_each_language() {
-    use sigil_stitch::lang::c::C;
     use sigil_stitch::lang::go::Go;
     use sigil_stitch::lang::haskell::Haskell;
     use sigil_stitch::lang::kotlin::Kotlin;
-    use sigil_stitch::lang::php::Php;
-    use sigil_stitch::lang::python::Python;
     use sigil_stitch::lang::scala::Scala;
 
     let rust = render_generic_newtype_file(
@@ -525,10 +1243,10 @@ fn test_newtype_type_params_are_owned_by_each_language() {
             "example.com/project/constraints",
             "Bound",
         )),
-        TypeName::primitive("T"),
+        TypeName::slice(TypeName::primitive("T")),
     );
     assert!(go.contains("\"example.com/project/constraints\""), "{go}");
-    assert!(go.contains("type Wrapper[T constraints.Bound] T"), "{go}");
+    assert!(go.contains("type Wrapper[T constraints.Bound] []T"), "{go}");
 
     let haskell = render_generic_newtype_file(
         Haskell::new(),
@@ -571,36 +1289,62 @@ fn test_newtype_type_params_are_owned_by_each_language() {
         scala.contains("class Wrapper[T <: Bound](val value: T)"),
         "{scala}"
     );
+}
 
-    let c = render_generic_newtype_file(
-        C::new(),
-        "wrapper.c",
-        TypeParamSpec::new("T").with_bound(TypeName::importable("bound.h", "Bound")),
-        TypeName::primitive("int"),
-    );
-    assert!(!c.contains("bound.h"), "{c}");
-    assert!(c.contains("typedef int Wrapper;"), "{c}");
+#[test]
+fn go_rejects_a_bare_type_parameter_as_a_newtype_target() {
+    let error = TypeSpec::builder("Wrapper", TypeKind::Newtype)
+        .add_type_param(TypeParamSpec::new("T"))
+        .extends(TypeName::primitive("T"))
+        .build()
+        .unwrap()
+        .emit(&sigil_stitch::lang::go::Go::new())
+        .unwrap_err();
 
-    let php = render_generic_newtype_file(
-        Php::new(),
-        "Wrapper.php",
-        TypeParamSpec::new("T").with_bound(TypeName::importable("Example\\Constraints", "Bound")),
-        TypeName::primitive("int"),
-    );
-    assert!(!php.contains("Constraints"), "{php}");
-    assert!(php.contains("class Wrapper"), "{php}");
+    assert!(matches!(
+        error,
+        SigilStitchError::InvalidTypeDeclaration { reason, .. }
+            if reason.contains("bare type parameter")
+    ));
+}
 
-    let python = render_generic_newtype_file(
-        Python::new(),
-        "wrapper.py",
-        TypeParamSpec::new("T").with_bound(TypeName::importable("example.constraints", "Bound")),
-        TypeName::primitive("int"),
-    );
-    assert!(!python.contains("example.constraints"), "{python}");
-    assert!(
-        python.contains("Wrapper = NewType(\"Wrapper\", int)"),
-        "{python}"
-    );
+#[test]
+fn unsupported_newtype_type_parameters_fail_instead_of_being_dropped() {
+    let parameter =
+        || TypeParamSpec::new("T").with_bound(TypeName::importable("constraints", "Bound"));
+
+    let c = TypeSpec::builder("Wrapper", TypeKind::Newtype)
+        .add_type_param(parameter())
+        .extends(TypeName::primitive("int"))
+        .build()
+        .unwrap()
+        .emit(&sigil_stitch::lang::c::C::new())
+        .unwrap_err();
+    assert!(matches!(c, SigilStitchError::UnsupportedTypeKind { .. }));
+
+    for lang in [
+        &sigil_stitch::lang::php::Php::new() as &dyn CodeLang,
+        &sigil_stitch::lang::python::Python::new() as &dyn CodeLang,
+    ] {
+        let error = TypeSpec::builder("Wrapper", TypeKind::Newtype)
+            .add_type_param(parameter())
+            .extends(TypeName::primitive("int"))
+            .build()
+            .unwrap()
+            .emit(lang)
+            .unwrap_err();
+        assert!(
+            matches!(
+                error,
+                SigilStitchError::UnsupportedTypeCapabilities {
+                    ref capabilities,
+                    ..
+                } if capabilities.contains(&TypeCapability::ParametricPolymorphism)
+                    && capabilities.contains(&TypeCapability::BoundedPolymorphism)
+            ),
+            "{error}"
+        );
+    }
 }
 
 #[test]
@@ -771,7 +1515,7 @@ fn test_embedded_go_struct_emit() {
 }
 
 #[test]
-fn test_embedded_ts_interface_emit() {
+fn test_embedded_ts_interface_fails_closed() {
     let spec = TypeSpec::builder("AdminUser", TypeKind::Interface)
         .add_embedded(TypeName::primitive("BaseUser"))
         .add_embedded(TypeName::primitive("AdminRole"))
@@ -782,21 +1526,18 @@ fn test_embedded_ts_interface_emit() {
         )
         .build()
         .unwrap();
-    let blocks = spec.emit(&TypeScript::new()).unwrap();
-    let output = render_blocks_ts(&blocks);
-    assert!(output.contains("BaseUser;"), "embedded BaseUser: {output}");
-    assert!(
-        output.contains("AdminRole;"),
-        "embedded AdminRole: {output}"
-    );
-    assert!(
-        output.contains("permissions: string[];"),
-        "field permissions: {output}"
-    );
+    let error = spec.emit(&TypeScript::new()).unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::UnsupportedTypeCapabilities {
+            ref capabilities,
+            ..
+        } if capabilities == &[TypeCapability::StructuralEmbedding]
+    ));
 }
 
 #[test]
-fn test_embedded_rust_struct_emit() {
+fn test_embedded_rust_struct_fails_closed() {
     let spec = TypeSpec::builder("Combined", TypeKind::Struct)
         .add_embedded(TypeName::primitive("Base"))
         .add_field(
@@ -806,10 +1547,14 @@ fn test_embedded_rust_struct_emit() {
         )
         .build()
         .unwrap();
-    let blocks = spec.emit(&Rust::new()).unwrap();
-    let output = render_blocks_rs(&blocks);
-    assert!(output.contains("Base,"), "embedded Base: {output}");
-    assert!(output.contains("extra: String,"), "field extra: {output}");
+    let error = spec.emit(&Rust::new()).unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::UnsupportedTypeCapabilities {
+            ref capabilities,
+            ..
+        } if capabilities == &[TypeCapability::StructuralEmbedding]
+    ));
 }
 
 #[test]
@@ -827,7 +1572,7 @@ fn test_embedded_only_no_fields() {
 }
 
 #[test]
-fn test_embedded_with_methods_after() {
+fn test_embedded_with_methods_fails_closed() {
     let spec = TypeSpec::builder("Controller", TypeKind::Class)
         .add_embedded(TypeName::primitive("BaseHandler"))
         .add_field(
@@ -844,16 +1589,14 @@ fn test_embedded_with_methods_after() {
         )
         .build()
         .unwrap();
-    let blocks = spec.emit(&TypeScript::new()).unwrap();
-    let output = render_blocks_ts(&blocks);
-    assert!(output.contains("BaseHandler;"), "embedded: {output}");
-    assert!(output.contains("name: string;"), "field: {output}");
-    assert!(output.contains("handle(): void {"), "method: {output}");
-    let embedded_pos = output.find("BaseHandler").unwrap();
-    let field_pos = output.find("name:").unwrap();
-    let method_pos = output.find("handle()").unwrap();
-    assert!(embedded_pos < field_pos, "embedded before field");
-    assert!(field_pos < method_pos, "field before method");
+    let error = spec.emit(&TypeScript::new()).unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::UnsupportedTypeCapabilities {
+            ref capabilities,
+            ..
+        } if capabilities == &[TypeCapability::StructuralEmbedding]
+    ));
 }
 
 #[test]

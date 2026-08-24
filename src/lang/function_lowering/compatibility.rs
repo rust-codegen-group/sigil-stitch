@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
+use crate::lang::capability::FunctionForm;
 use crate::spec::fun_spec::{FunctionSignatureStyle, ParamListStyle, ValidatedFunction};
 use crate::spec::modifiers::{ConstructorDelegationStyle, DeclarationContext};
 use crate::spec::parameter_spec::ParameterSpec;
@@ -274,7 +275,7 @@ pub(crate) fn lower<L: CodeLang + ?Sized>(
         lowering.signature.push_literal(" ");
     }
 
-    let keyword = if function.modifiers().is_constructor {
+    let keyword = if function.form() == FunctionForm::Constructor {
         lang.function_syntax().constructor_keyword
     } else {
         lang.function_keyword(function.declaration_context())

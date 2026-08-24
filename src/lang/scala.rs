@@ -10,7 +10,7 @@ use crate::lang::capability::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
-use crate::spec::where_spec::{TypeParamSpec, render_type_params};
+use crate::spec::where_spec::{TypeParamKind, TypeParamSpec, render_type_params};
 use crate::type_name::TypeName;
 
 /// Scala language implementation.
@@ -40,10 +40,12 @@ use crate::type_name::TypeName;
 ///
 /// # Inheritance
 ///
-/// Scala uses `extends` for the first supertype and `with` for subsequent traits:
+/// Scala uses `extends` for the optional superclass and `with` for implemented
+/// traits. Preserve that distinction in the builder:
 /// ```text
-/// tb.super_type(TypeName::primitive("Base"));
-/// tb.super_type(TypeName::primitive("Serializable"));
+/// let tb = TypeSpec::builder("Foo", TypeKind::Class)
+///     .extends(TypeName::primitive("Base"))
+///     .implements(TypeName::primitive("Serializable"));
 /// // Emits: class Foo extends Base with Serializable {
 /// ```
 ///
@@ -60,8 +62,12 @@ use crate::type_name::TypeName;
 /// Use `add_primary_constructor_param()` on `TypeSpecBuilder`:
 /// ```text
 /// let mut tb = TypeSpec::builder("Person", TypeKind::Class);
-/// tb.add_primary_constructor_param(ParameterSpec::new("val name", TypeName::primitive("String")));
-/// tb.add_primary_constructor_param(ParameterSpec::new("val age", TypeName::primitive("Int")));
+/// tb.add_primary_constructor_param(
+///     ParameterSpec::builder("name", TypeName::primitive("String")).is_property().build()?
+/// );
+/// tb.add_primary_constructor_param(
+///     ParameterSpec::builder("age", TypeName::primitive("Int")).is_property().build()?
+/// );
 /// // Emits: class Person(val name: String, val age: Int) {
 /// ```
 #[derive(Debug, Clone)]
@@ -98,6 +104,32 @@ impl Scala {
         self.extension = s.to_string();
         self
     }
+}
+
+fn is_valid_raw_type_parameter_kind(raw: &str) -> bool {
+    let raw = raw.trim();
+    if !raw.starts_with('[') || !raw.ends_with(']') || raw[1..raw.len() - 1].trim().is_empty() {
+        return false;
+    }
+
+    let mut depth = 0usize;
+    for character in raw.chars() {
+        match character {
+            '[' => depth += 1,
+            ']' if depth == 0 => return false,
+            ']' => depth -= 1,
+            '\n' | '\r' => return false,
+            _ if depth == 0 => return false,
+            _ => {}
+        }
+    }
+    depth == 0
+}
+
+pub(crate) fn invalid_raw_type_parameter(type_params: &[TypeParamSpec]) -> Option<&TypeParamSpec> {
+    type_params.iter().find(|parameter| {
+        matches!(parameter.kind(), Some(TypeParamKind::Raw(raw)) if !is_valid_raw_type_parameter_kind(raw))
+    })
 }
 
 #[rustfmt::skip]
@@ -203,10 +235,11 @@ const SCALA_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::InterfaceImplementation,
     // ParametricPolymorphism = type parameters
     TypeCapability::ParametricPolymorphism,
+    TypeCapability::HigherKindedPolymorphism,
     // BoundedPolymorphism = context/view bounds and type bounds
     TypeCapability::BoundedPolymorphism,
-    // ConstructorParameters = primary constructor parameters
-    TypeCapability::ConstructorParameters,
+    // PrimaryConstructorParameters = primary constructor parameters
+    TypeCapability::PrimaryConstructorParameters,
     // Attributes = annotations
     TypeCapability::Attributes,
 ];
@@ -217,6 +250,7 @@ const SCALA_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = type parameters
     TypeCapability::ParametricPolymorphism,
+    TypeCapability::HigherKindedPolymorphism,
     // BoundedPolymorphism = context/view bounds and type bounds
     TypeCapability::BoundedPolymorphism,
     // Attributes = annotations
@@ -240,6 +274,7 @@ const SCALA_TYPES: &[TypeCapabilityProfile] = &[
             TypeCapability::Methods,
             // ParametricPolymorphism = type parameters
             TypeCapability::ParametricPolymorphism,
+            TypeCapability::HigherKindedPolymorphism,
             // Attributes = annotations
             TypeCapability::Attributes,
             // Variants = enum cases
@@ -251,6 +286,9 @@ const SCALA_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // ParametricPolymorphism = type parameters
             TypeCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = inline upper bounds
+            TypeCapability::BoundedPolymorphism,
+            TypeCapability::HigherKindedPolymorphism,
         ],
     ),
     TypeCapabilityProfile::new(
@@ -258,6 +296,9 @@ const SCALA_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // ParametricPolymorphism = type parameters
             TypeCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = inline upper bounds
+            TypeCapability::BoundedPolymorphism,
+            TypeCapability::HigherKindedPolymorphism,
             // Attributes = annotations
             TypeCapability::Attributes,
         ],
@@ -281,6 +322,7 @@ const SCALA_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = type parameters
     FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::HigherKindedPolymorphism,
 ];
 const SCALA_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AbstractMethod = abstract members
@@ -298,6 +340,7 @@ const SCALA_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Override,
     // ParametricPolymorphism = type parameters
     FunctionCapability::ParametricPolymorphism,
+    FunctionCapability::HigherKindedPolymorphism,
 ];
 const SCALA_FUNCTIONS: &[FunctionCapabilityProfile] = &[
     FunctionCapabilityProfile::new(
@@ -330,6 +373,17 @@ impl CodeLang for Scala {
             .with_variants(SCALA_VARIANTS)
             .with_fields(crate::lang::field_lowering::scala::PROFILES)
             .with_properties(crate::lang::property_lowering::scala::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::scala::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::scala::lower(self, type_)
     }
 
     fn lower_function(
@@ -428,6 +482,15 @@ impl CodeLang for Scala {
         type_params: &[crate::spec::where_spec::TypeParamSpec],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
+        if let Some(parameter) = invalid_raw_type_parameter(type_params) {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "Scala higher-kinded parameter syntax must be a non-empty balanced bracket suffix"
+                    .to_string(),
+            });
+        }
         crate::lang::function_lowering::validate_constraints_target_declared_type_params(
             self.file_extension(),
             function_name,

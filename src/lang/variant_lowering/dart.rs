@@ -41,7 +41,7 @@ pub(crate) fn lower(
         block.add("%L", variant.name());
         if index + 1 != count {
             block.add(",", ());
-        } else if variants.has_following_members() {
+        } else if variants.has_non_variant_members() {
             block.add(";", ());
         }
         block.add_line();

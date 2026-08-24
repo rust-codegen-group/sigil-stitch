@@ -1,6 +1,8 @@
 use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::code_renderer::CodeRenderer;
+use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::ImportGroup;
+use sigil_stitch::lang::capability::{FunctionCapability, FunctionContext, FunctionForm};
 use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::emittable::Emittable;
@@ -193,17 +195,21 @@ fn test_type_param_kind_none_unchanged() {
 }
 
 #[test]
-fn test_type_param_with_kind_default_no_output() {
+fn rust_rejects_unsupported_higher_kinded_type_parameters() {
     let fun = FunSpec::builder("apply")
         .add_type_param(TypeParamSpec::new("F").with_kind(TypeParamKind::Constructor1))
         .body(CodeBlock::of("todo!()", ()).unwrap())
         .build()
         .unwrap();
-    let output = emit_fun_rs(&fun, DeclarationContext::TopLevel);
-    assert!(
-        output.contains("fn apply<F>()"),
-        "default renders no kind suffix: {output}"
-    );
+    assert!(matches!(
+        fun.emit(&Rust::new(), DeclarationContext::TopLevel),
+        Err(SigilStitchError::UnsupportedFunctionCapabilities {
+            context: FunctionContext::TopLevel,
+            form: FunctionForm::Function,
+            capabilities,
+            ..
+        }) if capabilities == vec![FunctionCapability::HigherKindedPolymorphism]
+    ));
 }
 
 #[test]

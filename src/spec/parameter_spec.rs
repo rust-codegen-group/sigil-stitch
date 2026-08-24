@@ -93,7 +93,13 @@ impl ParameterSpec {
         self.is_mutable_property
     }
 
-    /// Emit this parameter into a CodeBlockBuilder (appends format parts + args).
+    /// Emit this parameter with the pre-0.6.8 shared declaration grammar.
+    ///
+    /// Complete function and type lowerers should read the semantic accessors
+    /// on `ParameterSpec` and own their target-language parameter grammar.
+    #[deprecated(
+        note = "legacy 0.6.8 parameter grammar; use CodeLang::lower_function or CodeLang::lower_type"
+    )]
     pub fn emit_into(&self, cb: &mut CodeBlockBuilder, lang: &dyn CodeLang) {
         let mut fmt = String::new();
         let mut args: Vec<Arg> = Vec::new();
@@ -221,6 +227,7 @@ impl ParameterSpecBuilder {
 }
 
 #[cfg(test)]
+#[allow(deprecated)] // Direct coverage for the frozen pre-0.6.8 compatibility helper.
 mod tests {
     use super::*;
     use crate::code_block::CodeBlock;

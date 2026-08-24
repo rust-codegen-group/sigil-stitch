@@ -150,7 +150,6 @@ const RUST_RECORD_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::RecordFields,
     // Methods = impl methods
     TypeCapability::Methods,
-    TypeCapability::StructuralEmbedding,
     // ParametricPolymorphism = generic type parameters
     TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = trait bounds
@@ -195,8 +194,6 @@ const RUST_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // ParametricPolymorphism = generic type parameters
             TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = trait bounds
-            TypeCapability::BoundedPolymorphism,
         ],
     ),
     TypeCapabilityProfile::new(
@@ -287,6 +284,17 @@ impl CodeLang for Rust {
             .with_functions(RUST_FUNCTIONS)
             .with_variants(RUST_VARIANTS)
             .with_fields(crate::lang::field_lowering::rust::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::rust::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::rust::lower(self, type_)
     }
 
     fn lower_function(

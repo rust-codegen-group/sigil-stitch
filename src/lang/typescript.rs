@@ -247,7 +247,6 @@ const TS_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::AccessorMethods,
     // Methods = methods
     TypeCapability::Methods,
-    TypeCapability::StructuralEmbedding,
     // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
     // InterfaceImplementation = `implements`
@@ -264,15 +263,12 @@ const TS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::RecordFields,
     // Methods = methods
     TypeCapability::Methods,
-    TypeCapability::StructuralEmbedding,
     // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
     // ParametricPolymorphism = generic type parameters
     TypeCapability::ParametricPolymorphism,
     // BoundedPolymorphism = generic constraints
     TypeCapability::BoundedPolymorphism,
-    // Attributes = decorators
-    TypeCapability::Attributes,
 ];
 const TS_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Class, TS_CLASS_CAPABILITIES),
@@ -293,6 +289,8 @@ const TS_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // ParametricPolymorphism = generic type parameters
             TypeCapability::ParametricPolymorphism,
+            // BoundedPolymorphism = `extends` constraints on alias parameters
+            TypeCapability::BoundedPolymorphism,
         ],
     ),
 ];
@@ -406,6 +404,17 @@ impl CodeLang for TypeScript {
             .with_variants(TS_VARIANTS)
             .with_fields(crate::lang::field_lowering::typescript::PROFILES)
             .with_properties(crate::lang::property_lowering::typescript::PROFILES)
+    }
+
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::typescript::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::typescript::lower(self, type_)
     }
 
     fn validate_fields(

@@ -32,8 +32,10 @@ pub enum TypeCapability {
     ParametricPolymorphism,
     /// Bounded or constrained type parameters.
     BoundedPolymorphism,
+    /// Type parameters that range over type constructors.
+    HigherKindedPolymorphism,
     /// Parameters introduced directly by a declaration constructor.
-    ConstructorParameters,
+    PrimaryConstructorParameters,
     /// Sum-type variants.
     Variants,
     /// Declaration metadata / attributes.
@@ -329,6 +331,8 @@ pub enum FunctionCapability {
     ParametricPolymorphism,
     /// Bounded or constrained declaration type parameters.
     BoundedPolymorphism,
+    /// Declaration type parameters that range over type constructors.
+    HigherKindedPolymorphism,
     /// Declaration metadata / annotations.
     Attributes,
     /// An explicitly declared return type.
@@ -570,6 +574,10 @@ impl<'a> LanguageCapabilities<'a> {
                 .find(|profile| profile.kind() == kind)
                 .is_some_and(|profile| profile.supports(capability))
         })
+    }
+
+    pub(crate) fn type_validation_is_permissive(&self) -> bool {
+        self.types.uses_permissive_validation()
     }
 
     /// Whether any profile declares this function context.

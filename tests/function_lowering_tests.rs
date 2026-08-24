@@ -330,6 +330,29 @@ fn validated_function_exposes_complete_read_only_semantic_intent() {
 }
 
 #[test]
+fn scala_rejects_empty_raw_higher_kinded_function_parameters() {
+    let function = FunSpec::builder("transform")
+        .add_type_param(TypeParamSpec::new("F").with_kind(TypeParamKind::Raw("".to_string())))
+        .add_param(ParameterSpec::of("value", TypeName::primitive("Int")))
+        .returns(TypeName::primitive("Unit"))
+        .body(CodeBlock::of("()", ()).unwrap())
+        .build()
+        .unwrap();
+
+    let error = function
+        .emit(
+            &sigil_stitch::lang::scala::Scala::new(),
+            DeclarationContext::TopLevel,
+        )
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::InvalidFunctionTypeParameter { reason, .. }
+            if reason.contains("higher-kinded")
+    ));
+}
+
+#[test]
 fn boxed_adapter_preserves_type_refs_and_pretty_layout() {
     let lang = NovelLang::permissive();
     let boxed: Box<dyn CodeLang> = Box::new(lang.clone());

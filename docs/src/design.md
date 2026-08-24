@@ -12,9 +12,9 @@ which explains how data flows through the implementation.
 - [Language-Aware Tokenizer](macrolang.md) describes the private typed pipeline
   used by `sigil_quote!`.
 
-Design chapters describe the accepted direction even while a compatibility
-path is still being migrated. Each such chapter calls out transitional behavior
-explicitly so it is not mistaken for the desired interface.
+Design chapters describe the implemented built-in architecture. Frozen 0.6.8
+compatibility lowerers remain for external adapters and legacy direct facades;
+each chapter points to the compatibility appendix where that boundary matters.
 
 These chapters document the selected design and its invariants, not a catalogue
 of every rejected alternative. When the history of a hard-to-reverse trade-off

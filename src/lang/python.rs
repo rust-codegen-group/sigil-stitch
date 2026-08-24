@@ -307,7 +307,6 @@ const PY_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::RecordFields,
     // Methods = methods
     TypeCapability::Methods,
-    TypeCapability::StructuralEmbedding,
     // NominalSubtyping = base classes
     TypeCapability::NominalSubtyping,
     // InterfaceImplementation = additional bases
@@ -458,6 +457,17 @@ impl CodeLang for Python {
             .with_fields(crate::lang::field_lowering::python::PROFILES)
     }
 
+    fn validate_type(&self, type_: crate::lang::TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        crate::lang::type_lowering::python::validate(self, type_)
+    }
+
+    fn lower_type(
+        &self,
+        type_: crate::lang::ValidatedType<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::type_lowering::python::lower(self, type_)
+    }
+
     fn lower_function(
         &self,
         function: crate::spec::fun_spec::ValidatedFunction<'_>,
@@ -510,11 +520,11 @@ impl CodeLang for Python {
         let legacy_static_decorator = matches!(
             function.function_context(),
             FunctionContext::Member | FunctionContext::InterfaceMember
-        ) && !function.modifiers().is_constructor
+        ) && function.form() != FunctionForm::Constructor
             && function.modifiers().is_static
             && has_legacy_static_decorator(function);
         if function.modifiers().is_static
-            && !function.modifiers().is_constructor
+            && function.form() != FunctionForm::Constructor
             && !legacy_static_decorator
         {
             return Err(SigilStitchError::UnsupportedFunctionCapabilities {

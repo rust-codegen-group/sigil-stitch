@@ -67,6 +67,7 @@ mod ruby_function_lowering;
 mod rust_function_lowering;
 mod scala_function_lowering;
 mod swift_function_lowering;
+pub(crate) mod type_lowering;
 pub(crate) mod type_members_validation;
 mod typescript_function_lowering;
 pub(crate) mod variant_lowering;
@@ -86,6 +87,7 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
 pub use crate::spec::property_spec::{PropertyIntent, ValidatedProperty};
 pub use crate::spec::type_members_intent::TypeMembersIntent;
+pub use crate::spec::type_spec::{TypeIntent, ValidatedType};
 use crate::spec::where_spec::{TypeParamSpec, WhereConstraint, render_type_params};
 use crate::type_name::TypeName;
 
@@ -258,16 +260,18 @@ pub trait RendererLang: std::fmt::Debug + 'static {
 /// functions, types, fields, and imports. For basic `CodeBlock` rendering,
 /// only [`RendererLang`] is required.
 ///
-/// # Implementing structured type hooks
+/// # Implementing complete type lowering
 ///
 /// ```
-/// use sigil_stitch::code_block::{Arg, CodeBlock};
+/// use sigil_stitch::code_block::CodeBlock;
 /// use sigil_stitch::error::SigilStitchError;
-/// use sigil_stitch::lang::{CodeLang, RendererLang};
+/// use sigil_stitch::lang::capability::{
+///     LanguageCapabilities, TypeCapabilityProfile,
+/// };
+/// use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedType};
 /// use sigil_stitch::spec::file_spec::FileSpec;
 /// use sigil_stitch::spec::modifiers::TypeKind;
 /// use sigil_stitch::spec::type_spec::TypeSpec;
-/// use sigil_stitch::spec::where_spec::{TypeParamSpec, render_type_params};
 /// use sigil_stitch::type_name::TypeName;
 ///
 /// #[derive(Debug)]
@@ -278,37 +282,27 @@ pub trait RendererLang: std::fmt::Debug + 'static {
 ///     fn line_comment_prefix(&self) -> &str { "//" }
 /// }
 ///
+/// const TYPES: &[TypeCapabilityProfile<'_>] =
+///     &[TypeCapabilityProfile::new(TypeKind::TypeAlias, &[])];
+///
 /// impl CodeLang for ExampleLang {
-///     fn emit_newtype_decl(
-///         &self,
-///         visibility: &str,
-///         name: &str,
-///         type_params: &[TypeParamSpec],
-///         inner: &TypeName,
-///     ) -> Result<CodeBlock, SigilStitchError> {
-///         let mut args = Vec::new();
-///         let params = render_type_params(type_params, self, &mut args);
-///         args.push(Arg::TypeName(inner.clone()));
-///         CodeBlock::of(&format!("{visibility}type {name}{params} = %T"), args)
+///     fn capabilities(&self) -> LanguageCapabilities<'_> {
+///         LanguageCapabilities::strict().with_types(TYPES)
 ///     }
 ///
-///     fn emit_type_context(
+///     fn lower_type(
 ///         &self,
-///         _type_params: &[TypeParamSpec],
-///     ) -> Result<Option<CodeBlock>, SigilStitchError> {
-///         Ok(None)
-///     }
-///
-///     fn emit_type_close_suffix(
-///         &self,
-///         _kind: TypeKind,
-///         _impl_types: &[TypeName],
-///     ) -> Result<Option<CodeBlock>, SigilStitchError> {
-///         Ok(None)
+///         type_: ValidatedType<'_>,
+///     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+///         let target = type_.target_type().expect("validated alias target").clone();
+///         Ok(vec![CodeBlock::of(
+///             &format!("type {} = %T", type_.name()),
+///             target,
+///         )?])
 ///     }
 /// }
 ///
-/// let wrapped = TypeSpec::builder("Wrapped", TypeKind::Newtype)
+/// let wrapped = TypeSpec::builder("Wrapped", TypeKind::TypeAlias)
 ///     .extends(TypeName::primitive("String"))
 ///     .build()?;
 /// let output = FileSpec::builder_with("wrapped.example", ExampleLang)
@@ -327,6 +321,46 @@ pub trait CodeLang: RendererLang {
     /// sigil-stitch 0.6.8 inherit a permissive compatibility profile.
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::permissive()
+    }
+
+    /// Apply target-specific validation to one complete type declaration.
+    ///
+    /// Intrinsic shape and capability validation run before this hook. An
+    /// override adds identifier, visibility, inheritance, constructor, kind,
+    /// constraint, annotation, empty-body, and opaque-member rules owned by
+    /// the target grammar.
+    fn validate_type(&self, _type_: TypeIntent<'_>) -> Result<(), SigilStitchError> {
+        Ok(())
+    }
+
+    /// Collect target-specific type-declaration failures.
+    fn collect_type_validation_errors(
+        &self,
+        type_: TypeIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        if let Err(error) = self.validate_type(type_) {
+            errors.push(error);
+        }
+    }
+
+    /// Lower one fully validated type declaration into structured output.
+    ///
+    /// Permissive pre-0.6.8 adapters retain frozen compatibility lowering.
+    /// Strict adapters must override this complete seam. Every implementation
+    /// must return one or more non-empty blocks;
+    /// [`TypeSpec::emit()`](crate::spec::type_spec::TypeSpec::emit) rejects empty
+    /// output.
+    fn lower_type(&self, type_: ValidatedType<'_>) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        if self.capabilities().type_validation_is_permissive() {
+            type_lowering::lower_compatibility(self, type_)
+        } else {
+            Err(SigilStitchError::MissingTypeLowerer {
+                language: self.file_extension().to_string(),
+                kind: type_.kind(),
+                type_name: type_.name().to_string(),
+            })
+        }
     }
 
     /// Semantic capability represented by the legacy `is_abstract` modifier.
@@ -415,6 +449,7 @@ pub trait CodeLang: RendererLang {
     /// The compatibility default preserves pre-capability adapters. Strict
     /// built-in adapters override this for the type kinds their grammar can
     /// represent as explicitly abstract declarations.
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::validate_type instead")]
     fn abstract_type_modifier_is_valid(&self, _kind: TypeKind) -> bool {
         self.capabilities().function_validation_is_permissive()
     }
@@ -736,6 +771,7 @@ pub trait CodeLang: RendererLang {
     /// The keyword for a type declaration (e.g., "struct", "class").
     ///
     /// Default: `""`.
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn type_keyword(&self, _kind: crate::spec::modifiers::TypeKind) -> &str {
         ""
     }
@@ -744,6 +780,7 @@ pub trait CodeLang: RendererLang {
     /// vs in a separate impl block (Rust struct/enum).
     ///
     /// Default: `true`.
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn methods_inside_type_body(&self, _kind: crate::spec::modifiers::TypeKind) -> bool {
         true
     }
@@ -763,6 +800,7 @@ pub trait CodeLang: RendererLang {
     /// Optional kind suffix after the type name (e.g., Go's `type Foo struct`).
     ///
     /// Default: empty (TS/Rust put the kind keyword before the name).
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn type_kind_suffix(&self, _kind: crate::spec::modifiers::TypeKind) -> &str {
         ""
     }
@@ -770,6 +808,7 @@ pub trait CodeLang: RendererLang {
     /// Emit a newtype declaration while preserving semantic type references.
     ///
     /// Default: Rust tuple-struct `{visibility}struct {name}<T>({inner});`.
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn emit_newtype_decl(
         &self,
         visibility: &str,
@@ -796,6 +835,7 @@ pub trait CodeLang: RendererLang {
     /// Opening block delimiter for type headers, parameterized by type kind.
     ///
     /// Default: `" {"`.
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn type_header_block_open(&self, _kind: crate::spec::modifiers::TypeKind) -> &str {
         " {"
     }
@@ -862,6 +902,7 @@ pub trait CodeLang: RendererLang {
     /// Content emitted after `block_open` but before the first field in a type body.
     ///
     /// Default: `""`.
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn type_body_prefix(&self, _name: &str, _kind: crate::spec::modifiers::TypeKind) -> String {
         String::new()
     }
@@ -869,6 +910,7 @@ pub trait CodeLang: RendererLang {
     /// Content emitted after the last field but before `block_close` in a type body.
     ///
     /// Default: `""`.
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn type_body_suffix(&self, _name: &str, _kind: crate::spec::modifiers::TypeKind) -> String {
         String::new()
     }
@@ -876,6 +918,7 @@ pub trait CodeLang: RendererLang {
     /// Emit a suffix after the type's closing delimiter (e.g., Haskell `deriving`).
     ///
     /// Default: no suffix.
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn emit_type_close_suffix(
         &self,
         _kind: TypeKind,
