@@ -1,19 +1,23 @@
 # TypeName
 
+This chapter includes the accepted 0.7 type-name-lowering design, which is
+documented before its implementation.
+
 `TypeName` is the type reference enum at the heart of sigil-stitch's import tracking. When you use a `TypeName` with the `%T` format specifier in a `CodeBlock`, the library renders the type name in the output *and* records the import. At render time, `FileSpec` collects all recorded imports, deduplicates them, resolves naming conflicts, and emits the import header automatically.
 
 `TypeName` carries semantic type structure and has no language generic
-parameter. A target's `RendererLang` presentation decides how each supported
-variant is spelled at `FileSpec::render()` time. `Primitive`, `Qualified`, and
-especially `Raw` values may still contain target-specific names or syntax.
+parameter. At `FileSpec::render()` time, the selected `RendererLang` lowers one
+complete type name into structured target-language output or rejects it.
+`Primitive`, `Qualified`, and especially `Raw` values may still contain
+target-specific names or syntax.
 
 Public type rendering is always language-aware. For normal generation, place a
-`TypeName` in a `CodeBlock` `%T` slot and let `FileSpec` collect imports, resolve
-aliases, and choose the target syntax. `TypeName::to_doc_with_lang()` is for
-custom final renderers that already have a target language and an alias
-resolver. Language-neutral `TypeName::render()` and `TypeName::to_doc()`
-shortcuts are not exposed because they encourage type references to be
-flattened before import resolution.
+`TypeName` in a `CodeBlock` `%T` slot. `FileSpec` first applies the selected
+adapter's source-tree rewrite, then lowers every type name, collects imports
+from the lowered blocks, resolves aliases, and renders the target syntax with no
+further rewrite or type lowering. Language-neutral rendering shortcuts are not
+exposed because they would flatten type references before representability
+checks and import resolution.
 
 ## Import tracking
 
@@ -32,7 +36,11 @@ let user = TypeName::importable_type("./models", "User");
 # }
 ```
 
-When these types appear in a `CodeBlock` via `%T`, the import is tracked automatically. At file render time, all imports are collected, deduplicated, and emitted. If two modules export the same name, the first keeps the simple name and the second gets an auto-generated alias.
+When these types appear in a `CodeBlock` via `%T`, the import is tracked
+automatically. At file render time, all imports are collected, deduplicated,
+and emitted. Imports requesting the same local name form a peer conflict set.
+The default resolver uses encounter order only as a deterministic compatibility
+tie-break; a custom fallible resolver can assign a different complete set.
 
 You can also set an explicit alias:
 
@@ -80,11 +88,11 @@ let map = TypeName::qualified("java.util", "HashMap");
 # }
 ```
 
-The separator between module and name comes from
-`RendererLang::module_separator()` — `"::"` for Rust/C++, `"."` for
-Go/Python/Java/Kotlin/Scala/Swift/Dart/Haskell/OCaml. Languages without
-module-qualified paths (TypeScript, JavaScript, C, Bash, Zsh) silently fall
-back to rendering just the name.
+The selected language lowerer owns the separator between module and name:
+`"::"` for targets such as Rust and C++, and `"."` for targets such as Go,
+Python, Java, Kotlin, Scala, Swift, Dart, Haskell, and OCaml. A language that
+cannot preserve a qualified reference rejects it instead of silently dropping
+the module.
 
 Qualified types work anywhere a `TypeName` is accepted, including inside generics:
 
@@ -123,7 +131,7 @@ let val = TypeName::importable("serde_json", "Value").qualify();
 # use sigil_stitch::prelude::*;
 # fn main() {
 // TypeScript: string[]
-// Rust:       Vec<String>  (via type_presentation().array)
+// Rust:       Vec<String>
 // Go:         []string
 let arr = TypeName::array(TypeName::primitive("string"));
 
@@ -139,7 +147,7 @@ let ro = TypeName::readonly_array(TypeName::primitive("number"));
 # use sigil_stitch::prelude::*;
 # fn main() {
 // Go:         map[string]User
-// TypeScript: Record<string, User>  (via type_presentation().map)
+// TypeScript: Record<string, User>
 let m = TypeName::map(
     TypeName::primitive("string"),
     TypeName::importable("./models", "User"),
@@ -229,7 +237,9 @@ let i = TypeName::intersection(vec![
 # }
 ```
 
-These are primarily useful for TypeScript. Other languages render them using their closest equivalent (e.g., Python uses `X | Y` for unions).
+These are primarily useful for languages with union or intersection type
+syntax. Each adapter must preserve the requested meaning exactly or reject the
+complete type; it cannot substitute a merely similar construct.
 
 ## Optional types
 
@@ -246,7 +256,8 @@ let opt = TypeName::optional(TypeName::primitive("string"));
 # }
 ```
 
-The rendering adapts per language through the `optional` field in `lang.type_presentation()`.
+The selected language lowerer owns the complete optional-type grammar and
+rejects the variant when the target has no exact representation.
 
 ## Pointer and reference types
 
@@ -290,7 +301,40 @@ let f = TypeName::function(
 # }
 ```
 
-Function type rendering varies significantly across languages. The `function` field in `lang.type_presentation()` returns a `FunctionPresentation` struct that controls keyword, delimiters, arrow syntax, parameter order, and optional outer wrappers.
+Function type grammar varies significantly across languages. The selected
+adapter owns the complete construct, including parameter order, delimiters,
+arrows or keywords, wrapping, and any target-derived imports.
+
+## String literal types
+
+The 0.7 type-name design adds one focused singleton type:
+
+```text
+TypeName::StringLiteral("active".to_owned())
+```
+
+The stored string is the decoded semantic value, not source text with quotes
+or escapes. TypeScript lowers it to a string literal type, Python lowers it
+through structured `typing.Literal`, and targets without an exact string
+singleton type reject it.
+
+Python lowers one singleton as `typing.Literal["active"]`. A non-empty direct
+union containing only string singletons becomes one `typing.Literal[...]` in
+the original order, including duplicate members. A mixed union or a union
+nested inside another type lowers recursively through ordinary Python union
+grammar; this special case does not flatten nested unions.
+
+Several accepted values use ordinary union composition:
+
+```text
+TypeName::Union([
+    TypeName::StringLiteral("active".to_owned()),
+    TypeName::StringLiteral("inactive".to_owned()),
+])
+```
+
+There is no separate string-enum or literal-set type. Numeric literal types
+are not part of this extension.
 
 ## Raw escape hatch
 
@@ -306,9 +350,13 @@ let t = TypeName::raw("keyof User");
 
 `Raw` emits the string verbatim with no import tracking. Use it sparingly -- prefer the structured variants when possible.
 
-## Cross-language rendering
+## Language-owned lowering across targets
 
-The same `TypeName` variant renders differently per language. This is powered by the `TypePresentation` system -- each language returns a rendering pattern (prefix, postfix, surround, delimited, generic-wrap, or infix) for each type construct, and the rendering engine in `type_name_render.rs` interprets the pattern into formatted output. Language implementations never build `BoxDoc` directly.
+The same `TypeName` variant lowers differently per language. Each adapter
+constructs a non-empty `CodeBlock` for the complete accepted type expression;
+the core validates that block, collects its imports, resolves aliases, and then
+uses the ordinary direct or pretty renderer. Type blocks are produced after
+source rewrite and are not rewritten a second time.
 
 | TypeName | TypeScript | Rust | Go | C++ |
 |----------|-----------|------|-----|-----|
@@ -320,7 +368,8 @@ The same `TypeName` variant renders differently per language. This is powered by
 | `map(K, V)` | `Record<K, V>` | `HashMap<K, V>` | `map[K]V` | `std::map<K, V>` |
 | `function(A) -> R` | `(A) => R` | `fn(A) -> R` | `func(A) R` | `std::function<R(A)>` |
 
-See [Type Presentation](type_presentation.md) for the full technical details of how this rendering system works.
+See [TypeName Validation and Lowering](type_name_lowering.md) for ownership,
+output validation, compatibility, and import behavior.
 
 ## Inspection methods
 

@@ -1,5 +1,12 @@
 # Adding a Language
 
+This guide follows the accepted 0.7 target interface. Complete type-name
+lowering, fallible import resolution, and direct renderer-event methods are
+documented before their implementation. Until those stages land, the source
+still exposes the compatibility-backed methods described in the legacy
+appendix. Target-state signatures in this chapter are pseudocode contracts, not
+an assertion that each method is already available on `main`.
+
 sigil-stitch supports new languages by implementing two traits: `RendererLang` (renderer-only methods) and `CodeLang` (spec-layer methods). `CodeLang` extends `RendererLang`, so implementing `CodeLang` requires both. If you only need `CodeBlock`-level rendering without specs, `RendererLang` alone is sufficient.
 
 `RendererLang` covers rendering essentials. `CodeLang` adds declaration
@@ -31,7 +38,7 @@ can't handle (e.g., shell flags, Go channel operators), you may also need to add
 
 ## The RendererLang Trait
 
-These methods are used by the renderer (`code_renderer.rs`) and type rendering:
+These methods are used by the renderer (`code_renderer.rs`) and type lowering:
 
 ### Required Methods
 
@@ -49,24 +56,49 @@ Only two methods have no default:
 | `reserved_words()` | Empty | Words that need escaping |
 | `render_string_literal()` | C-style double quotes | Language-specific string quoting |
 | `render_verbatim_string()` | Delegates to `render_string_literal()` | Minimal escaping for interpolated strings |
-| `block_syntax()` | Brace-delimited blocks | Delimiters, indentation, and terminators |
-| `block_open_for_intent()` | Delegates to legacy `block_open_for()` | Map a `BlockIntent` role to an opener |
-| `block_close_for_intent()` | Delegates to legacy `block_close_for()` | Map a `BlockIntent` role to a closer |
-| `type_presentation()` | TypeScript-like forms | Compound type rendering |
-| `generic_syntax()` | Angle brackets | Generic application and constraints |
+| `indent_unit()` | Delegates to legacy `block_syntax()` | Exact indentation bytes |
+| `render_statement_end()` | Delegates to legacy `block_syntax()` | Complete statement-end suffix |
+| `render_block_open()` | Delegates to legacy block hooks | Complete opener suffix for one `BlockIntent` |
+| `render_block_close()` | Delegates to legacy block hooks | Complete final closer |
+| `render_branch_transition()` | Delegates to legacy block hooks | Outgoing closer plus connector whitespace |
+| `lower_type_name()` | Frozen pre-0.6.8 compatibility lowering | Validate and lower one complete type expression |
 
 Override `render_verbatim_string()` if your language has string interpolation (e.g., Bash `"$x"`, TypeScript `` `${x}` ``, Python `f"{x}"`).
 
-For keyword-delimited languages, implement `block_open_for_intent()` and
-`block_close_for_intent()` as a local `match` over `BlockIntent`. The legacy
-string-based `block_open_for()` / `block_close_for()` methods remain supported
-only for old serialized nodes and external adapters.
+Implement all four renderer-event methods as local target-language behavior.
+For keyword-delimited languages, match on `BlockIntent`; for brace languages,
+several arms may deliberately return the same bytes. The legacy
+`block_syntax()`, `block_open_for()`, `block_close_for()`, and intent-aware
+bridge hooks remain supported only for old nodes and external adapters. A new
+adapter does not assemble current renderer behavior from that shared config.
 
-`rewrite_nodes()` is available for renderer corrections that require a
-tree-level view after macro expansion. Prefer intent-keyed structural rewrites
-for blocks. Declaration grammar belongs to language-local lowering; the
-existing declaration syntax structs are a compatibility path, not the place to
-add another ordering or placement concept.
+`rewrite_nodes()` is the language-local source-tree correction seam for cases
+that require a tree-level view after macro expansion or declaration lowering.
+The core calls it exactly once for each source `CodeBlock`, then validates the
+rewritten tree, lowers every `TypeRef`, collects imports, resolves aliases, and
+renders without rewriting again. The hook sees semantic, unaliased type
+references and must not depend on resolved imports or rendered type text.
+
+Use the existing recursive walker when a rule must visit `Nested` or `Sequence`
+children; the core does not call the hook separately for them. The hook does
+not run for type-name-lowering results, raw content, raw import metadata, or a
+public `FileSpec::validate()` call. Semantic rejection belongs in the
+applicable validation or lowering hook; structural errors left by rewrite fail
+during the core's post-rewrite validation.
+
+Prefer intent-keyed structural rewrites for blocks. Declaration grammar belongs
+to language-local declaration lowering, and type grammar belongs to
+`lower_type_name()`. Do not add rewrite context, capability, configuration, or
+per-syntax hooks. The existing declaration syntax structs are a compatibility
+path, not the place to add another ordering or placement concept.
+
+Every new adapter must override `lower_type_name()`. Its provided default
+exists only so a pre-0.6.8 external adapter can continue to compile while it
+uses the frozen presentation configuration. A new implementation matches the
+complete `TypeName`, returns a non-empty structured `CodeBlock` for every
+accepted form, and returns `SigilStitchError` for unsupported forms. See
+[TypeName Validation and Lowering](type_name_lowering.md) for the output
+contract.
 
 ## The CodeLang Trait
 
@@ -230,59 +262,35 @@ Legacy type hooks such as `type_keyword()`,
 the permissive compatibility lowerer. A new adapter does not implement them.
 See the [legacy surface matrix](legacy_compatibility_and_migration.md#legacy-surface-matrix).
 
-### Renderer Configuration
+### Renderer Events
 
-`block_syntax()`, `generic_syntax()`, and `type_presentation()` are lower-level
-renderer and type-presentation seams. The deprecated declaration configuration
-structs have a different role and are documented centrally in [0.6.8 Legacy
-Compatibility and Migration](legacy_compatibility_and_migration.md#frozen-declaration-configuration).
-Do not add public flags, enums, or fields to them for a new language.
+The accepted renderer requests five complete language-owned results:
 
-#### `block_syntax()`
+```text
+indent_unit() -> borrowed indentation bytes
+render_statement_end() -> complete statement suffix or error
+render_block_open(intent, condition) -> opener suffix or error
+render_block_close(intent, condition) -> final closer or error
+render_branch_transition(intent, condition) -> outgoing closer and connector or error
+```
 
-Returns `BlockSyntaxConfig` controlling block delimiters and formatting:
-
-| Field | Default | Purpose |
-|-------|---------|---------|
-| `block_open` | `" {"` | Opening delimiter. Python overrides to `":"`. |
-| `block_close` | `"}"` | Closing delimiter. Python overrides to `""` (indent-only). |
-| `indent_unit` | `"  "` (2 spaces) | Indentation per level. |
-| `uses_semicolons` | `true` | Statement terminator behavior. |
-| `field_terminator` | `","` | After each field. Java/C++ override to `";"`. |
-| `type_close_terminator` | (default) | Terminator after closing brace for types. |
-| `bases_close` | (default) | Closing syntax for base-class lists. |
-
-#### `generic_syntax()`
-
-Returns `GenericSyntaxConfig` controlling generic/type-parameter syntax:
-
-| Field | Default | Purpose |
-|-------|---------|---------|
-| `open` | `"<"` | Generic opening bracket. Go overrides to `"["`. |
-| `close` | `">"` | Generic closing bracket. Go overrides to `"]"`. |
-| `application_style` | (default) | How generics are applied to types. |
-| `constraint_keyword` | `": "` | Generic bounds keyword. Java/TS override to `" extends "`. |
-| `constraint_separator` | `" + "` | Between multiple bounds. Java/TS override to `" & "`. |
-| `context_bound_keyword` | (default) | Context bound syntax (e.g. Scala's `:`). |
-
-#### `type_presentation()`
-
-Returns `TypePresentationConfig` controlling how semantic types (arrays, optionals, maps, tuples, references, function types, etc.) are rendered. See the [Type Presentation](#type-presentation) section below for details.
+These methods expose operations the renderer actually performs, not a public
+grammar matrix. A language may use private local helpers, but punctuation,
+keywords, and event ordering stay in its module. The provided defaults read
+`BlockSyntaxConfig` only to preserve 0.6.8 external adapters. The shared config
+is deprecated compatibility state and receives no new fields.
 
 #### Standalone Override Methods
 
 These methods don't belong to a config struct but have sensible defaults you can override:
 
 - `escape_reserved()` -- how reserved words are escaped.
-- `qualify_import_name()` -- receives the module, original name, and resolved
-  name. The default returns the resolved name; Go prefixes its package and
-  Haskell uses a module-qualified original name when an alias was assigned,
-  paired with a `qualified` import for that symbol.
-- `module_separator()` -- returns `Option<&str>`. Default `None`. Override to `Some("::")` (Rust/C++) or `Some(".")` (Go/Python/Java/etc.) to enable `TypeName::qualified()` inline rendering.
-- `fun_block_open()` -- custom block opener for functions.
-- `emit_type_context()` -- optional structured context for split function
-  signatures.
-- `render_type_param_kind()` -- how type parameters are annotated with variance.
+- `qualify_import_reference()` -- receives the module, original name, and
+  resolved name after complete-set alias assignment. The default returns the
+  resolved name; Go prefixes its package and Haskell uses a module-qualified
+  original name when an alias was assigned, paired with a `qualified` import
+  for that symbol. The two-argument `qualify_import_name()` is the frozen
+  0.6.8 bridge.
 - `line_comment_suffix()` -- suffix for line comments (default `""`).
 
 Deprecated standalone declaration hooks such as type fragments, preamble
@@ -318,11 +326,12 @@ use sigil_stitch::lang::capability::{
     FieldCapability, FieldCapabilityProfile, FieldContext, LanguageCapabilities,
     TypeCapability, TypeCapabilityProfile,
 };
-use sigil_stitch::lang::config::{BlockSyntaxConfig, GenericSyntaxConfig};
 use sigil_stitch::lang::{
-    CodeLang, RendererLang, TypeIntent, ValidatedFields, ValidatedType,
+    BlockIntent, CodeLang, RendererLang, TypeIntent, ValidatedFields,
+    ValidatedType,
 };
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use sigil_stitch::type_name::TypeName;
 
 #[derive(Debug, Clone, Default)]
 pub struct YourLang;
@@ -368,21 +377,41 @@ impl RendererLang for YourLang {
         format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
     }
 
-    fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
-        BlockSyntaxConfig {
-            uses_semicolons: true,
-            indent_unit: "    ",
-            field_terminator: ";",
-            ..Default::default()
-        }
+    fn indent_unit(&self) -> &str { "    " }
+
+    fn render_statement_end(&self) -> Result<&str, SigilStitchError> {
+        Ok(";")
     }
 
-    fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
-        GenericSyntaxConfig {
-            constraint_keyword: " extends ",
-            constraint_separator: " & ",
-            ..Default::default()
-        }
+    fn render_block_open(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        Ok(" {")
+    }
+
+    fn render_block_close(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        Ok("}")
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, SigilStitchError> {
+        Ok("} ".to_owned())
+    }
+
+    fn lower_type_name(
+        &self,
+        type_name: &TypeName,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        lower_your_lang_type_name(type_name)
     }
 }
 
@@ -519,8 +548,10 @@ impl CodeLang for YourLang {
 }
 ```
 
-The runnable `CodeLang` rustdoc example compiles as part of `cargo test --doc`.
-Use it as the contract reference when adding or changing structured hooks.
+This target-state walkthrough is intentionally ignored by rustdoc until the
+staged interfaces land. The runnable `CodeLang` rustdoc example in the crate
+compiles as part of `cargo test --doc`; use that current example as the
+executable contract while migrating.
 
 ### 2. Register the module
 
@@ -591,9 +622,10 @@ empty block likewise fails with `EmptyTypeLowering`. Follow the [external-adapte
 migration sequence](legacy_compatibility_and_migration.md#external-adapter-migration)
 when migrating an existing adapter family by family.
 
-`generic_syntax()` may still describe reusable type-expression presentation,
-such as bracket delimiters. Declaration placement—where type parameters,
-bounds, bases, constructors, and members appear—belongs in `lower_type()`.
+`lower_type_name()` owns generic application and every other type-expression
+form. Declaration placement—where declared type parameters, bounds, bases,
+constructors, and members appear—belongs in the relevant complete declaration
+lowerer.
 
 ## Reference Implementations
 
@@ -612,66 +644,35 @@ Study these existing implementations for patterns similar to your target:
 | Haskell | `src/lang/haskell.rs` | Split signature style, `where`/indentation blocks, postfix generics, `deriving` |
 | OCaml | `src/lang/ocaml.rs` | Postfix generics, `let` keyword, `= `/indentation blocks, `open Module` imports, `module_block` helper |
 
-## Type Presentation
+## Type-Name Lowering
 
-When your language uses type expressions (generics, arrays, optionals, maps, etc.), you configure how each semantic type concept renders by returning a `TypePresentationConfig` from the `type_presentation()` accessor. You never build `BoxDoc` directly.
+Implement one pure, fallible `lower_type_name()` match for the complete
+`TypeName`. The adapter owns representability, precedence, punctuation,
+wrapping, string escaping, qualified-name spelling, and target-derived imports.
+It may use private local helpers, but it must not expose a public matrix of
+syntax fragments.
 
-### How it works
+The returned `CodeBlock` is validation evidence. It must be non-empty and may
+contain only type-expression structure. Nested semantic types must be lowered
+recursively. Leave only terminal import-aware `TypeRef` values for the core to
+resolve later; never leave an unresolved array, optional, union, function, or
+other compound `TypeName` in the result. Statement boundaries, block-control
+nodes, and declaration fragments are invalid in this block.
 
-Each `TypeName` variant (Array, Optional, Map, etc.) uses your language's `TypePresentationConfig` to determine the syntactic pattern via `TypePresentation` — a small enum:
+Use `%T` for terminal imported symbols introduced by lowering. For example,
+Python's `StringLiteral` branch composes an importable `typing.Literal` leaf
+with a structured string-literal node. Import collection then sees the same
+symbol that final rendering uses. Do not return a parallel import list.
 
-- `GenericWrap { name }` — `name<P1, P2>` using your `generic_syntax().open`/`generic_syntax().close`
-- `Prefix { prefix }` — `prefix inner` (e.g., Go `[]T`, Rust `*const T`)
-- `Postfix { suffix }` — `inner suffix` (e.g., TypeScript `T[]`, Kotlin `T?`)
-- `Surround { prefix, suffix }` — `prefix inner suffix` (e.g., C++ `const T&`, C `const T*`)
-- `Delimited { open, sep, close }` — `open P1 sep P2 close` (e.g., Swift `[K: V]`, Go `map[K]V`)
-- `Infix { sep }` — `P1 sep P2` (e.g., TypeScript `A | B`, Rust `A + B`)
+Return an error when the target cannot preserve a variant exactly. Identity
+lowering and "closest equivalent" substitutions are valid only when they are
+semantically exact for that target. In particular, a language without string
+singleton types rejects `TypeName::StringLiteral` instead of widening it to a
+string primitive.
 
-### Configuring type presentation
-
-All fields in `TypePresentationConfig` have defaults matching TypeScript conventions. Override only when your language differs:
-
-```rust,ignore
-impl RendererLang for YourLang {
-    fn type_presentation(&self) -> TypePresentationConfig<'_> {
-        TypePresentationConfig {
-            // Array: default is Postfix { suffix: "[]" } (TS: T[])
-            // Override for Rust-style Vec<T>:
-            array: TypePresentation::GenericWrap { name: "Vec" },
-
-            // Optional: default is Infix { sep: " | " } with "null" literal
-            // Override for Kotlin-style T?:
-            optional: TypePresentation::Postfix { suffix: "?" },
-
-            // Map: default is GenericWrap { name: "Map" }
-            // Override for Go-style map[K]V:
-            map: TypePresentation::Delimited { open: "map[", sep: "]", close: "" },
-
-            // Tuple: default is Delimited { open: "(", sep: ", ", close: ")" }
-            // TS overrides to "[", "]" for [A, B] syntax. This shows Go-style (A, B):
-            tuple: TypePresentation::Delimited { open: "(", sep: ", ", close: ")" },
-
-            // Reference: default is Prefix { prefix: "" } (identity — for GC languages)
-            // Override for Rust-style &T:
-            reference: TypePresentation::Prefix { prefix: "&" },
-
-            // Function types: default is TypeScript (A, B) => R
-            function: FunctionPresentation {
-                keyword: "fn",
-                params_open: "(",
-                params_sep: ", ",
-                params_close: ")",
-                arrow: " -> ",
-                return_first: false,
-                curried: false,
-                wrapper_open: "",
-                wrapper_close: "",
-            },
-
-            ..Default::default()
-        }
-    }
-}
-```
-
-See [Type Presentation](type_presentation.md) for the full enum definition, all available fields, and examples for every supported language.
+After source rewrite, the core recursively invokes the hook for `TypeRef` nodes
+in direct, nested, and sequenced blocks before import collection, validates each
+returned block, and aborts the complete file on any failure. Direct and pretty
+rendering then consume the same fully lowered tree. The complete contract and
+compatibility rules are in [TypeName Validation and
+Lowering](type_name_lowering.md).

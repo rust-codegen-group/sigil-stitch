@@ -51,14 +51,60 @@ sequences use complete language-owned lowering for every built-in adapter.
 `TypeSpec` validates one complete declaration, constructs `ValidatedType` with
 validated children, and delegates once to `CodeLang::lower_type()`.
 
+Type expressions are the next accepted 0.7 migration. Its target state gives
+every built-in adapter complete fallible `RendererLang::lower_type_name()`
+ownership before import collection. The provided default will remain only as
+the frozen type-presentation bridge for external adapters written against
+0.6.8.
+
+That same pipeline stage introduces complete-set fallible import resolution.
+Declaration-generic grammar then moves out of `GenericSyntaxConfig`, direct
+renderer events move out of `BlockSyntaxConfig`, and quote handling becomes
+language-local in their own independently green stages. The accepted end state
+is documented now; the source-read inventory below names each temporary reader
+and its removal stage.
+
 The provided external-adapter lowerers remain private implementation details.
 They freeze 0.6.8 behavior; they are not examples for new adapters.
+
+## Current Configuration-Read Inventory
+
+This Stage 1 inventory distinguishes current source reads from the accepted
+target state. A built-in method that returns a legacy config is a provider, not
+by itself evidence that the current built-in path consumes that config. Later
+stages update this inventory as each reader moves behind a frozen compatibility
+boundary.
+
+| Shared surface | Current production readers | Classification | Removal stage and retained boundary |
+|----------------|----------------------------|----------------|-------------------------------------|
+| `TypePresentationConfig`, `TypePresentation`, `FunctionPresentation`, `AssociatedTypeStyle`, `BoundsPresentation`, `WildcardPresentation`; `RendererLang::type_presentation()` | `src/type_name_render.rs` reads the complete matrix for every compound type | Language-owned type grammar currently interpreted by a shared engine | Stage 3 moves all built-ins to complete local `lower_type_name()` implementations; only the frozen 0.6.8 default and direct compatibility facade retain the matrix |
+| `RendererLang::module_separator()` | `src/type_name_render.rs` reads it for qualified type names | Language-owned type grammar | Stage 3 moves qualified-name spelling into local type-name lowering; the old accessor remains only in the frozen type bridge |
+| `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in type rendering | `src/type_name_render.rs` reads generic-application delimiters and placement | Language-owned type grammar | Stage 3 removes this read from the current TypeName path |
+| `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in declarations | `src/spec/where_spec.rs` reads declaration parameter and bound grammar; `src/lang/type_lowering/compatibility.rs` reads it for legacy types | Language-owned declaration grammar in `where_spec`; compatibility-only grammar in the legacy lowerer | Stage 4 moves built-in declaration grammar into complete local lowerers; the compatibility module retains the frozen read |
+| `BlockSyntaxConfig::indent_unit` | `src/code_renderer.rs`, `src/spec/where_spec.rs`, and `src/lang/csharp_function_lowering.rs` | Renderer mechanics when indenting; language-owned declaration layout where a lowerer emits literal indentation | Stage 5 routes renderer mechanics through `indent_unit()` and removes built-in declaration reads; compatibility lowerers retain their bridge reads |
+| `BlockSyntaxConfig::{uses_semicolons, block_open, block_close, close_on_transition}` | `src/code_renderer.rs` and `src/lang/typescript_function_lowering.rs`; the field, function, property, and type compatibility modules also read them | Language-owned renderer-event or declaration grammar in current built-in paths; compatibility-only grammar in compatibility modules | Stage 5 moves the current renderer to complete event methods and removes built-in reads; frozen compatibility modules continue to interpret old adapters |
+| `BlockSyntaxConfig::{field_terminator, type_close_terminator, bases_close}` | Only `src/lang/field_lowering/compatibility.rs` and `src/lang/type_lowering/compatibility.rs` consume these fields in production | Compatibility-only declaration grammar | No current replacement config; complete declaration lowerers own these bytes locally and the old fields remain frozen |
+| `FunctionSyntaxConfig`, `OptionalFieldStyle`, `PropertyStyle`, and `property_getter_keyword()` | The function, field, property, and type compatibility modules consume the applicable surfaces | Compatibility-only declaration grammar | Already outside built-in complete lowerers; retain only for the 0.6.8 bridge and deprecate in Stage 2 |
+| `TypeDeclSyntaxConfig` | The function, field, property, and type compatibility modules read it; deprecated `ParameterSpec::emit_into()` also reads it for the direct 0.6.8 parameter facade | Compatibility-only declaration grammar | Complete built-in lowerers already own these bytes; retain the reads only in frozen compatibility modules and the deprecated direct facade |
+| `EnumAndAnnotationConfig` and `VariantValueFormat` | The function, field, property, type, and variant compatibility modules read them; `AnnotationSpec::emit_with()` and deprecated `ParameterSpec::emit_into()` retain direct 0.6.8 facade behavior; permissive variant dispatch reads `variants_before_fields` through the variant compatibility module | Compatibility-only annotation, parameter, and variant grammar | Complete built-in lowerers use `emit_with_syntax()` and target-local variant grammar; retain shared reads only at the named compatibility boundaries |
+| Shared `QuoteStyle`, the three public `quote_style` fields, and `with_quote_style()` | TypeScript, JavaScript, and Python currently read the enum while rendering strings; TypeScript and JavaScript also read it for local annotation text | Compatibility-held user preference whose concrete grammar belongs to each language | Stage 6 duplicates normalization and escaping locally, adds language-specific conveniences, and leaves the old enum, field, and setter as deprecated shims |
+
+Built-in unit tests that directly inspect config-return values are temporary
+migration expectations, not additional production readers.
+`tests/renderer_parity_tests.rs` also reads legacy indentation until Stage 5;
+the field/property custom-adapter tests exercise compatibility defaults; and
+`tests/assert_quote_tests.rs` plus the three language unit suites protect the
+quote shim until Stage 6. Definitions and overrides under `src/lang/*.rs`
+remain until the corresponding compatibility surface can be removed in a
+future major version.
 
 ## Legacy Surface Matrix
 
 | Family | Legacy surface | Compatibility behavior | Current replacement |
 |--------|----------------|------------------------|---------------------|
 | Capabilities | No `capabilities()` override | External adapters receive `LanguageCapabilities::permissive()` | Return a strict matrix with exact family profiles |
+| Type expressions | `type_presentation()`, `TypePresentationConfig`, `TypePresentation`, `FunctionPresentation`, `generic_syntax()`, `GenericSyntaxConfig`, qualified-name presentation accessors, and `TypeName::to_doc_with_lang()` | The provided `lower_type_name()` reproduces 0.6.8 output for old `TypeName` variants and rejects `StringLiteral` or any later variant; the direct document method remains only as a deprecated terminal facade | Implement complete fallible `RendererLang::lower_type_name()` and keep imports in the returned `CodeBlock` |
+| `TypeName` matching and documented JSON values | Exhaustive matches over the pre-0.6.8 variants; concrete `TypeName` JSON values documented before 0.7 | Supported Rust constructors remain; Stage 2 fixtures the documented JSON values. Generic Serde support does not promise compatibility for other representations, binary encodings, enum ordinals, field order, or serializer bytes | Add a wildcard arm to downstream matches; do not reinterpret unknown data or rely on an undocumented wire format |
 | Functions | `function_syntax()`, `FunctionSyntaxConfig`, `ParamListStyle`, `FunctionSignatureStyle`, `ConstructorDelegationStyle`, `WhereClauseStyle` | The provided `lower_function()` interprets them for external adapters | `validate_function()` and complete `lower_function()` |
 | Types | `type_keyword()`, `methods_inside_type_body()`, `type_kind_suffix()`, `emit_newtype_decl()`, `type_header_block_open()`, `type_body_prefix()` / `type_body_suffix()`, `emit_type_close_suffix()`, `abstract_type_modifier_is_valid()`, `type_decl_syntax()`, and type-emitter reads of `function_syntax()` / `enum_and_annotation()` | The provided `lower_type()` interprets them only for permissive external adapters | `validate_type()` and complete `lower_type()` |
 | Type parameters | `ParameterSpec::emit_into()` | Frozen compatibility code and direct compatibility tests may retain it | Read semantic parameter accessors inside complete function or type lowering |
@@ -67,19 +113,37 @@ They freeze 0.6.8 behavior; they are not examples for new adapters.
 | Properties | `property_style()`, `property_getter_keyword()`, `PropertyStyle` | The provided `lower_property()` freezes the old property emitter | `PropertyContext`, property capabilities, and complete `lower_property()` |
 | Variants | `VariantContext`, `.value()`, `VariantValueFormat`, `variants_before_fields` | Only permissive external adapters retain ownerless positional lowering; strict built-ins require an owner and complete sequence | Add variants to `TypeSpec`; use `.discriminant()` or `.constructor_argument()` |
 | Variant payload builders | `.associated_type()`, `.add_field()` | Deprecated aliases remain available | `.positional_payload()`, `.record_payload_field()` |
-| Block nodes | `block_open_for()`, `block_close_for()`, legacy serialized block nodes | Old nodes and external adapters remain renderable | `BlockIntent`, `block_open_for_intent()`, `block_close_for_intent()` |
+| Renderer events and block nodes | `block_syntax()`, `BlockSyntaxConfig`, `block_open_for()`, `block_close_for()`, intent-aware bridge hooks, and legacy serialized block nodes | Provided event defaults interpret old config and hooks; old nodes and external adapters remain renderable | `BlockIntent`, `indent_unit()`, `render_statement_end()`, `render_block_open()`, `render_block_close()`, and `render_branch_transition()` |
 
 Direct `FieldSpec::emit()` and `PropertySpec::emit()` remain public facades. Their
 `DeclarationContext` input is retained only as a compatibility payload. Prefer
 adding members to `TypeSpec` whenever the owning `TypeKind` or other members can
 affect validity.
 
-## Frozen Declaration Configuration
+## Frozen Grammar Configuration
 
-The legacy structs mix renderer policy with declaration grammar. Only the
-declaration-grammar portion is deprecated. `block_syntax()`, `generic_syntax()`,
-and `type_presentation()` remain lower-level rendering seams with separate
-invariants.
+The legacy structs mix renderer mechanics with type-expression and declaration
+grammar. The Stage 1 source still reads `block_syntax()`, `generic_syntax()`,
+and `type_presentation()` on current paths listed above. The accepted target
+deprecates all three shared configs: complete language-local lowerers own type
+and declaration grammar, while direct renderer-event methods plus
+`indent_unit()` replace final-renderer reads. Frozen compatibility lowerers may
+continue interpreting the old values; none of these structs receives new
+fields or variants.
+
+### `TypePresentationConfig` and `GenericSyntaxConfig`
+
+These values describe the pre-0.6.8 shared type-expression grammar: generic
+delimiters, prefix and postfix wrappers, delimiters, infix separators,
+qualified-name separators, and function-type placement. The provided
+`RendererLang::lower_type_name()` default continues to interpret them for all
+old `TypeName` variants so an existing external adapter remains source
+compatible.
+
+This bridge is intentionally closed. It rejects `TypeName::StringLiteral` and
+every later semantic variant, even if one of the old presentation patterns
+could produce plausible text. New and built-in adapters implement complete
+fallible type-name lowering instead of extending the configuration.
 
 ### `FunctionSyntaxConfig`
 
@@ -120,7 +184,32 @@ implement complete declaration lowering instead.
 | `annotation_prefix`, `annotation_suffix` | Legacy annotation spelling; complete lowerers use local structured emission |
 | `readonly_keyword`, `mutable_field_keyword` | Frozen parameter/property-promotion fragments |
 
+### Quote-style compatibility
+
+`QuoteStyle`, the public `quote_style` fields, and
+`with_quote_style(QuoteStyle)` predate 0.6.8 and remain source-compatible. They
+are deprecated shims rather than a general quote configuration shared by new
+languages. TypeScript, JavaScript, and Python each own quote normalization,
+escaping, and output locally and expose their own single-quote and double-quote
+conveniences. Both conveniences update the preserved field so there is one
+stored choice and no precedence rule.
+
 ## Builder Migration Recipes
+
+### Type names and exhaustive matches
+
+`TypeName` gains `StringLiteral(String)` in 0.7 and is marked
+`#[non_exhaustive]`. Downstream code that previously matched every variant must
+add a wildcard arm and decide whether an unknown type should be rejected or
+passed back to sigil-stitch for language-owned lowering. Do not widen an
+unknown variant to `Primitive` or `Raw`.
+
+The string-literal payload is the decoded string value. Several values compose
+as `TypeName::Union`; do not preserve hand-written quotes in `Raw` when the
+semantic singleton form is available. Stage 2 adds exact fixtures for the
+`TypeName` JSON values documented before 0.7. No other Serde representation or
+binary format receives a cross-version guarantee. Deserializing an unknown
+variant remains an error; it is never reinterpreted as another type.
 
 ### Enum variants
 
@@ -182,14 +271,16 @@ invalid C++.
 
 Migrate one declaration family at a time:
 
-1. Add a strict profile for every supported semantic context or owner kind.
-2. Add adapter-local validation for identifier rules, modifier combinations,
+1. Implement complete `lower_type_name()` handling for every accepted old
+   variant and explicit errors for unsupported forms.
+2. Add a strict profile for every supported semantic context or owner kind.
+3. Add adapter-local validation for identifier rules, modifier combinations,
    and relationships the profile cannot express.
-3. Implement the complete `lower_*` seam and preserve every accepted
+4. Implement the complete `lower_*` seam and preserve every accepted
    `TypeName` as a `%T` reference and every nested block as structured `%L`.
-4. Cover direct and owner-aware success and failure paths, import aliases, and
+5. Cover direct and owner-aware success and failure paths, import aliases, and
    both direct and pretty renderer paths where soft breaks are reachable.
-5. Remove migrated-family reads of deprecated grammar from the adapter.
+6. Remove migrated-family reads of deprecated grammar from the adapter.
 
 Keep rendered-output fixtures while migrating. A provided default is a
 compatibility bridge, not evidence that an adapter has completed the new seam.
@@ -220,6 +311,8 @@ For a migrated family, keep tests for:
 
 - an adapter implementing only the 0.6.8 trait surface;
 - valid legacy output preserved by the provided lowerer;
+- `StringLiteral` rejected by an adapter that implements only the 0.6.8 type
+  presentation surface;
 - invalid or ownerless built-in input rejected before materialization;
 - direct and `FileSpec` paths selecting the actual adapter;
 - semantic replacements for every deprecated builder alias; and

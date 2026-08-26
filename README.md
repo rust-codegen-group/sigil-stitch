@@ -152,7 +152,7 @@ The [sigil-stitch book](docs/src/SUMMARY.md) covers everything in depth:
 - [Introduction](docs/src/introduction.md) -- what it is and how the pieces fit together
 - [Getting Started](docs/src/getting_started.md) -- first CodeBlock, first FileSpec, first output
 - [Format Specifiers](docs/src/format_specifiers.md) -- deep dive on `%T`, `%N`, `%S`, `%V`, `%L`, `%W`, and friends
-- [TypeName](docs/src/type_name.md) -- type references, import tracking, cross-language rendering
+- [TypeName](docs/src/type_name.md) -- semantic type references, import tracking, and language-owned lowering
 - [Building Functions & Fields](docs/src/functions_and_fields.md) -- ParameterSpec, FieldSpec, FunSpec
 - [Building Types & Enums](docs/src/types_and_enums.md) -- TypeSpec, PropertySpec, AnnotationSpec, EnumVariantSpec
 - [Files & Projects](docs/src/files_and_projects.md) -- ImportSpec, FileSpec, ProjectSpec
@@ -162,10 +162,10 @@ The [sigil-stitch book](docs/src/SUMMARY.md) covers everything in depth:
 
 **Development Guide:**
 
-- [Architecture](docs/src/architecture.md) -- ownership, materialization, rendering, and import resolution
+- [Architecture](docs/src/architecture.md) -- ownership, source preparation, rendering, and import resolution
 - [Design](docs/src/design.md) -- accepted seams and design invariants
 - [Declaration Specs and Language Lowering](docs/src/declaration_lowering.md) -- declaration intent, capabilities, and language-owned grammar
-- [Type Presentation](docs/src/type_presentation.md) -- data-driven cross-language type rendering
+- [TypeName Validation and Lowering](docs/src/type_name_lowering.md) -- fallible language-owned type-expression lowering
 - [Adding a Language](docs/src/adding_a_language.md) -- implementing the CodeLang trait step by step
 
 ## MSRV

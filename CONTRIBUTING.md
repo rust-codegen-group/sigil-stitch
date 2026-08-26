@@ -12,18 +12,18 @@ sigil-stitch is a Rust library for type-safe, import-aware, width-aware code gen
 sigil-stitch/
 ├── src/                    # Main library crate
 │   ├── code_block.rs       # CodeBlock and format string parsing
-│   ├── code_node.rs        # CodeNode IR (tree nodes for CodeBlock)
-│   ├── code_renderer.rs    # Three-pass rendering pipeline
+│   ├── code_node.rs        # Structured source-tree nodes for CodeBlock
+│   ├── code_renderer.rs    # Prepared-tree semantic renderer
 │   ├── code_template.rs    # Named-parameter templates
-│   ├── type_name.rs        # TypeName enum and presentation data types
-│   ├── type_name_render.rs # Language-aware TypeName rendering engine
+│   ├── type_name.rs        # Semantic TypeName enum + legacy presentation data
+│   ├── type_name_render.rs # TypeName renderer retiring to the 0.6.8 bridge
 │   ├── import.rs           # Import types and conflict resolution
 │   ├── import_collector.rs # Import extraction from CodeBlock trees
 │   ├── name_allocator.rs   # Alias generation for import conflicts
 │   ├── error.rs            # Error types (snafu)
-│   ├── lang/               # CodeLang trait + 6 config struct accessors + language implementations
+│   ├── lang/               # Language traits, adapters, and compatibility seams
 │   │   ├── mod.rs          # RendererLang and CodeLang traits
-│   │   ├── config.rs       # Config structs (BlockSyntaxConfig, FunctionSyntaxConfig, etc.)
+│   │   ├── config.rs       # Shared grammar types retiring to compatibility
 │   │   ├── rewrite.rs      # Runtime node rewrite walker
 │   │   ├── typescript.rs   # One file per language: typescript, javascript,
 │   │   └── ...             # rust, go, python, java, kotlin,
@@ -82,11 +82,11 @@ CI runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo do
 - **No comments by default.** Only add a comment when the _why_ is non-obvious — a hidden constraint, a workaround, a surprising invariant. Don't explain what the code does; well-named identifiers do that.
 - **No unnecessary abstractions.** Three similar lines are better than a premature helper. Don't add features, refactoring, or error handling beyond what the task requires.
 - **Builder pattern:** Spec builders (`TypeSpec`, `FunSpec`, `FieldSpec`, `FileSpec`, etc.) take `mut self` and return `Self` for every setter -- chain them fluently: `FunSpec::builder("f").returns(t).body(b).build()`. `CodeBlockBuilder` takes `&mut self` -- use a `let mut` binding and call methods on it.
-- **Trait objects for language:** Public types no longer carry a language generic. The language enters at render time as `&dyn CodeLang`. `FileSpec` stores the language internally; `CodeBlock`, `TypeName`, and all specs are language-agnostic.
-- **`BoxDoc` never appears in `CodeLang`:** Language implementations return
-  pure presentation data or structured `CodeBlock` fragments. The rendering
-  engines in `type_name_render.rs` and `code_renderer.rs` interpret them into
-  `BoxDoc`. This is a hard invariant.
+- **Trait objects for language:** Public types no longer carry a language generic. The language enters at render time as `&dyn CodeLang`. `FileSpec` stores the language internally. `CodeBlock`, `TypeName`, and all specs have language-agnostic Rust types, but literal `CodeBlock` content is target-associated rather than automatically portable.
+- **`BoxDoc` never appears in a language hook:** Current complete declaration
+  lowerers and the accepted type-name seam return structured `CodeBlock`
+  values. `type_name_render.rs` is being retired to the frozen 0.6.8 bridge;
+  only the final renderer interprets prepared blocks into `BoxDoc` values.
 
 ## Testing
 
@@ -126,8 +126,8 @@ sigil-stitch generates source code. Malformed or malicious input to the code gen
 
 The [sigil-stitch book](docs/src/SUMMARY.md) covers the internals:
 
-- [Architecture](docs/src/architecture.md) — four layers, three-pass pipeline, import resolution
-- [Type Presentation](docs/src/type_presentation.md) — data-driven cross-language type rendering
+- [Architecture](docs/src/architecture.md) — ownership, source preparation, import resolution, and rendering
+- [TypeName Validation and Lowering](docs/src/type_name_lowering.md) — fallible language-owned type-expression lowering
 - [Language-Aware Tokenizer](docs/src/macrolang.md) — `MacroLang` enum, annotation heuristics, runtime rewrite passes
 - [Adding a Language](docs/src/adding_a_language.md) — implementing the CodeLang trait step by step
 
