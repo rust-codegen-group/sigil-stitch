@@ -168,7 +168,7 @@ impl Arg {
 /// An immutable code fragment with embedded type references.
 ///
 /// `CodeBlock` is the core composition primitive in sigil-stitch. It stores a tree
-/// of [`CodeNode`] nodes — self-contained IR nodes produced from format strings
+/// of [`CodeNode`] nodes — self-contained source nodes produced from format strings
 /// (`%T`, `%N`, `%S`, `%L`, etc.). CodeBlocks are produced by [`CodeBlockBuilder`]
 /// and consumed by [`FileSpec`](crate::spec::file_spec::FileSpec) during rendering.
 /// Type references embedded via `%T` are automatically tracked for import resolution.

@@ -29,9 +29,10 @@ declaration spec                 target-independent intent
 language-local lowering         exact grammar, spelling, and token order
   |
   v
-CodeBlock / CodeNode::TypeRef    structured target-language rendering IR
+CodeBlock / CodeNode::TypeRef    target-associated structured source
   |
-  +-- import and alias resolution
+  +-- source rewrite, then TypeName lowering
+  +-- import collection and alias resolution
   +-- layout and indentation
   |
   v

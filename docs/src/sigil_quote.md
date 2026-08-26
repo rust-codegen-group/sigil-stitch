@@ -52,16 +52,15 @@ a configured language instance:
 # extern crate sigil_stitch;
 # use sigil_stitch::{assert_rendered, prelude::*};
 # use sigil_stitch::lang::python::Python;
-# use sigil_stitch::lang::config::QuoteStyle;
 # fn main() {
 let block = sigil_quote!(Python {
     print($S("hi"))
 }).unwrap();
 
 assert_rendered!(
-    Python::new().with_quote_style(QuoteStyle::Double),
+    Python::new().with_indent("    "),
     block,
-    "print(\"hi\")\n",
+    "print('hi')\n",
 );
 # }
 ```
@@ -708,11 +707,13 @@ sigil_quote!(TypeScript {
 
 ## Context-Aware Block Delimiters
 
-By default, `{ ... }` in `sigil_quote!` uses the language's `block_syntax().block_open`.
-The parser classifies each brace header into a language-neutral `BlockIntent`; language
-adapters override `block_open_for_intent` and `block_close_for_intent` to map that
-intent to local syntax. For example, Bash maps `if` → `then`/`fi` and `for` → `do`/`done`,
-while Haskell maps `class` → `where`:
+The parser classifies each `{ ... }` header into a language-neutral
+`BlockIntent`. In the accepted 0.7 renderer, the selected adapter maps that
+intent through complete `render_block_open()`, `render_block_close()`, and
+`render_branch_transition()` operations. The current source routes the same
+intent through the frozen `block_syntax()` and block-hook bridge until the
+renderer-event migration lands. For example, Bash maps `if` to `then`/`fi` and
+`for` to `do`/`done`, while Haskell maps `class` to `where`:
 
 ```rust
 # extern crate sigil_stitch;

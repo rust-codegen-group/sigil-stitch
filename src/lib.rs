@@ -74,7 +74,7 @@
 
 /// Composable code fragments with format specifiers (`%T`, `%N`, `%S`, `%L`, etc.).
 pub mod code_block;
-/// Tree-based intermediate representation for code generation.
+/// Structured source-tree nodes used by `CodeBlock`.
 pub mod code_node;
 /// Rendering engine that walks `CodeNode` trees into final output.
 pub mod code_renderer;
@@ -98,7 +98,7 @@ pub mod lang;
 pub mod spec;
 /// Exact rendered-code assertion helpers for tests.
 pub mod testing;
-/// Type references with recursive import tracking and pretty-printing.
+/// Semantic type references with recursive import tracking.
 pub mod type_name;
 pub(crate) mod type_name_import;
 pub(crate) mod type_name_render;

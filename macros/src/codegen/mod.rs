@@ -1,4 +1,4 @@
-//! Infallible lowering from validated macro IR to generated Rust.
+//! Infallible lowering from validated macro parse forms to generated Rust.
 
 mod arguments;
 mod context;

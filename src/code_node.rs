@@ -1,6 +1,7 @@
-//! Tree-based intermediate representation for code generation.
+//! Structured source-tree nodes used by [`CodeBlock`](crate::code_block::CodeBlock).
 //!
-//! `CodeNode` is the internal IR used by [`CodeBlock`](crate::code_block::CodeBlock).
+//! `CodeNode` is the structured node model used by
+//! [`CodeBlock`](crate::code_block::CodeBlock).
 //! Each node is self-contained — type references, names, and nested blocks are
 //! stored inline rather than in a separate argument vector. This enables natural
 //! tree traversal for import collection, structural transformation, and rendering.

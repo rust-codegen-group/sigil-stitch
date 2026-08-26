@@ -7,6 +7,10 @@ Lowering](declaration_lowering.md) records their ownership boundaries. Versioned
 exceptions are catalogued in [0.6.8 Legacy Compatibility and
 Migration](legacy_compatibility_and_migration.md).
 
+Entries explicitly marked **accepted 0.7; implementation pending** describe
+the selected target contract, not APIs or pipeline stages available in the
+current source. Unmarked entries describe concepts already present.
+
 ## Declaration Intent
 
 ### Declaration spec
@@ -57,6 +61,30 @@ same adapter. `ValidatedType` exposes child declarations only through their
 validated wrappers. The adapter lowers the complete declaration and chooses
 whether it produces one block or several; every returned block must be
 non-empty.
+
+### Type name
+
+A semantic type reference. In the accepted 0.7 target, which is not yet
+implemented, it remains structured until one selected language adapter lowers
+the complete value before import collection. A `TypeName` may contain other
+type names, but it never contains a language-neutral choice of punctuation,
+precedence, or layout. `Primitive` and `Raw` are explicit target-aware leaves
+rather than a general type grammar.
+
+### Structured source block
+
+A `CodeBlock` is the shared Rust container for source nodes associated with one
+selected target. Its Rust type is language-agnostic so declaration lowerers,
+rewrite, import collection, and rendering can compose it, but its literal
+content and structure are not a portable cross-language program.
+
+### String literal type (accepted 0.7; implementation pending)
+
+A planned type inhabited by exactly one decoded string value.
+`TypeName::StringLiteral` will store the value without target quotes or escapes.
+The language adapter will either lower it exactly or reject it; several string
+literal types compose through `TypeName::Union`, not a string-enum or
+literal-set abstraction.
 
 ### Field sequence
 
@@ -150,6 +178,33 @@ Named, typed fields carried by a sum-type constructor or enum case. These are
 case-local payload fields, not ordinary members of the enclosing type.
 
 ## Transformation Boundaries
+
+### Source-tree rewrite (accepted 0.7 placement; implementation pending)
+
+The rewrite seam exists today, but its selected pipeline placement is a pending
+0.7 change: one language-local structural correction is applied exactly once
+to each source `CodeBlock` after declaration lowering and before type-name
+lowering. It is for target source fixups that require a tree-level view, such as
+joining a Go IIFE close to its invocation. It does not own declaration grammar,
+type grammar, validation, or final layout. Raw content, raw import metadata, and
+blocks returned by type-name lowering are not source-rewrite inputs.
+
+### Type-name lowering (accepted 0.7; implementation pending)
+
+The fallible conversion of one complete `TypeName` into a non-empty
+`CodeBlock` before import collection. The selected language adapter owns
+representability, precedence, punctuation, string escaping, and any
+target-derived type imports. A successful lowering block may retain only
+terminal import-aware type references; unresolved compound type names fail
+closed.
+
+### Import conflict set (accepted 0.7; implementation pending)
+
+The complete peer set of semantic imports that request the same local binding
+within one file. Exact explicit bindings are hard constraints; preferred
+aliases and natural names are soft requests. The resolver assigns every peer
+atomically and does not receive an incoming import, current owner, winner/loser
+pair, or mutable claim table.
 
 ### Lowering
 

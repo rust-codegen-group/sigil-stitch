@@ -33,13 +33,25 @@ Most of the time you do not need `ImportSpec` -- imports driven by `%T` and `Typ
 
 ## FileSpec
 
-The top-level file orchestrator. It combines code blocks and declaration specs,
-then drives the three-pass render pipeline:
+The top-level file orchestrator combines code blocks and declaration specs.
 
-1. **Materialize** -- Validate declaration specs and ask the language adapter to
-   lower them to `CodeBlock`s
-2. **Collect imports** -- Walk all blocks, extract import references from `%T` types
-3. **Render** -- Emit the import header, then the body with resolved names and pretty printing
+**Accepted 0.7 target; implementation pending.** The following is the selected
+render-preparation pipeline, not the order currently executed by `FileSpec`:
+
+1. **Lower declarations** -- Validate declaration specs and ask the language
+   adapter to lower them to source `CodeBlock`s.
+2. **Prepare blocks** -- Rewrite each source block exactly once, validate its
+   structure, lower every `%T` type, and validate the lowered type blocks.
+3. **Resolve imports** -- Collect imports only from the prepared blocks, then
+   deduplicate them and assign every peer conflict set atomically.
+4. **Render** -- Emit the import header and prepared body with no further
+   rewrite or type lowering.
+
+The current source instead collects and resolves imports immediately after
+declaration materialization. `CodeRenderer` then rewrites each block and renders
+its `TypeName` nodes. The staged migration described in [0.6.8 Legacy
+Compatibility and Migration](legacy_compatibility_and_migration.md) moves those
+transformations before import collection.
 
 ```rust
 # extern crate sigil_stitch;

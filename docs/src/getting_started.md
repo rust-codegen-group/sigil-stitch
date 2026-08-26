@@ -147,35 +147,39 @@ as fluent `with_*` builders:
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::lang::typescript::TypeScript;
-# use sigil_stitch::lang::config::QuoteStyle;
 # use sigil_stitch::prelude::*;
 # fn main() {
-// Prettier-style: double quotes, no semicolons, .tsx extension.
+// Four-space indentation, no semicolons, .tsx extension.
 let ts = TypeScript::new()
-    .with_quote_style(QuoteStyle::Double)
     .with_semicolons(false)
     .with_extension("tsx")
     .with_indent("    ");
 # }
 ```
 
-| Language     | `with_quote_style` | `with_indent` | `with_semicolons` | `with_extension` |
-| ------------ | :---: | :---: | :---: | :---: |
-| `TypeScript` | yes | yes | yes | yes |
-| `JavaScript` | yes | yes | yes | yes |
-| `Python`     | yes | yes | n/a | yes (e.g. `pyi`) |
-| `Java`   | n/a | yes | n/a | yes |
-| `Rust`   | n/a | yes | n/a | yes |
-| `Go`     | n/a | yes | n/a | yes |
-| `Kotlin`     | n/a | yes | n/a | yes (e.g. `kts`) |
-| `Swift`      | n/a | yes | n/a | yes |
-| `Dart`   | n/a | yes | n/a | yes |
-| `CSharp`     | n/a | yes | n/a | yes |
-| `Lua`        | n/a | yes | n/a | yes |
-| `C`      | n/a | yes | n/a | yes (e.g. `h`) |
-| `Cpp`    | n/a | yes | n/a | yes (e.g. `hpp`, `cxx`) |
-| `Bash`       | n/a | yes | n/a | yes (e.g. `sh`) |
-| `Zsh`        | n/a | yes | n/a | yes |
+| Language     | `with_indent` | `with_semicolons` | `with_extension` |
+| ------------ | :---: | :---: | :---: |
+| `TypeScript` | yes | yes | yes |
+| `JavaScript` | yes | yes | yes |
+| `Python`     | yes | n/a | yes (e.g. `pyi`) |
+| `Java`   | yes | n/a | yes |
+| `Rust`   | yes | n/a | yes |
+| `Go`     | yes | n/a | yes |
+| `Kotlin`     | yes | n/a | yes (e.g. `kts`) |
+| `Swift`      | yes | n/a | yes |
+| `Dart`   | yes | n/a | yes |
+| `CSharp`     | yes | n/a | yes |
+| `Lua`        | yes | n/a | yes |
+| `C`      | yes | n/a | yes (e.g. `h`) |
+| `Cpp`    | yes | n/a | yes (e.g. `hpp`, `cxx`) |
+| `Bash`       | yes | n/a | yes (e.g. `sh`) |
+| `Zsh`        | yes | n/a | yes |
+
+The shared pre-0.6.8 `QuoteStyle` enum and `with_quote_style(...)` setters are
+compatibility APIs, not the model for new language configuration. The accepted
+0.7 target gives TypeScript, JavaScript, and Python separate language-local
+single-quote and double-quote conveniences while preserving the old field for
+source compatibility. See the [legacy appendix](legacy_compatibility_and_migration.md#quote-style-compatibility).
 
 Language configuration is per-instance, not global: pass the configured language
 into the `FileSpec` / `ProjectSpec` you want rendered with those settings.
@@ -185,7 +189,7 @@ into the `FileSpec` / `ProjectSpec` you want rendered with those settings.
 Now that you've seen the basics:
 
 - [Format Specifiers](format_specifiers.md) explains every `%` specifier in depth.
-- [TypeName](type_name.md) covers type references, import tracking, and cross-language rendering.
+- [TypeName](type_name.md) covers semantic type references, import tracking, and language-owned lowering.
 - [Building Functions & Fields](functions_and_fields.md) covers ParameterSpec, FieldSpec, and FunSpec.
 - [Building Types & Enums](types_and_enums.md) covers TypeSpec, PropertySpec, AnnotationSpec, and EnumVariantSpec.
 - [Files & Projects](files_and_projects.md) covers ImportSpec, FileSpec, and ProjectSpec.
