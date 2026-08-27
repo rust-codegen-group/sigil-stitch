@@ -195,9 +195,6 @@ pub enum SigilStitchError {
         reason: String,
     },
 
-    // Keep all variants introduced after 0.6.8 below the 0.6.8 variants so
-    // extending this non-exhaustive enum does not renumber its legacy
-    // discriminants.
     /// A format argument does not match the corresponding specifier.
     #[snafu(display(
         "format string {format:?} argument {index} expects {expected} but got {actual}"

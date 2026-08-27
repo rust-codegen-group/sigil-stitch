@@ -1,0 +1,39 @@
+[
+  {
+    "Importable": {
+      "module": "./models",
+      "name": "User",
+      "is_type_only": false,
+      "alias": null,
+      "qualified": false
+    }
+  },
+  {
+    "Generic": {
+      "base": { "Primitive": "Result" },
+      "params": [
+        { "Primitive": "Value" },
+        { "Optional": { "Primitive": "Error" } }
+      ]
+    }
+  },
+  {
+    "Reference": {
+      "inner": { "Primitive": "str" },
+      "mutable": false,
+      "lifetime": "'a"
+    }
+  },
+  {
+    "Wildcard": {
+      "upper_bound": { "Primitive": "Number" },
+      "lower_bound": null
+    }
+  },
+  {
+    "Function": {
+      "params": [{ "Primitive": "Input" }],
+      "return_type": { "Primitive": "Output" }
+    }
+  }
+]

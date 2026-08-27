@@ -8,12 +8,14 @@ use crate::lang::capability::{
     FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::type_name::TypePresentation;
 
 /// JavaScript language implementation.
@@ -52,6 +54,8 @@ use crate::type_name::TypePresentation;
 #[derive(Debug, Clone)]
 pub struct JavaScript {
     /// Quote style for string literals and import paths.
+    #[deprecated(note = "legacy 0.6.8 field; quote selection is language-owned in 0.7")]
+    #[expect(deprecated, reason = "0.6.8 compatibility field")]
     pub quote_style: QuoteStyle,
     /// Indent with this string (default: "  ").
     pub indent: String,
@@ -62,6 +66,7 @@ pub struct JavaScript {
 }
 
 impl Default for JavaScript {
+    #[expect(deprecated, reason = "0.6.8 quote-style compatibility bridge")]
     fn default() -> Self {
         Self {
             quote_style: QuoteStyle::Single,
@@ -95,6 +100,8 @@ impl JavaScript {
     }
 
     /// Set the quote style used for string literals and import paths.
+    #[deprecated(note = "legacy 0.6.8 setter; use language-local quote selection in 0.7")]
+    #[expect(deprecated, reason = "0.6.8 compatibility setter")]
     pub fn with_quote_style(mut self, qs: QuoteStyle) -> Self {
         self.quote_style = qs;
         self
@@ -116,6 +123,14 @@ impl JavaScript {
     pub fn with_extension(mut self, s: &str) -> Self {
         self.extension = s.to_string();
         self
+    }
+
+    #[expect(deprecated, reason = "0.6.8 quote compatibility bridge")]
+    fn quote_char(&self) -> char {
+        match self.quote_style {
+            QuoteStyle::Single => '\'',
+            QuoteStyle::Double => '"',
+        }
     }
 }
 
@@ -144,13 +159,14 @@ impl RendererLang for JavaScript {
     }
 
     fn render_string_literal(&self, s: &str) -> String {
-        match self.quote_style {
-            QuoteStyle::Single => {
+        match self.quote_char() {
+            '\'' => {
                 format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
             }
-            QuoteStyle::Double => {
+            '"' => {
                 format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
             }
+            _ => unreachable!("quote compatibility helper returns only supported delimiters"),
         }
     }
 
@@ -165,6 +181,7 @@ impl RendererLang for JavaScript {
 
     // --- Config struct accessors ---
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
             tuple: TypePresentation::Delimited {
@@ -176,6 +193,7 @@ impl RendererLang for JavaScript {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
         GenericSyntaxConfig {
             constraint_keyword: "",
@@ -185,6 +203,7 @@ impl RendererLang for JavaScript {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             indent_unit: &self.indent,
@@ -415,7 +434,7 @@ impl CodeLang for JavaScript {
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
         let mut lines = Vec::new();
-        let quote = self.quote_style.char();
+        let quote = self.quote_char();
         let semi = if self.semicolons { ";" } else { "" };
 
         // Group entries by module path.
@@ -512,6 +531,7 @@ impl CodeLang for JavaScript {
         true
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             abstract_keyword: "",
@@ -519,6 +539,7 @@ impl CodeLang for JavaScript {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             super_type_keyword: " extends ",
@@ -526,6 +547,7 @@ impl CodeLang for JavaScript {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig {
             variant_separator: "",
@@ -535,6 +557,7 @@ impl CodeLang for JavaScript {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
 

@@ -1,5 +1,7 @@
 //! Frozen pre-0.6.8 function declaration lowering.
 
+#![allow(deprecated)]
+
 use std::borrow::Cow;
 
 use crate::code_block::{CodeBlock, CodeBlockBuilder};

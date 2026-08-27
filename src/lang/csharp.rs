@@ -146,6 +146,7 @@ impl RendererLang for CSharp {
         "//"
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
         crate::lang::config::TypePresentationConfig {
             array: crate::type_name::TypePresentation::GenericWrap { name: "List" },
@@ -158,6 +159,7 @@ impl RendererLang for CSharp {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
         crate::lang::config::GenericSyntaxConfig {
             constraint_keyword: " : ",
@@ -171,6 +173,7 @@ impl RendererLang for CSharp {
         Some(".")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
         crate::lang::config::BlockSyntaxConfig {
             indent_unit: &self.indent,
@@ -565,10 +568,12 @@ impl CodeLang for CSharp {
         true
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeSuffix("?")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " ",
@@ -579,6 +584,7 @@ impl CodeLang for CSharp {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
         crate::lang::config::TypeDeclSyntaxConfig {
             type_before_name: true,
@@ -588,6 +594,7 @@ impl CodeLang for CSharp {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
         crate::lang::config::EnumAndAnnotationConfig {
             annotation_prefix: "[",
@@ -599,6 +606,7 @@ impl CodeLang for CSharp {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
     use crate::import::ImportEntry;

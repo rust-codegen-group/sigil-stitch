@@ -6,6 +6,7 @@ use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapabilityProfile, FunctionContext, FunctionForm,
     LanguageCapabilities,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -57,7 +58,6 @@ fn bash_block_close_for_intent(intent: BlockIntent) -> Option<&'static str> {
 }
 
 /// Legacy string-only opener classification for old serialized/external nodes.
-#[allow(deprecated)]
 fn bash_block_open_for_legacy(condition: &str) -> Option<&'static str> {
     let raw = condition.trim();
     let t = raw.trim_end_matches(';').trim();
@@ -88,7 +88,6 @@ fn bash_block_open_for_legacy(condition: &str) -> Option<&'static str> {
 }
 
 /// Legacy string-only closer classification for old serialized/external nodes.
-#[allow(deprecated)]
 fn bash_block_close_for_legacy(condition: &str) -> Option<&'static str> {
     let t = condition.trim().trim_end_matches(';').trim();
     if t.starts_with("if ") || t.starts_with("elif ") || t == "else" {
@@ -218,10 +217,12 @@ impl RendererLang for Bash {
 
     // --- Config struct accessors ---
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig::default()
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
         GenericSyntaxConfig {
             constraint_keyword: "",
@@ -230,6 +231,7 @@ impl RendererLang for Bash {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             indent_unit: &self.indent,
@@ -240,12 +242,10 @@ impl RendererLang for Bash {
         }
     }
 
-    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         bash_block_open_for_legacy(condition)
     }
 
-    #[allow(deprecated)]
     fn block_close_for(&self, condition: &str) -> Option<&str> {
         bash_block_close_for_legacy(condition)
     }
@@ -337,6 +337,7 @@ impl CodeLang for Bash {
         true
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: "",
@@ -344,16 +345,19 @@ impl CodeLang for Bash {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig::default()
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig::default()
     }
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
 

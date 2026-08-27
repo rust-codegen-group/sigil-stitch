@@ -6,6 +6,7 @@ use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapabilityProfile, FunctionContext, FunctionForm,
     LanguageCapabilities,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -201,10 +202,12 @@ impl RendererLang for Zsh {
 
     // --- Config struct accessors ---
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig::default()
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
         GenericSyntaxConfig {
             constraint_keyword: "",
@@ -213,6 +216,7 @@ impl RendererLang for Zsh {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             indent_unit: &self.indent,
@@ -223,12 +227,10 @@ impl RendererLang for Zsh {
         }
     }
 
-    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         zsh_block_open_for_legacy(condition)
     }
 
-    #[allow(deprecated)]
     fn block_close_for(&self, condition: &str) -> Option<&str> {
         zsh_block_close_for_legacy(condition)
     }
@@ -315,6 +317,7 @@ impl CodeLang for Zsh {
         true
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: "",
@@ -322,16 +325,19 @@ impl CodeLang for Zsh {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig::default()
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig::default()
     }
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
 

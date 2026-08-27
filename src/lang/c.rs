@@ -156,6 +156,7 @@ impl RendererLang for C {
         "//"
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
         crate::lang::config::TypePresentationConfig {
             optional: crate::type_name::TypePresentation::Postfix { suffix: "*" },
@@ -174,6 +175,7 @@ impl RendererLang for C {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
         crate::lang::config::GenericSyntaxConfig {
             constraint_keyword: "",
@@ -183,6 +185,7 @@ impl RendererLang for C {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
         crate::lang::config::BlockSyntaxConfig {
             indent_unit: &self.indent,
@@ -404,6 +407,10 @@ impl CodeLang for C {
         false
     }
 
+    fn render_newtype_line(&self, _visibility: &str, name: &str, inner: &str) -> String {
+        format!("typedef {inner} {name};")
+    }
+
     fn emit_newtype_decl(
         &self,
         _visibility: &str,
@@ -414,10 +421,12 @@ impl CodeLang for C {
         CodeBlock::of(&format!("typedef %T {name};"), inner.clone())
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypePrefix("*")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " ",
@@ -425,6 +434,7 @@ impl CodeLang for C {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
         crate::lang::config::TypeDeclSyntaxConfig {
             type_before_name: true,
@@ -434,6 +444,7 @@ impl CodeLang for C {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
         crate::lang::config::EnumAndAnnotationConfig {
             annotation_prefix: "__attribute__((",
@@ -444,6 +455,7 @@ impl CodeLang for C {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
 

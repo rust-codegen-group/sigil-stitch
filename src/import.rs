@@ -68,6 +68,7 @@ impl ImportGroup {
     /// Resolve a list of raw import references into a deduplicated ImportGroup.
     /// First-encountered wins the simple name; later duplicates get aliases.
     /// Preferred aliases from `TypeName::with_alias()` take precedence.
+    #[deprecated(note = "legacy 0.6.8 infallible resolver; use ImportGroup::try_resolve in 0.7")]
     pub fn resolve(refs: &[ImportRef]) -> Self {
         let mut entries = Vec::new();
         let mut claimed: std::collections::HashMap<String, String> =
@@ -86,6 +87,9 @@ impl ImportGroup {
     ///
     /// Explicit entries are processed first so their aliases and names take
     /// precedence over auto-generated aliases from conflict resolution.
+    #[deprecated(
+        note = "legacy 0.6.8 infallible resolver; use ImportGroup::try_resolve_with_explicit in 0.7"
+    )]
     pub fn resolve_with_explicit(refs: &[ImportRef], explicit: Vec<ImportEntry>) -> Self {
         let mut entries = Vec::new();
         let mut claimed: std::collections::HashMap<String, String> =
@@ -219,6 +223,7 @@ pub fn validate_module_path(path: &str) -> Result<(), crate::error::SigilStitchE
 }
 
 #[cfg(test)]
+#[allow(deprecated)] // Exercises the frozen 0.6.8 resolver contract.
 mod tests {
     use super::*;
 

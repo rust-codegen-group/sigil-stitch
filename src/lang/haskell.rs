@@ -201,6 +201,7 @@ impl RendererLang for Haskell {
         "--"
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
         crate::lang::config::TypePresentationConfig {
             array: crate::type_name::TypePresentation::Delimited {
@@ -226,6 +227,7 @@ impl RendererLang for Haskell {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
         crate::lang::config::GenericSyntaxConfig {
             open: "",
@@ -241,7 +243,7 @@ impl RendererLang for Haskell {
         Some(".")
     }
 
-    fn qualify_import_name(&self, module: &str, name: &str, resolved_name: &str) -> String {
+    fn qualify_import_reference(&self, module: &str, name: &str, resolved_name: &str) -> String {
         if resolved_name == name {
             resolved_name.to_string()
         } else {
@@ -249,6 +251,7 @@ impl RendererLang for Haskell {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
         crate::lang::config::BlockSyntaxConfig {
             block_open: " =",
@@ -260,7 +263,6 @@ impl RendererLang for Haskell {
         }
     }
 
-    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         let t = condition.trim();
         if t.starts_with("class ") || t.starts_with("instance ") {
@@ -608,6 +610,37 @@ impl CodeLang for Haskell {
         " ="
     }
 
+    fn render_newtype_line(&self, _visibility: &str, name: &str, inner: &str) -> String {
+        format!("newtype {name} = {name} {inner}")
+    }
+
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
+    fn render_type_context(&self, type_params: &[TypeParamSpec]) -> String {
+        let resolve = |_module: &str, name: &str| name.to_string();
+        let mut constraints = Vec::new();
+        for type_param in type_params {
+            for bound in &type_param.bounds {
+                let bound = bound.render(80, &resolve).unwrap_or_default();
+                constraints.push(format!("{bound} {}", type_param.name));
+            }
+        }
+        if constraints.is_empty() {
+            return String::new();
+        }
+        if constraints.len() == 1 {
+            format!("{} => ", constraints[0])
+        } else {
+            format!("({}) => ", constraints.join(", "))
+        }
+    }
+
+    fn render_type_close_suffix(&self, _kind: TypeKind, impl_types: &[String]) -> String {
+        if impl_types.is_empty() {
+            return String::new();
+        }
+        format!("  deriving ({})", impl_types.join(", "))
+    }
+
     fn emit_newtype_decl(
         &self,
         _visibility: &str,
@@ -703,6 +736,7 @@ impl CodeLang for Haskell {
         CodeBlock::of(&format, args).map(Some)
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
         crate::lang::config::FunctionSyntaxConfig {
             return_type_separator: " -> ",
@@ -711,6 +745,7 @@ impl CodeLang for Haskell {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
         crate::lang::config::TypeDeclSyntaxConfig {
             type_annotation_separator: " :: ",
@@ -718,6 +753,7 @@ impl CodeLang for Haskell {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
         crate::lang::config::EnumAndAnnotationConfig {
             variant_prefix: "| ",
@@ -729,6 +765,7 @@ impl CodeLang for Haskell {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
 
@@ -1041,7 +1078,7 @@ mod tests {
     fn test_alias_uses_qualified_original_name() {
         let hs = Haskell::new();
         assert_eq!(
-            hs.qualify_import_name("Domain.Json", "ToJSON", "JsonToJSON"),
+            hs.qualify_import_reference("Domain.Json", "ToJSON", "JsonToJSON"),
             "Domain.Json.ToJSON"
         );
     }

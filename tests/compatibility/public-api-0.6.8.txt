@@ -1,0 +1,145 @@
+# kind|public surface|exact 0.6.8 signature|retirement owner
+type|lang::config::QuoteStyle|pub enum QuoteStyle|quote-handling
+type|lang::config::OptionalFieldStyle|pub enum OptionalFieldStyle|compat
+type|lang::config::TypePresentationConfig|pub struct TypePresentationConfig<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::array|pub array: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::readonly_array|pub readonly_array: Option<TypePresentation<'a>>|type-name-lowering
+field|lang::config::TypePresentationConfig::optional|pub optional: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::optional_absent_literal|pub optional_absent_literal: &'a str|type-name-lowering
+field|lang::config::TypePresentationConfig::map|pub map: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::union|pub union: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::intersection|pub intersection: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::pointer|pub pointer: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::slice|pub slice: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::tuple|pub tuple: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::reference|pub reference: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::reference_mut|pub reference_mut: TypePresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::function|pub function: FunctionPresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::associated_type|pub associated_type: AssociatedTypeStyle<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::impl_trait|pub impl_trait: BoundsPresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::dyn_trait|pub dyn_trait: BoundsPresentation<'a>|type-name-lowering
+field|lang::config::TypePresentationConfig::wildcard|pub wildcard: WildcardPresentation<'a>|type-name-lowering
+type|type_name::TypePresentation|pub enum TypePresentation<'a>|type-name-lowering
+type|type_name::GenericApplicationStyle|pub enum GenericApplicationStyle|type-name-lowering
+type|type_name::FunctionPresentation|pub struct FunctionPresentation<'a>|type-name-lowering
+field|type_name::FunctionPresentation::keyword|pub keyword: &'a str|type-name-lowering
+field|type_name::FunctionPresentation::params_open|pub params_open: &'a str|type-name-lowering
+field|type_name::FunctionPresentation::params_sep|pub params_sep: &'a str|type-name-lowering
+field|type_name::FunctionPresentation::params_close|pub params_close: &'a str|type-name-lowering
+field|type_name::FunctionPresentation::arrow|pub arrow: &'a str|type-name-lowering
+field|type_name::FunctionPresentation::return_first|pub return_first: bool|type-name-lowering
+field|type_name::FunctionPresentation::curried|pub curried: bool|type-name-lowering
+field|type_name::FunctionPresentation::wrapper_open|pub wrapper_open: &'a str|type-name-lowering
+field|type_name::FunctionPresentation::wrapper_close|pub wrapper_close: &'a str|type-name-lowering
+type|type_name::AssociatedTypeStyle|pub enum AssociatedTypeStyle<'a>|type-name-lowering
+type|type_name::BoundsPresentation|pub struct BoundsPresentation<'a>|type-name-lowering
+field|type_name::BoundsPresentation::keyword|pub keyword: &'a str|type-name-lowering
+field|type_name::BoundsPresentation::separator|pub separator: &'a str|type-name-lowering
+type|type_name::WildcardPresentation|pub struct WildcardPresentation<'a>|type-name-lowering
+field|type_name::WildcardPresentation::unbounded|pub unbounded: &'a str|type-name-lowering
+field|type_name::WildcardPresentation::upper_keyword|pub upper_keyword: &'a str|type-name-lowering
+field|type_name::WildcardPresentation::lower_keyword|pub lower_keyword: &'a str|type-name-lowering
+type|lang::config::GenericSyntaxConfig|pub struct GenericSyntaxConfig<'a>|generic-declaration-lowering
+field|lang::config::GenericSyntaxConfig::open|pub open: &'a str|generic-declaration-lowering
+field|lang::config::GenericSyntaxConfig::close|pub close: &'a str|generic-declaration-lowering
+field|lang::config::GenericSyntaxConfig::application_style|pub application_style: GenericApplicationStyle|generic-declaration-lowering
+field|lang::config::GenericSyntaxConfig::constraint_keyword|pub constraint_keyword: &'a str|generic-declaration-lowering
+field|lang::config::GenericSyntaxConfig::constraint_separator|pub constraint_separator: &'a str|generic-declaration-lowering
+field|lang::config::GenericSyntaxConfig::context_bound_keyword|pub context_bound_keyword: &'a str|generic-declaration-lowering
+type|lang::config::BlockSyntaxConfig|pub struct BlockSyntaxConfig<'a>|renderer-events
+field|lang::config::BlockSyntaxConfig::block_open|pub block_open: &'a str|renderer-events
+field|lang::config::BlockSyntaxConfig::block_close|pub block_close: &'a str|renderer-events
+field|lang::config::BlockSyntaxConfig::indent_unit|pub indent_unit: &'a str|renderer-events
+field|lang::config::BlockSyntaxConfig::uses_semicolons|pub uses_semicolons: bool|renderer-events
+field|lang::config::BlockSyntaxConfig::field_terminator|pub field_terminator: &'a str|compat
+field|lang::config::BlockSyntaxConfig::type_close_terminator|pub type_close_terminator: &'a str|compat
+field|lang::config::BlockSyntaxConfig::bases_close|pub bases_close: &'a str|compat
+field|lang::config::BlockSyntaxConfig::close_on_transition|pub close_on_transition: bool|renderer-events
+type|lang::config::FunctionSyntaxConfig|pub struct FunctionSyntaxConfig<'a>|compat
+type|spec::fun_spec::ParamListStyle|pub enum ParamListStyle|compat
+type|spec::fun_spec::FunctionSignatureStyle|pub enum FunctionSignatureStyle|compat
+type|spec::modifiers::ConstructorDelegationStyle|pub enum ConstructorDelegationStyle|compat
+type|spec::where_spec::WhereClauseStyle|pub enum WhereClauseStyle|compat
+field|lang::config::FunctionSyntaxConfig::return_type_separator|pub return_type_separator: &'a str|compat
+field|lang::config::FunctionSyntaxConfig::async_keyword|pub async_keyword: &'a str|compat
+field|lang::config::FunctionSyntaxConfig::async_suffix|pub async_suffix: &'a str|compat
+field|lang::config::FunctionSyntaxConfig::async_suffix_before_return|pub async_suffix_before_return: bool|compat
+field|lang::config::FunctionSyntaxConfig::abstract_keyword|pub abstract_keyword: &'a str|compat
+field|lang::config::FunctionSyntaxConfig::override_keyword|pub override_keyword: &'a str|compat
+field|lang::config::FunctionSyntaxConfig::override_annotation|pub override_annotation: &'a str|compat
+field|lang::config::FunctionSyntaxConfig::param_list_style|pub param_list_style: ParamListStyle|compat
+field|lang::config::FunctionSyntaxConfig::function_signature_style|pub function_signature_style: FunctionSignatureStyle|compat
+field|lang::config::FunctionSyntaxConfig::constructor_keyword|pub constructor_keyword: &'a str|compat
+field|lang::config::FunctionSyntaxConfig::constructor_delegation_style|pub constructor_delegation_style: ConstructorDelegationStyle|compat
+field|lang::config::FunctionSyntaxConfig::where_clause_style|pub where_clause_style: WhereClauseStyle|compat
+field|lang::config::FunctionSyntaxConfig::empty_body|pub empty_body: &'a str|compat
+field|lang::config::FunctionSyntaxConfig::type_params_before_return_type|pub type_params_before_return_type: bool|compat
+field|lang::config::FunctionSyntaxConfig::suppress_async_in_interface|pub suppress_async_in_interface: bool|compat
+field|lang::config::FunctionSyntaxConfig::static_keyword|pub static_keyword: &'a str|compat
+type|lang::config::TypeDeclSyntaxConfig|pub struct TypeDeclSyntaxConfig<'a>|compat
+field|lang::config::TypeDeclSyntaxConfig::type_before_name|pub type_before_name: bool|compat
+field|lang::config::TypeDeclSyntaxConfig::return_type_is_prefix|pub return_type_is_prefix: bool|compat
+field|lang::config::TypeDeclSyntaxConfig::type_annotation_separator|pub type_annotation_separator: &'a str|compat
+field|lang::config::TypeDeclSyntaxConfig::super_type_keyword|pub super_type_keyword: &'a str|compat
+field|lang::config::TypeDeclSyntaxConfig::super_type_separator|pub super_type_separator: &'a str|compat
+field|lang::config::TypeDeclSyntaxConfig::super_type_subsequent_separator|pub super_type_subsequent_separator: Option<&'a str>|compat
+field|lang::config::TypeDeclSyntaxConfig::implements_keyword|pub implements_keyword: &'a str|compat
+field|lang::config::TypeDeclSyntaxConfig::type_alias_target_first|pub type_alias_target_first: bool|compat
+field|lang::config::TypeDeclSyntaxConfig::supports_primary_constructor|pub supports_primary_constructor: bool|compat
+type|lang::config::VariantValueFormat|pub enum VariantValueFormat|compat
+type|spec::modifiers::PropertyStyle|pub enum PropertyStyle|compat
+type|lang::config::EnumAndAnnotationConfig|pub struct EnumAndAnnotationConfig<'a>|compat
+field|lang::config::EnumAndAnnotationConfig::variant_prefix|pub variant_prefix: &'a str|compat
+field|lang::config::EnumAndAnnotationConfig::variant_prefix_first|pub variant_prefix_first: Option<&'a str>|compat
+field|lang::config::EnumAndAnnotationConfig::variant_separator|pub variant_separator: &'a str|compat
+field|lang::config::EnumAndAnnotationConfig::variant_trailing_separator|pub variant_trailing_separator: bool|compat
+field|lang::config::EnumAndAnnotationConfig::variant_value_format|pub variant_value_format: VariantValueFormat|compat
+field|lang::config::EnumAndAnnotationConfig::variants_before_fields|pub variants_before_fields: bool|compat
+field|lang::config::EnumAndAnnotationConfig::variant_section_terminator|pub variant_section_terminator: &'a str|compat
+field|lang::config::EnumAndAnnotationConfig::annotation_prefix|pub annotation_prefix: &'a str|compat
+field|lang::config::EnumAndAnnotationConfig::annotation_suffix|pub annotation_suffix: &'a str|compat
+field|lang::config::EnumAndAnnotationConfig::readonly_keyword|pub readonly_keyword: &'a str|compat
+field|lang::config::EnumAndAnnotationConfig::mutable_field_keyword|pub mutable_field_keyword: &'a str|compat
+method|lang::RendererLang::block_syntax|fn block_syntax(&self) -> config::BlockSyntaxConfig<'_>|renderer-events
+method|lang::RendererLang::block_open_for|fn block_open_for(&self, _condition: &str) -> Option<&str>|compat
+method|lang::RendererLang::block_close_for|fn block_close_for(&self, _condition: &str) -> Option<&str>|compat
+method|lang::RendererLang::qualify_import_name|fn qualify_import_name(&self, _module: &str, resolved_name: &str) -> String|compat
+method|lang::RendererLang::module_separator|fn module_separator(&self) -> Option<&str>|type-name-lowering
+method|lang::RendererLang::type_presentation|fn type_presentation(&self) -> config::TypePresentationConfig<'_>|type-name-lowering
+method|lang::RendererLang::generic_syntax|fn generic_syntax(&self) -> config::GenericSyntaxConfig<'_>|generic-declaration-lowering
+method|lang::CodeLang::function_keyword|fn function_keyword(&self, _ctx: crate::spec::modifiers::DeclarationContext) -> &str|compat
+method|lang::CodeLang::type_keyword|fn type_keyword(&self, _kind: crate::spec::modifiers::TypeKind) -> &str|compat
+method|lang::CodeLang::methods_inside_type_body|fn methods_inside_type_body(&self, _kind: crate::spec::modifiers::TypeKind) -> bool|compat
+method|lang::CodeLang::variable_prefix|fn variable_prefix(&self) -> &str|compat
+method|lang::CodeLang::type_kind_suffix|fn type_kind_suffix(&self, _kind: crate::spec::modifiers::TypeKind) -> &str|compat
+method|lang::CodeLang::render_newtype_line|fn render_newtype_line(&self, vis: &str, name: &str, inner: &str) -> String|compat
+method|lang::CodeLang::fun_block_open|fn fun_block_open(&self) -> &str|compat
+method|lang::CodeLang::type_header_block_open|fn type_header_block_open(&self, _kind: crate::spec::modifiers::TypeKind) -> &str|compat
+method|lang::CodeLang::doc_comment_inside_body|fn doc_comment_inside_body(&self) -> bool|compat
+method|lang::CodeLang::doc_before_annotations|fn doc_before_annotations(&self) -> bool|compat
+method|lang::CodeLang::optional_field_style|fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle|compat
+method|lang::CodeLang::property_style|fn property_style(&self) -> crate::spec::modifiers::PropertyStyle|compat
+method|lang::CodeLang::property_getter_keyword|fn property_getter_keyword(&self) -> &str|compat
+method|lang::CodeLang::render_type_context|fn render_type_context(&self, _type_params: &[crate::spec::where_spec::TypeParamSpec]) -> String|compat
+method|lang::CodeLang::type_body_prefix|fn type_body_prefix(&self, _name: &str, _kind: crate::spec::modifiers::TypeKind) -> String|compat
+method|lang::CodeLang::type_body_suffix|fn type_body_suffix(&self, _name: &str, _kind: crate::spec::modifiers::TypeKind) -> String|compat
+method|lang::CodeLang::render_type_close_suffix|fn render_type_close_suffix(&self, _kind: crate::spec::modifiers::TypeKind, _impl_types: &[String]) -> String|compat
+method|lang::CodeLang::render_type_param_kind|fn render_type_param_kind(&self, _kind: &crate::spec::where_spec::TypeParamKind) -> String|generic-declaration-lowering
+method|lang::CodeLang::function_syntax|fn function_syntax(&self) -> config::FunctionSyntaxConfig<'_>|compat
+method|lang::CodeLang::type_decl_syntax|fn type_decl_syntax(&self) -> config::TypeDeclSyntaxConfig<'_>|compat
+method|lang::CodeLang::enum_and_annotation|fn enum_and_annotation(&self) -> config::EnumAndAnnotationConfig<'_>|compat
+method|lang::config::QuoteStyle::char|pub fn char(self) -> char|quote-handling
+method|type_name::TypeName::to_doc|pub fn to_doc<F>(&self, resolve: &F) -> BoxDoc<'static, ()> where F: Fn(&str, &str) -> String|compat
+method|type_name::TypeName::render|pub fn render<F>(&self, width: usize, resolve: &F) -> Result<String, crate::error::SigilStitchError> where F: Fn(&str, &str) -> String|compat
+method|type_name::TypeName::to_doc_with_lang|pub fn to_doc_with_lang<F>(&self, resolve: &F, lang: &dyn RendererLang) -> BoxDoc<'static, ()> where F: Fn(&str, &str) -> String|compat
+function|spec::where_spec::render_type_params|pub fn render_type_params(params: &[TypeParamSpec], lang: &dyn CodeLang, args: &mut Vec<Arg>) -> String|compat
+method|spec::parameter_spec::ParameterSpec::emit_into|pub fn emit_into(&self, cb: &mut CodeBlockBuilder, lang: &dyn CodeLang)|compat
+method|import::ImportGroup::new|pub fn new() -> Self|compat
+method|import::ImportGroup::resolve|pub fn resolve(refs: &[ImportRef]) -> Self|compat
+method|import::ImportGroup::resolve_with_explicit|pub fn resolve_with_explicit(refs: &[ImportRef], explicit: Vec<ImportEntry>) -> Self|compat
+field|lang::typescript::TypeScript::quote_style|pub quote_style: QuoteStyle|quote-handling
+method|lang::typescript::TypeScript::with_quote_style|pub fn with_quote_style(mut self, qs: QuoteStyle) -> Self|quote-handling
+field|lang::javascript::JavaScript::quote_style|pub quote_style: QuoteStyle|quote-handling
+method|lang::javascript::JavaScript::with_quote_style|pub fn with_quote_style(mut self, qs: QuoteStyle) -> Self|quote-handling
+field|lang::python::Python::quote_style|pub quote_style: QuoteStyle|quote-handling
+method|lang::python::Python::with_quote_style|pub fn with_quote_style(mut self, qs: QuoteStyle) -> Self|quote-handling

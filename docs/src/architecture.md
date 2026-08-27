@@ -16,7 +16,7 @@ The type-name-lowering pass, complete-set fallible import resolver, and direct
 renderer-event methods in this chapter are accepted 0.7 migrations documented
 before implementation. Sections that describe those seams state the target
 architecture; the compatibility appendix records what the current source still
-uses while the stages land.
+uses before each behavior-specific cutover.
 
 ## Pipeline and Ownership
 
@@ -101,8 +101,9 @@ Each supported language implements both traits in its own module
 (`src/lang/typescript.rs`, etc.). Control-flow nodes carry a language-neutral
 `BlockIntent`; in the accepted renderer-event design, each adapter maps that
 intent locally through `render_block_open()`, `render_block_close()`, and
-`render_branch_transition()`. The current source uses intent-aware and legacy
-block hooks as the compatibility bridge until that stage lands. Languages can
+`render_branch_transition()`. The current source retains intent-aware and
+legacy block hooks as the compatibility bridge; the accepted renderer-event
+interface replaces current-path reads of those hooks. Languages can
 implement `rewrite_nodes()` for structural or literal fixups such as Go IIFE
 `}()` fusion or C++ lambda `};` semicolons. The core invokes this existing
 source-tree seam once per source block after declaration lowering and before

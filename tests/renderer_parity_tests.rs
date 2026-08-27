@@ -34,6 +34,7 @@ fn languages() -> Vec<Box<dyn CodeLang>> {
 }
 
 #[test]
+#[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
 fn direct_and_pretty_adapters_preserve_all_language_indentation() {
     let direct = CodeBlock::of("call(alpha, beta)\n%>body%<", ()).unwrap();
     let pretty = CodeBlock::of("call(%>alpha,%Wbeta%<)\n%>body%<", ()).unwrap();
@@ -174,6 +175,7 @@ fn if_intent_block(soft_break: bool) -> CodeBlock {
 }
 
 #[test]
+#[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
 fn intent_blocks_match_across_direct_and_pretty_adapters() {
     let direct = if_intent_block(false);
     let pretty = if_intent_block(true);

@@ -10,7 +10,7 @@ use crate::lang::capability::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
-use crate::spec::where_spec::{TypeParamKind, TypeParamSpec, render_type_params};
+use crate::spec::where_spec::{TypeParamKind, TypeParamSpec, render_type_params_for};
 use crate::type_name::TypeName;
 
 /// Scala language implementation.
@@ -181,6 +181,7 @@ impl RendererLang for Scala {
         "//"
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> crate::lang::config::TypePresentationConfig<'_> {
         crate::lang::config::TypePresentationConfig {
             array: crate::type_name::TypePresentation::GenericWrap { name: "Array" },
@@ -197,6 +198,7 @@ impl RendererLang for Scala {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> crate::lang::config::GenericSyntaxConfig<'_> {
         crate::lang::config::GenericSyntaxConfig {
             open: "[",
@@ -212,6 +214,7 @@ impl RendererLang for Scala {
         Some(".")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
         crate::lang::config::BlockSyntaxConfig {
             indent_unit: &self.indent,
@@ -625,6 +628,7 @@ impl CodeLang for Scala {
         true
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeWrap {
             open: "Option[",
@@ -640,6 +644,10 @@ impl CodeLang for Scala {
         }
     }
 
+    fn render_newtype_line(&self, visibility: &str, name: &str, inner: &str) -> String {
+        format!("{visibility}class {name}(val value: {inner})")
+    }
+
     fn emit_newtype_decl(
         &self,
         visibility: &str,
@@ -648,7 +656,7 @@ impl CodeLang for Scala {
         inner: &TypeName,
     ) -> Result<CodeBlock, SigilStitchError> {
         let mut args = Vec::new();
-        let type_params = render_type_params(type_params, self, &mut args);
+        let type_params = render_type_params_for(type_params, self, &mut args);
         args.push(Arg::TypeName(inner.clone()));
         CodeBlock::of(
             &format!("{visibility}class {name}{type_params}(val value: %T)"),
@@ -660,6 +668,7 @@ impl CodeLang for Scala {
         " = {"
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> crate::lang::config::FunctionSyntaxConfig<'_> {
         crate::lang::config::FunctionSyntaxConfig {
             abstract_keyword: "",
@@ -667,6 +676,7 @@ impl CodeLang for Scala {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> crate::lang::config::TypeDeclSyntaxConfig<'_> {
         crate::lang::config::TypeDeclSyntaxConfig {
             super_type_keyword: " extends ",
@@ -677,6 +687,7 @@ impl CodeLang for Scala {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> crate::lang::config::EnumAndAnnotationConfig<'_> {
         crate::lang::config::EnumAndAnnotationConfig {
             readonly_keyword: "val ",
@@ -687,6 +698,7 @@ impl CodeLang for Scala {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
     use crate::import::ImportEntry;

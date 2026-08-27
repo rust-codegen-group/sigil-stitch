@@ -32,6 +32,7 @@ use crate::lang::capability::{
     FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, TypeDeclSyntaxConfig,
     TypePresentationConfig,
@@ -123,6 +124,7 @@ impl RendererLang for Ruby {
         Some("::")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             block_open: "",
@@ -135,6 +137,7 @@ impl RendererLang for Ruby {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
             optional_absent_literal: "nil",
@@ -363,6 +366,7 @@ impl CodeLang for Ruby {
         "" // Class/module bodies start on next line
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             type_before_name: false,
@@ -373,6 +377,7 @@ impl CodeLang for Ruby {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: "", // No return type syntax in Ruby
@@ -382,6 +387,7 @@ impl CodeLang for Ruby {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig {
             readonly_keyword: "",
@@ -393,6 +399,7 @@ impl CodeLang for Ruby {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use crate::import::ImportEntry;
 

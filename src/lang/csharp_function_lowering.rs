@@ -120,6 +120,7 @@ fn append_suffixes(signature: &mut SignatureBuilder, function: ValidatedFunction
     }
 }
 
+#[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
 fn append_where_constraints(
     signature: &mut SignatureBuilder,
     lang: &CSharp,

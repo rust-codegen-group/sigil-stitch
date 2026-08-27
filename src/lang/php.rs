@@ -50,6 +50,7 @@ use crate::lang::capability::{
     FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, OptionalFieldStyle,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -58,6 +59,7 @@ use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::TypeParamSpec;
 use crate::type_name::TypeName;
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::type_name::{AssociatedTypeStyle, TypePresentation};
 
 /// PHP language implementation.
@@ -164,6 +166,7 @@ impl RendererLang for Php {
         format!("#[{text}]")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             indent_unit: &self.indent,
@@ -172,6 +175,7 @@ impl RendererLang for Php {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
             array: TypePresentation::GenericWrap { name: "array" },
@@ -579,10 +583,12 @@ impl CodeLang for Php {
         true
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn optional_field_style(&self) -> OptionalFieldStyle {
         OptionalFieldStyle::TypePrefix("?")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: ": ",
@@ -596,6 +602,7 @@ impl CodeLang for Php {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             type_before_name: true,
@@ -606,6 +613,7 @@ impl CodeLang for Php {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig {
             annotation_prefix: "#[",
@@ -613,6 +621,12 @@ impl CodeLang for Php {
             readonly_keyword: "readonly ",
             ..Default::default()
         }
+    }
+
+    fn render_newtype_line(&self, visibility: &str, name: &str, inner: &str) -> String {
+        format!(
+            "{visibility}class {name} {{ public function __construct(private {inner} $value) {{}} }}"
+        )
     }
 
     fn emit_newtype_decl(
@@ -632,6 +646,7 @@ impl CodeLang for Php {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
     use crate::import::ImportEntry;

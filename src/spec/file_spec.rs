@@ -172,6 +172,7 @@ impl FileSpec {
     /// Render the file to a string using the three-pass algorithm.
     ///
     /// `width` controls the target line width for pretty-printing.
+    #[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
     pub fn render(&self, width: usize) -> Result<String, SigilStitchError> {
         self.validate()?;
 
