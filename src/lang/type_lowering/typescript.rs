@@ -8,10 +8,12 @@ use crate::lang::RendererLang;
 use crate::lang::typescript::TypeScript;
 use crate::spec::modifiers::{TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+use crate::type_name::TypeName;
 
 use super::common;
 
-fn is_identifier(name: &str) -> bool {
+pub(crate) fn is_identifier(name: &str) -> bool {
     let mut chars = name.chars();
     chars
         .next()
@@ -53,14 +55,7 @@ pub(crate) fn validate(lang: &TypeScript, type_: TypeIntent<'_>) -> Result<(), S
             });
         }
     }
-    if !type_.where_constraints().is_empty() {
-        return Err(SigilStitchError::InvalidTypeDeclaration {
-            type_name: type_.name().to_string(),
-            reason:
-                "TypeScript type constraints must be attached directly to a declared type parameter"
-                    .to_string(),
-        });
-    }
+    common::validate_constraint_subjects(type_, lang.file_extension(), type_.where_constraints())?;
     if matches!(type_.kind(), TypeKind::Class | TypeKind::Struct)
         && type_.nominal_super_types().len() > 1
     {
@@ -80,7 +75,7 @@ pub(crate) fn lower(
         let mut block = CodeBlock::builder();
         preamble(&mut block, lang, &type_)?;
         let mut arguments = Vec::new();
-        let params = common::type_params(lang, &type_, &mut arguments);
+        let params = type_parameters(&type_, &mut arguments);
         arguments.push(Arg::TypeName(
             type_.target_type().expect("validated target").clone(),
         ));
@@ -113,7 +108,7 @@ pub(crate) fn lower(
     });
     format.push_str(type_.name());
     let mut arguments = Vec::new();
-    format.push_str(&common::type_params(lang, &type_, &mut arguments));
+    format.push_str(&type_parameters(&type_, &mut arguments));
     if !type_.nominal_super_types().is_empty() {
         format.push_str(" extends ");
         for (index, base) in type_.nominal_super_types().iter().enumerate() {
@@ -154,6 +149,49 @@ pub(crate) fn lower(
     block.add("%<}", ());
     block.add_line();
     Ok(vec![block.build()?])
+}
+
+fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> String {
+    if type_.type_params().is_empty() {
+        return String::new();
+    }
+    let mut format = String::from("<");
+    for (index, parameter) in type_.type_params().iter().enumerate() {
+        if index > 0 {
+            format.push_str(", ");
+        }
+        format.push_str(parameter.name());
+        let bounds = parameter_bounds(parameter, type_.where_constraints());
+        if !bounds.is_empty() {
+            format.push_str(" extends ");
+            for (bound_index, bound) in bounds.into_iter().enumerate() {
+                if bound_index > 0 {
+                    format.push_str(" & ");
+                }
+                format.push_str("%T");
+                arguments.push(Arg::TypeName(bound.clone()));
+            }
+        }
+    }
+    format.push('>');
+    format
+}
+
+fn parameter_bounds<'a>(
+    parameter: &'a TypeParamSpec,
+    constraints: &'a [WhereConstraint],
+) -> Vec<&'a TypeName> {
+    let mut bounds = parameter.bounds().iter().collect::<Vec<_>>();
+    for bound in constraints
+        .iter()
+        .filter(|constraint| constraint.parameter_subject_name() == Some(parameter.name()))
+        .flat_map(WhereConstraint::bounds)
+    {
+        if !bounds.contains(&bound) {
+            bounds.push(bound);
+        }
+    }
+    bounds
 }
 
 fn preamble(

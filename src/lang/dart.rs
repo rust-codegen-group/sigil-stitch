@@ -432,12 +432,56 @@ impl CodeLang for Dart {
         type_params: &[crate::spec::where_spec::TypeParamSpec],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
+        if let Some(parameter) = type_params.iter().find(|parameter| {
+            parameter.is_lifetime()
+                || !crate::lang::type_lowering::dart::is_identifier(parameter.name())
+                || self.reserved_words().contains(&parameter.name())
+        }) {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "Dart type parameters require an ordinary non-keyword identifier"
+                    .to_string(),
+            });
+        }
         crate::lang::function_lowering::validate_constraints_target_declared_type_params(
             self.file_extension(),
             function_name,
             type_params,
             constraints,
-        )
+        )?;
+        for parameter in type_params {
+            if !parameter.context_bounds().is_empty() {
+                return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                    language: self.file_extension().to_string(),
+                    function_name: function_name.to_string(),
+                    parameter_name: parameter.name().to_string(),
+                    reason: "Dart function type parameters do not support context bounds"
+                        .to_string(),
+                });
+            }
+            let mut bounds = parameter.bounds().iter().collect::<Vec<_>>();
+            for bound in constraints
+                .iter()
+                .filter(|constraint| constraint.parameter_subject_name() == Some(parameter.name()))
+                .flat_map(|constraint| constraint.bounds())
+            {
+                if !bounds.contains(&bound) {
+                    bounds.push(bound);
+                }
+            }
+            if bounds.len() > 1 {
+                return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                    language: self.file_extension().to_string(),
+                    function_name: function_name.to_string(),
+                    parameter_name: parameter.name().to_string(),
+                    reason: "Dart function type parameters accept at most one upper bound"
+                        .to_string(),
+                });
+            }
+        }
+        Ok(())
     }
 
     fn constructor_name_matches(&self, name: &str, declaring_type: Option<&str>) -> bool {

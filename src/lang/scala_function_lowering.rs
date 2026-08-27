@@ -30,7 +30,7 @@ pub(crate) fn lower(
     signature.push_literal("def ");
     signature.push_literal(function.name());
     let type_params = type_params_with_inline_constraints(function, lang.file_extension())?;
-    signature.push_type_params(type_params.as_ref(), lang);
+    append_type_parameters(&mut signature, type_params.as_ref());
     signature.push_literal("(");
     signature.push_code(tupled_parameter_list(
         function.parameters(),
@@ -59,6 +59,47 @@ pub(crate) fn lower(
         block.add_line();
     }
     block.build()
+}
+
+fn append_type_parameters(
+    signature: &mut SignatureBuilder,
+    type_params: &[crate::spec::where_spec::TypeParamSpec],
+) {
+    if type_params.is_empty() {
+        return;
+    }
+    signature.push_literal("[");
+    for (index, parameter) in type_params.iter().enumerate() {
+        if index > 0 {
+            signature.push_literal(", ");
+        }
+        signature.push_literal(parameter.name());
+        if let Some(kind) = parameter.kind() {
+            signature.push_literal(&scala_kind(kind));
+        }
+        if !parameter.bounds().is_empty() {
+            signature.push_literal(" <: ");
+            for (bound_index, bound) in parameter.bounds().iter().enumerate() {
+                if bound_index > 0 {
+                    signature.push_literal(" with ");
+                }
+                signature.push_type(bound);
+            }
+        }
+        for bound in parameter.context_bounds() {
+            signature.push_literal(" : ");
+            signature.push_type(bound);
+        }
+    }
+    signature.push_literal("]");
+}
+
+fn scala_kind(kind: &crate::spec::where_spec::TypeParamKind) -> String {
+    match kind {
+        crate::spec::where_spec::TypeParamKind::Constructor1 => "[_]".to_string(),
+        crate::spec::where_spec::TypeParamKind::Constructor2 => "[_, _]".to_string(),
+        crate::spec::where_spec::TypeParamKind::Raw(value) => value.clone(),
+    }
 }
 
 fn emit_parameter(block: &mut CodeBlockBuilder, lang: &Scala, parameter: &ParameterSpec) {

@@ -394,6 +394,17 @@ pub enum SigilStitchError {
         function_name: String,
     },
 
+    /// A function declaration contains the same type parameter name more than once.
+    #[snafu(display(
+        "duplicate type parameter name {parameter_name:?} on function {function_name:?}"
+    ))]
+    DuplicateFunctionTypeParameterName {
+        /// The function being validated.
+        function_name: String,
+        /// The duplicated parameter name.
+        parameter_name: String,
+    },
+
     /// A function constraint did not target a declared type parameter as required.
     #[snafu(display(
         "language {language:?} cannot lower constraint for {subject:?} on function {function_name:?}; the subject must name a declared type parameter"
@@ -420,6 +431,21 @@ pub enum SigilStitchError {
         parameter_name: String,
         /// Why the parameter cannot be represented.
         reason: String,
+    },
+
+    /// A strict adapter declared function support but omitted complete lowering.
+    #[snafu(display(
+        "language {language:?} has no complete lowerer for {form:?} function {function_name:?} in {context:?} context"
+    ))]
+    MissingFunctionLowerer {
+        /// The language file extension.
+        language: String,
+        /// The function being emitted.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The declaration form.
+        form: FunctionForm,
     },
 
     /// A language does not support the requested function context.

@@ -39,7 +39,7 @@ pub(crate) fn validate(lang: &Haskell, type_: TypeIntent<'_>) -> Result<(), Sigi
         }
     }
     for constraint in type_.where_constraints() {
-        let declared = constraint.subject().simple_name().is_some_and(|subject| {
+        let declared = constraint.parameter_subject_name().is_some_and(|subject| {
             type_
                 .type_params()
                 .iter()
@@ -258,7 +258,7 @@ fn starts_uppercase(name: &str) -> bool {
             .all(|character| character == '_' || character == '\'' || character.is_alphanumeric())
 }
 
-fn starts_lowercase_identifier(name: &str) -> bool {
+pub(crate) fn starts_lowercase_identifier(name: &str) -> bool {
     name.chars()
         .next()
         .is_some_and(|character| character.is_lowercase())

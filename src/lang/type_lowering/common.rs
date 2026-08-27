@@ -1,11 +1,11 @@
 //! Policy-free helpers used by complete language-local type lowerers.
 
-use crate::code_block::{Arg, CodeBlockBuilder};
+use crate::code_block::CodeBlockBuilder;
 use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
 use crate::spec::modifiers::{TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
-use crate::spec::where_spec::{WhereConstraint, render_type_params_for};
+use crate::spec::where_spec::WhereConstraint;
 
 pub(super) fn validate_declaration(
     type_: TypeIntent<'_>,
@@ -80,7 +80,7 @@ pub(super) fn validate_constraint_subjects(
     constraints: &[WhereConstraint],
 ) -> Result<(), SigilStitchError> {
     for constraint in constraints {
-        let Some(subject) = constraint.subject().simple_name() else {
+        let Some(subject) = constraint.parameter_subject_name() else {
             return Err(SigilStitchError::InvalidTypeParameter {
                 type_name: type_.name().to_string(),
                 parameter_name: format!("{:?}", constraint.subject()),
@@ -137,14 +137,6 @@ pub(super) fn emit_raw_annotations(block: &mut CodeBlockBuilder, type_: &Validat
         block.add_code(annotation.clone());
         block.add_line();
     }
-}
-
-pub(super) fn type_params<L: CodeLang + ?Sized>(
-    lang: &L,
-    type_: &ValidatedType<'_>,
-    arguments: &mut Vec<Arg>,
-) -> String {
-    render_type_params_for(type_.type_params(), lang, arguments)
 }
 
 pub(super) fn emit_fields<L: CodeLang + ?Sized>(

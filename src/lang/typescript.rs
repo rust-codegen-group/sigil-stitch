@@ -620,6 +620,31 @@ impl CodeLang for TypeScript {
         type_params: &[crate::spec::where_spec::TypeParamSpec],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
+        if let Some(parameter) = type_params.iter().find(|parameter| {
+            parameter.is_lifetime()
+                || !crate::lang::type_lowering::typescript::is_identifier(parameter.name())
+                || self.reserved_words().contains(&parameter.name())
+        }) {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "TypeScript type parameters require an ordinary non-keyword identifier"
+                    .to_string(),
+            });
+        }
+        if let Some(parameter) = type_params
+            .iter()
+            .find(|parameter| !parameter.context_bounds().is_empty())
+        {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "TypeScript function type parameters do not support context bounds"
+                    .to_string(),
+            });
+        }
         crate::lang::function_lowering::validate_constraints_target_declared_type_params(
             self.file_extension(),
             function_name,

@@ -48,7 +48,7 @@ pub(crate) fn lower(
     }
     signature.push_literal(function.name());
     let type_params = type_params_with_inline_constraints(function, lang.file_extension())?;
-    signature.push_type_params(type_params.as_ref(), lang);
+    append_type_parameters(&mut signature, type_params.as_ref());
     signature.push_literal("(");
     signature.push_code(tupled_parameter_list(
         function.parameters(),
@@ -63,6 +63,32 @@ pub(crate) fn lower(
 
     finish(&mut block, signature, lang, function)?;
     block.build()
+}
+
+fn append_type_parameters(
+    signature: &mut SignatureBuilder,
+    type_params: &[crate::spec::where_spec::TypeParamSpec],
+) {
+    if type_params.is_empty() {
+        return;
+    }
+    signature.push_literal("<");
+    for (index, parameter) in type_params.iter().enumerate() {
+        if index > 0 {
+            signature.push_literal(", ");
+        }
+        signature.push_literal(parameter.name());
+        if !parameter.bounds().is_empty() {
+            signature.push_literal(" extends ");
+            for (bound_index, bound) in parameter.bounds().iter().enumerate() {
+                if bound_index > 0 {
+                    signature.push_literal(" & ");
+                }
+                signature.push_type(bound);
+            }
+        }
+    }
+    signature.push_literal(">");
 }
 
 fn emit_preamble(

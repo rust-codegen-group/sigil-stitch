@@ -9,6 +9,8 @@ use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+use crate::type_name::TypeName;
 
 use super::common;
 
@@ -89,13 +91,7 @@ pub(crate) fn validate(lang: &Scala, type_: TypeIntent<'_>) -> Result<(), SigilS
             });
         }
     }
-    if !type_.where_constraints().is_empty() {
-        return Err(SigilStitchError::InvalidTypeDeclaration {
-            type_name: type_.name().to_string(),
-            reason: "Scala type constraints must be attached directly to a declared type parameter"
-                .to_string(),
-        });
-    }
+    common::validate_constraint_subjects(type_, lang.file_extension(), type_.where_constraints())?;
     if matches!(type_.kind(), TypeKind::Class | TypeKind::Struct)
         && type_.nominal_super_types().len() > 1
     {
@@ -115,7 +111,7 @@ pub(crate) fn lower(
         let mut block = CodeBlock::builder();
         preamble(&mut block, lang, &type_)?;
         let mut arguments = Vec::new();
-        let params = common::type_params(lang, &type_, &mut arguments);
+        let params = type_parameters(&type_, &mut arguments);
         arguments.push(Arg::TypeName(
             type_.target_type().expect("validated target").clone(),
         ));
@@ -134,7 +130,7 @@ pub(crate) fn lower(
         let mut block = CodeBlock::builder();
         preamble(&mut block, lang, &type_)?;
         let mut arguments = Vec::new();
-        let params = common::type_params(lang, &type_, &mut arguments);
+        let params = type_parameters(&type_, &mut arguments);
         arguments.push(Arg::TypeName(
             type_.target_type().expect("validated target").clone(),
         ));
@@ -167,7 +163,7 @@ pub(crate) fn lower(
     });
     format.push_str(type_.name());
     let mut arguments = Vec::new();
-    format.push_str(&common::type_params(lang, &type_, &mut arguments));
+    format.push_str(&type_parameters(&type_, &mut arguments));
     if !type_.primary_constructor_parameters().is_empty() {
         format.push_str("(%L)");
         arguments.push(Arg::Code(primary_constructor(
@@ -208,6 +204,64 @@ pub(crate) fn lower(
     Ok(vec![block.build()?])
 }
 
+fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> String {
+    if type_.type_params().is_empty() {
+        return String::new();
+    }
+    let mut format = String::from("[");
+    for (index, parameter) in type_.type_params().iter().enumerate() {
+        if index > 0 {
+            format.push_str(", ");
+        }
+        format.push_str(parameter.name());
+        if let Some(kind) = parameter.kind() {
+            format.push_str(&scala_kind(kind));
+        }
+        let bounds = parameter_bounds(parameter, type_.where_constraints());
+        if !bounds.is_empty() {
+            format.push_str(" <: ");
+            for (bound_index, bound) in bounds.into_iter().enumerate() {
+                if bound_index > 0 {
+                    format.push_str(" with ");
+                }
+                format.push_str("%T");
+                arguments.push(Arg::TypeName(bound.clone()));
+            }
+        }
+        for bound in parameter.context_bounds() {
+            format.push_str(" : %T");
+            arguments.push(Arg::TypeName(bound.clone()));
+        }
+    }
+    format.push(']');
+    format
+}
+
+fn parameter_bounds<'a>(
+    parameter: &'a TypeParamSpec,
+    constraints: &'a [WhereConstraint],
+) -> Vec<&'a TypeName> {
+    let mut bounds = parameter.bounds().iter().collect::<Vec<_>>();
+    for bound in constraints
+        .iter()
+        .filter(|constraint| constraint.parameter_subject_name() == Some(parameter.name()))
+        .flat_map(WhereConstraint::bounds)
+    {
+        if !bounds.contains(&bound) {
+            bounds.push(bound);
+        }
+    }
+    bounds
+}
+
+fn scala_kind(kind: &crate::spec::where_spec::TypeParamKind) -> String {
+    match kind {
+        crate::spec::where_spec::TypeParamKind::Constructor1 => "[_]".to_string(),
+        crate::spec::where_spec::TypeParamKind::Constructor2 => "[_, _]".to_string(),
+        crate::spec::where_spec::TypeParamKind::Raw(value) => value.clone(),
+    }
+}
+
 fn preamble(
     block: &mut CodeBlockBuilder,
     lang: &Scala,
@@ -241,7 +295,7 @@ fn primary_constructor(parameters: &[ParameterSpec]) -> Result<CodeBlock, SigilS
     block.build()
 }
 
-fn is_identifier(name: &str) -> bool {
+pub(crate) fn is_identifier(name: &str) -> bool {
     let mut chars = name.chars();
     chars.next().is_some_and(|character| {
         character == '_' || character == '$' || unicode_ident::is_xid_start(character)

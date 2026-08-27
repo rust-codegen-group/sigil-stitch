@@ -65,10 +65,9 @@ before import collection. The provided default is only the frozen
 type-presentation bridge for external adapters written against 0.6.8.
 
 Complete-set fallible import resolution and language-local quote handling are
-also implemented. The accepted target still moves declaration-generic grammar
-out of `GenericSyntaxConfig` and direct renderer events out of
-`BlockSyntaxConfig`. These are behavior-specific contracts rather than an
-execution sequence. The source-read inventory below names each temporary
+also implemented. Built-in declaration-generic grammar has moved out of
+`GenericSyntaxConfig`; only direct renderer events still need to move out of
+`BlockSyntaxConfig`. The source-read inventory below names each remaining
 reader and the behavior that retires its current-path use.
 
 The provided external-adapter lowerers remain private implementation details.
@@ -86,8 +85,8 @@ inventory whenever a reader moves behind a frozen compatibility boundary.
 | `TypePresentationConfig`, `TypePresentation`, `FunctionPresentation`, `AssociatedTypeStyle`, `BoundsPresentation`, `WildcardPresentation`; `RendererLang::type_presentation()` | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only type grammar | Built-ins implement complete local `lower_type_name()` operations; only the frozen 0.6.8 default and direct compatibility facade retain the matrix |
 | `RendererLang::module_separator()` | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only qualified-name grammar | Built-ins own qualified-name spelling; the old accessor remains only in the frozen type bridge and direct facade |
 | `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in type rendering | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only type grammar | Built-ins own generic type application locally; the frozen bridge and direct facade retain the old delimiters and placement |
-| `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in declarations | `src/spec/where_spec.rs` reads declaration parameter and bound grammar; `src/lang/type_lowering/compatibility.rs` reads it for legacy types | Language-owned declaration grammar in `where_spec`; compatibility-only grammar in the legacy lowerer | Generic declaration lowering moves built-in declaration grammar into complete local lowerers; the compatibility module retains the frozen read |
-| `BlockSyntaxConfig::indent_unit` | `src/code_renderer.rs`, `src/spec/where_spec.rs`, and `src/lang/csharp_function_lowering.rs` | Renderer mechanics when indenting; language-owned declaration layout where a lowerer emits literal indentation | Renderer events route renderer mechanics through `indent_unit()`; complete declaration lowerers remove built-in grammar reads, while compatibility lowerers retain their bridge reads |
+| `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in declarations | `src/spec/where_spec.rs`, `src/lang/function_lowering/compatibility.rs`, `src/lang/type_lowering/compatibility.rs`, `src/lang/compatibility_markers.rs`, and the deprecated direct newtype facades in `src/lang/{go,kotlin,scala}.rs` | Compatibility-only declaration grammar | Built-in complete lowerers own type-parameter, bound, lifetime, kind, context-bound, and constraint-clause grammar; the named compatibility modules and direct facades retain the frozen 0.6.8 read |
+| `BlockSyntaxConfig::indent_unit` | `src/code_renderer.rs`, `src/spec/where_spec.rs`, and `src/lang/csharp_function_lowering.rs` | Renderer mechanics when indenting; compatibility declaration layout in `where_spec`; one remaining built-in declaration-layout read in C# | Renderer events route renderer mechanics through `indent_unit()` and move the C# layout byte to the target-owned indentation operation; compatibility lowerers retain their bridge reads |
 | `BlockSyntaxConfig::{uses_semicolons, block_open, block_close, close_on_transition}` | `src/code_renderer.rs` and `src/lang/typescript_function_lowering.rs`; the field, function, property, and type compatibility modules also read them | Language-owned renderer-event or declaration grammar in current built-in paths; compatibility-only grammar in compatibility modules | Renderer events replace current renderer reads; complete declaration lowerers own built-in grammar, while frozen compatibility modules continue to interpret old adapters |
 | `BlockSyntaxConfig::{field_terminator, type_close_terminator, bases_close}` | Only `src/lang/field_lowering/compatibility.rs` and `src/lang/type_lowering/compatibility.rs` consume these fields in production | Compatibility-only declaration grammar | No current replacement config; complete declaration lowerers own these bytes locally and the old fields remain frozen |
 | `FunctionSyntaxConfig`, `OptionalFieldStyle`, `PropertyStyle`, and `property_getter_keyword()` | The function, field, property, and type compatibility modules consume the applicable surfaces | Compatibility-only declaration grammar | Already outside built-in complete lowerers; retain only for the deprecated 0.6.8 bridge |
@@ -112,7 +111,7 @@ corresponding compatibility surface can be removed in a future major version.
 | `TypeName` matching and documented JSON values | Exhaustive matches over the pre-0.6.8 variants; concrete `TypeName` JSON values documented before 0.7 | Supported Rust constructors remain; checked fixtures preserve the documented JSON values. Generic Serde support does not promise compatibility for other representations, binary encodings, enum ordinals, field order, or serializer bytes | Add a wildcard arm to downstream matches; do not reinterpret unknown data or rely on an undocumented wire format |
 | Functions | `function_keyword()`, `fun_block_open()`, `function_syntax()`, `FunctionSyntaxConfig`, `ParamListStyle`, `FunctionSignatureStyle`, `ConstructorDelegationStyle`, and `WhereClauseStyle` | The provided `lower_function()` interprets them for external adapters | `validate_function()` and complete `lower_function()` |
 | Types | `type_keyword()`, `methods_inside_type_body()`, `type_kind_suffix()`, `emit_newtype_decl()`, `type_header_block_open()`, `type_body_prefix()` / `type_body_suffix()`, `emit_type_close_suffix()`, `abstract_type_modifier_is_valid()`, `type_decl_syntax()`, and type-emitter reads of `function_syntax()` / `enum_and_annotation()` | The provided `lower_type()` interprets them only for permissive external adapters | `validate_type()` and complete `lower_type()` |
-| Type parameters | `render_type_param_kind()` and `ParameterSpec::emit_into()` | The transitional shared generic renderer and frozen direct facade interpret them | Complete language-owned generic declaration lowering |
+| Type parameters | `generic_syntax()`, `render_type_params()`, `render_type_param_kind()`, and `ParameterSpec::emit_into()` | The provided permissive declaration lowerers and direct facades preserve frozen 0.6.8 grammar | Complete language-owned type and function lowering; strict adapters without a complete function lowerer fail with `MissingFunctionLowerer` |
 | Variable spelling | `variable_prefix()` | Frozen function, field, property, and type compatibility lowerers interpret the adapter's prefix | Complete language-owned declaration lowering |
 | Preambles | `doc_before_annotations()`, `doc_comment_inside_body()` | Frozen compatibility lowerers may read them | Emit documentation and attributes in each complete lowerer |
 | Fields | `optional_field_style()`, `OptionalFieldStyle` | The provided `lower_fields()` freezes the old field emitter | `FieldCapability`, `FieldContext`, `TypeName::Optional`, and complete `lower_fields()` |
@@ -129,28 +128,29 @@ affect validity.
 ## Frozen Grammar Configuration
 
 The legacy structs mix renderer mechanics with type-expression and declaration
-grammar. Built-in type-name lowering no longer reads `type_presentation()`;
-only the frozen external-adapter bridge does. Current declaration and renderer
-paths still read `generic_syntax()` and `block_syntax()` where listed above.
-The accepted target deprecates all three shared configs: complete
-language-local lowerers own type and declaration grammar, while direct
-renderer-event methods plus `indent_unit()` replace final-renderer reads.
-Frozen compatibility lowerers may continue interpreting the old values; none
-of these structs receives new fields or variants.
+grammar. Built-in type-name and declaration lowering no longer read
+`type_presentation()` or `generic_syntax()`; only the frozen external-adapter
+bridges and direct compatibility facades do. Current renderer paths still read
+`block_syntax()` where listed above. Complete language-local lowerers own type
+and declaration grammar, while direct renderer-event methods plus
+`indent_unit()` replace final-renderer reads. Frozen compatibility lowerers may
+continue interpreting the old values; none of these structs receives new
+fields or variants.
 
 ### `TypePresentationConfig` and `GenericSyntaxConfig`
 
-These values describe the pre-0.6.8 shared type-expression grammar: generic
-delimiters, prefix and postfix wrappers, delimiters, infix separators,
-qualified-name separators, and function-type placement. The provided
-`RendererLang::lower_type_name()` default continues to interpret them for all
-old `TypeName` variants so an existing external adapter remains source
-compatible.
+These values describe the pre-0.6.8 shared type-expression and declaration
+grammar: generic delimiters, bounds, prefix and postfix wrappers, infix
+separators, qualified-name separators, and function-type placement. The
+provided `RendererLang::lower_type_name()`, permissive declaration lowerers,
+and deprecated direct facades continue to interpret the applicable fields so
+an existing external adapter remains source compatible.
 
-This bridge is intentionally closed. It rejects `TypeName::StringLiteral` and
-every later semantic variant, even if one of the old presentation patterns
-could produce plausible text. New and built-in adapters implement complete
-fallible type-name lowering instead of extending the configuration.
+These bridges are intentionally closed. Type-name compatibility rejects
+`TypeName::StringLiteral` and every later semantic variant, even if one of the
+old presentation patterns could produce plausible text. New and built-in
+adapters implement complete fallible type-name and declaration lowering instead
+of extending the configuration.
 
 ### `FunctionSyntaxConfig`
 

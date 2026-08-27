@@ -5,6 +5,7 @@
 use crate::code_block::{Arg, CodeBlock};
 use crate::error::SigilStitchError;
 use crate::lang::csharp::CSharp;
+use crate::lang::csharp_constraints;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
@@ -32,6 +33,18 @@ pub(crate) fn validate(lang: &CSharp, type_: TypeIntent<'_>) -> Result<(), Sigil
         lang.reserved_words(),
     )?;
     common::validate_constraint_subjects(type_, lang.file_extension(), type_.where_constraints())?;
+    for parameter in type_.type_params() {
+        if let Err(reason) = csharp_constraints::validate_type_constraint_bounds(
+            parameter,
+            type_.where_constraints(),
+        ) {
+            return Err(SigilStitchError::InvalidTypeParameter {
+                type_name: type_.name().to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: reason.to_string(),
+            });
+        }
+    }
     if type_.kind() == TypeKind::Class && type_.nominal_super_types().len() > 1 {
         return Err(SigilStitchError::InvalidTypeDeclaration {
             type_name: type_.name().to_string(),
@@ -119,13 +132,8 @@ fn append_constraints(
 ) -> bool {
     let mut emitted = false;
     for parameter in type_.type_params() {
-        let direct_bounds = parameter.bounds().iter().chain(parameter.context_bounds());
-        let explicit_bounds = type_
-            .where_constraints()
-            .iter()
-            .filter(|constraint| constraint.subject().simple_name() == Some(parameter.name()))
-            .flat_map(|constraint| constraint.bounds());
-        let bounds = direct_bounds.chain(explicit_bounds).collect::<Vec<_>>();
+        let bounds =
+            csharp_constraints::merged_constraint_bounds(parameter, type_.where_constraints());
         if bounds.is_empty() {
             continue;
         }
@@ -138,7 +146,7 @@ fn append_constraints(
                 format.push_str(", ");
             }
             format.push_str("%T");
-            arguments.push(Arg::TypeName(bound.clone()));
+            arguments.push(Arg::TypeName(bound));
         }
     }
     emitted

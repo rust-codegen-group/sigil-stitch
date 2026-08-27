@@ -403,12 +403,60 @@ impl CodeLang for CSharp {
         type_params: &[crate::spec::where_spec::TypeParamSpec],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
+        if let Some(parameter) = type_params.iter().find(|parameter| {
+            parameter.is_lifetime()
+                || !crate::lang::type_lowering::is_identifier(parameter.name())
+                || self.reserved_words().contains(&parameter.name())
+        }) {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "C# type parameters require an ordinary non-keyword identifier".to_string(),
+            });
+        }
         crate::lang::function_lowering::validate_constraints_target_declared_type_params(
             self.file_extension(),
             function_name,
             type_params,
             constraints,
-        )
+        )?;
+        for parameter in type_params {
+            if let Err(reason) =
+                crate::lang::csharp_constraints::validate_constraint_bounds(parameter, constraints)
+            {
+                return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                    language: self.file_extension().to_string(),
+                    function_name: function_name.to_string(),
+                    parameter_name: parameter.name().to_string(),
+                    reason: reason.to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        for parameter in function.type_params() {
+            if let Err(reason) =
+                crate::lang::csharp_constraints::validate_function_constraint_context(
+                    parameter,
+                    function.where_constraints(),
+                    function.modifiers().is_override,
+                )
+            {
+                return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                    language: self.file_extension().to_string(),
+                    function_name: function.name().to_string(),
+                    parameter_name: parameter.name().to_string(),
+                    reason: reason.to_string(),
+                });
+            }
+        }
+        Ok(())
     }
 
     fn constructor_name_matches(&self, name: &str, declaring_type: Option<&str>) -> bool {

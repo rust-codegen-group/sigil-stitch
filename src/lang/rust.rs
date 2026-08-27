@@ -66,6 +66,58 @@ const RUST_RESERVED: &[&str] = &[
     "unsized", "virtual", "yield",
 ];
 
+pub(crate) fn is_valid_lifetime_parameter_name(name: &str) -> bool {
+    let Some(identifier) = name.strip_prefix('\'') else {
+        return false;
+    };
+    identifier != "_"
+        && identifier != "static"
+        && crate::lang::type_lowering::is_identifier(identifier)
+        && !RUST_RESERVED.contains(&identifier)
+}
+
+pub(crate) fn is_valid_lifetime_bound(
+    bound: &crate::type_name::TypeName,
+    type_params: &[crate::spec::where_spec::TypeParamSpec],
+) -> bool {
+    let name = match bound {
+        crate::type_name::TypeName::Primitive(name) | crate::type_name::TypeName::Raw(name) => name,
+        _ => return false,
+    };
+    name == "'static"
+        || type_params.iter().any(|parameter| {
+            parameter.is_lifetime()
+                && parameter.name() == name
+                && is_valid_lifetime_parameter_name(parameter.name())
+        })
+}
+
+pub(crate) fn lifetime_constraint_subject_name(
+    subject: &crate::type_name::TypeName,
+) -> Result<Option<&str>, ()> {
+    use crate::type_name::TypeName;
+
+    match subject {
+        TypeName::Primitive(name) | TypeName::Raw(name) if name.starts_with('\'') => Ok(Some(name)),
+        _ if lifetime_head_name(subject).is_some() => Err(()),
+        _ => Ok(None),
+    }
+}
+
+fn lifetime_head_name(type_name: &crate::type_name::TypeName) -> Option<&str> {
+    use crate::type_name::TypeName;
+
+    match type_name {
+        TypeName::Primitive(name) | TypeName::Raw(name) | TypeName::Importable { name, .. }
+            if name.starts_with('\'') =>
+        {
+            Some(name)
+        }
+        TypeName::Generic { base, .. } => lifetime_head_name(base),
+        _ => None,
+    }
+}
+
 fn is_valid_import_alias(alias: &str) -> bool {
     let mut characters = alias.chars();
     alias != "_"
@@ -334,6 +386,101 @@ impl CodeLang for Rust {
         function: crate::spec::fun_spec::ValidatedFunction<'_>,
     ) -> Result<CodeBlock, SigilStitchError> {
         crate::lang::rust_function_lowering::lower(self, function)
+    }
+
+    fn validate_function_type_constraints(
+        &self,
+        function_name: &str,
+        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        constraints: &[crate::spec::where_spec::WhereConstraint],
+    ) -> Result<(), SigilStitchError> {
+        for parameter in type_params {
+            if parameter.is_lifetime() {
+                if !is_valid_lifetime_parameter_name(parameter.name()) {
+                    return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                        language: self.file_extension().to_string(),
+                        function_name: function_name.to_string(),
+                        parameter_name: parameter.name().to_string(),
+                        reason:
+                            "Rust lifetime parameters require a valid non-keyword declared name"
+                                .to_string(),
+                    });
+                }
+                if parameter
+                    .bounds()
+                    .iter()
+                    .any(|bound| !is_valid_lifetime_bound(bound, type_params))
+                {
+                    return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                        language: self.file_extension().to_string(),
+                        function_name: function_name.to_string(),
+                        parameter_name: parameter.name().to_string(),
+                        reason: "Rust lifetime parameters accept only declared lifetime or 'static bounds"
+                            .to_string(),
+                    });
+                }
+            } else if !crate::lang::type_lowering::is_identifier(parameter.name())
+                || parameter.name().starts_with('\'')
+                || self.reserved_words().contains(&parameter.name())
+            {
+                return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                    language: self.file_extension().to_string(),
+                    function_name: function_name.to_string(),
+                    parameter_name: parameter.name().to_string(),
+                    reason: "Rust type parameters require an ordinary non-keyword identifier"
+                        .to_string(),
+                });
+            }
+            if !parameter.context_bounds().is_empty() {
+                return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                    language: self.file_extension().to_string(),
+                    function_name: function_name.to_string(),
+                    parameter_name: parameter.name().to_string(),
+                    reason:
+                        "Rust function type parameters do not support Scala-style context bounds"
+                            .to_string(),
+                });
+            }
+        }
+        for constraint in constraints {
+            let subject = match lifetime_constraint_subject_name(constraint.subject()) {
+                Ok(Some(subject)) => subject,
+                Ok(None) => continue,
+                Err(()) => {
+                    return Err(SigilStitchError::InvalidFunctionConstraintSubject {
+                        language: self.file_extension().to_string(),
+                        function_name: function_name.to_string(),
+                        subject: format!("{:?}", constraint.subject()),
+                    });
+                }
+            };
+            if !type_params.iter().any(|parameter| {
+                parameter.is_lifetime()
+                    && parameter.name() == subject
+                    && is_valid_lifetime_parameter_name(parameter.name())
+            }) {
+                return Err(SigilStitchError::InvalidFunctionConstraintSubject {
+                    language: self.file_extension().to_string(),
+                    function_name: function_name.to_string(),
+                    subject: subject.to_string(),
+                });
+            }
+            if constraint
+                .bounds()
+                .iter()
+                .any(|bound| !is_valid_lifetime_bound(bound, type_params))
+            {
+                return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                    language: self.file_extension().to_string(),
+                    function_name: function_name.to_string(),
+                    parameter_name: subject.to_string(),
+                    reason:
+                        "Rust lifetime constraints accept only declared lifetime or 'static bounds"
+                            .to_string(),
+                });
+            }
+        }
+        Ok(())
     }
 
     fn validate_fields(

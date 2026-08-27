@@ -162,18 +162,17 @@ pub(crate) fn lower(
         let mut block = CodeBlock::builder();
         preamble(&mut block, lang, &type_)?;
         let mut arguments = Vec::new();
-        let params = common::type_params(lang, &type_, &mut arguments);
+        let (params, deferred_bounds) = type_parameters(&type_, &mut arguments);
         arguments.push(Arg::TypeName(
             type_.target_type().expect("validated target").clone(),
         ));
-        block.add(
-            &format!(
-                "{}typealias {}{params} = %T",
-                lang.render_visibility(type_.modifiers().visibility, DeclarationContext::TopLevel),
-                type_.name()
-            ),
-            arguments,
+        let mut format = format!(
+            "{}typealias {}{params} = %T",
+            lang.render_visibility(type_.modifiers().visibility, DeclarationContext::TopLevel),
+            type_.name()
         );
+        append_where_constraints(&mut format, &mut arguments, &type_, deferred_bounds);
+        block.add(&format, arguments);
         block.add_line();
         return Ok(vec![block.build()?]);
     }

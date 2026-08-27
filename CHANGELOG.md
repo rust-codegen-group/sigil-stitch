@@ -18,6 +18,14 @@
 
 ### Changed
 
+- Built-in type and function declarations now lower type parameters, bounds,
+  lifetimes, higher-kinded parameters, context bounds, and explicit constraint
+  clauses entirely in language-owned lowerers. Deprecated
+  `GenericSyntaxConfig` remains only for permissive 0.6.8 adapters and direct
+  compatibility facades.
+- Strict adapters that advertise a function profile but omit complete
+  `lower_function()` support now fail with `MissingFunctionLowerer` instead of
+  falling through to the permissive shared-grammar lowerer.
 - `FileSpec` now rewrites source trees and lowers type references before import
   collection, so rewrite-introduced and target-derived imports participate in
   the authoritative alias assignment.

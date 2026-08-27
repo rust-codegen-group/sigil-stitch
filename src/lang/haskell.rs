@@ -497,12 +497,50 @@ impl CodeLang for Haskell {
         type_params: &[crate::spec::where_spec::TypeParamSpec],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
+        if let Some(parameter) = type_params.iter().find(|parameter| {
+            parameter.is_lifetime()
+                || !crate::lang::type_lowering::haskell::starts_lowercase_identifier(
+                    parameter.name(),
+                )
+                || self.reserved_words().contains(&parameter.name())
+        }) {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "Haskell type variables require a lowercase non-keyword identifier"
+                    .to_string(),
+            });
+        }
         crate::lang::function_lowering::validate_constraints_target_declared_type_params(
             self.file_extension(),
             function_name,
             type_params,
             constraints,
         )
+    }
+
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        if let Some(parameter) = function.type_params().iter().find(|parameter| {
+            !function
+                .parameters()
+                .iter()
+                .map(|parameter| parameter.param_type())
+                .chain(function.return_type())
+                .any(|type_name| type_name_contains_parameter(type_name, parameter.name()))
+        }) {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function.name().to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "Haskell function type variables must occur in a parameter or result type"
+                    .to_string(),
+            });
+        }
+        Ok(())
     }
 
     fn requires_complete_function_type_information(
@@ -796,10 +834,114 @@ impl CodeLang for Haskell {
     }
 }
 
+fn type_name_contains_parameter(type_name: &TypeName, parameter_name: &str) -> bool {
+    match type_name {
+        TypeName::Primitive(name) | TypeName::Raw(name) => name == parameter_name,
+        TypeName::Array(inner)
+        | TypeName::ReadonlyArray(inner)
+        | TypeName::Pointer(inner)
+        | TypeName::Slice(inner)
+        | TypeName::Optional(inner)
+        | TypeName::Reference { inner, .. } => type_name_contains_parameter(inner, parameter_name),
+        TypeName::Generic { base, params } => {
+            type_name_contains_parameter(base, parameter_name)
+                || params
+                    .iter()
+                    .any(|parameter| type_name_contains_parameter(parameter, parameter_name))
+        }
+        TypeName::Union(types)
+        | TypeName::Intersection(types)
+        | TypeName::Tuple(types)
+        | TypeName::ImplTrait { bounds: types }
+        | TypeName::DynTrait { bounds: types } => types
+            .iter()
+            .any(|type_name| type_name_contains_parameter(type_name, parameter_name)),
+        TypeName::Map { key, value } => {
+            type_name_contains_parameter(key, parameter_name)
+                || type_name_contains_parameter(value, parameter_name)
+        }
+        TypeName::Function {
+            params,
+            return_type,
+        } => {
+            params
+                .iter()
+                .any(|parameter| type_name_contains_parameter(parameter, parameter_name))
+                || type_name_contains_parameter(return_type, parameter_name)
+        }
+        TypeName::AssociatedType {
+            base, qualifier, ..
+        } => {
+            type_name_contains_parameter(base, parameter_name)
+                || qualifier.as_deref().is_some_and(|qualifier| {
+                    type_name_contains_parameter(qualifier, parameter_name)
+                })
+        }
+        TypeName::Wildcard {
+            upper_bound,
+            lower_bound,
+        } => {
+            upper_bound
+                .as_deref()
+                .is_some_and(|bound| type_name_contains_parameter(bound, parameter_name))
+                || lower_bound
+                    .as_deref()
+                    .is_some_and(|bound| type_name_contains_parameter(bound, parameter_name))
+        }
+        TypeName::Importable { .. } | TypeName::StringLiteral(_) => false,
+    }
+}
+
 #[cfg(test)]
 #[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
+
+    #[test]
+    fn type_parameter_occurrence_walks_complete_type_name_structure() {
+        let parameter = || TypeName::primitive("a");
+        let other = || TypeName::primitive("Value");
+        let containing = [
+            parameter(),
+            TypeName::raw("a"),
+            TypeName::array(parameter()),
+            TypeName::readonly_array(parameter()),
+            TypeName::pointer(parameter()),
+            TypeName::slice(parameter()),
+            TypeName::optional(parameter()),
+            TypeName::reference(parameter()),
+            TypeName::generic(other(), vec![parameter()]),
+            TypeName::union(vec![other(), parameter()]),
+            TypeName::intersection(vec![other(), parameter()]),
+            TypeName::tuple(vec![other(), parameter()]),
+            TypeName::impl_trait(vec![other(), parameter()]),
+            TypeName::dyn_trait(vec![other(), parameter()]),
+            TypeName::map(other(), parameter()),
+            TypeName::function(vec![other()], parameter()),
+            TypeName::associated_type(other(), Some(parameter()), "Member"),
+            TypeName::wildcard_extends(parameter()),
+            TypeName::wildcard_super(parameter()),
+        ];
+        for type_name in containing {
+            assert!(
+                type_name_contains_parameter(&type_name, "a"),
+                "{type_name:?}"
+            );
+        }
+
+        for type_name in [
+            other(),
+            TypeName::raw("Value"),
+            TypeName::importable("Data.Text", "Text"),
+            TypeName::string_literal("a"),
+            TypeName::wildcard(),
+        ] {
+            assert!(
+                !type_name_contains_parameter(&type_name, "a"),
+                "{type_name:?}"
+            );
+        }
+    }
 
     #[test]
     fn test_file_extension() {

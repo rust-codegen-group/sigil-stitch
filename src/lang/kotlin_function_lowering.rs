@@ -45,7 +45,7 @@ pub(crate) fn lower(
     }
     let type_params = type_params_with_inline_constraints(function, lang.file_extension())?;
     let (declaration_type_params, where_bounds) = split_kotlin_bounds(type_params.as_ref());
-    if signature.push_type_params(&declaration_type_params, lang) {
+    if append_type_parameters(&mut signature, &declaration_type_params) {
         signature.push_literal(" ");
     }
     signature.push_literal(function.name());
@@ -69,6 +69,25 @@ pub(crate) fn lower(
 
     finish(&mut block, signature, function)?;
     block.build()
+}
+
+fn append_type_parameters(signature: &mut SignatureBuilder, type_params: &[TypeParamSpec]) -> bool {
+    if type_params.is_empty() {
+        return false;
+    }
+    signature.push_literal("<");
+    for (index, parameter) in type_params.iter().enumerate() {
+        if index > 0 {
+            signature.push_literal(", ");
+        }
+        signature.push_literal(parameter.name());
+        if let Some(bound) = parameter.bounds().first() {
+            signature.push_literal(" : ");
+            signature.push_type(bound);
+        }
+    }
+    signature.push_literal(">");
+    true
 }
 
 fn emit_preamble(
@@ -129,8 +148,7 @@ fn split_kotlin_bounds(
     let mut where_bounds = Vec::new();
 
     for type_param in &mut declaration_type_params {
-        let mut bounds = std::mem::take(&mut type_param.bounds);
-        bounds.append(&mut type_param.context_bounds);
+        let bounds = std::mem::take(&mut type_param.bounds);
         if bounds.len() <= 1 {
             type_param.bounds = bounds;
             continue;

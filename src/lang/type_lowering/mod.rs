@@ -26,6 +26,10 @@ use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
 use crate::spec::type_spec::ValidatedType;
 
+pub(crate) fn is_identifier(name: &str) -> bool {
+    common::is_identifier(name)
+}
+
 pub(crate) fn lower_compatibility<L: CodeLang + ?Sized>(
     lang: &L,
     type_: ValidatedType<'_>,

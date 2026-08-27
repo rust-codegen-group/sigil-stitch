@@ -12,10 +12,11 @@ Lowering](declaration_lowering.md) for the ownership decision and [0.6.8 Legacy
 Compatibility and Migration](legacy_compatibility_and_migration.md) for the
 versioned compatibility contract.
 
-The type-name-lowering pass and complete-set fallible import resolver described
-here are implemented. The direct renderer-event methods remain an accepted 0.7
-migration documented before implementation; the compatibility appendix records
-the shared renderer grammar still used before that cutover.
+The type-name-lowering pass, language-owned declaration-generic grammar, and
+complete-set fallible import resolver described here are implemented. The
+direct renderer-event methods remain an accepted 0.7 migration documented
+before implementation; the compatibility appendix records the shared renderer
+grammar still used before that cutover.
 
 ## Pipeline and Ownership
 
@@ -73,7 +74,10 @@ target and is not a portable cross-language program.
   the selected adapter, `validate_function()` may add target-local checks to a
   classified `FunctionIntent`. sigil-stitch then constructs a
   `ValidatedFunction`; `lower_function()` accepts that validated read-only view
-  and returns a structured `CodeBlock`. Fields follow the same pattern at
+  and returns a structured `CodeBlock`. A strict adapter that advertises a
+  function profile but omits this operation fails with
+  `MissingFunctionLowerer`; only permissive pre-0.6.8 adapters receive the
+  frozen shared-grammar default. Fields follow the same pattern at
   sequence granularity: `validate_fields()` receives `FieldSequenceIntent`,
   `collect_field_validation_errors()` preserves independent sibling failures,
   and `lower_fields()` receives `ValidatedFields`. Properties use
@@ -111,7 +115,10 @@ Type-name-lowering results and raw import metadata are not rewritten.
 
 Deprecated grammar and type-presentation accessors remain only at
 compatibility boundaries for external adapters and direct compatibility
-facades. New adapters and new syntax dimensions use language-owned lowering.
+facades. Built-in type and function lowerers spell type parameters, bounds,
+lifetimes, kinds, context bounds, and explicit constraint clauses locally;
+shared helpers may merge semantic constraint values but select no tokens or
+placement. New adapters and new syntax dimensions use language-owned lowering.
 The complete inventory and migration replacements are in [0.6.8 Legacy
 Compatibility and Migration](legacy_compatibility_and_migration.md).
 
