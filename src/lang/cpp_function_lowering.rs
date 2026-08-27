@@ -5,9 +5,7 @@
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::lang::cpp::Cpp;
-use crate::lang::function_lowering::{
-    SignatureBuilder, tupled_parameter_list, type_params_with_inline_constraints,
-};
+use crate::lang::function_lowering::{SignatureBuilder, tupled_parameter_list};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::parameter_spec::ParameterSpec;
@@ -35,8 +33,6 @@ pub(crate) fn lower(
     }
 
     signature.push_literal(function.name());
-    let type_params = type_params_with_inline_constraints(function, lang.file_extension())?;
-    signature.push_type_params(type_params.as_ref(), lang);
     signature.push_literal("(");
     signature.push_code(tupled_parameter_list(
         function.parameters(),

@@ -1,9 +1,10 @@
-//! Where-clause types and rendering for generic declarations.
+//! Semantic type-parameter and where-constraint values.
 //!
-//! Extracted from `fun_spec.rs` to give where-clause rendering its own
-//! module. Consumed by both
+//! Consumed by both
 //! [`FunSpec`](crate::spec::fun_spec::FunSpec) and
-//! [`TypeSpec`](crate::spec::type_spec::TypeSpec).
+//! [`TypeSpec`](crate::spec::type_spec::TypeSpec). The rendering helpers at the
+//! end of this module are frozen 0.6.8 compatibility facades; current built-in
+//! declaration lowerers own their complete target grammar locally.
 
 use crate::code_block::Arg;
 use crate::lang::CodeLang;
@@ -27,6 +28,13 @@ impl WhereConstraint {
     /// Return the declared bounds.
     pub fn bounds(&self) -> &[TypeName] {
         &self.bounds
+    }
+
+    pub(crate) fn parameter_subject_name(&self) -> Option<&str> {
+        match &self.subject {
+            TypeName::Primitive(name) => Some(name),
+            _ => None,
+        }
     }
 }
 
@@ -104,7 +112,9 @@ impl TypeParamSpec {
 
     /// Create a lifetime parameter (Rust `'a`).
     ///
-    /// The name should include the tick: `"'a"`, `"'static"`.
+    /// The name must include the apostrophe and name a declared lifetime such
+    /// as `"'a"`. Reserved lifetimes such as `"'static"` and `"'_"` are not
+    /// valid declaration parameter names.
     pub fn lifetime(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -159,9 +169,11 @@ impl TypeParamSpec {
     }
 }
 
-/// Render type parameters into `<T: Bound, U>` form, appending to a format
-/// string and args vec. Returns the format string fragment (empty string if
-/// no type params).
+/// Render type parameters through the frozen 0.6.8 shared grammar.
+///
+/// Returns an empty string when `params` is empty. New adapters should instead
+/// implement complete [`CodeLang::lower_function`] and [`CodeLang::lower_type`]
+/// operations.
 #[deprecated(note = "legacy 0.6.8 declaration grammar; implement complete language-owned lowering")]
 pub fn render_type_params(
     params: &[TypeParamSpec],

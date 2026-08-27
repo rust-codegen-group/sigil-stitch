@@ -9,7 +9,7 @@ use crate::lang::RendererLang;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[deprecated(note = "legacy shared type grammar; implement RendererLang::lower_type_name instead")]
 pub enum TypePresentation<'a> {
-    /// `name<P1, P2>` — delimiters from `generic_syntax().open`/`.close`.
+    /// Legacy `name<P1, P2>` wrapper using the compatibility generic delimiters.
     GenericWrap {
         /// The wrapper type name (e.g., `"Vec"`, `"Option"`, `"HashMap"`).
         name: &'a str,
@@ -53,7 +53,7 @@ pub enum TypePresentation<'a> {
     note = "legacy shared type grammar; implement language-owned TypeName lowering instead"
 )]
 pub enum GenericApplicationStyle {
-    /// `Base<P1, P2>` or `Base[P1, P2]` — uses `generic_syntax().open`/`.close`.
+    /// Legacy delimited application using the compatibility generic delimiters.
     Delimited,
     /// `Base P1 P2` — Haskell-style prefix juxtaposition.
     /// Compound params are parenthesized: `Either String (Maybe Int)`.

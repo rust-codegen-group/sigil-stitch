@@ -446,6 +446,7 @@ fn typescript_type_aliases_preserve_direct_bounds() {
 #[test]
 fn non_context_bound_languages_reject_context_bound_intent() {
     for lang in [
+        &sigil_stitch::lang::dart::Dart::new() as &dyn CodeLang,
         &sigil_stitch::lang::java::Java::new() as &dyn CodeLang,
         &sigil_stitch::lang::kotlin::Kotlin::new(),
         &sigil_stitch::lang::swift::Swift::new(),
@@ -469,22 +470,99 @@ fn non_context_bound_languages_reject_context_bound_intent() {
 }
 
 #[test]
-fn java_and_typescript_reject_detached_where_constraints() {
-    for lang in [
-        &sigil_stitch::lang::java::Java::new() as &dyn CodeLang,
-        &sigil_stitch::lang::typescript::TypeScript::new(),
+fn inline_constraint_languages_lower_explicit_type_constraints() {
+    for (lang, expected) in [
+        (
+            &sigil_stitch::lang::dart::Dart::new() as &dyn CodeLang,
+            "class Box<T extends Bound>",
+        ),
+        (
+            &sigil_stitch::lang::go::Go::new(),
+            "type Box[T Bound] struct",
+        ),
+        (
+            &sigil_stitch::lang::java::Java::new(),
+            "class Box<T extends Bound>",
+        ),
+        (
+            &sigil_stitch::lang::scala::Scala::new(),
+            "class Box[T <: Bound]",
+        ),
+        (
+            &sigil_stitch::lang::typescript::TypeScript::new(),
+            "class Box<T extends Bound>",
+        ),
     ] {
         let type_ = TypeSpec::builder("Box", TypeKind::Class)
             .add_type_param(TypeParamSpec::new("T"))
             .add_where_constraint(TypeName::primitive("T"), vec![TypeName::primitive("Bound")])
             .build()
             .unwrap();
+        let output = render_type_dyn(lang, type_).unwrap();
         assert!(
-            matches!(
-                type_.emit(lang),
-                Err(SigilStitchError::InvalidTypeDeclaration { .. })
-            ),
-            ".{}",
+            output.contains(expected),
+            ".{}: {output}",
+            lang.file_extension()
+        );
+    }
+}
+
+#[test]
+fn inline_constraint_languages_deduplicate_direct_and_explicit_bounds() {
+    for lang in [
+        &sigil_stitch::lang::dart::Dart::new() as &dyn CodeLang,
+        &sigil_stitch::lang::go::Go::new(),
+        &sigil_stitch::lang::java::Java::new(),
+        &sigil_stitch::lang::scala::Scala::new(),
+        &sigil_stitch::lang::typescript::TypeScript::new(),
+    ] {
+        let type_ = TypeSpec::builder("Box", TypeKind::Class)
+            .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("Bound")))
+            .add_where_constraint(TypeName::primitive("T"), vec![TypeName::primitive("Bound")])
+            .build()
+            .unwrap();
+        let output = render_type_dyn(lang, type_).unwrap();
+        assert_eq!(
+            output.matches("Bound").count(),
+            1,
+            ".{}: {output}",
+            lang.file_extension()
+        );
+    }
+}
+
+#[test]
+fn inline_constraint_languages_preserve_direct_then_explicit_bound_order() {
+    for (lang, expected) in [
+        (
+            &sigil_stitch::lang::go::Go::new() as &dyn CodeLang,
+            "T interface { First; Second }",
+        ),
+        (
+            &sigil_stitch::lang::java::Java::new(),
+            "T extends First & Second",
+        ),
+        (
+            &sigil_stitch::lang::scala::Scala::new(),
+            "T <: First with Second",
+        ),
+        (
+            &sigil_stitch::lang::typescript::TypeScript::new(),
+            "T extends First & Second",
+        ),
+    ] {
+        let type_ = TypeSpec::builder("Box", TypeKind::Class)
+            .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("First")))
+            .add_where_constraint(
+                TypeName::primitive("T"),
+                vec![TypeName::primitive("Second")],
+            )
+            .build()
+            .unwrap();
+        let output = render_type_dyn(lang, type_).unwrap();
+        assert!(
+            output.contains(expected),
+            ".{}: {output}",
             lang.file_extension()
         );
     }
@@ -494,8 +572,13 @@ fn java_and_typescript_reject_detached_where_constraints() {
 fn attached_constraint_languages_reject_unknown_subjects() {
     for lang in [
         &sigil_stitch::lang::csharp::CSharp::new() as &dyn CodeLang,
+        &sigil_stitch::lang::dart::Dart::new(),
+        &sigil_stitch::lang::go::Go::new(),
+        &sigil_stitch::lang::java::Java::new(),
         &sigil_stitch::lang::kotlin::Kotlin::new(),
+        &sigil_stitch::lang::scala::Scala::new(),
         &sigil_stitch::lang::swift::Swift::new(),
+        &sigil_stitch::lang::typescript::TypeScript::new(),
     ] {
         let type_ = TypeSpec::builder("Box", TypeKind::Class)
             .add_type_param(TypeParamSpec::new("T"))
@@ -785,6 +868,72 @@ fn shared_type_validation_rejects_invalid_identifiers_and_parameter_subjects() {
 }
 
 #[test]
+fn rust_type_lifetime_bounds_target_declared_lifetimes() {
+    let static_bound = render_type(
+        sigil_stitch::lang::rust::Rust::new(),
+        "StaticBound.rs",
+        TypeSpec::builder("StaticBound", TypeKind::Class)
+            .add_type_param(
+                TypeParamSpec::lifetime("'a").with_bound(TypeName::primitive("'static")),
+            )
+            .build()
+            .unwrap(),
+    );
+    assert!(
+        static_bound.contains("struct StaticBound<'a: 'static>"),
+        "{static_bound}"
+    );
+
+    let declared_bound = render_type(
+        sigil_stitch::lang::rust::Rust::new(),
+        "DeclaredBound.rs",
+        TypeSpec::builder("DeclaredBound", TypeKind::Class)
+            .add_type_param(TypeParamSpec::lifetime("'b"))
+            .add_type_param(TypeParamSpec::lifetime("'a").with_bound(TypeName::primitive("'b")))
+            .build()
+            .unwrap(),
+    );
+    assert!(
+        declared_bound.contains("struct DeclaredBound<'b, 'a: 'b>"),
+        "{declared_bound}"
+    );
+
+    let explicit_static_bound = render_type(
+        sigil_stitch::lang::rust::Rust::new(),
+        "ExplicitStaticBound.rs",
+        TypeSpec::builder("ExplicitStaticBound", TypeKind::Class)
+            .add_type_param(TypeParamSpec::lifetime("'a"))
+            .add_where_constraint(
+                TypeName::primitive("'a"),
+                vec![TypeName::primitive("'static")],
+            )
+            .build()
+            .unwrap(),
+    );
+    assert!(
+        explicit_static_bound.contains("where\n    'a: 'static,"),
+        "{explicit_static_bound}"
+    );
+
+    let compound_type_bound = render_type(
+        sigil_stitch::lang::rust::Rust::new(),
+        "CompoundTypeBound.rs",
+        TypeSpec::builder("CompoundTypeBound", TypeKind::Class)
+            .add_type_param(TypeParamSpec::new("T"))
+            .add_where_constraint(
+                TypeName::array(TypeName::primitive("T")),
+                vec![TypeName::primitive("Clone")],
+            )
+            .build()
+            .unwrap(),
+    );
+    assert!(
+        compound_type_bound.contains("where\n    Vec<T>: Clone,"),
+        "{compound_type_bound}"
+    );
+}
+
+#[test]
 fn target_specific_type_validation_rejects_grammar_invalid_shapes() {
     fn assert_invalid(type_: TypeSpec, lang: &dyn CodeLang, expected: &str) {
         let error = type_.emit(lang).unwrap_err();
@@ -895,20 +1044,15 @@ fn target_specific_type_validation_rejects_grammar_invalid_shapes() {
         &sigil_stitch::lang::go::Go::new(),
         "do not support context bounds",
     );
-    assert_invalid(
-        TypeSpec::builder("Sample", TypeKind::Class)
-            .add_field(field())
-            .add_type_param(TypeParamSpec::new("T"))
-            .add_where_constraint(TypeName::primitive("T"), vec![TypeName::primitive("Bound")])
-            .build()
-            .unwrap(),
-        &sigil_stitch::lang::go::Go::new(),
-        "attached directly",
-    );
-
     for (parameter, expected) in [
         (TypeParamSpec::lifetime("a"), "lifetime"),
         (TypeParamSpec::lifetime("'static"), "lifetime"),
+        (TypeParamSpec::lifetime("'_"), "lifetime"),
+        (TypeParamSpec::lifetime("'self"), "lifetime"),
+        (
+            TypeParamSpec::lifetime("'a").with_bound(TypeName::primitive("Clone")),
+            "lifetime",
+        ),
         (TypeParamSpec::new("type"), "ordinary non-keyword"),
         (
             TypeParamSpec::new("T").with_context_bound(TypeName::primitive("Bound")),
@@ -925,6 +1069,31 @@ fn target_specific_type_validation_rejects_grammar_invalid_shapes() {
             expected,
         );
     }
+    assert_invalid(
+        TypeSpec::builder("Sample", TypeKind::Class)
+            .add_field(field())
+            .add_type_param(TypeParamSpec::lifetime("'a"))
+            .add_where_constraint(
+                TypeName::primitive("'a"),
+                vec![TypeName::primitive("Clone")],
+            )
+            .build()
+            .unwrap(),
+        &sigil_stitch::lang::rust::Rust::new(),
+        "lifetime constraints",
+    );
+    assert_invalid(
+        TypeSpec::builder("Sample", TypeKind::Class)
+            .add_field(field())
+            .add_where_constraint(
+                TypeName::primitive("'missing"),
+                vec![TypeName::primitive("'static")],
+            )
+            .build()
+            .unwrap(),
+        &sigil_stitch::lang::rust::Rust::new(),
+        "declared lifetime",
+    );
 
     for parameter in [
         ParameterSpec::builder("bad-name", TypeName::primitive("Value"))
@@ -987,34 +1156,15 @@ fn target_specific_type_validation_rejects_grammar_invalid_shapes() {
     }
     assert_invalid(
         TypeSpec::builder("Sample", TypeKind::Class)
-            .add_type_param(TypeParamSpec::new("T"))
-            .add_where_constraint(TypeName::primitive("T"), vec![TypeName::primitive("Bound")])
-            .build()
-            .unwrap(),
-        &sigil_stitch::lang::scala::Scala::new(),
-        "attached directly",
-    );
-
-    assert_invalid(
-        TypeSpec::builder("Sample", TypeKind::Class)
-            .add_type_param(
-                TypeParamSpec::new("T")
-                    .with_bound(TypeName::primitive("First"))
-                    .with_bound(TypeName::primitive("Second")),
+            .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("First")))
+            .add_where_constraint(
+                TypeName::primitive("T"),
+                vec![TypeName::primitive("Second")],
             )
             .build()
             .unwrap(),
         &sigil_stitch::lang::dart::Dart::new(),
-        "at most one direct upper bound",
-    );
-    assert_invalid(
-        TypeSpec::builder("Sample", TypeKind::Class)
-            .add_type_param(TypeParamSpec::new("T"))
-            .add_where_constraint(TypeName::primitive("T"), vec![TypeName::primitive("Bound")])
-            .build()
-            .unwrap(),
-        &sigil_stitch::lang::dart::Dart::new(),
-        "attached directly",
+        "at most one upper bound",
     );
     assert_invalid(
         TypeSpec::builder("Sample", TypeKind::Enum).build().unwrap(),

@@ -8,6 +8,7 @@ use crate::lang::RendererLang;
 use crate::lang::go::Go;
 use crate::spec::modifiers::{TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
 use crate::type_name::TypeName;
 
 use super::common;
@@ -80,12 +81,7 @@ pub(crate) fn validate(lang: &Go, type_: TypeIntent<'_>) -> Result<(), SigilStit
             "Go newtypes cannot use a bare type parameter as their target type",
         ));
     }
-    if !type_.where_constraints().is_empty() {
-        return Err(invalid(
-            type_,
-            "Go type constraints must be attached directly to a declared type parameter",
-        ));
-    }
+    common::validate_constraint_subjects(type_, lang.file_extension(), type_.where_constraints())?;
     Ok(())
 }
 
@@ -178,11 +174,12 @@ fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> Strin
         }
         format.push_str(parameter.name());
         format.push(' ');
-        match parameter.bounds() {
+        let bounds = parameter_bounds(parameter, type_.where_constraints());
+        match bounds.as_slice() {
             [] => format.push_str("any"),
             [bound] => {
                 format.push_str("%T");
-                arguments.push(Arg::TypeName(bound.clone()));
+                arguments.push(Arg::TypeName((*bound).clone()));
             }
             bounds => {
                 format.push_str("interface { ");
@@ -191,7 +188,7 @@ fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> Strin
                         format.push_str("; ");
                     }
                     format.push_str("%T");
-                    arguments.push(Arg::TypeName(bound.clone()));
+                    arguments.push(Arg::TypeName((*bound).clone()));
                 }
                 format.push_str(" }");
             }
@@ -199,6 +196,23 @@ fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> Strin
     }
     format.push(']');
     format
+}
+
+fn parameter_bounds<'a>(
+    parameter: &'a TypeParamSpec,
+    constraints: &'a [WhereConstraint],
+) -> Vec<&'a TypeName> {
+    let mut bounds = parameter.bounds().iter().collect::<Vec<_>>();
+    for bound in constraints
+        .iter()
+        .filter(|constraint| constraint.parameter_subject_name() == Some(parameter.name()))
+        .flat_map(WhereConstraint::bounds)
+    {
+        if !bounds.contains(&bound) {
+            bounds.push(bound);
+        }
+    }
+    bounds
 }
 
 fn invalid(type_: TypeIntent<'_>, reason: &str) -> SigilStitchError {

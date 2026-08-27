@@ -396,6 +396,39 @@ impl FunSpec {
             }
         }
         let language = lang.file_extension().to_string();
+        let mut type_parameter_names = std::collections::HashSet::new();
+        for parameter in &self.type_params {
+            if !type_parameter_names.insert(parameter.name()) {
+                return Err(SigilStitchError::DuplicateFunctionTypeParameterName {
+                    function_name: self.name.clone(),
+                    parameter_name: parameter.name().to_string(),
+                });
+            }
+        }
+
+        if !permissive_validation {
+            for constraint in &self.where_constraints {
+                if constraint.subject().is_empty() || constraint.bounds().is_empty() {
+                    return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                        language: language.clone(),
+                        function_name: self.name.clone(),
+                        parameter_name: format!("{:?}", constraint.subject()),
+                        reason:
+                            "where constraints require a non-empty subject and at least one bound"
+                                .to_string(),
+                    });
+                }
+                if constraint.bounds().iter().any(TypeName::is_empty) {
+                    return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                        language: language.clone(),
+                        function_name: self.name.clone(),
+                        parameter_name: format!("{:?}", constraint.subject()),
+                        reason: "where-constraint bounds must not contain an empty type"
+                            .to_string(),
+                    });
+                }
+            }
+        }
 
         if !permissive_validation
             && form == FunctionForm::Constructor
@@ -975,7 +1008,7 @@ impl FunSpecBuilder {
         if let Some(wc) = self
             .where_constraints
             .iter_mut()
-            .find(|wc| wc.subject.simple_name() == Some(param_name))
+            .find(|wc| wc.parameter_subject_name() == Some(param_name))
         {
             wc.bounds.push(bound);
         } else {

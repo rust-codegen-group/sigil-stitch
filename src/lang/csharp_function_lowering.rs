@@ -6,9 +6,8 @@ use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::lang::capability::FunctionForm;
 use crate::lang::csharp::CSharp;
-use crate::lang::function_lowering::{
-    SignatureBuilder, tupled_parameter_list, type_params_with_inline_constraints,
-};
+use crate::lang::csharp_constraints;
+use crate::lang::function_lowering::{SignatureBuilder, tupled_parameter_list};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::modifiers::{DeclarationContext, Visibility};
@@ -20,14 +19,6 @@ pub(crate) fn lower(
 ) -> Result<CodeBlock, SigilStitchError> {
     let mut block = CodeBlock::builder();
     emit_preamble(&mut block, lang, function)?;
-
-    let constrained_type_params =
-        type_params_with_inline_constraints(function, lang.file_extension())?;
-    let mut declaration_type_params = constrained_type_params.to_vec();
-    for type_param in &mut declaration_type_params {
-        type_param.bounds.clear();
-        type_param.context_bounds.clear();
-    }
 
     let mut signature = SignatureBuilder::new();
     let is_static_constructor = function.form() == FunctionForm::Constructor
@@ -59,7 +50,7 @@ pub(crate) fn lower(
     }
 
     signature.push_literal(function.name());
-    signature.push_type_params(&declaration_type_params, lang);
+    append_type_parameters(&mut signature, function.type_params());
     signature.push_literal("(");
     signature.push_code(tupled_parameter_list(
         function.parameters(),
@@ -67,11 +58,32 @@ pub(crate) fn lower(
     )?);
     signature.push_literal(")");
     append_suffixes(&mut signature, function);
-    let has_where_constraints =
-        append_where_constraints(&mut signature, lang, &constrained_type_params);
+    let has_where_constraints = append_where_constraints(
+        &mut signature,
+        lang,
+        function.type_params(),
+        function.where_constraints(),
+    );
 
     finish(&mut block, signature, function, has_where_constraints)?;
     block.build()
+}
+
+fn append_type_parameters(
+    signature: &mut SignatureBuilder,
+    type_params: &[crate::spec::where_spec::TypeParamSpec],
+) {
+    if type_params.is_empty() {
+        return;
+    }
+    signature.push_literal("<");
+    for (index, parameter) in type_params.iter().enumerate() {
+        if index > 0 {
+            signature.push_literal(", ");
+        }
+        signature.push_literal(parameter.name());
+    }
+    signature.push_literal(">");
 }
 
 fn emit_preamble(
@@ -125,10 +137,12 @@ fn append_where_constraints(
     signature: &mut SignatureBuilder,
     lang: &CSharp,
     type_params: &[crate::spec::where_spec::TypeParamSpec],
+    constraints: &[crate::spec::where_spec::WhereConstraint],
 ) -> bool {
     let mut emitted = false;
     for type_param in type_params {
-        if type_param.bounds().is_empty() && type_param.context_bounds().is_empty() {
+        let bounds = csharp_constraints::merged_constraint_bounds(type_param, constraints);
+        if bounds.is_empty() {
             continue;
         }
         emitted = true;
@@ -137,16 +151,11 @@ fn append_where_constraints(
         signature.push_literal("where ");
         signature.push_literal(type_param.name());
         signature.push_literal(" : ");
-        for (index, bound) in type_param
-            .bounds()
-            .iter()
-            .chain(type_param.context_bounds())
-            .enumerate()
-        {
+        for (index, bound) in bounds.into_iter().enumerate() {
             if index > 0 {
                 signature.push_literal(", ");
             }
-            signature.push_type(bound);
+            signature.push_type(&bound);
         }
     }
     emitted

@@ -8,10 +8,12 @@ use crate::lang::RendererLang;
 use crate::lang::dart::Dart;
 use crate::spec::modifiers::{TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+use crate::type_name::TypeName;
 
 use super::common;
 
-fn is_identifier(name: &str) -> bool {
+pub(crate) fn is_identifier(name: &str) -> bool {
     let mut chars = name.chars();
     chars
         .next()
@@ -40,21 +42,22 @@ pub(crate) fn validate(lang: &Dart, type_: TypeIntent<'_>) -> Result<(), SigilSt
         lang.reserved_words(),
     )?;
     for parameter in type_.type_params() {
-        if parameter.bounds().len() > 1 || !parameter.context_bounds().is_empty() {
+        if !parameter.context_bounds().is_empty() {
             return Err(SigilStitchError::InvalidTypeParameter {
                 type_name: type_.name().to_string(),
                 parameter_name: parameter.name().to_string(),
-                reason: "Dart type parameters accept at most one direct upper bound".to_string(),
+                reason: "Dart type declarations do not support context bounds".to_string(),
+            });
+        }
+        if parameter_bounds(parameter, type_.where_constraints()).len() > 1 {
+            return Err(SigilStitchError::InvalidTypeParameter {
+                type_name: type_.name().to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "Dart type parameters accept at most one upper bound".to_string(),
             });
         }
     }
-    if !type_.where_constraints().is_empty() {
-        return Err(SigilStitchError::InvalidTypeDeclaration {
-            type_name: type_.name().to_string(),
-            reason: "Dart type constraints must be attached directly to a declared type parameter"
-                .to_string(),
-        });
-    }
+    common::validate_constraint_subjects(type_, lang.file_extension(), type_.where_constraints())?;
     if type_.nominal_super_types().len() > 1 {
         return Err(SigilStitchError::InvalidTypeDeclaration {
             type_name: type_.name().to_string(),
@@ -80,7 +83,7 @@ pub(crate) fn lower(
         common::emit_structured_annotations(&mut block, &type_, "@", "")?;
         common::emit_raw_annotations(&mut block, &type_);
         let mut arguments = Vec::new();
-        let params = common::type_params(lang, &type_, &mut arguments);
+        let params = type_parameters(&type_, &mut arguments);
         arguments.push(Arg::TypeName(
             type_.target_type().expect("validated target").clone(),
         ));
@@ -108,7 +111,7 @@ pub(crate) fn lower(
     });
     format.push_str(type_.name());
     let mut arguments = Vec::new();
-    format.push_str(&common::type_params(lang, &type_, &mut arguments));
+    format.push_str(&type_parameters(&type_, &mut arguments));
     if let Some(base) = type_.nominal_super_types().first() {
         format.push_str(" extends %T");
         arguments.push(Arg::TypeName(base.clone()));
@@ -137,4 +140,40 @@ pub(crate) fn lower(
     block.add("%<}", ());
     block.add_line();
     Ok(vec![block.build()?])
+}
+
+fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> String {
+    if type_.type_params().is_empty() {
+        return String::new();
+    }
+    let mut format = String::from("<");
+    for (index, parameter) in type_.type_params().iter().enumerate() {
+        if index > 0 {
+            format.push_str(", ");
+        }
+        format.push_str(parameter.name());
+        if let Some(bound) = parameter_bounds(parameter, type_.where_constraints()).first() {
+            format.push_str(" extends %T");
+            arguments.push(Arg::TypeName((*bound).clone()));
+        }
+    }
+    format.push('>');
+    format
+}
+
+fn parameter_bounds<'a>(
+    parameter: &'a TypeParamSpec,
+    constraints: &'a [WhereConstraint],
+) -> Vec<&'a TypeName> {
+    let mut bounds = parameter.bounds().iter().collect::<Vec<_>>();
+    for bound in constraints
+        .iter()
+        .filter(|constraint| constraint.parameter_subject_name() == Some(parameter.name()))
+        .flat_map(WhereConstraint::bounds)
+    {
+        if !bounds.contains(&bound) {
+            bounds.push(bound);
+        }
+    }
+    bounds
 }

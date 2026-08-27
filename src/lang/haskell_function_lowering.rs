@@ -19,9 +19,7 @@ pub(crate) fn lower(
     if let Some(return_type) = function.return_type() {
         let type_params = type_params_with_inline_constraints(function, lang.file_extension())?;
         block.add("%L :: ", function.name());
-        if let Some(context) = lang.emit_type_context(type_params.as_ref())? {
-            block.add_code(context);
-        }
+        emit_type_context(&mut block, type_params.as_ref());
         for parameter in function.parameters() {
             block.add("%T -> ", parameter.param_type().clone());
         }
@@ -48,6 +46,36 @@ pub(crate) fn lower(
         block.add("%<", ());
     }
     block.build()
+}
+
+fn emit_type_context(
+    block: &mut CodeBlockBuilder,
+    type_params: &[crate::spec::where_spec::TypeParamSpec],
+) {
+    let constraint_count = type_params
+        .iter()
+        .map(|parameter| parameter.bounds().len() + parameter.context_bounds().len())
+        .sum::<usize>();
+    if constraint_count == 0 {
+        return;
+    }
+    if constraint_count > 1 {
+        block.add("(", ());
+    }
+    let mut index = 0;
+    for parameter in type_params {
+        for bound in parameter.bounds().iter().chain(parameter.context_bounds()) {
+            if index > 0 {
+                block.add(", ", ());
+            }
+            block.add("%T %L", (bound.clone(), parameter.name()));
+            index += 1;
+        }
+    }
+    if constraint_count > 1 {
+        block.add(")", ());
+    }
+    block.add(" => ", ());
 }
 
 fn append_suffixes(block: &mut CodeBlockBuilder, function: ValidatedFunction<'_>) {

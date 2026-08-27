@@ -11,10 +11,9 @@ use std::borrow::Cow;
 
 use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
-use crate::lang::CodeLang;
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::parameter_spec::ParameterSpec;
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint, render_type_params_for};
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
 use crate::type_name::TypeName;
 
 pub(crate) use compatibility::lower as lower_compatibility;
@@ -45,17 +44,6 @@ impl SignatureBuilder {
     pub(crate) fn push_code(&mut self, code: CodeBlock) {
         self.format.push_str("%L");
         self.args.push(Arg::Code(code));
-    }
-
-    pub(crate) fn push_type_params<L: CodeLang + ?Sized>(
-        &mut self,
-        params: &[TypeParamSpec],
-        lang: &L,
-    ) -> bool {
-        let rendered = render_type_params_for(params, lang, &mut self.args);
-        let present = !rendered.is_empty();
-        self.format.push_str(&rendered);
-        present
     }
 
     pub(crate) fn append_to(self, block: &mut CodeBlockBuilder) {
@@ -107,7 +95,7 @@ pub(crate) fn validate_constraints_target_declared_type_params(
     constraints: &[WhereConstraint],
 ) -> Result<(), SigilStitchError> {
     for constraint in constraints {
-        let Some(subject) = constraint.subject().simple_name() else {
+        let Some(subject) = constraint.parameter_subject_name() else {
             return Err(SigilStitchError::InvalidFunctionConstraintSubject {
                 language: language.to_string(),
                 function_name: function_name.to_string(),
@@ -139,7 +127,7 @@ pub(crate) fn type_params_with_inline_constraints<'a>(
 
     let mut type_params = function.type_params().to_vec();
     for constraint in function.where_constraints() {
-        let Some(subject) = constraint.subject().simple_name() else {
+        let Some(subject) = constraint.parameter_subject_name() else {
             return Err(SigilStitchError::InvalidFunctionConstraintSubject {
                 language: language.to_string(),
                 function_name: function.name().to_string(),

@@ -76,7 +76,7 @@ pub(crate) fn lower(
     });
     format.push_str(type_.name());
     let mut arguments = Vec::new();
-    format.push_str(&common::type_params(lang, &type_, &mut arguments));
+    format.push_str(&type_parameters(&type_, &mut arguments));
     let bases: Vec<_> = type_
         .nominal_super_types()
         .iter()
@@ -129,4 +129,29 @@ pub(crate) fn lower(
     block.add("%<}", ());
     block.add_line();
     Ok(vec![block.build()?])
+}
+
+fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> String {
+    if type_.type_params().is_empty() {
+        return String::new();
+    }
+    let mut format = String::from("<");
+    for (index, parameter) in type_.type_params().iter().enumerate() {
+        if index > 0 {
+            format.push_str(", ");
+        }
+        format.push_str(parameter.name());
+        if !parameter.bounds().is_empty() {
+            format.push_str(": ");
+            for (bound_index, bound) in parameter.bounds().iter().enumerate() {
+                if bound_index > 0 {
+                    format.push_str(" & ");
+                }
+                format.push_str("%T");
+                arguments.push(Arg::TypeName(bound.clone()));
+            }
+        }
+    }
+    format.push('>');
+    format
 }

@@ -625,7 +625,11 @@ when migrating an existing adapter family by family.
 `lower_type_name()` owns generic application and every other type-expression
 form. Declaration placement—where declared type parameters, bounds, bases,
 constructors, and members appear—belongs in the relevant complete declaration
-lowerer.
+lowerer. Spell the complete generic declaration grammar locally; do not call
+`generic_syntax()` or `render_type_params()` from a new lowerer. A strict
+function profile without `lower_function()` fails closed with
+`MissingFunctionLowerer`, just as an incomplete strict type family fails with
+`MissingTypeLowerer`.
 
 ## Reference Implementations
 

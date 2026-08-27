@@ -28,7 +28,7 @@ pub(crate) fn lower(
     }
     signature.push_literal("fn ");
     signature.push_literal(function.name());
-    signature.push_type_params(function.type_params(), lang);
+    append_type_parameters(&mut signature, function.type_params());
     signature.push_literal("(");
     signature.push_code(tupled_parameter_list(
         function.parameters(),
@@ -62,6 +62,42 @@ pub(crate) fn lower(
         block.add_line();
     }
     block.build()
+}
+
+fn append_type_parameters(
+    signature: &mut SignatureBuilder,
+    type_params: &[crate::spec::where_spec::TypeParamSpec],
+) {
+    if type_params.is_empty() {
+        return;
+    }
+    signature.push_literal("<");
+    let mut first = true;
+    for parameter in type_params
+        .iter()
+        .filter(|parameter| parameter.is_lifetime())
+        .chain(
+            type_params
+                .iter()
+                .filter(|parameter| !parameter.is_lifetime()),
+        )
+    {
+        if !first {
+            signature.push_literal(", ");
+        }
+        first = false;
+        signature.push_literal(parameter.name());
+        if !parameter.bounds().is_empty() {
+            signature.push_literal(": ");
+            for (index, bound) in parameter.bounds().iter().enumerate() {
+                if index > 0 {
+                    signature.push_literal(" + ");
+                }
+                signature.push_type(bound);
+            }
+        }
+    }
+    signature.push_literal(">");
 }
 
 fn emit_parameter(block: &mut CodeBlockBuilder, lang: &Rust, parameter: &ParameterSpec) {

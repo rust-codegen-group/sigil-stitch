@@ -13,6 +13,7 @@ use crate::spec::modifiers::{ConstructorDelegationStyle, DeclarationContext};
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::where_spec::{
     TypeParamSpec, WhereClauseStyle, emit_separate_where_block, emit_where_block,
+    render_type_params_for,
 };
 
 use super::{
@@ -82,9 +83,11 @@ impl<'lang, 'function, L: CodeLang + ?Sized> CompatibilityLowering<'lang, 'funct
 
     fn push_type_params(&mut self) -> Result<bool, SigilStitchError> {
         let type_params = type_params_for_rendering(self.lang, self.function)?;
-        Ok(self
-            .signature
-            .push_type_params(type_params.as_ref(), self.lang))
+        let rendered =
+            render_type_params_for(type_params.as_ref(), self.lang, &mut self.signature.args);
+        let present = !rendered.is_empty();
+        self.signature.format.push_str(&rendered);
+        Ok(present)
     }
 
     fn push_receiver(&mut self) {

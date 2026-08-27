@@ -36,18 +36,20 @@ pub(crate) fn validate(lang: &Rust, type_: TypeIntent<'_>) -> Result<(), SigilSt
     }
     for parameter in type_.type_params() {
         if parameter.is_lifetime() {
-            let Some(name) = parameter.name().strip_prefix('\'') else {
+            if !crate::lang::rust::is_valid_lifetime_parameter_name(parameter.name()) {
                 return Err(invalid_parameter(
                     type_,
                     parameter.name(),
-                    "Rust lifetime parameters must begin with an apostrophe",
+                    "Rust lifetime parameters require a valid non-keyword declared name",
                 ));
-            };
-            if name == "static" || !common::is_identifier(name) {
+            }
+            if parameter.bounds().iter().any(|bound| {
+                !crate::lang::rust::is_valid_lifetime_bound(bound, type_.type_params())
+            }) {
                 return Err(invalid_parameter(
                     type_,
                     parameter.name(),
-                    "Rust lifetime parameters require a valid non-static lifetime name",
+                    "Rust lifetime parameters accept only declared lifetime or 'static bounds",
                 ));
             }
         } else if !common::is_identifier(parameter.name())
@@ -65,6 +67,42 @@ pub(crate) fn validate(lang: &Rust, type_: TypeIntent<'_>) -> Result<(), SigilSt
                 type_,
                 parameter.name(),
                 "Rust type declarations do not support Scala-style context bounds",
+            ));
+        }
+    }
+    for constraint in type_.where_constraints() {
+        let subject =
+            match crate::lang::rust::lifetime_constraint_subject_name(constraint.subject()) {
+                Ok(Some(subject)) => subject,
+                Ok(None) => continue,
+                Err(()) => {
+                    return Err(invalid_parameter(
+                        type_,
+                        &format!("{:?}", constraint.subject()),
+                        "Rust lifetime constraints must use an unparameterized lifetime subject",
+                    ));
+                }
+            };
+        if !type_.type_params().iter().any(|parameter| {
+            parameter.is_lifetime()
+                && parameter.name() == subject
+                && crate::lang::rust::is_valid_lifetime_parameter_name(parameter.name())
+        }) {
+            return Err(invalid_parameter(
+                type_,
+                subject,
+                "Rust lifetime constraints must target a declared lifetime",
+            ));
+        }
+        if constraint
+            .bounds()
+            .iter()
+            .any(|bound| !crate::lang::rust::is_valid_lifetime_bound(bound, type_.type_params()))
+        {
+            return Err(invalid_parameter(
+                type_,
+                subject,
+                "Rust lifetime constraints accept only declared lifetime or 'static bounds",
             ));
         }
     }
@@ -103,7 +141,7 @@ fn lower_declaration(
         TypeKind::TypeAlias | TypeKind::Newtype => unreachable!(),
     };
     let mut arguments = Vec::new();
-    let parameters = common::type_params(lang, type_, &mut arguments);
+    let parameters = type_parameters(type_, &mut arguments);
     block.add(
         &format!(
             "{}{keyword} {}{parameters}",
@@ -136,7 +174,7 @@ fn lower_declaration(
 fn lower_impl(lang: &Rust, type_: &ValidatedType<'_>) -> Result<CodeBlock, SigilStitchError> {
     let mut block = CodeBlock::builder();
     let mut arguments = Vec::new();
-    let parameters = common::type_params(lang, type_, &mut arguments);
+    let parameters = type_parameters(type_, &mut arguments);
     let arguments_for_type = bare_type_parameters(type_);
     block.add(
         &format!(
@@ -161,7 +199,7 @@ fn lower_alias(lang: &Rust, type_: &ValidatedType<'_>) -> Result<CodeBlock, Sigi
     let mut block = CodeBlock::builder();
     preamble(&mut block, lang, type_)?;
     let mut arguments = Vec::new();
-    let parameters = common::type_params(lang, type_, &mut arguments);
+    let parameters = type_parameters(type_, &mut arguments);
     arguments.push(Arg::TypeName(
         type_
             .target_type()
@@ -184,7 +222,7 @@ fn lower_newtype(lang: &Rust, type_: &ValidatedType<'_>) -> Result<CodeBlock, Si
     let mut block = CodeBlock::builder();
     preamble(&mut block, lang, type_)?;
     let mut arguments = Vec::new();
-    let parameters = common::type_params(lang, type_, &mut arguments);
+    let parameters = type_parameters(type_, &mut arguments);
     arguments.push(Arg::TypeName(
         type_
             .target_type()
@@ -208,6 +246,43 @@ fn lower_newtype(lang: &Rust, type_: &ValidatedType<'_>) -> Result<CodeBlock, Si
         block.add_line();
     }
     block.build()
+}
+
+fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> String {
+    if type_.type_params().is_empty() {
+        return String::new();
+    }
+    let mut format = String::from("<");
+    let mut first = true;
+    for parameter in type_
+        .type_params()
+        .iter()
+        .filter(|parameter| parameter.is_lifetime())
+        .chain(
+            type_
+                .type_params()
+                .iter()
+                .filter(|parameter| !parameter.is_lifetime()),
+        )
+    {
+        if !first {
+            format.push_str(", ");
+        }
+        first = false;
+        format.push_str(parameter.name());
+        if !parameter.bounds().is_empty() {
+            format.push_str(": ");
+            for (bound_index, bound) in parameter.bounds().iter().enumerate() {
+                if bound_index > 0 {
+                    format.push_str(" + ");
+                }
+                format.push_str("%T");
+                arguments.push(Arg::TypeName(bound.clone()));
+            }
+        }
+    }
+    format.push('>');
+    format
 }
 
 fn preamble(
@@ -258,6 +333,13 @@ fn bare_type_parameters(type_: &ValidatedType<'_>) -> String {
     let names = type_
         .type_params()
         .iter()
+        .filter(|parameter| parameter.is_lifetime())
+        .chain(
+            type_
+                .type_params()
+                .iter()
+                .filter(|parameter| !parameter.is_lifetime()),
+        )
         .map(|parameter| parameter.name())
         .collect::<Vec<_>>()
         .join(", ");

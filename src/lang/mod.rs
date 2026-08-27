@@ -50,6 +50,7 @@ mod bash_function_lowering;
 mod c_function_lowering;
 mod compatibility_markers;
 mod cpp_function_lowering;
+mod csharp_constraints;
 mod csharp_function_lowering;
 mod dart_function_lowering;
 pub(crate) mod field_lowering;
@@ -643,15 +644,26 @@ pub trait CodeLang: RendererLang {
 
     /// Lower one fully validated function declaration into structured output.
     ///
-    /// The default preserves the pre-0.6.8 syntax-configuration contract for
-    /// external adapters. New language-specific grammar belongs in an override
-    /// of this complete lowering seam, not in another placement or keyword
-    /// hook interpreted by `FunSpec`.
+    /// The default preserves the pre-0.6.8 syntax-configuration contract only
+    /// for adapters whose function capabilities remain permissive. A strict
+    /// adapter that advertises a function profile must override this complete
+    /// seam or receives [`SigilStitchError::MissingFunctionLowerer`]. New
+    /// language-specific grammar belongs here, not in another placement or
+    /// keyword hook interpreted by `FunSpec`.
     fn lower_function(
         &self,
         function: ValidatedFunction<'_>,
     ) -> Result<CodeBlock, SigilStitchError> {
-        function_lowering::lower_compatibility(self, function)
+        if self.capabilities().function_validation_is_permissive() {
+            function_lowering::lower_compatibility(self, function)
+        } else {
+            Err(SigilStitchError::MissingFunctionLowerer {
+                language: self.file_extension().to_string(),
+                function_name: function.name().to_string(),
+                context: function.function_context(),
+                form: function.form(),
+            })
+        }
     }
 
     /// Apply additional target-specific validation to one complete field sequence.

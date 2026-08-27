@@ -10,6 +10,8 @@ use crate::lang::capability::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+use crate::type_name::TypeName;
 
 /// Java language implementation.
 ///
@@ -81,6 +83,98 @@ impl Java {
         self.extension = s.to_string();
         self
     }
+}
+
+#[derive(PartialEq, Eq)]
+enum JavaErasureIdentity {
+    Imported { module: String, name: String },
+    Named(String),
+    Associated { base: Box<Self>, member: String },
+}
+
+fn java_erasure_identity(type_name: &TypeName) -> Option<JavaErasureIdentity> {
+    Some(match type_name {
+        TypeName::Importable { module, name, .. } => JavaErasureIdentity::Imported {
+            module: module.clone(),
+            name: name.clone(),
+        },
+        TypeName::Primitive(name) | TypeName::Raw(name) => JavaErasureIdentity::Named(name.clone()),
+        TypeName::Array(_) => JavaErasureIdentity::Imported {
+            module: "java.util".to_string(),
+            name: "List".to_string(),
+        },
+        TypeName::Generic { base, .. } => java_erasure_identity(base)?,
+        TypeName::Map { .. } => JavaErasureIdentity::Imported {
+            module: "java.util".to_string(),
+            name: "Map".to_string(),
+        },
+        TypeName::Optional(_) => JavaErasureIdentity::Imported {
+            module: "java.util".to_string(),
+            name: "Optional".to_string(),
+        },
+        TypeName::AssociatedType {
+            base,
+            qualifier: None,
+            member,
+        } => JavaErasureIdentity::Associated {
+            base: Box::new(java_erasure_identity(base)?),
+            member: member.clone(),
+        },
+        TypeName::ReadonlyArray(_)
+        | TypeName::Union(_)
+        | TypeName::Intersection(_)
+        | TypeName::Pointer(_)
+        | TypeName::Slice(_)
+        | TypeName::Tuple(_)
+        | TypeName::Reference { .. }
+        | TypeName::Function { .. }
+        | TypeName::AssociatedType {
+            qualifier: Some(_), ..
+        }
+        | TypeName::ImplTrait { .. }
+        | TypeName::DynTrait { .. }
+        | TypeName::Wildcard { .. }
+        | TypeName::StringLiteral(_) => return None,
+    })
+}
+
+pub(crate) fn deduplicated_bounds<'a>(
+    bounds: impl IntoIterator<Item = &'a TypeName>,
+) -> Vec<&'a TypeName> {
+    let mut deduplicated: Vec<&'a TypeName> = Vec::new();
+    for bound in bounds {
+        if !deduplicated.contains(&bound) {
+            deduplicated.push(bound);
+        }
+    }
+    deduplicated
+}
+
+pub(crate) fn conflicting_bound_erasures<'a>(
+    type_params: &'a [TypeParamSpec],
+    constraints: &'a [WhereConstraint],
+) -> Option<(&'a str, &'a TypeName, &'a TypeName)> {
+    for parameter in type_params {
+        let explicit_bounds = constraints
+            .iter()
+            .filter(|constraint| constraint.parameter_subject_name() == Some(parameter.name()))
+            .flat_map(WhereConstraint::bounds);
+        let bounds = deduplicated_bounds(parameter.bounds().iter().chain(explicit_bounds));
+        let mut erasures = Vec::new();
+        for bound in bounds {
+            let Some(erasure) = java_erasure_identity(bound) else {
+                continue;
+            };
+            if let Some((_, previous)) = erasures
+                .iter()
+                .find(|(previous_erasure, _)| previous_erasure == &erasure)
+            {
+                return Some((parameter.name(), *previous, bound));
+            }
+            erasures.push((erasure, bound));
+        }
+    }
+    None
 }
 
 #[rustfmt::skip]
@@ -385,12 +479,49 @@ impl CodeLang for Java {
         type_params: &[crate::spec::where_spec::TypeParamSpec],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
+        if let Some(parameter) = type_params.iter().find(|parameter| {
+            parameter.is_lifetime()
+                || !crate::lang::type_lowering::java::is_identifier(parameter.name())
+                || self.reserved_words().contains(&parameter.name())
+        }) {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "Java type parameters require an ordinary non-keyword identifier"
+                    .to_string(),
+            });
+        }
+        if let Some(parameter) = type_params
+            .iter()
+            .find(|parameter| !parameter.context_bounds().is_empty())
+        {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "Java function type parameters do not support context bounds".to_string(),
+            });
+        }
         crate::lang::function_lowering::validate_constraints_target_declared_type_params(
             self.file_extension(),
             function_name,
             type_params,
             constraints,
-        )
+        )?;
+        if let Some((parameter_name, first, second)) =
+            conflicting_bound_erasures(type_params, constraints)
+        {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter_name.to_string(),
+                reason: format!(
+                    "Java bounds {first:?} and {second:?} have the same erased type; distinct bounds require pairwise-distinct erasures"
+                ),
+            });
+        }
+        Ok(())
     }
 
     fn function_visibility_is_valid(
@@ -610,6 +741,46 @@ impl CodeLang for Java {
 mod tests {
     use super::*;
     use crate::import::ImportEntry;
+
+    #[test]
+    fn java_bound_erasure_is_unavailable_for_non_class_type_shapes() {
+        let imported = || TypeName::importable("types", "Value");
+        let unsupported = [
+            TypeName::readonly_array(imported()),
+            TypeName::union(vec![imported(), TypeName::primitive("Other")]),
+            TypeName::intersection(vec![imported(), TypeName::primitive("Other")]),
+            TypeName::pointer(imported()),
+            TypeName::slice(imported()),
+            TypeName::tuple(vec![imported()]),
+            TypeName::reference(imported()),
+            TypeName::function(vec![imported()], TypeName::primitive("Result")),
+            TypeName::associated_type(imported(), Some(TypeName::primitive("Owner")), "Member"),
+            TypeName::impl_trait(vec![imported()]),
+            TypeName::dyn_trait(vec![imported()]),
+            TypeName::string_literal("value"),
+        ];
+        for type_name in unsupported {
+            assert!(java_erasure_identity(&type_name).is_none(), "{type_name:?}");
+        }
+    }
+
+    #[test]
+    fn java_bound_erasure_normalizes_parameterized_types() {
+        let imported = TypeName::importable("types", "Container");
+        let first = TypeName::generic(imported.clone(), vec![TypeName::primitive("String")]);
+        let second = TypeName::generic(imported, vec![TypeName::primitive("Integer")]);
+        assert!(java_erasure_identity(&first) == java_erasure_identity(&second));
+
+        for type_name in [
+            TypeName::primitive("Value"),
+            TypeName::array(TypeName::primitive("Value")),
+            TypeName::map(TypeName::primitive("Key"), TypeName::primitive("Value")),
+            TypeName::optional(TypeName::primitive("Value")),
+            TypeName::associated_type(TypeName::primitive("Owner"), None, "Member"),
+        ] {
+            assert!(java_erasure_identity(&type_name).is_some());
+        }
+    }
 
     #[test]
     fn test_file_extension() {

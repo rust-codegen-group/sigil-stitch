@@ -1,0 +1,2259 @@
+===== bash type zero width=100 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash function zero width=100 =====
+function work() {
+    body
+}
+===== bash type zero width=12 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash function zero width=12 =====
+function work() {
+    body
+}
+===== bash type one width=100 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash function one width=100 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash type one width=12 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash function one width=12 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash type many width=100 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash function many width=100 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 2 }
+===== bash type many width=12 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash function many width=12 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 2 }
+===== bash type bounded width=100 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash function bounded width=100 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash type bounded width=12 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash function bounded width=12 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash type context-bound width=100 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash type context-bound width=12 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash type lifetime width=100 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash type lifetime width=12 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash type higher-kinded width=100 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash type higher-kinded width=12 =====
+ERROR: UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }
+===== bash function context-bound width=100 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash function context-bound width=12 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash function lifetime width=100 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash function lifetime width=12 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash function higher-kinded width=100 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash function higher-kinded width=12 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash function explicit-constraint width=100 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash function explicit-constraint width=12 =====
+ERROR: TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== bash type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.bash", error_count: 1, errors: [UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }] }
+===== bash function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.bash", error_count: 1, errors: [TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }] }
+===== bash type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.bash", error_count: 1, errors: [UnsupportedTypeKind { language: "bash", kind: Class, type_name: "Box" }] }
+===== bash function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.bash", error_count: 1, errors: [TooManyFunctionParameters { language: "bash", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }] }
+===== c type zero width=100 =====
+struct Box {
+    Value value;
+};
+===== c function zero width=100 =====
+Value work() {
+    body
+}
+===== c type zero width=12 =====
+struct Box {
+    Value value;
+};
+===== c function zero width=12 =====
+Value work() {
+    body
+}
+===== c type one width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== c function one width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== c type one width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== c function one width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== c type many width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== c function many width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== c type many width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== c function many width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== c type bounded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c function bounded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c type bounded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c function bounded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c type context-bound width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c type context-bound width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c type lifetime width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== c type lifetime width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== c type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== c type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== c function context-bound width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c function context-bound width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c function lifetime width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== c function lifetime width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== c function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== c function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== c function explicit-constraint width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c function explicit-constraint width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== c type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.c", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== c function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.c", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== c type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.c", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "c", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== c function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.c", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "c", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== cpp type zero width=100 =====
+class Box {
+    Value value;
+};
+===== cpp function zero width=100 =====
+Value work() {
+    body
+}
+===== cpp type zero width=12 =====
+class Box {
+    Value value;
+};
+===== cpp function zero width=12 =====
+Value work() {
+    body
+}
+===== cpp type one width=100 =====
+template <typename T>
+class Box {
+    T value;
+};
+===== cpp function one width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== cpp type one width=12 =====
+template <typename T>
+class Box {
+    T value;
+};
+===== cpp function one width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== cpp type many width=100 =====
+template <typename T, typename U>
+class Box {
+    T value;
+};
+===== cpp function many width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== cpp type many width=12 =====
+template <typename T, typename U>
+class Box {
+    T value;
+};
+===== cpp function many width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== cpp type bounded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }
+===== cpp function bounded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== cpp type bounded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }
+===== cpp function bounded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== cpp type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }
+===== cpp type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }
+===== cpp type context-bound width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }
+===== cpp type context-bound width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }
+===== cpp type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "cpp type parameters require an ordinary non-keyword identifier" }
+===== cpp type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "cpp type parameters require an ordinary non-keyword identifier" }
+===== cpp type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== cpp type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== cpp function context-bound width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== cpp function context-bound width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== cpp function lifetime width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== cpp function lifetime width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== cpp function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== cpp function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== cpp function explicit-constraint width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== cpp function explicit-constraint width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== cpp type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }] }
+===== cpp function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== cpp type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }] }
+===== cpp function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== csharp type zero width=100 =====
+internal class Box {
+    Value @value;
+}
+===== csharp function zero width=100 =====
+Value work() {
+    body
+}
+===== csharp type zero width=12 =====
+internal class Box {
+    Value @value;
+}
+===== csharp function zero width=12 =====
+Value work() {
+    body
+}
+===== csharp type one width=100 =====
+internal class Box<T> {
+    T @value;
+}
+===== csharp function one width=100 =====
+T work<T>(T first) {
+    body
+}
+===== csharp type one width=12 =====
+internal class Box<T> {
+    T @value;
+}
+===== csharp function one width=12 =====
+T work<T>(T first) {
+    body
+}
+===== csharp type many width=100 =====
+internal class Box<T, U> {
+    T @value;
+}
+===== csharp function many width=100 =====
+T work<T, U>(T first, U second) {
+    body
+}
+===== csharp type many width=12 =====
+internal class Box<T, U> {
+    T @value;
+}
+===== csharp function many width=12 =====
+T work<T, U>(T first,
+    U second) {
+    body
+}
+===== csharp type bounded width=100 =====
+internal class Box<T>
+    where T : Bound
+{
+    T @value;
+}
+===== csharp function bounded width=100 =====
+T work<T>(T first)
+    where T : Bound
+{
+    body
+}
+===== csharp type bounded width=12 =====
+internal class Box<T>
+    where T : Bound
+{
+    T @value;
+}
+===== csharp function bounded width=12 =====
+T work<T>(T first)
+    where T : Bound
+{
+    body
+}
+===== csharp type explicit-constraint width=100 =====
+internal class Box<T>
+    where T : Bound
+{
+    T @value;
+}
+===== csharp type explicit-constraint width=12 =====
+internal class Box<T>
+    where T : Bound
+{
+    T @value;
+}
+===== csharp type context-bound width=100 =====
+internal class Box<T>
+    where T : Context
+{
+    T @value;
+}
+===== csharp type context-bound width=12 =====
+internal class Box<T>
+    where T : Context
+{
+    T @value;
+}
+===== csharp type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "cs type parameters require an ordinary non-keyword identifier" }
+===== csharp type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "cs type parameters require an ordinary non-keyword identifier" }
+===== csharp type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "cs", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== csharp type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "cs", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== csharp function context-bound width=100 =====
+Value work<T>(Value @value)
+    where T : Context
+{
+    body
+}
+===== csharp function context-bound width=12 =====
+Value work<T>(Value @value)
+    where T : Context
+{
+    body
+}
+===== csharp function lifetime width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "cs", function_name: "work", parameter_name: "'a", reason: "C# type parameters require an ordinary non-keyword identifier" }
+===== csharp function lifetime width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "cs", function_name: "work", parameter_name: "'a", reason: "C# type parameters require an ordinary non-keyword identifier" }
+===== csharp function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cs", function_name: "work", context: Member, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== csharp function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "cs", function_name: "work", context: Member, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== csharp function explicit-constraint width=100 =====
+T work<T>(T @value)
+    where T : Bound
+{
+    body
+}
+===== csharp function explicit-constraint width=12 =====
+T work<T>(T @value)
+    where T : Bound
+{
+    body
+}
+===== csharp type imported-constraints width=100 =====
+using alpha;
+using beta;
+
+internal class Box<T, U>
+    where T : FirstConstraint
+    where U : SecondConstraint
+{
+    T @value;
+}
+===== csharp function imported-constraints width=100 =====
+using alpha;
+using beta;
+
+internal class Bounds {
+    U work<T, U>(T @value)
+        where T : FirstConstraint
+        where U : SecondConstraint
+    {
+        body
+    }
+}
+===== csharp type imported-constraints width=12 =====
+using alpha;
+using beta;
+
+internal class Box<T, U>
+    where T : FirstConstraint
+    where U : SecondConstraint
+{
+    T @value;
+}
+===== csharp function imported-constraints width=12 =====
+using alpha;
+using beta;
+
+internal class Bounds {
+    U work<T, U>(T @value)
+        where T : FirstConstraint
+        where U : SecondConstraint
+    {
+        body
+    }
+}
+===== dart type zero width=100 =====
+class Box {
+  Value value;
+}
+===== dart function zero width=100 =====
+work() {
+  body
+}
+===== dart type zero width=12 =====
+class Box {
+  Value value;
+}
+===== dart function zero width=12 =====
+work() {
+  body
+}
+===== dart type one width=100 =====
+class Box<T> {
+  T value;
+}
+===== dart function one width=100 =====
+T work<T>(T first) {
+  body
+}
+===== dart type one width=12 =====
+class Box<T> {
+  T value;
+}
+===== dart function one width=12 =====
+T work<T>(T first) {
+  body
+}
+===== dart type many width=100 =====
+class Box<T, U> {
+  T value;
+}
+===== dart function many width=100 =====
+T work<T, U>(T first, U second) {
+  body
+}
+===== dart type many width=12 =====
+class Box<T, U> {
+  T value;
+}
+===== dart function many width=12 =====
+T work<T, U>(T first,
+  U second) {
+  body
+}
+===== dart type bounded width=100 =====
+class Box<T extends Bound> {
+  T value;
+}
+===== dart function bounded width=100 =====
+T work<T extends Bound>(T first) {
+  body
+}
+===== dart type bounded width=12 =====
+class Box<T extends Bound> {
+  T value;
+}
+===== dart function bounded width=12 =====
+T work<T extends Bound>(T first) {
+  body
+}
+===== dart type explicit-constraint width=100 =====
+class Box<T extends Bound> {
+  T value;
+}
+===== dart type explicit-constraint width=12 =====
+class Box<T extends Bound> {
+  T value;
+}
+===== dart type context-bound width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Dart type declarations do not support context bounds" }
+===== dart type context-bound width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Dart type declarations do not support context bounds" }
+===== dart type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "dart type parameters require an ordinary non-keyword identifier" }
+===== dart type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "dart type parameters require an ordinary non-keyword identifier" }
+===== dart type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "dart", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== dart type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "dart", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== dart function context-bound width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "dart", function_name: "work", parameter_name: "T", reason: "Dart function type parameters do not support context bounds" }
+===== dart function context-bound width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "dart", function_name: "work", parameter_name: "T", reason: "Dart function type parameters do not support context bounds" }
+===== dart function lifetime width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "dart", function_name: "work", parameter_name: "'a", reason: "Dart type parameters require an ordinary non-keyword identifier" }
+===== dart function lifetime width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "dart", function_name: "work", parameter_name: "'a", reason: "Dart type parameters require an ordinary non-keyword identifier" }
+===== dart function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "dart", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== dart function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "dart", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== dart function explicit-constraint width=100 =====
+T work<T extends Bound>(T value) {
+  body
+}
+===== dart function explicit-constraint width=12 =====
+T work<T extends Bound>(T value) {
+  body
+}
+===== dart type imported-constraints width=100 =====
+import 'alpha';
+import 'beta';
+
+class Box<T extends FirstConstraint, U extends SecondConstraint> {
+  T value;
+}
+===== dart function imported-constraints width=100 =====
+import 'alpha';
+import 'beta';
+
+U work<T extends FirstConstraint, U extends SecondConstraint>(T value) {
+  body
+}
+===== dart type imported-constraints width=12 =====
+import 'alpha';
+import 'beta';
+
+class Box<T extends FirstConstraint, U extends SecondConstraint> {
+  T value;
+}
+===== dart function imported-constraints width=12 =====
+import 'alpha';
+import 'beta';
+
+U work<T extends FirstConstraint, U extends SecondConstraint>(T value) {
+  body
+}
+===== go type zero width=100 =====
+type Box struct {
+	value Value
+}
+===== go function zero width=100 =====
+func work() {
+	body
+}
+===== go type zero width=12 =====
+type Box struct {
+	value Value
+}
+===== go function zero width=12 =====
+func work() {
+	body
+}
+===== go type one width=100 =====
+type Box[T any] struct {
+	value T
+}
+===== go function one width=100 =====
+func work[T any](first T) T {
+	body
+}
+===== go type one width=12 =====
+type Box[T any] struct {
+	value T
+}
+===== go function one width=12 =====
+func work[T any](first T) T {
+	body
+}
+===== go type many width=100 =====
+type Box[T any, U any] struct {
+	value T
+}
+===== go function many width=100 =====
+func work[T any, U any](first T, second U) T {
+	body
+}
+===== go type many width=12 =====
+type Box[T any, U any] struct {
+	value T
+}
+===== go function many width=12 =====
+func work[T any, U any](first T,
+	second U) T {
+	body
+}
+===== go type bounded width=100 =====
+type Box[T Bound] struct {
+	value T
+}
+===== go function bounded width=100 =====
+func work[T Bound](first T) T {
+	body
+}
+===== go type bounded width=12 =====
+type Box[T Bound] struct {
+	value T
+}
+===== go function bounded width=12 =====
+func work[T Bound](first T) T {
+	body
+}
+===== go type explicit-constraint width=100 =====
+type Box[T Bound] struct {
+	value T
+}
+===== go type explicit-constraint width=12 =====
+type Box[T Bound] struct {
+	value T
+}
+===== go type context-bound width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Go type declarations do not support context bounds" }
+===== go type context-bound width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Go type declarations do not support context bounds" }
+===== go type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "Go type parameters require an ordinary non-keyword identifier" }
+===== go type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "Go type parameters require an ordinary non-keyword identifier" }
+===== go type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "go", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== go type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "go", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== go function context-bound width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "go", function_name: "work", parameter_name: "T", reason: "Go function type parameters do not support context bounds" }
+===== go function context-bound width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "go", function_name: "work", parameter_name: "T", reason: "Go function type parameters do not support context bounds" }
+===== go function lifetime width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "go", function_name: "work", parameter_name: "'a", reason: "Go type parameters require an ordinary non-keyword identifier" }
+===== go function lifetime width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "go", function_name: "work", parameter_name: "'a", reason: "Go type parameters require an ordinary non-keyword identifier" }
+===== go function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "go", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== go function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "go", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== go function explicit-constraint width=100 =====
+func work[T Bound](value T) T {
+	body
+}
+===== go function explicit-constraint width=12 =====
+func work[T Bound](value T) T {
+	body
+}
+===== go type imported-constraints width=100 =====
+import (
+	"alpha"
+	"beta"
+)
+
+type Box[T alpha.FirstConstraint, U beta.SecondConstraint] struct {
+	value T
+}
+===== go function imported-constraints width=100 =====
+import (
+	"alpha"
+	"beta"
+)
+
+func work[T alpha.FirstConstraint, U beta.SecondConstraint](value T) U {
+	body
+}
+===== go type imported-constraints width=12 =====
+import (
+	"alpha"
+	"beta"
+)
+
+type Box[T alpha.FirstConstraint, U beta.SecondConstraint] struct {
+	value T
+}
+===== go function imported-constraints width=12 =====
+import (
+	"alpha"
+	"beta"
+)
+
+func work[T alpha.FirstConstraint, U beta.SecondConstraint](value T) U {
+	body
+}
+===== haskell type zero width=100 =====
+data Box =
+  Box {
+    value :: Value
+  }
+===== haskell function zero width=100 =====
+work =
+  body
+===== haskell type zero width=12 =====
+data Box =
+  Box {
+    value :: Value
+  }
+===== haskell function zero width=12 =====
+work =
+  body
+===== haskell type one width=100 =====
+data Box a =
+  Box {
+    value :: a
+  }
+===== haskell function one width=100 =====
+work :: a -> a
+work first =
+  body
+===== haskell type one width=12 =====
+data Box a =
+  Box {
+    value :: a
+  }
+===== haskell function one width=12 =====
+work :: a -> a
+work first =
+  body
+===== haskell type many width=100 =====
+data Box a b =
+  Box {
+    value :: a
+  }
+===== haskell function many width=100 =====
+work :: a -> b -> a
+work first second =
+  body
+===== haskell type many width=12 =====
+data Box a b =
+  Box {
+    value :: a
+  }
+===== haskell function many width=12 =====
+work :: a -> b -> a
+work first second =
+  body
+===== haskell type bounded width=100 =====
+data Bound a => Box a =
+  Box {
+    value :: a
+  }
+===== haskell function bounded width=100 =====
+work :: Bound a => a -> a
+work first =
+  body
+===== haskell type bounded width=12 =====
+data Bound a => Box a =
+  Box {
+    value :: a
+  }
+===== haskell function bounded width=12 =====
+work :: Bound a => a -> a
+work first =
+  body
+===== haskell type explicit-constraint width=100 =====
+data Bound a => Box a =
+  Box {
+    value :: a
+  }
+===== haskell type explicit-constraint width=12 =====
+data Bound a => Box a =
+  Box {
+    value :: a
+  }
+===== haskell type context-bound width=100 =====
+data Context a => Box a =
+  Box {
+    value :: a
+  }
+===== haskell type context-bound width=12 =====
+data Context a => Box a =
+  Box {
+    value :: a
+  }
+===== haskell type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "Haskell type variables require a lowercase non-keyword identifier" }
+===== haskell type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "Haskell type variables require a lowercase non-keyword identifier" }
+===== haskell type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "hs", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== haskell type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "hs", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== haskell function context-bound width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "hs", function_name: "work", parameter_name: "a", reason: "Haskell function type variables must occur in a parameter or result type" }
+===== haskell function context-bound width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "hs", function_name: "work", parameter_name: "a", reason: "Haskell function type variables must occur in a parameter or result type" }
+===== haskell function lifetime width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "hs", function_name: "work", parameter_name: "'a", reason: "Haskell type variables require a lowercase non-keyword identifier" }
+===== haskell function lifetime width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "hs", function_name: "work", parameter_name: "'a", reason: "Haskell type variables require a lowercase non-keyword identifier" }
+===== haskell function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "hs", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== haskell function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "hs", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== haskell function explicit-constraint width=100 =====
+work :: Bound a => a -> a
+work value =
+  body
+===== haskell function explicit-constraint width=12 =====
+work :: Bound a => a -> a
+work value =
+  body
+===== haskell type imported-constraints width=100 =====
+import Alpha (FirstConstraint)
+import Beta (SecondConstraint)
+
+data (FirstConstraint a, SecondConstraint b) => Box a b =
+  Box {
+    value :: a
+  }
+===== haskell function imported-constraints width=100 =====
+import Alpha (FirstConstraint)
+import Beta (SecondConstraint)
+
+work :: (FirstConstraint a, SecondConstraint b) => a -> b
+work value =
+  body
+===== haskell type imported-constraints width=12 =====
+import Alpha (FirstConstraint)
+import Beta (SecondConstraint)
+
+data (FirstConstraint a, SecondConstraint b) => Box a b =
+  Box {
+    value :: a
+  }
+===== haskell function imported-constraints width=12 =====
+import Alpha (FirstConstraint)
+import Beta (SecondConstraint)
+
+work :: (FirstConstraint a, SecondConstraint b) => a -> b
+work value =
+  body
+===== java type zero width=100 =====
+class Box {
+    Value value;
+}
+===== java function zero width=100 =====
+Value work() {
+    body
+}
+===== java type zero width=12 =====
+class Box {
+    Value value;
+}
+===== java function zero width=12 =====
+Value work() {
+    body
+}
+===== java type one width=100 =====
+class Box<T> {
+    T value;
+}
+===== java function one width=100 =====
+<T> T work(T first) {
+    body
+}
+===== java type one width=12 =====
+class Box<T> {
+    T value;
+}
+===== java function one width=12 =====
+<T> T work(T first) {
+    body
+}
+===== java type many width=100 =====
+class Box<T, U> {
+    T value;
+}
+===== java function many width=100 =====
+<T, U> T work(T first, U second) {
+    body
+}
+===== java type many width=12 =====
+class Box<T, U> {
+    T value;
+}
+===== java function many width=12 =====
+<T, U> T work(T first,
+    U second) {
+    body
+}
+===== java type bounded width=100 =====
+class Box<T extends Bound> {
+    T value;
+}
+===== java function bounded width=100 =====
+<T extends Bound> T work(T first) {
+    body
+}
+===== java type bounded width=12 =====
+class Box<T extends Bound> {
+    T value;
+}
+===== java function bounded width=12 =====
+<T extends Bound> T work(T first) {
+    body
+}
+===== java type explicit-constraint width=100 =====
+class Box<T extends Bound> {
+    T value;
+}
+===== java type explicit-constraint width=12 =====
+class Box<T extends Bound> {
+    T value;
+}
+===== java type context-bound width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Java type declarations do not support context bounds" }
+===== java type context-bound width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Java type declarations do not support context bounds" }
+===== java type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "java type parameters require an ordinary non-keyword identifier" }
+===== java type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "java type parameters require an ordinary non-keyword identifier" }
+===== java type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "java", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== java type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "java", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== java function context-bound width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "java", function_name: "work", parameter_name: "T", reason: "Java function type parameters do not support context bounds" }
+===== java function context-bound width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "java", function_name: "work", parameter_name: "T", reason: "Java function type parameters do not support context bounds" }
+===== java function lifetime width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "java", function_name: "work", parameter_name: "'a", reason: "Java type parameters require an ordinary non-keyword identifier" }
+===== java function lifetime width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "java", function_name: "work", parameter_name: "'a", reason: "Java type parameters require an ordinary non-keyword identifier" }
+===== java function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "java", function_name: "work", context: Member, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== java function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "java", function_name: "work", context: Member, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== java function explicit-constraint width=100 =====
+<T extends Bound> T work(T value) {
+    body
+}
+===== java function explicit-constraint width=12 =====
+<T extends Bound> T work(T value) {
+    body
+}
+===== java type imported-constraints width=100 =====
+import alpha.FirstConstraint;
+import beta.SecondConstraint;
+
+class Box<T extends FirstConstraint, U extends SecondConstraint> {
+    T value;
+}
+===== java function imported-constraints width=100 =====
+import alpha.FirstConstraint;
+import beta.SecondConstraint;
+
+class Bounds {
+    <T extends FirstConstraint, U extends SecondConstraint> U work(T value) {
+        body
+    }
+}
+===== java type imported-constraints width=12 =====
+import alpha.FirstConstraint;
+import beta.SecondConstraint;
+
+class Box<T extends FirstConstraint, U extends SecondConstraint> {
+    T value;
+}
+===== java function imported-constraints width=12 =====
+import alpha.FirstConstraint;
+import beta.SecondConstraint;
+
+class Bounds {
+    <T extends FirstConstraint, U extends SecondConstraint> U work(T value) {
+        body
+    }
+}
+===== javascript type zero width=100 =====
+class Box {
+}
+===== javascript function zero width=100 =====
+function work() {
+  body
+}
+===== javascript type zero width=12 =====
+class Box {
+}
+===== javascript function zero width=12 =====
+function work() {
+  body
+}
+===== javascript type one width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== javascript function one width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript type one width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== javascript function one width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript type many width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== javascript function many width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript type many width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== javascript function many width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript type bounded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== javascript function bounded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript type bounded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== javascript function bounded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== javascript type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== javascript type context-bound width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== javascript type context-bound width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== javascript type lifetime width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== javascript type lifetime width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== javascript type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== javascript type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== javascript function context-bound width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript function context-bound width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript function lifetime width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript function lifetime width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript function explicit-constraint width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript function explicit-constraint width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== javascript type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.js", error_count: 2, errors: [UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }, UnsupportedFieldCapabilities { language: "js", field_name: "value", context: TypeMember(Class), capabilities: [ExplicitType] }] }
+===== javascript function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.js", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+===== javascript type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.js", error_count: 2, errors: [UnsupportedTypeCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }, UnsupportedFieldCapabilities { language: "js", field_name: "value", context: TypeMember(Class), capabilities: [ExplicitType] }] }
+===== javascript function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.js", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+===== kotlin type zero width=100 =====
+internal class Box {
+    var value: Value
+}
+===== kotlin function zero width=100 =====
+fun work() {
+    body
+}
+===== kotlin type zero width=12 =====
+internal class Box {
+    var value: Value
+}
+===== kotlin function zero width=12 =====
+fun work() {
+    body
+}
+===== kotlin type one width=100 =====
+internal class Box<T> {
+    var value: T
+}
+===== kotlin function one width=100 =====
+fun <T> work(first: T): T {
+    body
+}
+===== kotlin type one width=12 =====
+internal class Box<T> {
+    var value: T
+}
+===== kotlin function one width=12 =====
+fun <T> work(first: T): T {
+    body
+}
+===== kotlin type many width=100 =====
+internal class Box<T, U> {
+    var value: T
+}
+===== kotlin function many width=100 =====
+fun <T, U> work(first: T, second: U): T {
+    body
+}
+===== kotlin type many width=12 =====
+internal class Box<T, U> {
+    var value: T
+}
+===== kotlin function many width=12 =====
+fun <T, U> work(first: T,
+    second: U): T {
+    body
+}
+===== kotlin type bounded width=100 =====
+internal class Box<T : Bound> {
+    var value: T
+}
+===== kotlin function bounded width=100 =====
+fun <T : Bound> work(first: T): T {
+    body
+}
+===== kotlin type bounded width=12 =====
+internal class Box<T : Bound> {
+    var value: T
+}
+===== kotlin function bounded width=12 =====
+fun <T : Bound> work(first: T): T {
+    body
+}
+===== kotlin type explicit-constraint width=100 =====
+internal class Box<T> where T : Bound {
+    var value: T
+}
+===== kotlin type explicit-constraint width=12 =====
+internal class Box<T> where T : Bound {
+    var value: T
+}
+===== kotlin type context-bound width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Kotlin type declarations do not support Scala-style context bounds" }
+===== kotlin type context-bound width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Kotlin type declarations do not support Scala-style context bounds" }
+===== kotlin type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "kt type parameters require an ordinary non-keyword identifier" }
+===== kotlin type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "kt type parameters require an ordinary non-keyword identifier" }
+===== kotlin type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "kt", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== kotlin type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "kt", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== kotlin function context-bound width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "kt", function_name: "work", parameter_name: "T", reason: "Kotlin function type parameters do not support Scala-style context bounds" }
+===== kotlin function context-bound width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "kt", function_name: "work", parameter_name: "T", reason: "Kotlin function type parameters do not support Scala-style context bounds" }
+===== kotlin function lifetime width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "kt", function_name: "work", parameter_name: "'a", reason: "Kotlin type parameters require an ordinary non-keyword identifier" }
+===== kotlin function lifetime width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "kt", function_name: "work", parameter_name: "'a", reason: "Kotlin type parameters require an ordinary non-keyword identifier" }
+===== kotlin function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "kt", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== kotlin function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "kt", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== kotlin function explicit-constraint width=100 =====
+fun <T : Bound> work(value: T): T {
+    body
+}
+===== kotlin function explicit-constraint width=12 =====
+fun <T : Bound> work(value: T): T {
+    body
+}
+===== kotlin type imported-constraints width=100 =====
+import alpha.FirstConstraint
+import beta.SecondConstraint
+
+internal class Box<T, U> where T : FirstConstraint, U : SecondConstraint {
+    var value: T
+}
+===== kotlin function imported-constraints width=100 =====
+import alpha.FirstConstraint
+import beta.SecondConstraint
+
+fun <T : FirstConstraint, U : SecondConstraint> work(value: T): U {
+    body
+}
+===== kotlin type imported-constraints width=12 =====
+import alpha.FirstConstraint
+import beta.SecondConstraint
+
+internal class Box<T, U> where T : FirstConstraint, U : SecondConstraint {
+    var value: T
+}
+===== kotlin function imported-constraints width=12 =====
+import alpha.FirstConstraint
+import beta.SecondConstraint
+
+fun <T : FirstConstraint, U : SecondConstraint> work(value: T): U {
+    body
+}
+===== lua type zero width=100 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua function zero width=100 =====
+function work()
+  body
+end
+===== lua type zero width=12 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua function zero width=12 =====
+function work()
+  body
+end
+===== lua type one width=100 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua function one width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua type one width=12 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua function one width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua type many width=100 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua function many width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua type many width=12 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua function many width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua type bounded width=100 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua function bounded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua type bounded width=12 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua function bounded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua type context-bound width=100 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua type context-bound width=12 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua type lifetime width=100 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua type lifetime width=12 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua type higher-kinded width=100 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua type higher-kinded width=12 =====
+ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
+===== lua function context-bound width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua function context-bound width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua function lifetime width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua function lifetime width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua function explicit-constraint width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua function explicit-constraint width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== lua type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }] }
+===== lua function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+===== lua type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }] }
+===== lua function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+===== ocaml type zero width=100 =====
+type box =
+  {
+    value : Value;
+  }
+===== ocaml function zero width=100 =====
+let work =
+  body
+===== ocaml type zero width=12 =====
+type box =
+  {
+    value : Value;
+  }
+===== ocaml function zero width=12 =====
+let work =
+  body
+===== ocaml type one width=100 =====
+type 'a box =
+  {
+    value : a;
+  }
+===== ocaml function one width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== ocaml type one width=12 =====
+type 'a box =
+  {
+    value : a;
+  }
+===== ocaml function one width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== ocaml type many width=100 =====
+type ('a, 'b) box =
+  {
+    value : a;
+  }
+===== ocaml function many width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== ocaml type many width=12 =====
+type ('a, 'b) box =
+  {
+    value : a;
+  }
+===== ocaml function many width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== ocaml type bounded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [BoundedPolymorphism] }
+===== ocaml function bounded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== ocaml type bounded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [BoundedPolymorphism] }
+===== ocaml function bounded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== ocaml type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [BoundedPolymorphism] }
+===== ocaml type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [BoundedPolymorphism] }
+===== ocaml type context-bound width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [BoundedPolymorphism] }
+===== ocaml type context-bound width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [BoundedPolymorphism] }
+===== ocaml type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "box", parameter_name: "'a", reason: "OCaml type parameters require a lowercase type-variable identifier" }
+===== ocaml type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "box", parameter_name: "'a", reason: "OCaml type parameters require a lowercase type-variable identifier" }
+===== ocaml type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [HigherKindedPolymorphism] }
+===== ocaml type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [HigherKindedPolymorphism] }
+===== ocaml function context-bound width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== ocaml function context-bound width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== ocaml function lifetime width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== ocaml function lifetime width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== ocaml function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== ocaml function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== ocaml function explicit-constraint width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== ocaml function explicit-constraint width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== ocaml type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.ml", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [BoundedPolymorphism] }] }
+===== ocaml function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.ml", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== ocaml type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.ml", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "ml", type_name: "box", capabilities: [BoundedPolymorphism] }] }
+===== ocaml function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.ml", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "ml", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== php type zero width=100 =====
+class Box {
+}
+===== php function zero width=100 =====
+function work() {
+    body
+}
+===== php type zero width=12 =====
+class Box {
+}
+===== php function zero width=12 =====
+function work() {
+    body
+}
+===== php type one width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== php function one width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== php type one width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== php function one width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== php type many width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== php function many width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== php type many width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== php function many width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== php type bounded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php function bounded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php type bounded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php function bounded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php type context-bound width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php type context-bound width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php type lifetime width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== php type lifetime width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== php type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== php type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== php function context-bound width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php function context-bound width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php function lifetime width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== php function lifetime width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== php function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== php function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== php function explicit-constraint width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php function explicit-constraint width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== php type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.php", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== php function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.php", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== php type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.php", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "php", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== php function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.php", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "php", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== python type zero width=100 =====
+class Box:
+    pass
+===== python function zero width=100 =====
+def work():
+    body
+===== python type zero width=12 =====
+class Box:
+    pass
+===== python function zero width=12 =====
+def work():
+    body
+===== python type one width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== python function one width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== python type one width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== python function one width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== python type many width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== python function many width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== python type many width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== python function many width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== python type bounded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python function bounded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python type bounded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python function bounded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python type context-bound width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python type context-bound width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python type lifetime width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== python type lifetime width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== python type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== python type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== python function context-bound width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python function context-bound width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python function lifetime width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== python function lifetime width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+===== python function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== python function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+===== python function explicit-constraint width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python function explicit-constraint width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== python type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.py", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== python function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.py", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== python type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.py", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "py", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== python function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.py", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "py", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+===== ruby type zero width=100 =====
+class Box
+end
+===== ruby function zero width=100 =====
+def work()
+  body
+end
+===== ruby type zero width=12 =====
+class Box
+end
+===== ruby function zero width=12 =====
+def work()
+  body
+end
+===== ruby type one width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== ruby function one width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby type one width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== ruby function one width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby type many width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== ruby function many width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby type many width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism] }
+===== ruby function many width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby type bounded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== ruby function bounded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby type bounded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+===== ruby function bounded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism, BoundedPolymorphism] }
+===== ruby type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism, BoundedPolymorphism] }
+===== ruby type context-bound width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism, BoundedPolymorphism] }
+===== ruby type context-bound width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism, BoundedPolymorphism] }
+===== ruby type lifetime width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism] }
+===== ruby type lifetime width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism] }
+===== ruby type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism, HigherKindedPolymorphism] }
+===== ruby type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism, HigherKindedPolymorphism] }
+===== ruby function context-bound width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby function context-bound width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby function lifetime width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby function lifetime width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby function explicit-constraint width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby function explicit-constraint width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+===== ruby type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism, BoundedPolymorphism] }] }
+===== ruby function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+===== ruby type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 1, errors: [UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields, ParametricPolymorphism, BoundedPolymorphism] }] }
+===== ruby function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+===== rust type zero width=100 =====
+struct Box {
+    value: Value,
+}
+===== rust function zero width=100 =====
+fn work() {
+    body
+}
+===== rust type zero width=12 =====
+struct Box {
+    value: Value,
+}
+===== rust function zero width=12 =====
+fn work() {
+    body
+}
+===== rust type one width=100 =====
+struct Box<T> {
+    value: T,
+}
+===== rust function one width=100 =====
+fn work<T>(first: T) -> T {
+    body
+}
+===== rust type one width=12 =====
+struct Box<T> {
+    value: T,
+}
+===== rust function one width=12 =====
+fn work<T>(first: T) -> T {
+    body
+}
+===== rust type many width=100 =====
+struct Box<T, U> {
+    value: T,
+}
+===== rust function many width=100 =====
+fn work<T, U>(first: T, second: U) -> T {
+    body
+}
+===== rust type many width=12 =====
+struct Box<T, U> {
+    value: T,
+}
+===== rust function many width=12 =====
+fn work<T, U>(first: T,
+    second: U) -> T {
+    body
+}
+===== rust type bounded width=100 =====
+struct Box<T: Bound> {
+    value: T,
+}
+===== rust function bounded width=100 =====
+fn work<T: Bound>(first: T) -> T {
+    body
+}
+===== rust type bounded width=12 =====
+struct Box<T: Bound> {
+    value: T,
+}
+===== rust function bounded width=12 =====
+fn work<T: Bound>(first: T) -> T {
+    body
+}
+===== rust type explicit-constraint width=100 =====
+struct Box<T>
+where
+    T: Bound,
+{
+    value: T,
+}
+===== rust type explicit-constraint width=12 =====
+struct Box<T>
+where
+    T: Bound,
+{
+    value: T,
+}
+===== rust type context-bound width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Rust type declarations do not support Scala-style context bounds" }
+===== rust type context-bound width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Rust type declarations do not support Scala-style context bounds" }
+===== rust type lifetime width=100 =====
+struct Box<'a> {
+    value: Value,
+}
+===== rust type lifetime width=12 =====
+struct Box<'a> {
+    value: Value,
+}
+===== rust type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "rs", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== rust type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "rs", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== rust function context-bound width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "rs", function_name: "work", parameter_name: "T", reason: "Rust function type parameters do not support Scala-style context bounds" }
+===== rust function context-bound width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "rs", function_name: "work", parameter_name: "T", reason: "Rust function type parameters do not support Scala-style context bounds" }
+===== rust function lifetime width=100 =====
+fn work<'a>(value: Value) -> Value {
+    body
+}
+===== rust function lifetime width=12 =====
+fn work<'a>(value: Value) -> Value {
+    body
+}
+===== rust function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rs", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== rust function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "rs", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== rust function explicit-constraint width=100 =====
+fn work<T>(value: T) -> T
+where
+    T: Bound,
+{
+    body
+}
+===== rust function explicit-constraint width=12 =====
+fn work<T>(value: T) -> T
+where
+    T: Bound,
+{
+    body
+}
+===== rust type imported-constraints width=100 =====
+use alpha::FirstConstraint;
+use beta::SecondConstraint;
+
+struct Box<T, U>
+where
+    T: FirstConstraint,
+    U: SecondConstraint,
+{
+    value: T,
+}
+===== rust function imported-constraints width=100 =====
+use alpha::FirstConstraint;
+use beta::SecondConstraint;
+
+fn work<T, U>(value: T) -> U
+where
+    T: FirstConstraint,
+    U: SecondConstraint,
+{
+    body
+}
+===== rust type imported-constraints width=12 =====
+use alpha::FirstConstraint;
+use beta::SecondConstraint;
+
+struct Box<T, U>
+where
+    T: FirstConstraint,
+    U: SecondConstraint,
+{
+    value: T,
+}
+===== rust function imported-constraints width=12 =====
+use alpha::FirstConstraint;
+use beta::SecondConstraint;
+
+fn work<T, U>(value: T) -> U
+where
+    T: FirstConstraint,
+    U: SecondConstraint,
+{
+    body
+}
+===== scala type zero width=100 =====
+class Box {
+  var value: Value
+}
+===== scala function zero width=100 =====
+def work() = {
+  body
+}
+===== scala type zero width=12 =====
+class Box {
+  var value: Value
+}
+===== scala function zero width=12 =====
+def work() = {
+  body
+}
+===== scala type one width=100 =====
+class Box[T] {
+  var value: T
+}
+===== scala function one width=100 =====
+def work[T](first: T): T = {
+  body
+}
+===== scala type one width=12 =====
+class Box[T] {
+  var value: T
+}
+===== scala function one width=12 =====
+def work[T](first: T): T = {
+  body
+}
+===== scala type many width=100 =====
+class Box[T, U] {
+  var value: T
+}
+===== scala function many width=100 =====
+def work[T, U](first: T, second: U): T = {
+  body
+}
+===== scala type many width=12 =====
+class Box[T, U] {
+  var value: T
+}
+===== scala function many width=12 =====
+def work[T, U](first: T,
+  second: U): T = {
+  body
+}
+===== scala type bounded width=100 =====
+class Box[T <: Bound] {
+  var value: T
+}
+===== scala function bounded width=100 =====
+def work[T <: Bound](first: T): T = {
+  body
+}
+===== scala type bounded width=12 =====
+class Box[T <: Bound] {
+  var value: T
+}
+===== scala function bounded width=12 =====
+def work[T <: Bound](first: T): T = {
+  body
+}
+===== scala type explicit-constraint width=100 =====
+class Box[T <: Bound] {
+  var value: T
+}
+===== scala type explicit-constraint width=12 =====
+class Box[T <: Bound] {
+  var value: T
+}
+===== scala type context-bound width=100 =====
+class Box[T : Context] {
+  var value: T
+}
+===== scala type context-bound width=12 =====
+class Box[T : Context] {
+  var value: T
+}
+===== scala type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "scala type parameters require an ordinary non-keyword identifier" }
+===== scala type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "scala type parameters require an ordinary non-keyword identifier" }
+===== scala type higher-kinded width=100 =====
+class Box[F[_]] {
+  var value: F
+}
+===== scala type higher-kinded width=12 =====
+class Box[F[_]] {
+  var value: F
+}
+===== scala function context-bound width=100 =====
+def work[T : Context](value: Value): Value = {
+  body
+}
+===== scala function context-bound width=12 =====
+def work[T : Context](value: Value): Value = {
+  body
+}
+===== scala function lifetime width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "scala", function_name: "work", parameter_name: "'a", reason: "Scala type parameters require an ordinary non-keyword identifier" }
+===== scala function lifetime width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "scala", function_name: "work", parameter_name: "'a", reason: "Scala type parameters require an ordinary non-keyword identifier" }
+===== scala function higher-kinded width=100 =====
+def work[F[_]](value: Value): Value = {
+  body
+}
+===== scala function higher-kinded width=12 =====
+def work[F[_]](value: Value): Value = {
+  body
+}
+===== scala function explicit-constraint width=100 =====
+def work[T <: Bound](value: T): T = {
+  body
+}
+===== scala function explicit-constraint width=12 =====
+def work[T <: Bound](value: T): T = {
+  body
+}
+===== scala type imported-constraints width=100 =====
+import alpha.FirstConstraint
+import beta.SecondConstraint
+
+class Box[T <: FirstConstraint, U <: SecondConstraint] {
+  var value: T
+}
+===== scala function imported-constraints width=100 =====
+import alpha.FirstConstraint
+import beta.SecondConstraint
+
+def work[T <: FirstConstraint, U <: SecondConstraint](value: T): U = {
+  body
+}
+===== scala type imported-constraints width=12 =====
+import alpha.FirstConstraint
+import beta.SecondConstraint
+
+class Box[T <: FirstConstraint, U <: SecondConstraint] {
+  var value: T
+}
+===== scala function imported-constraints width=12 =====
+import alpha.FirstConstraint
+import beta.SecondConstraint
+
+def work[T <: FirstConstraint, U <: SecondConstraint](value: T): U = {
+  body
+}
+===== swift type zero width=100 =====
+class Box {
+    var value: Value
+}
+===== swift function zero width=100 =====
+func work() {
+    body
+}
+===== swift type zero width=12 =====
+class Box {
+    var value: Value
+}
+===== swift function zero width=12 =====
+func work() {
+    body
+}
+===== swift type one width=100 =====
+class Box<T> {
+    var value: T
+}
+===== swift function one width=100 =====
+func work<T>(first: T) -> T {
+    body
+}
+===== swift type one width=12 =====
+class Box<T> {
+    var value: T
+}
+===== swift function one width=12 =====
+func work<T>(first: T) -> T {
+    body
+}
+===== swift type many width=100 =====
+class Box<T, U> {
+    var value: T
+}
+===== swift function many width=100 =====
+func work<T, U>(first: T, second: U) -> T {
+    body
+}
+===== swift type many width=12 =====
+class Box<T, U> {
+    var value: T
+}
+===== swift function many width=12 =====
+func work<T, U>(first: T,
+    second: U) -> T {
+    body
+}
+===== swift type bounded width=100 =====
+class Box<T: Bound> {
+    var value: T
+}
+===== swift function bounded width=100 =====
+func work<T: Bound>(first: T) -> T {
+    body
+}
+===== swift type bounded width=12 =====
+class Box<T: Bound> {
+    var value: T
+}
+===== swift function bounded width=12 =====
+func work<T: Bound>(first: T) -> T {
+    body
+}
+===== swift type explicit-constraint width=100 =====
+class Box<T> where T: Bound {
+    var value: T
+}
+===== swift type explicit-constraint width=12 =====
+class Box<T> where T: Bound {
+    var value: T
+}
+===== swift type context-bound width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Swift type declarations do not support context bounds" }
+===== swift type context-bound width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "Swift type declarations do not support context bounds" }
+===== swift type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "swift type parameters require an ordinary non-keyword identifier" }
+===== swift type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "swift type parameters require an ordinary non-keyword identifier" }
+===== swift type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "swift", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== swift type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "swift", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== swift function context-bound width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "swift", function_name: "work", parameter_name: "T", reason: "Swift function type parameters do not support context bounds" }
+===== swift function context-bound width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "swift", function_name: "work", parameter_name: "T", reason: "Swift function type parameters do not support context bounds" }
+===== swift function lifetime width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "swift", function_name: "work", parameter_name: "'a", reason: "Swift type parameters require an ordinary non-keyword identifier" }
+===== swift function lifetime width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "swift", function_name: "work", parameter_name: "'a", reason: "Swift type parameters require an ordinary non-keyword identifier" }
+===== swift function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "swift", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== swift function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "swift", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== swift function explicit-constraint width=100 =====
+func work<T: Bound>(value: T) -> T {
+    body
+}
+===== swift function explicit-constraint width=12 =====
+func work<T: Bound>(value: T) -> T {
+    body
+}
+===== swift type imported-constraints width=100 =====
+import Alpha
+import Beta
+
+class Box<T, U> where T: FirstConstraint, U: SecondConstraint {
+    var value: T
+}
+===== swift function imported-constraints width=100 =====
+import Alpha
+import Beta
+
+func work<T: FirstConstraint, U: SecondConstraint>(value: T) -> U {
+    body
+}
+===== swift type imported-constraints width=12 =====
+import Alpha
+import Beta
+
+class Box<T, U> where T: FirstConstraint, U: SecondConstraint {
+    var value: T
+}
+===== swift function imported-constraints width=12 =====
+import Alpha
+import Beta
+
+func work<T: FirstConstraint, U: SecondConstraint>(value: T) -> U {
+    body
+}
+===== typescript type zero width=100 =====
+class Box {
+  value: Value;
+}
+===== typescript function zero width=100 =====
+function work() {
+  body
+}
+===== typescript type zero width=12 =====
+class Box {
+  value: Value;
+}
+===== typescript function zero width=12 =====
+function work() {
+  body
+}
+===== typescript type one width=100 =====
+class Box<T> {
+  value: T;
+}
+===== typescript function one width=100 =====
+function work<T>(first: T): T {
+  body
+}
+===== typescript type one width=12 =====
+class Box<T> {
+  value: T;
+}
+===== typescript function one width=12 =====
+function work<T>(first: T): T {
+  body
+}
+===== typescript type many width=100 =====
+class Box<T, U> {
+  value: T;
+}
+===== typescript function many width=100 =====
+function work<T, U>(first: T, second: U): T {
+  body
+}
+===== typescript type many width=12 =====
+class Box<T, U> {
+  value: T;
+}
+===== typescript function many width=12 =====
+function work<T, U>(first: T,
+  second: U): T {
+  body
+}
+===== typescript type bounded width=100 =====
+class Box<T extends Bound> {
+  value: T;
+}
+===== typescript function bounded width=100 =====
+function work<T extends Bound>(first: T): T {
+  body
+}
+===== typescript type bounded width=12 =====
+class Box<T extends Bound> {
+  value: T;
+}
+===== typescript function bounded width=12 =====
+function work<T extends Bound>(first: T): T {
+  body
+}
+===== typescript type explicit-constraint width=100 =====
+class Box<T extends Bound> {
+  value: T;
+}
+===== typescript type explicit-constraint width=12 =====
+class Box<T extends Bound> {
+  value: T;
+}
+===== typescript type context-bound width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "TypeScript type declarations do not support context bounds" }
+===== typescript type context-bound width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "T", reason: "TypeScript type declarations do not support context bounds" }
+===== typescript type lifetime width=100 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "ts type parameters require an ordinary non-keyword identifier" }
+===== typescript type lifetime width=12 =====
+ERROR: InvalidTypeParameter { type_name: "Box", parameter_name: "'a", reason: "ts type parameters require an ordinary non-keyword identifier" }
+===== typescript type higher-kinded width=100 =====
+ERROR: UnsupportedTypeCapabilities { language: "ts", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== typescript type higher-kinded width=12 =====
+ERROR: UnsupportedTypeCapabilities { language: "ts", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
+===== typescript function context-bound width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "ts", function_name: "work", parameter_name: "T", reason: "TypeScript function type parameters do not support context bounds" }
+===== typescript function context-bound width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "ts", function_name: "work", parameter_name: "T", reason: "TypeScript function type parameters do not support context bounds" }
+===== typescript function lifetime width=100 =====
+ERROR: InvalidFunctionTypeParameter { language: "ts", function_name: "work", parameter_name: "'a", reason: "TypeScript type parameters require an ordinary non-keyword identifier" }
+===== typescript function lifetime width=12 =====
+ERROR: InvalidFunctionTypeParameter { language: "ts", function_name: "work", parameter_name: "'a", reason: "TypeScript type parameters require an ordinary non-keyword identifier" }
+===== typescript function higher-kinded width=100 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ts", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== typescript function higher-kinded width=12 =====
+ERROR: UnsupportedFunctionCapabilities { language: "ts", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
+===== typescript function explicit-constraint width=100 =====
+function work<T extends Bound>(value: T): T {
+  body
+}
+===== typescript function explicit-constraint width=12 =====
+function work<T extends Bound>(value: T): T {
+  body
+}
+===== typescript type imported-constraints width=100 =====
+import { FirstConstraint } from 'alpha';
+import { SecondConstraint } from 'beta';
+
+class Box<T extends FirstConstraint, U extends SecondConstraint> {
+  value: T;
+}
+===== typescript function imported-constraints width=100 =====
+import { FirstConstraint } from 'alpha';
+import { SecondConstraint } from 'beta';
+
+function work<T extends FirstConstraint, U extends SecondConstraint>(value: T): U {
+  body
+}
+===== typescript type imported-constraints width=12 =====
+import { FirstConstraint } from 'alpha';
+import { SecondConstraint } from 'beta';
+
+class Box<T extends FirstConstraint, U extends SecondConstraint> {
+  value: T;
+}
+===== typescript function imported-constraints width=12 =====
+import { FirstConstraint } from 'alpha';
+import { SecondConstraint } from 'beta';
+
+function work<T extends FirstConstraint, U extends SecondConstraint>(value: T): U {
+  body
+}
+===== zsh type zero width=100 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh function zero width=100 =====
+function work() {
+    body
+}
+===== zsh type zero width=12 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh function zero width=12 =====
+function work() {
+    body
+}
+===== zsh type one width=100 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh function one width=100 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh type one width=12 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh function one width=12 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh type many width=100 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh function many width=100 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 2 }
+===== zsh type many width=12 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh function many width=12 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 2 }
+===== zsh type bounded width=100 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh function bounded width=100 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh type bounded width=12 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh function bounded width=12 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh type explicit-constraint width=100 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh type explicit-constraint width=12 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh type context-bound width=100 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh type context-bound width=12 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh type lifetime width=100 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh type lifetime width=12 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh type higher-kinded width=100 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh type higher-kinded width=12 =====
+ERROR: UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }
+===== zsh function context-bound width=100 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh function context-bound width=12 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh function lifetime width=100 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh function lifetime width=12 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh function higher-kinded width=100 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh function higher-kinded width=12 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh function explicit-constraint width=100 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh function explicit-constraint width=12 =====
+ERROR: TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }
+===== zsh type imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.zsh", error_count: 1, errors: [UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }] }
+===== zsh function imported-constraints width=100 =====
+ERROR: FileSpecValidation { filename: "bounds.zsh", error_count: 1, errors: [TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }] }
+===== zsh type imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.zsh", error_count: 1, errors: [UnsupportedTypeKind { language: "zsh", kind: Class, type_name: "Box" }] }
+===== zsh function imported-constraints width=12 =====
+ERROR: FileSpecValidation { filename: "bounds.zsh", error_count: 1, errors: [TooManyFunctionParameters { language: "zsh", function_name: "work", context: TopLevel, form: Function, maximum: 0, actual: 1 }] }

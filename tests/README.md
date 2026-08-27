@@ -15,6 +15,11 @@ The integration suites are grouped by the contract they protect:
   capability profiles.
 - `tests/*_lowering_tests.rs` checks complete declaration lowering and
   fail-closed validation.
+- `tests/declaration_generic_lowering_tests.rs` owns the canonical 20-language
+  type/function declaration matrix for zero, one, many, bounded, lifetime,
+  higher-kinded, context-bound, and explicit-constraint cases. It also checks
+  imported bound aliases, wide/narrow rendering, and strict missing-lowerer
+  failure.
 - `tests/renderer_parity_tests.rs` covers all built-in languages on the direct
   and pretty renderer paths, resolved-import validation, and the exact output
   or rejection for every current `TypeName` variant in every built-in language.
@@ -63,6 +68,7 @@ cargo test --test function_capability_matrix_tests
 cargo test --test property_capability_matrix_tests
 cargo test --test variant_capability_matrix_tests
 cargo test --test renderer_parity_tests
+cargo test --test declaration_generic_lowering_tests
 cargo test --test typescript shared::golden::tests
 ```
 

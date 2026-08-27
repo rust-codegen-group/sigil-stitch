@@ -320,6 +320,13 @@ but do not choose their relative order. Related adapters may additionally share
 a genuinely family-specific lowering helper. An adapter can bypass either
 without adding a new variant to a shared grammar interface.
 
+Built-in type and function lowerers spell declaration generics locally,
+including bounds, lifetimes, kinds, context bounds, and explicit constraint
+clauses. Only the frozen permissive compatibility path interprets the
+deprecated shared generic configuration. A strict adapter that advertises a
+function profile but omits `lower_function()` fails with
+`MissingFunctionLowerer` instead of silently selecting compatibility grammar.
+
 A useful locality test is to add a language with a previously unseen syntax.
 The change should be confined to that adapter, its private helpers, and its
 tests. If the change requires a new shared placement enum and new branches in a

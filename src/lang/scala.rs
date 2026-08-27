@@ -504,6 +504,19 @@ impl CodeLang for Scala {
         type_params: &[crate::spec::where_spec::TypeParamSpec],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
+        if let Some(parameter) = type_params.iter().find(|parameter| {
+            parameter.is_lifetime()
+                || !crate::lang::type_lowering::scala::is_identifier(parameter.name())
+                || self.reserved_words().contains(&parameter.name())
+        }) {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().to_string(),
+                function_name: function_name.to_string(),
+                parameter_name: parameter.name().to_string(),
+                reason: "Scala type parameters require an ordinary non-keyword identifier"
+                    .to_string(),
+            });
+        }
         if let Some(parameter) = invalid_raw_type_parameter(type_params) {
             return Err(SigilStitchError::InvalidFunctionTypeParameter {
                 language: self.file_extension().to_string(),
