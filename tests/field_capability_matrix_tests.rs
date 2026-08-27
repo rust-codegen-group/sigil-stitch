@@ -2,6 +2,11 @@ use sigil_stitch::lang::CodeLang;
 use sigil_stitch::lang::capability::{FieldCapability, FieldContext};
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind};
 
+#[path = "shared/languages.rs"]
+mod languages_registry;
+
+use languages_registry::{BUILT_IN_LANGUAGES, adapter_for};
+
 use FieldCapability::{
     Attributes, ExplicitType, Initializer, OptionalPresence, ReadOnly, StaticField,
 };
@@ -112,7 +117,7 @@ fn built_in_field_matrices_are_exhaustive() {
     use TypeKind::{Class, Enum, Interface, Struct, Trait};
 
     assert_matrix(
-        &sigil_stitch::lang::c::C::new(),
+        adapter_for("c").as_ref(),
         &[
             profile(Direct(TopLevel), C_TOP_LEVEL_FIELDS, EXPLICIT),
             profile(Direct(Member), C_FIELDS, EXPLICIT),
@@ -124,7 +129,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::cpp::Cpp::new(),
+        adapter_for("cpp").as_ref(),
         &[
             profile(Direct(TopLevel), FULL_TYPED, EXPLICIT),
             profile(Direct(Member), FULL_TYPED, EXPLICIT),
@@ -136,7 +141,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::csharp::CSharp::new(),
+        adapter_for("csharp").as_ref(),
         &[
             profile(Direct(Member), FULL_TYPED, EXPLICIT),
             profile(TypeMember(Class), FULL_TYPED, EXPLICIT),
@@ -144,7 +149,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::dart::Dart::new(),
+        adapter_for("dart").as_ref(),
         &[
             profile(Direct(Member), DYNAMIC_FULL, &[]),
             profile(TypeMember(Class), DYNAMIC_FULL, &[]),
@@ -152,7 +157,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::go::Go::new(),
+        adapter_for("go").as_ref(),
         &[
             profile(Direct(Member), GO_FIELDS, EXPLICIT),
             profile(TypeMember(Struct), GO_FIELDS, EXPLICIT),
@@ -160,7 +165,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::haskell::Haskell::new(),
+        adapter_for("haskell").as_ref(),
         &[
             profile(Direct(Member), IMMUTABLE_FIELDS, EXPLICIT),
             profile(TypeMember(Struct), IMMUTABLE_FIELDS, EXPLICIT),
@@ -169,7 +174,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::java::Java::new(),
+        adapter_for("java").as_ref(),
         &[
             profile(Direct(Member), FULL_TYPED, EXPLICIT),
             profile(TypeMember(Class), FULL_TYPED, EXPLICIT),
@@ -178,7 +183,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::javascript::JavaScript::new(),
+        adapter_for("javascript").as_ref(),
         &[
             profile(Direct(Member), JS_FIELDS, &[]),
             profile(Direct(InterfaceMember), JS_FIELDS, &[]),
@@ -190,7 +195,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::kotlin::Kotlin::new(),
+        adapter_for("kotlin").as_ref(),
         &[
             profile(Direct(Member), VALUE_FIELDS, &[]),
             profile(TypeMember(Class), VALUE_FIELDS, &[]),
@@ -199,7 +204,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::ocaml::OCaml::new(),
+        adapter_for("ocaml").as_ref(),
         &[
             profile(Direct(Member), IMMUTABLE_FIELDS, EXPLICIT),
             profile(TypeMember(Struct), IMMUTABLE_FIELDS, EXPLICIT),
@@ -208,7 +213,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::php::Php::new(),
+        adapter_for("php").as_ref(),
         &[
             profile(Direct(Member), FULL_TYPED, &[]),
             profile(TypeMember(Class), FULL_TYPED, &[]),
@@ -217,7 +222,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::python::Python::new(),
+        adapter_for("python").as_ref(),
         &[
             profile(Direct(Member), PYTHON_FIELDS, &[]),
             profile(Direct(InterfaceMember), PYTHON_FIELDS, &[]),
@@ -228,7 +233,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::rust::Rust::new(),
+        adapter_for("rust").as_ref(),
         &[
             profile(Direct(Member), RUST_FIELDS, EXPLICIT),
             profile(TypeMember(Struct), RUST_FIELDS, EXPLICIT),
@@ -237,7 +242,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::scala::Scala::new(),
+        adapter_for("scala").as_ref(),
         &[
             profile(Direct(Member), VALUE_FIELDS, &[]),
             profile(TypeMember(Class), VALUE_FIELDS, &[]),
@@ -246,7 +251,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::swift::Swift::new(),
+        adapter_for("swift").as_ref(),
         &[
             profile(Direct(Member), DYNAMIC_FULL, &[]),
             profile(TypeMember(Class), DYNAMIC_FULL, &[]),
@@ -254,7 +259,7 @@ fn built_in_field_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::typescript::TypeScript::new(),
+        adapter_for("typescript").as_ref(),
         &[
             profile(Direct(Member), TS_CONCRETE, &[]),
             profile(Direct(InterfaceMember), TS_CONTRACT, EXPLICIT),
@@ -268,13 +273,12 @@ fn built_in_field_matrices_are_exhaustive() {
 
 #[test]
 fn shell_lua_and_ruby_have_no_field_profiles() {
-    let languages: Vec<Box<dyn CodeLang>> = vec![
-        Box::new(sigil_stitch::lang::bash::Bash::new()),
-        Box::new(sigil_stitch::lang::zsh::Zsh::new()),
-        Box::new(sigil_stitch::lang::lua::Lua::new()),
-        Box::new(sigil_stitch::lang::ruby::Ruby::new()),
-    ];
-    for lang in languages {
-        assert_matrix(lang.as_ref(), &[]);
+    const UNSUPPORTED: &[&str] = &["bash", "zsh", "lua", "ruby"];
+
+    for language in BUILT_IN_LANGUAGES
+        .into_iter()
+        .filter(|language| UNSUPPORTED.contains(&language.id))
+    {
+        assert_matrix(language.adapter().as_ref(), &[]);
     }
 }

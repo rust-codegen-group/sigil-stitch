@@ -60,7 +60,9 @@ pub struct Python {
     pub indent: String,
     /// Quote style for string literals. Python accepts both; `Single` is the
     /// community default (Black defaults to `Double`).
-    #[deprecated(note = "legacy 0.6.8 field; quote selection is language-owned in 0.7")]
+    #[deprecated(
+        note = "legacy 0.6.8 field; use Python::with_single_quotes() or Python::with_double_quotes()"
+    )]
     #[expect(deprecated, reason = "0.6.8 compatibility field")]
     pub quote_style: QuoteStyle,
     /// File extension (default: "py"). Set to "pyi" for stub files.
@@ -85,10 +87,26 @@ impl Python {
     }
 
     /// Set the quote style used for string literals.
-    #[deprecated(note = "legacy 0.6.8 setter; use language-local quote selection in 0.7")]
+    #[deprecated(
+        note = "legacy 0.6.8 setter; use Python::with_single_quotes() or Python::with_double_quotes()"
+    )]
     #[expect(deprecated, reason = "0.6.8 compatibility setter")]
     pub fn with_quote_style(mut self, qs: QuoteStyle) -> Self {
         self.quote_style = qs;
+        self
+    }
+
+    /// Use single quotes for string literals.
+    #[expect(deprecated, reason = "updates the 0.6.8 compatibility field")]
+    pub fn with_single_quotes(mut self) -> Self {
+        self.quote_style = QuoteStyle::Single;
+        self
+    }
+
+    /// Use double quotes for string literals.
+    #[expect(deprecated, reason = "updates the 0.6.8 compatibility field")]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.quote_style = QuoteStyle::Double;
         self
     }
 
@@ -119,6 +137,15 @@ const PYTHON_RESERVED: &[&str] = &[
     "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while",
     "with", "yield",
 ];
+
+fn is_valid_import_alias(alias: &str) -> bool {
+    let mut characters = alias.chars();
+    characters
+        .next()
+        .is_some_and(|character| character == '_' || unicode_ident::is_xid_start(character))
+        && characters.all(unicode_ident::is_xid_continue)
+        && !PYTHON_RESERVED.contains(&alias)
+}
 
 /// Common Python stdlib top-level module names.
 /// Used to separate stdlib imports from third-party imports (PEP 8).
@@ -207,6 +234,12 @@ fn is_stdlib(module: &str) -> bool {
 }
 
 impl RendererLang for Python {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::python(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -216,23 +249,32 @@ impl RendererLang for Python {
     }
 
     fn render_string_literal(&self, s: &str) -> String {
-        match self.quote_char() {
-            '\'' => format!(
-                "'{}'",
-                s.replace('\\', "\\\\")
-                    .replace('\'', "\\'")
-                    .replace('\n', "\\n")
-                    .replace('\t', "\\t")
-            ),
-            '"' => format!(
-                "\"{}\"",
-                s.replace('\\', "\\\\")
-                    .replace('"', "\\\"")
-                    .replace('\n', "\\n")
-                    .replace('\t', "\\t")
-            ),
-            _ => unreachable!("quote compatibility helper returns only supported delimiters"),
+        let quote = self.quote_char();
+        let mut escaped = String::with_capacity(s.len() + 2);
+        escaped.push(quote);
+        for ch in s.chars() {
+            match ch {
+                '\\' => escaped.push_str("\\\\"),
+                value if value == quote => {
+                    escaped.push('\\');
+                    escaped.push(value);
+                }
+                '\u{0008}' => escaped.push_str("\\b"),
+                '\t' => escaped.push_str("\\t"),
+                '\n' => escaped.push_str("\\n"),
+                '\u{000C}' => escaped.push_str("\\f"),
+                '\r' => escaped.push_str("\\r"),
+                value @ ('\u{0000}'..='\u{001F}' | '\u{007F}'..='\u{009F}') => {
+                    escaped.push_str(&format!("\\x{:02X}", value as u32));
+                }
+                value @ ('\u{2028}' | '\u{2029}') => {
+                    escaped.push_str(&format!("\\u{:04X}", value as u32));
+                }
+                value => escaped.push(value),
+            }
         }
+        escaped.push(quote);
+        escaped
     }
 
     fn render_verbatim_string(&self, s: &str) -> String {
@@ -467,6 +509,16 @@ fn python_plain_decorator_name(block: &CodeBlock) -> Option<String> {
 }
 
 impl CodeLang for Python {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::validate_identifier_aliases(
+            self,
+            imports,
+            is_valid_import_alias,
+        )
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(PY_TYPES)
@@ -721,18 +773,15 @@ impl CodeLang for Python {
 
 /// Render a `from module import name1, name2` line.
 fn render_from_import(module: &str, entries: &[&ImportEntry]) -> String {
-    let mut names: Vec<&str> = Vec::new();
+    let mut names = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for entry in entries {
-        let name = entry.alias.as_deref().unwrap_or(&entry.name);
-        if seen.insert(name) {
-            if let Some(alias) = &entry.alias {
-                // Import with alias: `from module import OrigName as Alias`
-                // The alias is already the resolved name; original is entry.name.
-                names.push(alias);
-            } else {
-                names.push(&entry.name);
-            }
+        let local_name = entry.alias.as_deref().unwrap_or(&entry.name);
+        if seen.insert(local_name) {
+            names.push(match &entry.alias {
+                Some(alias) => format!("{} as {alias}", entry.name),
+                None => entry.name.clone(),
+            });
         }
     }
     names.sort();
@@ -857,6 +906,118 @@ mod tests {
         let py = Python::new();
         assert_eq!(py.render_string_literal("hello"), "'hello'");
         assert_eq!(py.render_string_literal("it's"), "'it\\'s'");
+    }
+
+    #[test]
+    fn quote_selection_apis_are_equivalent() {
+        let input = "'\"\\\n";
+        let legacy_setter = Python::new().with_quote_style(QuoteStyle::Double);
+        let mut legacy_field = Python::new();
+        legacy_field.quote_style = QuoteStyle::Double;
+        let convenience = Python::new().with_double_quotes();
+
+        assert_eq!(
+            legacy_setter.render_string_literal(input),
+            legacy_field.render_string_literal(input)
+        );
+        assert_eq!(
+            legacy_setter.render_string_literal(input),
+            convenience.render_string_literal(input)
+        );
+        assert_eq!(
+            Python::new()
+                .with_single_quotes()
+                .render_string_literal(input),
+            Python::new().render_string_literal(input)
+        );
+    }
+
+    #[test]
+    fn string_literals_escape_source_controls_without_rewriting_unicode() {
+        let py = Python::new();
+        assert_eq!(py.render_string_literal(""), "''");
+        assert_eq!(
+            py.render_string_literal("\0\u{0001}\u{0008}\t\n\u{000B}\u{000C}\r\u{001F}\u{007F}\u{0085}\u{2028}\u{2029}雪😀"),
+            "'\\x00\\x01\\b\\t\\n\\x0B\\f\\r\\x1F\\x7F\\x85\\u2028\\u2029雪😀'"
+        );
+        assert_eq!(
+            py.render_string_literal("\0\u{0037}\u{0001}A$#{value}"),
+            "'\\x007\\x01A$#{value}'"
+        );
+        assert_eq!(
+            Python::new()
+                .with_double_quotes()
+                .render_string_literal("'\"\\\r"),
+            "\"'\\\"\\\\\\r\""
+        );
+    }
+
+    #[test]
+    fn string_singleton_types_lower_direct_homogeneous_mixed_and_nested_unions() {
+        let py = Python::new();
+        let render = |type_name| {
+            CodeBlock::of("%T", (type_name,))
+                .unwrap()
+                .render_standalone(&py, 80)
+                .unwrap()
+        };
+
+        assert_eq!(
+            render(TypeName::string_literal("a'\\\n")),
+            "Literal['a\\'\\\\\\n']"
+        );
+        assert_eq!(
+            render(TypeName::union(vec![
+                TypeName::string_literal("active"),
+                TypeName::string_literal("inactive"),
+            ])),
+            "Literal['active', 'inactive']"
+        );
+        assert_eq!(
+            render(TypeName::union(vec![
+                TypeName::string_literal("active"),
+                TypeName::primitive("int"),
+            ])),
+            "Literal['active'] | int"
+        );
+        assert_eq!(
+            render(TypeName::union(vec![
+                TypeName::union(vec![
+                    TypeName::string_literal("active"),
+                    TypeName::string_literal("inactive"),
+                ]),
+                TypeName::primitive("int"),
+            ])),
+            "Literal['active', 'inactive'] | int"
+        );
+    }
+
+    #[test]
+    fn string_singleton_target_import_participates_in_alias_resolution() {
+        let block = CodeBlock::of(
+            "external: %T\nsingleton: %T",
+            (
+                TypeName::importable_type("example", "Literal"),
+                TypeName::string_literal("active"),
+            ),
+        )
+        .unwrap();
+        let file = crate::spec::file_spec::FileSpec::builder_with("literal.py", Python::new())
+            .add_code(block)
+            .build()
+            .unwrap();
+        let output = file.render(80).unwrap();
+
+        assert!(output.contains("from example import Literal"), "{output}");
+        assert!(
+            output.contains("from typing import Literal as TypingLiteral"),
+            "{output}"
+        );
+        assert!(output.contains("external: Literal"), "{output}");
+        assert!(
+            output.contains("singleton: TypingLiteral['active']"),
+            "{output}"
+        );
     }
 
     #[test]

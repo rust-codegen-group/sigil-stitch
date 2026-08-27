@@ -36,6 +36,15 @@ fn expected_record_matches_exactly() {
 }
 
 #[test]
+fn non_exhaustive_enum_record_matches_exactly() {
+    assert!(
+        compare("non-exhaustive-enum.out", "non-exhaustive-enum.allowlist")
+            .status
+            .success()
+    );
+}
+
+#[test]
 fn duplicate_tool_records_are_one_canonical_identity() {
     assert!(
         compare("duplicate-output.out", "expected.allowlist")

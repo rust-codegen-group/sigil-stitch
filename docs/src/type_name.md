@@ -1,7 +1,6 @@
 # TypeName
 
-This chapter includes the accepted 0.7 type-name-lowering design, which is
-documented before its implementation.
+This chapter describes the implemented 0.7 type-name-lowering contract.
 
 `TypeName` is the type reference enum at the heart of sigil-stitch's import tracking. When you use a `TypeName` with the `%T` format specifier in a `CodeBlock`, the library renders the type name in the output *and* records the import. At render time, `FileSpec` collects all recorded imports, deduplicates them, resolves naming conflicts, and emits the import header automatically.
 
@@ -307,16 +306,17 @@ arrows or keywords, wrapping, and any target-derived imports.
 
 ## String literal types
 
-The 0.7 type-name design adds one focused singleton type:
+0.7 adds one focused singleton type:
 
 ```text
 TypeName::StringLiteral("active".to_owned())
 ```
 
 The stored string is the decoded semantic value, not source text with quotes
-or escapes. TypeScript lowers it to a string literal type, Python lowers it
-through structured `typing.Literal`, and targets without an exact string
-singleton type reject it.
+or escapes. Use `TypeName::string_literal(...)` when constructing one.
+TypeScript lowers it to a string literal type, Python lowers it through
+structured `typing.Literal`, and targets without an exact string singleton
+type reject it.
 
 Python lowers one singleton as `typing.Literal["active"]`. A non-empty direct
 union containing only string singletons becomes one `typing.Literal[...]` in

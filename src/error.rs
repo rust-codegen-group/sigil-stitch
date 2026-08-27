@@ -1012,4 +1012,85 @@ pub enum SigilStitchError {
         /// Structured origin of the second semantic member.
         second_member: Box<TypeMemberNameOrigin>,
     },
+
+    /// Import claims contain an alias conflict with no valid assignment.
+    #[snafu(display("import alias conflict for {requested_name:?}: {reason}"))]
+    ImportAliasConflict {
+        /// Requested local binding shared by the conflicting claims.
+        requested_name: String,
+        /// Why the conflict cannot be resolved.
+        reason: String,
+    },
+
+    /// A caller-provided import alias resolver rejected the complete conflict set.
+    #[snafu(display("import alias resolver rejected the conflict set: {reason}"))]
+    ImportAliasResolverRejected {
+        /// Resolver-provided diagnostic.
+        reason: String,
+    },
+
+    /// A resolver returned incomplete, duplicate, unknown, or unsafe assignments.
+    #[snafu(display("invalid import alias assignments: {reason}"))]
+    InvalidImportAliasAssignments {
+        /// Core validation failure.
+        reason: String,
+    },
+
+    /// A target language rejected an otherwise complete resolved import group.
+    #[snafu(display("language {language:?} rejected resolved imports: {reason}"))]
+    InvalidResolvedImports {
+        /// Language file extension.
+        language: String,
+        /// Target-local rejection reason.
+        reason: String,
+    },
+
+    /// A semantic type reference is intrinsically malformed.
+    #[snafu(display("invalid type reference at {context}: {reason}"))]
+    InvalidTypeName {
+        /// Stable source occurrence and structural path.
+        context: String,
+        /// Target-independent reason for rejection.
+        reason: String,
+    },
+
+    /// A language adapter cannot represent a semantic type reference.
+    #[snafu(display("language {language:?} cannot lower type reference at {context}: {reason}"))]
+    UnsupportedTypeName {
+        /// Language file extension.
+        language: String,
+        /// Stable source occurrence and structural path.
+        context: String,
+        /// Target-local reason for rejection.
+        reason: String,
+    },
+
+    /// A rewritten source tree is structurally invalid.
+    #[snafu(display("invalid rewritten source at {context}: {reason}"))]
+    InvalidRewrittenSource {
+        /// Stable source occurrence and structural path.
+        context: String,
+        /// Reason the rewritten source cannot continue through the pipeline.
+        reason: String,
+    },
+
+    /// A language adapter returned an invalid type-expression block.
+    #[snafu(display(
+        "language {language:?} returned invalid type-expression output at {context}: {reason}"
+    ))]
+    InvalidTypeNameLowering {
+        /// Language file extension.
+        language: String,
+        /// Stable source occurrence and structural path.
+        context: String,
+        /// Reason the adapter output was rejected.
+        reason: String,
+    },
+
+    /// A non-terminal semantic type reached final rendering.
+    #[snafu(display("non-terminal type reference reached final rendering at {context}"))]
+    UnexpectedTypeReference {
+        /// Final-render occurrence.
+        context: String,
+    },
 }

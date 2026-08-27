@@ -75,3 +75,23 @@ fn test_same_package_symbols() {
     let output = file.render(80).unwrap();
     golden::assert_golden("go/same_package_symbols.go", &output);
 }
+
+#[test]
+fn conflicting_symbol_names_use_the_resolved_package_alias() {
+    let standard = TypeName::importable("net/http", "Server");
+    let application = TypeName::importable("example.com/server", "Server");
+    let block = CodeBlock::of("var _ %T\nvar _ %T", (standard, application)).unwrap();
+
+    let output = FileSpec::builder_with("servers.go", Go::new())
+        .header(CodeBlock::of("package main", ()).unwrap())
+        .add_code(block)
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap();
+
+    assert!(output.contains("ServerServer \"example.com/server\""));
+    assert!(output.contains("var _ http.Server"));
+    assert!(output.contains("var _ ServerServer.Server"));
+    assert!(!output.contains("server.ServerServer"));
+}

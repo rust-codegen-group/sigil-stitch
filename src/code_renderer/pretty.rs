@@ -1,15 +1,20 @@
 use ::pretty::BoxDoc;
 
-use super::RenderAdapter;
+use super::{LayoutGroup, RenderAdapter};
 use crate::error::SigilStitchError;
+
+struct DocumentGroup {
+    doc: BoxDoc<'static, ()>,
+    layout: LayoutGroup,
+}
 
 pub(super) struct PrettyAdapter {
     indent_unit: String,
     width: usize,
-    docs: Vec<BoxDoc<'static, ()>>,
+    docs: Vec<DocumentGroup>,
     indent_depth: usize,
     at_line_start: bool,
-    pending_soft_break_indent: Option<String>,
+    pending_soft_break: Option<(String, LayoutGroup)>,
 }
 
 impl PrettyAdapter {
@@ -17,10 +22,13 @@ impl PrettyAdapter {
         Self {
             indent_unit: indent_unit.to_string(),
             width,
-            docs: vec![BoxDoc::nil()],
+            docs: vec![DocumentGroup {
+                doc: BoxDoc::nil(),
+                layout: LayoutGroup::IndependentBreaks,
+            }],
             indent_depth: 0,
             at_line_start: true,
-            pending_soft_break_indent: None,
+            pending_soft_break: None,
         }
     }
 
@@ -32,12 +40,12 @@ impl PrettyAdapter {
                 context: "CodeRenderer pretty groups".to_string(),
                 message: "missing document group".to_string(),
             })?;
-        *current = std::mem::replace(current, BoxDoc::nil()).append(doc);
+        current.doc = std::mem::replace(&mut current.doc, BoxDoc::nil()).append(doc);
         Ok(())
     }
 
     fn flush_soft_break(&mut self, indent_if_broken: bool) -> Result<(), SigilStitchError> {
-        let Some(indent) = self.pending_soft_break_indent.take() else {
+        let Some((indent, layout)) = self.pending_soft_break.take() else {
             return Ok(());
         };
         let broken = if indent_if_broken {
@@ -45,7 +53,11 @@ impl PrettyAdapter {
         } else {
             BoxDoc::hardline()
         };
-        self.append_doc(broken.flat_alt(BoxDoc::space()).group())
+        let soft_break = broken.flat_alt(BoxDoc::space());
+        match layout {
+            LayoutGroup::IndependentBreaks => self.append_doc(soft_break.group()),
+            LayoutGroup::ConsistentBreaks => self.append_doc(soft_break),
+        }
     }
 
     pub(super) fn finish(mut self) -> Result<String, SigilStitchError> {
@@ -56,12 +68,14 @@ impl PrettyAdapter {
                 message: "unclosed document group".to_string(),
             });
         }
-        let doc = self.docs.pop().ok_or_else(|| SigilStitchError::Render {
+        let group = self.docs.pop().ok_or_else(|| SigilStitchError::Render {
             context: "CodeRenderer pretty groups".to_string(),
             message: "missing root document".to_string(),
         })?;
         let mut buf = Vec::new();
-        doc.render(self.width, &mut buf)
+        group
+            .doc
+            .render(self.width, &mut buf)
             .map_err(|error| SigilStitchError::Render {
                 context: "CodeRenderer pretty output".to_string(),
                 message: error.to_string(),
@@ -105,26 +119,15 @@ impl RenderAdapter for PrettyAdapter {
 
     fn soft_break(&mut self) -> Result<(), SigilStitchError> {
         self.flush_soft_break(false)?;
-        self.pending_soft_break_indent = Some(self.indent_unit.repeat(self.indent_depth));
-        self.at_line_start = false;
-        Ok(())
-    }
-
-    fn type_doc(&mut self, doc: BoxDoc<'static, ()>) -> Result<(), SigilStitchError> {
-        self.ensure_indent()?;
-        let width = self.width;
-        let indent = self.indent_unit.repeat(self.indent_depth);
-        let column_doc = BoxDoc::column(move |column| {
-            let mut buf = Vec::new();
-            if doc.render(width.saturating_sub(column), &mut buf).is_err() {
-                return BoxDoc::fail();
-            }
-            let Ok(rendered) = String::from_utf8(buf) else {
-                return BoxDoc::fail();
-            };
-            type_lines_to_doc(&rendered, &indent)
-        });
-        self.append_doc(column_doc)?;
+        let layout =
+            self.docs
+                .last()
+                .map(|group| group.layout)
+                .ok_or_else(|| SigilStitchError::Render {
+                    context: "CodeRenderer pretty groups".to_string(),
+                    message: "missing document group".to_string(),
+                })?;
+        self.pending_soft_break = Some((self.indent_unit.repeat(self.indent_depth), layout));
         self.at_line_start = false;
         Ok(())
     }
@@ -151,8 +154,12 @@ impl RenderAdapter for PrettyAdapter {
         Ok(())
     }
 
-    fn begin_group(&mut self) -> Result<(), SigilStitchError> {
-        self.docs.push(BoxDoc::nil());
+    fn begin_group(&mut self, layout: LayoutGroup) -> Result<(), SigilStitchError> {
+        self.flush_soft_break(true)?;
+        self.docs.push(DocumentGroup {
+            doc: BoxDoc::nil(),
+            layout,
+        });
         Ok(())
     }
 
@@ -163,25 +170,11 @@ impl RenderAdapter for PrettyAdapter {
                 message: "group end without group begin".to_string(),
             });
         }
-        let doc = self.docs.pop().ok_or_else(|| SigilStitchError::Render {
+        self.flush_soft_break(false)?;
+        let group = self.docs.pop().ok_or_else(|| SigilStitchError::Render {
             context: "CodeRenderer pretty groups".to_string(),
             message: "missing completed document group".to_string(),
         })?;
-        self.append_doc(doc.group())
+        self.append_doc(group.doc.group())
     }
-}
-
-fn type_lines_to_doc(rendered: &str, indent: &str) -> BoxDoc<'static, ()> {
-    let mut lines = rendered.split('\n');
-    let mut doc = lines
-        .next()
-        .map(|line| BoxDoc::text(line.to_string()))
-        .unwrap_or_else(BoxDoc::nil);
-    for line in lines {
-        doc = doc
-            .append(BoxDoc::hardline())
-            .append(BoxDoc::text(indent.to_string()))
-            .append(BoxDoc::text(line.to_string()));
-    }
-    doc
 }

@@ -185,7 +185,8 @@ pub struct WildcardPresentation<'a> {
 /// // Optional: string | null
 /// let maybe_str = TypeName::optional(TypeName::primitive("string"));
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum TypeName {
     /// A type that requires an import statement.
     Importable {
@@ -197,10 +198,10 @@ pub enum TypeName {
         is_type_only: bool,
         /// Optional preferred alias for this import (e.g., `Foo as Bar`).
         alias: Option<String>,
-        /// When true, render as `module{sep}name` inline (e.g., `serde_json::Value`)
-        /// and skip import generation. The separator comes from
-        /// [`RendererLang::module_separator()`]. Falls back to unqualified rendering
-        /// if the language returns `None`.
+        /// When true, request an inline qualified reference such as
+        /// `serde_json::Value` and skip import generation. The selected language
+        /// lowerer must represent that intent exactly or reject it. The deprecated
+        /// document facade retains its pre-0.6.8 unqualified fallback.
         #[serde(default)]
         qualified: bool,
     },
@@ -282,6 +283,11 @@ pub enum TypeName {
     },
     /// Raw string escape hatch. No import tracking.
     Raw(String),
+    /// One decoded string value used as an exact singleton type.
+    ///
+    /// The selected language owns quoting and escaping. Languages without
+    /// string singleton types reject this variant.
+    StringLiteral(String),
 }
 
 impl TypeName {
@@ -314,11 +320,10 @@ impl TypeName {
 
     /// Create a qualified type name that renders inline as `module{sep}name`.
     ///
-    /// The separator comes from [`RendererLang::module_separator()`] — `"::"` for
-    /// Rust/C++, `"."` for Go/Python/Java/etc.  No import statement is generated.
-    ///
-    /// If the target language returns `None` from `module_separator()`, the
-    /// qualified flag is silently ignored and the type renders as just `name`.
+    /// The selected language lowerer owns the separator and complete spelling.
+    /// No import statement is generated. A language that cannot preserve the
+    /// qualified reference returns `UnsupportedTypeName` during source
+    /// preparation rather than silently removing the module.
     ///
     /// ```ignore
     /// TypeName::qualified("serde_json", "Value")      // Rust: serde_json::Value
@@ -365,7 +370,7 @@ impl TypeName {
     /// with its full module path. Only affects `Importable` variants; other
     /// variants are returned unchanged.
     ///
-    /// See [`TypeName::qualified()`] for details on separator and fallback behavior.
+    /// See [`TypeName::qualified()`] for the exact-or-reject behavior.
     pub fn qualify(mut self) -> Self {
         if let TypeName::Importable {
             qualified: ref mut q,
@@ -492,6 +497,11 @@ impl TypeName {
         TypeName::Raw(s.to_string())
     }
 
+    /// Create an exact string singleton type from its decoded value.
+    pub fn string_literal(value: impl Into<String>) -> Self {
+        TypeName::StringLiteral(value.into())
+    }
+
     /// Create an associated/path-dependent type with a qualifier.
     ///
     /// Rust: `<base as qualifier>::member` (e.g., `<T as Iterator>::Item`).
@@ -555,6 +565,7 @@ impl TypeName {
             TypeName::Primitive(name) => Some(name),
             TypeName::Generic { base, .. } => base.simple_name(),
             TypeName::Raw(s) => Some(s),
+            TypeName::StringLiteral(_) => None,
             _ => None,
         }
     }
@@ -679,6 +690,26 @@ mod tests {
     fn test_primitive() {
         let t = TypeName::primitive("number");
         assert_eq!(t.render_canonical(80, &identity_resolve).unwrap(), "number");
+    }
+
+    #[test]
+    fn string_literal_json_uses_the_decoded_value() {
+        assert_eq!(
+            serde_json::to_value(TypeName::string_literal("active\n雪")).unwrap(),
+            serde_json::json!({ "StringLiteral": "active\n雪" })
+        );
+    }
+
+    #[test]
+    fn legacy_document_facades_fail_closed_for_string_literals() {
+        let literal = TypeName::string_literal("active");
+        assert!(literal.render(80, &identity_resolve).is_err());
+        assert!(
+            literal
+                .to_doc_with_lang(&identity_resolve, &TypeScript::new())
+                .render(80, &mut Vec::new())
+                .is_err()
+        );
     }
 
     #[test]

@@ -118,6 +118,10 @@ Build structured declarations with the spec builders:
 Specs record declaration intent. At render time the selected language validates
 that intent and lowers it to structured `CodeBlock`s, so type references remain
 available to import tracking and alias resolution.
+`FileSpec` rewrites and validates each source tree, lowers every complete
+`TypeName`, then collects and resolves the resulting imports before emitting
+any source. Callers that need project-specific conflict naming can supply a
+borrowed `ImportAliasConflictResolver` for one file or project render.
 See [Building Functions & Fields](docs/src/functions_and_fields.md), [Building Types & Enums](docs/src/types_and_enums.md), and [Files & Projects](docs/src/files_and_projects.md) for examples and the full API.
 
 ## Supported Languages

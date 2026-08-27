@@ -91,6 +91,12 @@ const RUBY_RESERVED: &[&str] = &[
 ];
 
 impl RendererLang for Ruby {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::ruby(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -221,6 +227,12 @@ const RUBY_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Ruby {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::reject_aliases(self, imports)
+    }
     fn type_member_declaration_context(&self, _kind: TypeKind) -> DeclarationContext {
         DeclarationContext::Member
     }

@@ -54,7 +54,9 @@ use crate::type_name::TypePresentation;
 #[derive(Debug, Clone)]
 pub struct JavaScript {
     /// Quote style for string literals and import paths.
-    #[deprecated(note = "legacy 0.6.8 field; quote selection is language-owned in 0.7")]
+    #[deprecated(
+        note = "legacy 0.6.8 field; use JavaScript::with_single_quotes() or JavaScript::with_double_quotes()"
+    )]
     #[expect(deprecated, reason = "0.6.8 compatibility field")]
     pub quote_style: QuoteStyle,
     /// Indent with this string (default: "  ").
@@ -100,10 +102,26 @@ impl JavaScript {
     }
 
     /// Set the quote style used for string literals and import paths.
-    #[deprecated(note = "legacy 0.6.8 setter; use language-local quote selection in 0.7")]
+    #[deprecated(
+        note = "legacy 0.6.8 setter; use JavaScript::with_single_quotes() or JavaScript::with_double_quotes()"
+    )]
     #[expect(deprecated, reason = "0.6.8 compatibility setter")]
     pub fn with_quote_style(mut self, qs: QuoteStyle) -> Self {
         self.quote_style = qs;
+        self
+    }
+
+    /// Use single quotes for string literals and import paths.
+    #[expect(deprecated, reason = "updates the 0.6.8 compatibility field")]
+    pub fn with_single_quotes(mut self) -> Self {
+        self.quote_style = QuoteStyle::Single;
+        self
+    }
+
+    /// Use double quotes for string literals and import paths.
+    #[expect(deprecated, reason = "updates the 0.6.8 compatibility field")]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.quote_style = QuoteStyle::Double;
         self
     }
 
@@ -149,7 +167,73 @@ const JS_RESERVED: &[&str] = &[
     "async", "await",
 ];
 
+fn is_valid_import_binding(binding: &str) -> bool {
+    let mut characters = binding.chars();
+    characters.next().is_some_and(|character| {
+        character == '_' || character == '$' || unicode_id_start::is_id_start(character)
+    }) && characters.all(|character| {
+        character == '$'
+            || character == '\u{200c}'
+            || character == '\u{200d}'
+            || unicode_id_start::is_id_continue(character)
+    }) && !JS_RESERVED.contains(&binding)
+}
+
+fn module_to_namespace_alias(module: &str) -> String {
+    let last_segment = module
+        .rsplit(['/', ':', '.', '\\'])
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(module);
+
+    let mut characters = last_segment.chars();
+    match characters.next() {
+        None => "Module".to_string(),
+        Some(first) => {
+            let upper: String = first.to_uppercase().collect();
+            format!("{upper}{}", characters.as_str())
+        }
+    }
+}
+
+fn validate_import_bindings(
+    lang: &JavaScript,
+    imports: &ImportGroup,
+) -> Result<(), SigilStitchError> {
+    let mut bindings = std::collections::HashSet::new();
+    for entry in imports.entries() {
+        if entry.is_side_effect {
+            continue;
+        }
+        let binding = if entry.is_wildcard {
+            module_to_namespace_alias(&entry.module)
+        } else {
+            entry.resolved_name().to_string()
+        };
+        if !is_valid_import_binding(&binding) {
+            return Err(SigilStitchError::InvalidResolvedImports {
+                language: lang.file_extension().to_string(),
+                reason: format!("JavaScript import binding {binding:?} is not a valid identifier"),
+            });
+        }
+        if !bindings.insert(binding.clone()) {
+            return Err(SigilStitchError::InvalidResolvedImports {
+                language: lang.file_extension().to_string(),
+                reason: format!(
+                    "multiple JavaScript imports produce the local binding {binding:?}"
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
 impl RendererLang for JavaScript {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::javascript(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -159,15 +243,33 @@ impl RendererLang for JavaScript {
     }
 
     fn render_string_literal(&self, s: &str) -> String {
-        match self.quote_char() {
-            '\'' => {
-                format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
+        let quote = self.quote_char();
+        let mut escaped = String::with_capacity(s.len() + 2);
+        escaped.push(quote);
+        for ch in s.chars() {
+            match ch {
+                '\\' => escaped.push_str("\\\\"),
+                value if value == quote => {
+                    escaped.push('\\');
+                    escaped.push(value);
+                }
+                '\u{0008}' => escaped.push_str("\\b"),
+                '\t' => escaped.push_str("\\t"),
+                '\n' => escaped.push_str("\\n"),
+                '\u{000B}' => escaped.push_str("\\v"),
+                '\u{000C}' => escaped.push_str("\\f"),
+                '\r' => escaped.push_str("\\r"),
+                value @ ('\u{0000}'..='\u{001F}' | '\u{007F}'..='\u{009F}') => {
+                    escaped.push_str(&format!("\\x{:02X}", value as u32));
+                }
+                value @ ('\u{2028}' | '\u{2029}') => {
+                    escaped.push_str(&format!("\\u{:04X}", value as u32));
+                }
+                value => escaped.push(value),
             }
-            '"' => {
-                format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
-            }
-            _ => unreachable!("quote compatibility helper returns only supported delimiters"),
         }
+        escaped.push(quote);
+        escaped
     }
 
     fn render_verbatim_string(&self, s: &str) -> String {
@@ -317,6 +419,12 @@ const JS_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for JavaScript {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        validate_import_bindings(self, imports)
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(JS_TYPES)
@@ -434,7 +542,6 @@ impl CodeLang for JavaScript {
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
         let mut lines = Vec::new();
-        let quote = self.quote_char();
         let semi = if self.semicolons { ";" } else { "" };
 
         // Group entries by module path.
@@ -442,14 +549,18 @@ impl CodeLang for JavaScript {
             std::collections::BTreeMap::new();
         for entry in imports.entries() {
             if entry.is_side_effect {
-                lines.push(format!("import {quote}{}{quote}{semi}", entry.module));
+                lines.push(format!(
+                    "import {}{semi}",
+                    self.render_string_literal(&entry.module)
+                ));
                 continue;
             }
             if entry.is_wildcard {
-                let alias = super::module_to_alias(&entry.module);
+                let alias = module_to_namespace_alias(&entry.module);
                 lines.push(format!(
-                    "import * as {} from {quote}{}{quote}{semi}",
-                    alias, entry.module,
+                    "import * as {} from {}{semi}",
+                    alias,
+                    self.render_string_literal(&entry.module),
                 ));
                 continue;
             }
@@ -473,9 +584,9 @@ impl CodeLang for JavaScript {
 
             if !names.is_empty() {
                 lines.push(format!(
-                    "import {{ {} }} from {quote}{}{quote}{semi}",
+                    "import {{ {} }} from {}{semi}",
                     names.join(", "),
-                    module,
+                    self.render_string_literal(module),
                 ));
             }
         }
@@ -661,6 +772,25 @@ mod tests {
     }
 
     #[test]
+    fn import_paths_use_language_owned_string_escaping() {
+        let js = JavaScript::new().with_double_quotes();
+        let imports = ImportGroup {
+            entries: vec![ImportEntry {
+                module: "./path\\segment\t\u{2028}".into(),
+                name: "value".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            }],
+        };
+        assert_eq!(
+            js.render_imports(&imports),
+            "import { value } from \"./path\\\\segment\\t\\u2028\";"
+        );
+    }
+
+    #[test]
     fn test_render_imports_multiple_modules() {
         let js = JavaScript::new();
         let imports = ImportGroup {
@@ -739,8 +869,52 @@ mod tests {
 
     #[test]
     fn test_string_literal_double_quotes() {
-        let js = JavaScript::new().with_quote_style(QuoteStyle::Double);
+        let js = JavaScript::new().with_double_quotes();
         assert_eq!(js.render_string_literal("hello"), "\"hello\"");
+    }
+
+    #[test]
+    fn quote_selection_apis_are_equivalent() {
+        let input = "'\"\\\n";
+        let legacy_setter = JavaScript::new().with_quote_style(QuoteStyle::Double);
+        let mut legacy_field = JavaScript::new();
+        legacy_field.quote_style = QuoteStyle::Double;
+        let convenience = JavaScript::new().with_double_quotes();
+
+        assert_eq!(
+            legacy_setter.render_string_literal(input),
+            legacy_field.render_string_literal(input)
+        );
+        assert_eq!(
+            legacy_setter.render_string_literal(input),
+            convenience.render_string_literal(input)
+        );
+        assert_eq!(
+            JavaScript::new()
+                .with_single_quotes()
+                .render_string_literal(input),
+            JavaScript::new().render_string_literal(input)
+        );
+    }
+
+    #[test]
+    fn string_literals_escape_source_controls_without_rewriting_unicode() {
+        let js = JavaScript::new();
+        assert_eq!(js.render_string_literal(""), "''");
+        assert_eq!(
+            js.render_string_literal("\0\u{0001}\u{0008}\t\n\u{000B}\u{000C}\r\u{001F}\u{007F}\u{0085}\u{2028}\u{2029}雪😀"),
+            "'\\x00\\x01\\b\\t\\n\\v\\f\\r\\x1F\\x7F\\x85\\u2028\\u2029雪😀'"
+        );
+        assert_eq!(
+            js.render_string_literal("\0\u{0037}\u{0001}A$#{value}"),
+            "'\\x007\\x01A$#{value}'"
+        );
+        assert_eq!(
+            JavaScript::new()
+                .with_double_quotes()
+                .render_string_literal("'\"\\\r"),
+            "\"'\\\"\\\\\\r\""
+        );
     }
 
     #[test]

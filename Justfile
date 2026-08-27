@@ -56,6 +56,10 @@ coverage-nextest:
     mkdir -p coverage
     cargo llvm-cov nextest --lcov --output-path coverage/lcov.info
 
+# Measure standalone TypeName materialization without a timing gate
+bench-type-name-lowering:
+    cargo bench --bench type_name_lowering
+
 # Update golden test files
 bless:
     BLESS=1 cargo test --workspace

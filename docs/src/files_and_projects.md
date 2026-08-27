@@ -35,23 +35,22 @@ Most of the time you do not need `ImportSpec` -- imports driven by `%T` and `Typ
 
 The top-level file orchestrator combines code blocks and declaration specs.
 
-**Accepted 0.7 target; implementation pending.** The following is the selected
-render-preparation pipeline, not the order currently executed by `FileSpec`:
+`FileSpec::render()` owns the complete render-preparation pipeline:
 
 1. **Lower declarations** -- Validate declaration specs and ask the language
    adapter to lower them to source `CodeBlock`s.
 2. **Prepare blocks** -- Rewrite each source block exactly once, validate its
    structure, lower every `%T` type, and validate the lowered type blocks.
-3. **Resolve imports** -- Collect imports only from the prepared blocks, then
-   deduplicate them and assign every peer conflict set atomically.
+3. **Resolve imports** -- Collect imports only from the prepared blocks, merge
+   explicit imports, then deduplicate them and assign every peer conflict set
+   atomically.
 4. **Render** -- Emit the import header and prepared body with no further
    rewrite or type lowering.
 
-The current source instead collects and resolves imports immediately after
-declaration materialization. `CodeRenderer` then rewrites each block and renders
-its `TypeName` nodes. The staged migration described in [0.6.8 Legacy
-Compatibility and Migration](legacy_compatibility_and_migration.md) moves those
-transformations before import collection.
+No import header or body text is returned until every preparation and
+resolution operation succeeds. `FileSpec::validate()` remains model-only
+validation; rewrite, type-name lowering, and import resolution run only during
+render preparation.
 
 ```rust
 # extern crate sigil_stitch;
@@ -75,6 +74,28 @@ let output = file.render(80).unwrap();
 // const u: User = getUser();
 # }
 ```
+
+### Custom import conflict resolution
+
+`render()` uses the built-in deterministic module-prefix policy. For
+project-specific naming, implement `ImportAliasConflictResolver` and pass a
+borrowed value to `render_with_import_alias_resolver()`. One call receives all
+ambiguous peer classes in that file. It must return exactly one assignment for
+every claim; exact `ImportSpec` bindings cannot change. Missing, duplicate,
+unknown, unsafe, globally colliding, or target-invalid assignments abort the
+render before source is returned.
+
+`ProjectSpec::render_with_import_alias_resolver()` applies the same borrowed
+policy independently to each file. Its matching
+`write_to_with_import_alias_resolver()` renders every file successfully before
+creating output, so a resolution failure cannot leave a partially written
+project. The resolver is an execution dependency and is never stored or
+serialized in a file or project spec.
+
+Direct `ImportGroup::try_resolve()` and `try_resolve_with()` callers must invoke
+the selected adapter's `CodeLang::validate_resolved_imports()` before passing
+the group to `render_imports()`. `FileSpec` and `ProjectSpec` perform this
+target-local validation automatically.
 
 You can mix member types freely: `add_code()` for raw CodeBlocks, `add_type()` for TypeSpec, `add_function()` for FunSpec, `add_raw()` for escape-hatch strings with no import tracking.
 

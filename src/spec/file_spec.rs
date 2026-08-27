@@ -1,7 +1,7 @@
 use crate::code_block::CodeBlock;
 use crate::code_renderer::CodeRenderer;
 use crate::error::SigilStitchError;
-use crate::import::ImportGroup;
+use crate::import::{ImportAliasConflictResolver, ImportGroup};
 use crate::import_collector;
 use crate::lang::CodeLang;
 use crate::spec::emittable::Emittable;
@@ -10,6 +10,7 @@ use crate::spec::import_spec::ImportSpec;
 use crate::spec::modifiers::DeclarationContext;
 use crate::spec::type_spec::TypeSpec;
 use crate::type_name::TypeName;
+use crate::type_name_lowering::{DiagnosticPath, TypeNameMaterializer};
 
 /// A member of a file.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -45,11 +46,9 @@ pub enum FileMember {
 ///
 /// `FileSpec` is the top-level orchestrator that combines code blocks, type
 /// declarations, and functions into a rendered source file. It drives the
-/// three-pass rendering pipeline:
-///
-/// 1. **Materialize** -- Specs (`TypeSpec`, `FunSpec`) emit `CodeBlock`s
-/// 2. **Collect imports** -- Walk all blocks, extract `ImportRef` from `%T` types
-/// 3. **Render** -- Emit import header + body with resolved names and pretty printing
+/// complete rendering pipeline: declarations are materialized, source trees are
+/// rewritten and validated, type references are lowered, imports are collected
+/// and resolved, and the prepared source is rendered.
 ///
 /// # Examples
 ///
@@ -169,11 +168,28 @@ impl FileSpec {
         }
     }
 
-    /// Render the file to a string using the three-pass algorithm.
-    ///
-    /// `width` controls the target line width for pretty-printing.
-    #[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
+    /// Render the file with the built-in fallible import-alias policy.
     pub fn render(&self, width: usize) -> Result<String, SigilStitchError> {
+        self.render_with_resolver(width, None)
+    }
+
+    /// Render the file with a borrowed import-alias conflict resolver.
+    ///
+    /// The resolver is an execution dependency and is never stored or
+    /// serialized with this `FileSpec`.
+    pub fn render_with_import_alias_resolver(
+        &self,
+        width: usize,
+        resolver: &dyn ImportAliasConflictResolver,
+    ) -> Result<String, SigilStitchError> {
+        self.render_with_resolver(width, Some(resolver))
+    }
+
+    fn render_with_resolver(
+        &self,
+        width: usize,
+        resolver: Option<&dyn ImportAliasConflictResolver>,
+    ) -> Result<String, SigilStitchError> {
         self.validate()?;
 
         let lang: &dyn CodeLang =
@@ -183,8 +199,7 @@ impl FileSpec {
                     filename: self.filename.clone(),
                 })?;
 
-        // Phase 0: Materialize specs into CodeBlocks.
-        enum Materialized {
+        enum Emitted {
             Blocks(Vec<CodeBlock>),
             Raw(String),
             RawWithImports {
@@ -193,65 +208,111 @@ impl FileSpec {
             },
         }
 
-        let mut materialized: Vec<Materialized> = Vec::with_capacity(self.members.len());
-        for m in &self.members {
-            materialized.push(match m {
-                FileMember::Code(b) => Materialized::Blocks(vec![b.clone()]),
-                FileMember::RawContent(s) => Materialized::Raw(s.clone()),
-                FileMember::RawContentWithImports { content, types } => {
-                    Materialized::RawWithImports {
-                        content: content.clone(),
-                        types: types.clone(),
-                    }
-                }
-                FileMember::Type(spec) => Materialized::Blocks(spec.emit(lang)?),
+        enum Prepared {
+            Blocks(Vec<CodeBlock>),
+            Raw(String),
+            RawWithImports {
+                content: String,
+                metadata: Vec<CodeBlock>,
+            },
+        }
+
+        let mut emitted = Vec::with_capacity(self.members.len());
+        for member in &self.members {
+            emitted.push(match member {
+                FileMember::Code(block) => Emitted::Blocks(vec![block.clone()]),
+                FileMember::RawContent(s) => Emitted::Raw(s.clone()),
+                FileMember::RawContentWithImports { content, types } => Emitted::RawWithImports {
+                    content: content.clone(),
+                    types: types.clone(),
+                },
+                FileMember::Type(spec) => Emitted::Blocks(spec.emit(lang)?),
                 FileMember::Fun(spec) => {
-                    Materialized::Blocks(vec![spec.emit(lang, DeclarationContext::TopLevel)?])
+                    Emitted::Blocks(vec![spec.emit(lang, DeclarationContext::TopLevel)?])
                 }
-                FileMember::Spec(spec) => Materialized::Blocks(spec.emit_members(lang)?),
+                FileMember::Spec(spec) => Emitted::Blocks(spec.emit_members(lang)?),
             });
         }
 
-        // Pass 1: Collect imports from all CodeBlock members.
+        let mut materializer = TypeNameMaterializer::new(lang);
+        let prepared_header = self
+            .header
+            .as_ref()
+            .map(|header| materializer.prepare_source_block(header, DiagnosticPath::root("header")))
+            .transpose()?;
+        let mut prepared = Vec::with_capacity(emitted.len());
+        for (member_index, member) in emitted.into_iter().enumerate() {
+            prepared.push(match member {
+                Emitted::Blocks(blocks) => Prepared::Blocks(
+                    blocks
+                        .iter()
+                        .enumerate()
+                        .map(|(block_index, block)| {
+                            materializer.prepare_source_block(
+                                block,
+                                DiagnosticPath::member_block(member_index, block_index),
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                ),
+                Emitted::Raw(content) => Prepared::Raw(content),
+                Emitted::RawWithImports { content, types } => {
+                    let metadata = types
+                        .iter()
+                        .enumerate()
+                        .map(|(type_index, type_name)| {
+                            materializer.prepare_metadata_type(
+                                type_name,
+                                DiagnosticPath::raw_metadata(member_index, type_index),
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    Prepared::RawWithImports { content, metadata }
+                }
+            });
+        }
+
         let mut import_refs = Vec::new();
 
-        if let Some(header) = &self.header {
+        if let Some(header) = &prepared_header {
             import_refs.extend(import_collector::collect_imports(header));
         }
 
-        for mat in &materialized {
-            match mat {
-                Materialized::Blocks(blocks) => {
+        for member in &prepared {
+            match member {
+                Prepared::Blocks(blocks) => {
                     for block in blocks {
                         import_refs.extend(import_collector::collect_imports(block));
                     }
                 }
-                Materialized::RawWithImports { types, .. } => {
-                    for ty in types {
-                        ty.collect_imports(&mut import_refs);
+                Prepared::RawWithImports { metadata, .. } => {
+                    for block in metadata {
+                        import_refs.extend(import_collector::collect_imports(block));
                     }
                 }
-                Materialized::Raw(_) => {}
+                Prepared::Raw(_) => {}
             }
         }
 
-        // Import Resolution: Dedup, conflict detection, alias assignment.
-        // Convert explicit ImportSpec entries to ImportEntry and merge.
         let explicit_entries: Vec<_> = self
             .explicit_imports
             .iter()
             .cloned()
             .map(|spec| spec.into_entry())
             .collect();
-        let imports = ImportGroup::resolve_with_explicit(&import_refs, explicit_entries);
+        let imports = match resolver {
+            Some(resolver) => {
+                ImportGroup::try_resolve_with(&import_refs, explicit_entries, resolver)?
+            }
+            None => ImportGroup::try_resolve(&import_refs, explicit_entries)?,
+        };
+        lang.validate_resolved_imports(&imports)?;
 
-        // Pass 2: Render with resolved names.
         let mut output = String::new();
 
-        // Render header block if present (e.g., license comment, Go package declaration).
-        if let Some(header) = &self.header {
-            let mut renderer = CodeRenderer::new(lang, &imports, width);
-            let header_output = renderer.render(header)?;
+        if let Some(header) = &prepared_header {
+            let renderer = CodeRenderer::new(lang, &imports, width);
+            let header_output = renderer.render_prepared(header)?;
             if !header_output.is_empty() {
                 output.push_str(&header_output);
                 if !header_output.ends_with('\n') {
@@ -261,39 +322,37 @@ impl FileSpec {
             }
         }
 
-        // Render import header.
         let import_header = lang.render_imports(&imports);
         if !import_header.is_empty() {
             output.push_str(&import_header);
             output.push_str("\n\n");
         }
 
-        // Render materialized members.
-        for (i, mat) in materialized.iter().enumerate() {
+        for (i, member) in prepared.iter().enumerate() {
             if i > 0 {
                 output.push('\n');
             }
-            match mat {
-                Materialized::Blocks(blocks) => {
+            match member {
+                Prepared::Blocks(blocks) => {
                     for (j, block) in blocks.iter().enumerate() {
                         if j > 0 {
                             output.push('\n');
                         }
-                        let mut renderer = CodeRenderer::new(lang, &imports, width);
-                        let member_output = renderer.render(block)?;
+                        let renderer = CodeRenderer::new(lang, &imports, width);
+                        let member_output = renderer.render_prepared(block)?;
                         output.push_str(&member_output);
                         if !member_output.ends_with('\n') {
                             output.push('\n');
                         }
                     }
                 }
-                Materialized::Raw(content) => {
+                Prepared::Raw(content) => {
                     output.push_str(content);
                     if !content.ends_with('\n') {
                         output.push('\n');
                     }
                 }
-                Materialized::RawWithImports { content, .. } => {
+                Prepared::RawWithImports { content, .. } => {
                     output.push_str(content);
                     if !content.ends_with('\n') {
                         output.push('\n');

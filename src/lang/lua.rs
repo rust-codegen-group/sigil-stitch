@@ -119,7 +119,22 @@ const LUA_RESERVED: &[&str] = &[
     "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while",
 ];
 
+fn is_valid_import_alias(alias: &str) -> bool {
+    let mut characters = alias.chars();
+    characters
+        .next()
+        .is_some_and(|character| character == '_' || character.is_ascii_alphabetic())
+        && characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+        && !LUA_RESERVED.contains(&alias)
+}
+
 impl RendererLang for Lua {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::lua(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -207,6 +222,23 @@ const LUA_FUNCTIONS: &[FunctionCapabilityProfile] =
     ];
 
 impl CodeLang for Lua {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::validate_identifier_aliases(
+            self,
+            imports,
+            is_valid_import_alias,
+        )?;
+        if imports.entries().iter().any(|entry| entry.is_wildcard) {
+            return Err(crate::error::SigilStitchError::InvalidResolvedImports {
+                language: self.file_extension().to_string(),
+                reason: "Lua has no wildcard import form".to_string(),
+            });
+        }
+        Ok(())
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         // Lua has no named type declaration system; tables and metatables
         // are constructed through CodeBlock instead.

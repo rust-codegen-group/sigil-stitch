@@ -151,6 +151,15 @@ const HASKELL_RESERVED: &[&str] = &[
     "qualified", "then", "type", "where",
 ];
 
+fn is_valid_import_alias(alias: &str) -> bool {
+    let mut characters = alias.chars();
+    characters.next().is_some_and(char::is_uppercase)
+        && characters.all(|character| {
+            character == '_' || character == '\'' || unicode_ident::is_xid_continue(character)
+        })
+        && !HASKELL_RESERVED.contains(&alias)
+}
+
 /// Classify an import module for ordering.
 /// 0 = base/Prelude, 1 = standard libs (Data.*, Control.*, System.*), 2 = everything else.
 fn import_group_order(module: &str) -> u8 {
@@ -171,6 +180,12 @@ fn import_group_order(module: &str) -> u8 {
 }
 
 impl RendererLang for Haskell {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::haskell(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -389,6 +404,23 @@ const HASKELL_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Haskell {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::validate_identifier_aliases(
+            self,
+            imports,
+            is_valid_import_alias,
+        )?;
+        if imports.entries().iter().any(|entry| entry.is_side_effect) {
+            return Err(crate::error::SigilStitchError::InvalidResolvedImports {
+                language: self.file_extension().to_string(),
+                reason: "Haskell has no side-effect import form".to_string(),
+            });
+        }
+        Ok(())
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(HASKELL_TYPES)

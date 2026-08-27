@@ -1,6 +1,6 @@
 mod helpers;
 
-#[path = "../golden.rs"]
+#[path = "../shared/golden.rs"]
 mod golden;
 
 mod args_tuple;

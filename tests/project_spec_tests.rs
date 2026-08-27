@@ -1,4 +1,9 @@
+use std::cell::Cell;
+
 use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::import::{
+    ImportAliasAssignment, ImportAliasConflictResolver, ImportAliasConflicts, ImportAliasRejection,
+};
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::Visibility;
@@ -251,4 +256,71 @@ fn test_multi_file_rust_project() {
     assert_eq!(rendered[0].path, "types.rs");
     assert_eq!(rendered[1].path, "main.rs");
     assert!(rendered[1].content.contains("use crate::types::Config;"));
+}
+
+struct RejectSecondFileResolver {
+    calls: Cell<usize>,
+}
+
+impl ImportAliasConflictResolver for RejectSecondFileResolver {
+    fn resolve(
+        &self,
+        conflicts: &ImportAliasConflicts<'_>,
+    ) -> Result<Vec<ImportAliasAssignment>, ImportAliasRejection> {
+        let call = self.calls.get() + 1;
+        self.calls.set(call);
+        if call == 2 {
+            return Err(ImportAliasRejection::new("second file rejected"));
+        }
+        Ok(conflicts
+            .conflicts()
+            .iter()
+            .flat_map(|conflict| conflict.claims())
+            .enumerate()
+            .map(|(index, claim)| {
+                ImportAliasAssignment::new(claim.id(), format!("Resolved{index}"))
+            })
+            .collect())
+    }
+}
+
+fn file_with_import_conflict(filename: &str) -> FileSpec {
+    FileSpec::builder(filename)
+        .add_code(
+            CodeBlock::of(
+                "%T %T",
+                (
+                    TypeName::importable_type("./models", "User"),
+                    TypeName::importable_type("./other", "User"),
+                ),
+            )
+            .unwrap(),
+        )
+        .build()
+        .unwrap()
+}
+
+#[test]
+fn project_custom_resolver_is_file_local_and_write_is_all_or_error() {
+    let project = ProjectSpec::builder()
+        .add_file(file_with_import_conflict("first.ts"))
+        .add_file(file_with_import_conflict("second.ts"))
+        .build()
+        .unwrap();
+    let resolver = RejectSecondFileResolver {
+        calls: Cell::new(0),
+    };
+    let output_dir = std::env::temp_dir().join(format!(
+        "sigil_stitch_alias_resolver_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&output_dir);
+
+    let error = project
+        .write_to_with_import_alias_resolver(&output_dir, 80, &resolver)
+        .unwrap_err();
+
+    assert_eq!(resolver.calls.get(), 2);
+    assert!(error.to_string().contains("second file rejected"));
+    assert!(!output_dir.exists());
 }

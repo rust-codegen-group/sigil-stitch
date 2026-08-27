@@ -59,18 +59,17 @@ documented `TypeName` JSON set is checked as `serde_json::Value`, and
 `0.6.8`. The compatibility manifest and fixtures live under
 `tests/compatibility/`.
 
-Type expressions are the next accepted 0.7 migration. Its target state gives
-every built-in adapter complete fallible `RendererLang::lower_type_name()`
-ownership before import collection. The provided default will remain only as
-the frozen type-presentation bridge for external adapters written against
-0.6.8.
+Type expressions now use complete fallible
+`RendererLang::lower_type_name()` implementations for every built-in adapter
+before import collection. The provided default is only the frozen
+type-presentation bridge for external adapters written against 0.6.8.
 
-The accepted target also uses complete-set fallible import resolution, moves
-declaration-generic grammar out of `GenericSyntaxConfig`, moves direct renderer
-events out of `BlockSyntaxConfig`, and makes quote handling language-local.
-These are behavior-specific contracts rather than an execution sequence. The
-source-read inventory below names each temporary reader and the behavior that
-retires its current-path use.
+Complete-set fallible import resolution and language-local quote handling are
+also implemented. The accepted target still moves declaration-generic grammar
+out of `GenericSyntaxConfig` and direct renderer events out of
+`BlockSyntaxConfig`. These are behavior-specific contracts rather than an
+execution sequence. The source-read inventory below names each temporary
+reader and the behavior that retires its current-path use.
 
 The provided external-adapter lowerers remain private implementation details.
 They freeze 0.6.8 behavior; they are not examples for new adapters.
@@ -84,9 +83,9 @@ inventory whenever a reader moves behind a frozen compatibility boundary.
 
 | Shared surface | Current production readers | Classification | Retirement owner and retained boundary |
 |----------------|----------------------------|----------------|----------------------------------------|
-| `TypePresentationConfig`, `TypePresentation`, `FunctionPresentation`, `AssociatedTypeStyle`, `BoundsPresentation`, `WildcardPresentation`; `RendererLang::type_presentation()` | `src/type_name_render.rs` reads the complete matrix for every compound type | Language-owned type grammar currently interpreted by a shared engine | Type-name lowering moves all built-ins to complete local `lower_type_name()` implementations; only the frozen 0.6.8 default and direct compatibility facade retain the matrix |
-| `RendererLang::module_separator()` | `src/type_name_render.rs` reads it for qualified type names | Language-owned type grammar | Type-name lowering owns qualified-name spelling; the old accessor remains only in the frozen type bridge |
-| `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in type rendering | `src/type_name_render.rs` reads generic-application delimiters and placement | Language-owned type grammar | Type-name lowering removes this read from the current `TypeName` path |
+| `TypePresentationConfig`, `TypePresentation`, `FunctionPresentation`, `AssociatedTypeStyle`, `BoundsPresentation`, `WildcardPresentation`; `RendererLang::type_presentation()` | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only type grammar | Built-ins implement complete local `lower_type_name()` operations; only the frozen 0.6.8 default and direct compatibility facade retain the matrix |
+| `RendererLang::module_separator()` | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only qualified-name grammar | Built-ins own qualified-name spelling; the old accessor remains only in the frozen type bridge and direct facade |
+| `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in type rendering | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only type grammar | Built-ins own generic type application locally; the frozen bridge and direct facade retain the old delimiters and placement |
 | `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in declarations | `src/spec/where_spec.rs` reads declaration parameter and bound grammar; `src/lang/type_lowering/compatibility.rs` reads it for legacy types | Language-owned declaration grammar in `where_spec`; compatibility-only grammar in the legacy lowerer | Generic declaration lowering moves built-in declaration grammar into complete local lowerers; the compatibility module retains the frozen read |
 | `BlockSyntaxConfig::indent_unit` | `src/code_renderer.rs`, `src/spec/where_spec.rs`, and `src/lang/csharp_function_lowering.rs` | Renderer mechanics when indenting; language-owned declaration layout where a lowerer emits literal indentation | Renderer events route renderer mechanics through `indent_unit()`; complete declaration lowerers remove built-in grammar reads, while compatibility lowerers retain their bridge reads |
 | `BlockSyntaxConfig::{uses_semicolons, block_open, block_close, close_on_transition}` | `src/code_renderer.rs` and `src/lang/typescript_function_lowering.rs`; the field, function, property, and type compatibility modules also read them | Language-owned renderer-event or declaration grammar in current built-in paths; compatibility-only grammar in compatibility modules | Renderer events replace current renderer reads; complete declaration lowerers own built-in grammar, while frozen compatibility modules continue to interpret old adapters |
@@ -130,13 +129,14 @@ affect validity.
 ## Frozen Grammar Configuration
 
 The legacy structs mix renderer mechanics with type-expression and declaration
-grammar. The current source still reads `block_syntax()`, `generic_syntax()`,
-and `type_presentation()` on the paths listed above. The accepted target
-deprecates all three shared configs: complete language-local lowerers own type
-and declaration grammar, while direct renderer-event methods plus
-`indent_unit()` replace final-renderer reads. Frozen compatibility lowerers may
-continue interpreting the old values; none of these structs receives new
-fields or variants.
+grammar. Built-in type-name lowering no longer reads `type_presentation()`;
+only the frozen external-adapter bridge does. Current declaration and renderer
+paths still read `generic_syntax()` and `block_syntax()` where listed above.
+The accepted target deprecates all three shared configs: complete
+language-local lowerers own type and declaration grammar, while direct
+renderer-event methods plus `indent_unit()` replace final-renderer reads.
+Frozen compatibility lowerers may continue interpreting the old values; none
+of these structs receives new fields or variants.
 
 ### `TypePresentationConfig` and `GenericSyntaxConfig`
 
@@ -197,18 +197,18 @@ implement complete declaration lowering instead.
 `with_quote_style(QuoteStyle)` predate 0.6.8 and remain source-compatible. They
 are deprecated shims rather than a general quote configuration shared by new
 languages. TypeScript, JavaScript, and Python each own quote normalization,
-escaping, and output locally. Target-local single-quote and double-quote
-conveniences update the preserved field so there is one stored choice and no
-precedence rule.
+escaping, and output locally. Their `with_single_quotes()` and
+`with_double_quotes()` conveniences update the preserved field so there is one
+stored choice and no precedence rule.
 
 ### Import resolver compatibility
 
 `ImportGroup::resolve()` and `resolve_with_explicit()` remain the exact
 deprecated, infallible 0.6.8 algorithms. They preserve first-encountered and
-explicit-entry precedence, including their established duplicate-binding
-aliases. Separately named fallible complete-set entry points replace them for
-new callers; the old methods are not implemented by unwrapping the new
-resolver.
+explicit-entry precedence, including cases that can produce duplicate local
+bindings. `ImportGroup::try_resolve()` and `try_resolve_with()` are the current
+fallible complete-set entry points; the old methods are not implemented by
+unwrapping the new resolver.
 
 ## Builder Migration Recipes
 

@@ -2,6 +2,11 @@ use sigil_stitch::lang::CodeLang;
 use sigil_stitch::lang::capability::{PropertyCapability, PropertyContext};
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind};
 
+#[path = "shared/languages.rs"]
+mod languages_registry;
+
+use languages_registry::{BUILT_IN_LANGUAGES, adapter_for};
+
 use PropertyCapability::{Attributes, ExplicitType, ReadAccessor, StaticProperty, WriteAccessor};
 
 const ALL_CAPABILITIES: &[PropertyCapability] = &[
@@ -101,7 +106,7 @@ fn built_in_property_matrices_are_exhaustive() {
     use TypeKind::{Class, Enum, Interface, Struct, Trait};
 
     assert_matrix(
-        &sigil_stitch::lang::javascript::JavaScript::new(),
+        adapter_for("javascript").as_ref(),
         &[
             profile(Direct(Member), DYNAMIC, &[]),
             profile(Direct(InterfaceMember), DYNAMIC, &[]),
@@ -113,7 +118,7 @@ fn built_in_property_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::kotlin::Kotlin::new(),
+        adapter_for("kotlin").as_ref(),
         &[
             profile(Direct(Member), VALUE_PROPERTY, REQUIRED_TYPED_READ),
             profile(Direct(InterfaceMember), VALUE_PROPERTY, REQUIRED_TYPED_READ),
@@ -125,7 +130,7 @@ fn built_in_property_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::php::Php::new(),
+        adapter_for("php").as_ref(),
         &[
             profile(Direct(Member), TYPED, &[]),
             profile(TypeMember(Class), TYPED, &[]),
@@ -134,7 +139,7 @@ fn built_in_property_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::scala::Scala::new(),
+        adapter_for("scala").as_ref(),
         &[
             profile(Direct(Member), VALUE_PROPERTY, &[]),
             profile(TypeMember(Class), VALUE_PROPERTY, &[]),
@@ -143,7 +148,7 @@ fn built_in_property_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::swift::Swift::new(),
+        adapter_for("swift").as_ref(),
         &[
             profile(Direct(Member), TYPED, REQUIRED_TYPED_READ),
             profile(TypeMember(Class), TYPED, REQUIRED_TYPED_READ),
@@ -151,7 +156,7 @@ fn built_in_property_matrices_are_exhaustive() {
         ],
     );
     assert_matrix(
-        &sigil_stitch::lang::typescript::TypeScript::new(),
+        adapter_for("typescript").as_ref(),
         &[
             profile(Direct(Member), TYPED, &[]),
             profile(TypeMember(Class), TYPED, &[]),
@@ -162,23 +167,19 @@ fn built_in_property_matrices_are_exhaustive() {
 
 #[test]
 fn unsupported_built_ins_have_no_property_profiles() {
-    let languages: Vec<Box<dyn CodeLang>> = vec![
-        Box::new(sigil_stitch::lang::bash::Bash::new()),
-        Box::new(sigil_stitch::lang::c::C::new()),
-        Box::new(sigil_stitch::lang::cpp::Cpp::new()),
-        Box::new(sigil_stitch::lang::csharp::CSharp::new()),
-        Box::new(sigil_stitch::lang::dart::Dart::new()),
-        Box::new(sigil_stitch::lang::go::Go::new()),
-        Box::new(sigil_stitch::lang::haskell::Haskell::new()),
-        Box::new(sigil_stitch::lang::java::Java::new()),
-        Box::new(sigil_stitch::lang::lua::Lua::new()),
-        Box::new(sigil_stitch::lang::ocaml::OCaml::new()),
-        Box::new(sigil_stitch::lang::python::Python::new()),
-        Box::new(sigil_stitch::lang::ruby::Ruby::new()),
-        Box::new(sigil_stitch::lang::rust::Rust::new()),
-        Box::new(sigil_stitch::lang::zsh::Zsh::new()),
+    const SUPPORTED: &[&str] = &[
+        "javascript",
+        "kotlin",
+        "php",
+        "scala",
+        "swift",
+        "typescript",
     ];
-    for lang in languages {
-        assert_matrix(lang.as_ref(), &[]);
+
+    for language in BUILT_IN_LANGUAGES
+        .into_iter()
+        .filter(|language| !SUPPORTED.contains(&language.id))
+    {
+        assert_matrix(language.adapter().as_ref(), &[]);
     }
 }

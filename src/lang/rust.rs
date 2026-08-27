@@ -66,7 +66,23 @@ const RUST_RESERVED: &[&str] = &[
     "unsized", "virtual", "yield",
 ];
 
+fn is_valid_import_alias(alias: &str) -> bool {
+    let mut characters = alias.chars();
+    alias != "_"
+        && characters
+            .next()
+            .is_some_and(|character| character == '_' || unicode_ident::is_xid_start(character))
+        && characters.all(unicode_ident::is_xid_continue)
+        && !RUST_RESERVED.contains(&alias)
+}
+
 impl RendererLang for Rust {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::rust(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -284,6 +300,16 @@ const RUST_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Rust {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::validate_identifier_aliases(
+            self,
+            imports,
+            is_valid_import_alias,
+        )
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(RUST_TYPES)

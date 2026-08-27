@@ -21,11 +21,13 @@ use crate::type_name::{
 /// TypeScript language implementation.
 ///
 /// Construct with [`TypeScript::new()`] and customize via the `with_*`
-/// methods, e.g. `TypeScript::new().with_quote_style(QuoteStyle::Double)`.
+/// methods, e.g. `TypeScript::new().with_double_quotes()`.
 #[derive(Debug, Clone)]
 pub struct TypeScript {
     /// Quote style for string literals and import paths.
-    #[deprecated(note = "legacy 0.6.8 field; quote selection is language-owned in 0.7")]
+    #[deprecated(
+        note = "legacy 0.6.8 field; use TypeScript::with_single_quotes() or TypeScript::with_double_quotes()"
+    )]
     #[expect(deprecated, reason = "0.6.8 compatibility field")]
     pub quote_style: QuoteStyle,
     /// Indent with this string (default: "  ").
@@ -55,10 +57,26 @@ impl TypeScript {
     }
 
     /// Set the quote style used for string literals and import paths.
-    #[deprecated(note = "legacy 0.6.8 setter; use language-local quote selection in 0.7")]
+    #[deprecated(
+        note = "legacy 0.6.8 setter; use TypeScript::with_single_quotes() or TypeScript::with_double_quotes()"
+    )]
     #[expect(deprecated, reason = "0.6.8 compatibility setter")]
     pub fn with_quote_style(mut self, qs: QuoteStyle) -> Self {
         self.quote_style = qs;
+        self
+    }
+
+    /// Use single quotes for string literals and import paths.
+    #[expect(deprecated, reason = "updates the 0.6.8 compatibility field")]
+    pub fn with_single_quotes(mut self) -> Self {
+        self.quote_style = QuoteStyle::Single;
+        self
+    }
+
+    /// Use double quotes for string literals and import paths.
+    #[expect(deprecated, reason = "updates the 0.6.8 compatibility field")]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.quote_style = QuoteStyle::Double;
         self
     }
 
@@ -181,7 +199,73 @@ const TS_RESERVED: &[&str] = &[
     "defer",
 ];
 
+fn is_valid_import_binding(binding: &str) -> bool {
+    let mut characters = binding.chars();
+    characters.next().is_some_and(|character| {
+        character == '_' || character == '$' || unicode_id_start::is_id_start(character)
+    }) && characters.all(|character| {
+        character == '$'
+            || character == '\u{200c}'
+            || character == '\u{200d}'
+            || unicode_id_start::is_id_continue(character)
+    }) && !TS_RESERVED.contains(&binding)
+}
+
+fn module_to_namespace_alias(module: &str) -> String {
+    let last_segment = module
+        .rsplit(['/', ':', '.', '\\'])
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(module);
+
+    let mut characters = last_segment.chars();
+    match characters.next() {
+        None => "Module".to_string(),
+        Some(first) => {
+            let upper: String = first.to_uppercase().collect();
+            format!("{upper}{}", characters.as_str())
+        }
+    }
+}
+
+fn validate_import_bindings(
+    lang: &TypeScript,
+    imports: &ImportGroup,
+) -> Result<(), SigilStitchError> {
+    let mut bindings = std::collections::HashSet::new();
+    for entry in imports.entries() {
+        if entry.is_side_effect {
+            continue;
+        }
+        let binding = if entry.is_wildcard {
+            module_to_namespace_alias(&entry.module)
+        } else {
+            entry.resolved_name().to_string()
+        };
+        if !is_valid_import_binding(&binding) {
+            return Err(SigilStitchError::InvalidResolvedImports {
+                language: lang.file_extension().to_string(),
+                reason: format!("TypeScript import binding {binding:?} is not a valid identifier"),
+            });
+        }
+        if !bindings.insert(binding.clone()) {
+            return Err(SigilStitchError::InvalidResolvedImports {
+                language: lang.file_extension().to_string(),
+                reason: format!(
+                    "multiple TypeScript imports produce the local binding {binding:?}"
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
 impl RendererLang for TypeScript {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::typescript(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -191,15 +275,33 @@ impl RendererLang for TypeScript {
     }
 
     fn render_string_literal(&self, s: &str) -> String {
-        match self.quote_char() {
-            '\'' => {
-                format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
+        let quote = self.quote_char();
+        let mut escaped = String::with_capacity(s.len() + 2);
+        escaped.push(quote);
+        for ch in s.chars() {
+            match ch {
+                '\\' => escaped.push_str("\\\\"),
+                value if value == quote => {
+                    escaped.push('\\');
+                    escaped.push(value);
+                }
+                '\u{0008}' => escaped.push_str("\\b"),
+                '\t' => escaped.push_str("\\t"),
+                '\n' => escaped.push_str("\\n"),
+                '\u{000B}' => escaped.push_str("\\v"),
+                '\u{000C}' => escaped.push_str("\\f"),
+                '\r' => escaped.push_str("\\r"),
+                value @ ('\u{0000}'..='\u{001F}' | '\u{007F}'..='\u{009F}') => {
+                    escaped.push_str(&format!("\\x{:02X}", value as u32));
+                }
+                value @ ('\u{2028}' | '\u{2029}') => {
+                    escaped.push_str(&format!("\\u{:04X}", value as u32));
+                }
+                value => escaped.push(value),
             }
-            '"' => {
-                format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
-            }
-            _ => unreachable!("quote compatibility helper returns only supported delimiters"),
         }
+        escaped.push(quote);
+        escaped
     }
 
     fn render_verbatim_string(&self, s: &str) -> String {
@@ -416,6 +518,12 @@ const TS_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for TypeScript {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        validate_import_bindings(self, imports)
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(TS_TYPES)
@@ -585,7 +693,6 @@ impl CodeLang for TypeScript {
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
         let mut lines = Vec::new();
-        let quote = self.quote_char();
         let term = if self.uses_semicolons { ";" } else { "" };
 
         // Group entries by module path.
@@ -593,16 +700,19 @@ impl CodeLang for TypeScript {
             std::collections::BTreeMap::new();
         for entry in imports.entries() {
             if entry.is_side_effect {
-                lines.push(format!("import {quote}{}{quote}{term}", entry.module));
+                lines.push(format!(
+                    "import {}{term}",
+                    self.render_string_literal(&entry.module)
+                ));
                 continue;
             }
             if entry.is_wildcard {
                 // TS wildcard: import * as Module from "module";
-                // Use module_to_alias to generate a reasonable namespace name.
-                let alias = super::module_to_alias(&entry.module);
+                let alias = module_to_namespace_alias(&entry.module);
                 lines.push(format!(
-                    "import * as {} from {quote}{}{quote}{term}",
-                    alias, entry.module,
+                    "import * as {} from {}{term}",
+                    alias,
+                    self.render_string_literal(&entry.module),
                 ));
                 continue;
             }
@@ -632,16 +742,16 @@ impl CodeLang for TypeScript {
 
             if !type_names.is_empty() {
                 lines.push(format!(
-                    "import type {{ {} }} from {quote}{}{quote}{term}",
+                    "import type {{ {} }} from {}{term}",
                     type_names.join(", "),
-                    module,
+                    self.render_string_literal(module),
                 ));
             }
             if !value_names.is_empty() {
                 lines.push(format!(
-                    "import {{ {} }} from {quote}{}{quote}{term}",
+                    "import {{ {} }} from {}{term}",
                     value_names.join(", "),
-                    module,
+                    self.render_string_literal(module),
                 ));
             }
         }
@@ -743,8 +853,118 @@ mod tests {
 
     #[test]
     fn test_string_literal_double_quotes() {
-        let ts = TypeScript::new().with_quote_style(QuoteStyle::Double);
+        let ts = TypeScript::new().with_double_quotes();
         assert_eq!(ts.render_string_literal("hello"), "\"hello\"");
+    }
+
+    #[test]
+    fn quote_selection_apis_are_equivalent() {
+        let input = "'\"\\\n";
+        let legacy_setter = TypeScript::new().with_quote_style(QuoteStyle::Double);
+        let mut legacy_field = TypeScript::new();
+        legacy_field.quote_style = QuoteStyle::Double;
+        let convenience = TypeScript::new().with_double_quotes();
+
+        assert_eq!(
+            legacy_setter.render_string_literal(input),
+            legacy_field.render_string_literal(input)
+        );
+        assert_eq!(
+            legacy_setter.render_string_literal(input),
+            convenience.render_string_literal(input)
+        );
+        assert_eq!(
+            TypeScript::new()
+                .with_single_quotes()
+                .render_string_literal(input),
+            TypeScript::new().render_string_literal(input)
+        );
+    }
+
+    #[test]
+    fn string_literals_escape_source_controls_without_rewriting_unicode() {
+        let ts = TypeScript::new();
+        assert_eq!(ts.render_string_literal(""), "''");
+        assert_eq!(ts.render_string_literal("\0"), "'\\x00'");
+        assert_eq!(
+            ts.render_string_literal("\0\u{0001}\u{0008}\t\n\u{000B}\u{000C}\r\u{001F}\u{007F}\u{0085}\u{2028}\u{2029}雪😀"),
+            "'\\x00\\x01\\b\\t\\n\\v\\f\\r\\x1F\\x7F\\x85\\u2028\\u2029雪😀'"
+        );
+        assert_eq!(
+            ts.render_string_literal("\0\u{0037}\u{0001}A$#{value}"),
+            "'\\x007\\x01A$#{value}'"
+        );
+        assert_eq!(
+            TypeScript::new()
+                .with_double_quotes()
+                .render_string_literal("'\"\\\r"),
+            "\"'\\\"\\\\\\r\""
+        );
+    }
+
+    #[test]
+    fn string_singleton_types_preserve_precedence_and_escaping() {
+        let ts = TypeScript::new();
+        let literal = crate::type_name::TypeName::string_literal("a'\\\n");
+        let ordinary = CodeBlock::of(
+            "%S",
+            (crate::code_block::StringLitArg("a'\\\n".to_string()),),
+        )
+        .unwrap()
+        .render_standalone(&ts, 80)
+        .unwrap();
+        let singleton = CodeBlock::of("%T", (literal.clone(),))
+            .unwrap()
+            .render_standalone(&ts, 80)
+            .unwrap();
+        assert_eq!(singleton, ordinary);
+        assert_eq!(singleton, "'a\\'\\\\\\n'");
+
+        let union = crate::type_name::TypeName::union(vec![
+            crate::type_name::TypeName::string_literal("active"),
+            crate::type_name::TypeName::string_literal("inactive"),
+        ]);
+        assert_eq!(
+            CodeBlock::of("%T", (union,))
+                .unwrap()
+                .render_standalone(&ts, 80)
+                .unwrap(),
+            "'active' | 'inactive'"
+        );
+
+        let array =
+            crate::type_name::TypeName::array(crate::type_name::TypeName::string_literal("active"));
+        assert_eq!(
+            CodeBlock::of("%T", (array,))
+                .unwrap()
+                .render_standalone(&ts, 80)
+                .unwrap(),
+            "('active')[]"
+        );
+
+        let function = crate::type_name::TypeName::function(
+            vec![crate::type_name::TypeName::string_literal("input")],
+            crate::type_name::TypeName::string_literal("output"),
+        );
+        assert_eq!(
+            CodeBlock::of("%T", (function,))
+                .unwrap()
+                .render_standalone(&ts, 80)
+                .unwrap(),
+            "(arg0: 'input') => 'output'"
+        );
+
+        let member = crate::type_name::TypeName::member_type(
+            crate::type_name::TypeName::primitive("Value"),
+            "type'\\path",
+        );
+        assert_eq!(
+            CodeBlock::of("%T", (member,))
+                .unwrap()
+                .render_standalone(&ts, 80)
+                .unwrap(),
+            "Value['type\\'\\\\path']"
+        );
     }
 
     #[test]
@@ -843,6 +1063,25 @@ mod tests {
         let output = ts.render_imports(&imports);
         assert!(output.contains("import type { User } from './models'"));
         assert!(output.contains("import type { User as OtherUser } from './other'"));
+    }
+
+    #[test]
+    fn import_paths_use_language_owned_string_escaping() {
+        let ts = TypeScript::new().with_double_quotes();
+        let imports = ImportGroup {
+            entries: vec![ImportEntry {
+                module: "./path\\segment\t\u{2028}".into(),
+                name: "Value".into(),
+                alias: None,
+                is_type_only: true,
+                is_side_effect: false,
+                is_wildcard: false,
+            }],
+        };
+        assert_eq!(
+            ts.render_imports(&imports),
+            "import type { Value } from \"./path\\\\segment\\t\\u2028\";"
+        );
     }
 
     #[test]

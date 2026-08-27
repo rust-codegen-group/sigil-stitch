@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Complete fallible `RendererLang::lower_type_name()` implementations for all
+  built-in languages, with intrinsic and adapter-output validation before
+  rendering.
+- `TypeName::StringLiteral(String)` and `TypeName::string_literal(...)` for
+  decoded string singleton types. TypeScript emits literal types, Python emits
+  import-aware `typing.Literal`, and other built-in targets reject the form.
+- Language-local `with_single_quotes()` and `with_double_quotes()` conveniences
+  on TypeScript, JavaScript, and Python.
+- Complete-peer import conflict resolution through
+  `ImportGroup::try_resolve()`, `ImportGroup::try_resolve_with()`, and borrowed
+  per-render resolver entry points on `FileSpec` and `ProjectSpec`.
+
+### Changed
+
+- `FileSpec` now rewrites source trees and lowers type references before import
+  collection, so rewrite-introduced and target-derived imports participate in
+  the authoritative alias assignment.
+- `TypeName` is now non-exhaustive. Downstream exhaustive matches must add a
+  wildcard arm and either return the value to language-owned lowering or reject
+  it; unknown variants must not be widened to `Primitive` or `Raw`.
+- TypeScript, JavaScript, and Python string quoting now escapes delimiters,
+  backslashes, source controls, and line separators with fixed-width escapes
+  while preserving ordinary Unicode.
+- Python now renders resolved import aliases as `Original as Alias`, including
+  conflicts involving target-derived `typing.Literal` imports.
+- Import conflicts that cannot satisfy exact bindings, complete assignments,
+  safe text, global uniqueness, or target-local alias rules now fail before any
+  generated source is returned. Upgrade the 0.7 core, language adapters, and
+  callers together; partial migration is unsupported.
+
+### Deprecated
+
+- `ImportGroup::resolve()` and `resolve_with_explicit()` remain frozen 0.6.8
+  compatibility facades; new code should use the fallible complete-set APIs.
+- The shared `QuoteStyle`, public `quote_style` fields, and
+  `with_quote_style(...)` setters remain source-compatible shims; new code
+  should use the target-local quote conveniences.
+
 ## 0.6.8
 
 ### Added
