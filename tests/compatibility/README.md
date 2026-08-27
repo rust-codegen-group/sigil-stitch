@@ -15,7 +15,8 @@ The inventory is checked in three ways:
 - `compatibility_0_6_8.rs` compiles exact restored signatures through the
   external crate boundary and exercises the compatibility bridges.
 - `cargo-semver-checks 0.49.0` checks the entire public Rust surface against
-  tag `0.6.8`; the allowlist is empty.
+  tag `0.6.8`; the allowlist contains only the approved change that makes
+  `TypeName` non-exhaustive.
 - The manifest test rejects malformed or duplicate inventory records and
   requires the restored signatures, JSON fixture, complete legacy grammar-hook
   inventory, quote shims, and both infallible import resolvers to be named.

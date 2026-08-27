@@ -233,12 +233,11 @@ function main() {
 # use sigil_stitch::prelude::*;
 # use sigil_stitch::lang::bash::Bash;
 # fn main() {
-let utils = TypeName::importable("./lib/utils.sh", "");
-let config = TypeName::importable("./lib/config.sh", "");
-
-let body = CodeBlock::of("# uses %T and %T", (utils, config)).unwrap();
+let body = CodeBlock::of("# uses imported helpers", ()).unwrap();
 
 let output = FileSpec::builder_with("app.bash", Bash::new())
+    .add_import(ImportSpec::side_effect("./lib/utils.sh"))
+    .add_import(ImportSpec::side_effect("./lib/config.sh"))
     .add_code(body)
     .build()
     .unwrap()

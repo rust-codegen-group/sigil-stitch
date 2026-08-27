@@ -4,6 +4,11 @@ use sigil_stitch::lang::capability::{
 };
 use sigil_stitch::spec::modifiers::TypeKind;
 
+#[path = "shared/languages.rs"]
+mod languages_registry;
+
+use languages_registry::adapter_for;
+
 const ALL_KINDS: [TypeKind; 7] = [
     TypeKind::Class,
     TypeKind::Struct,
@@ -65,36 +70,27 @@ fn profile_and_registry_builders_preserve_variant_semantics() {
 
 #[test]
 fn languages_without_variant_declarations_have_no_owner_profile() {
-    assert_matrix(&sigil_stitch::lang::bash::Bash::new(), None);
-    assert_matrix(&sigil_stitch::lang::zsh::Zsh::new(), None);
-    assert_matrix(&sigil_stitch::lang::lua::Lua::new(), None);
-    assert_matrix(&sigil_stitch::lang::go::Go::new(), None);
+    assert_matrix(adapter_for("bash").as_ref(), None);
+    assert_matrix(adapter_for("zsh").as_ref(), None);
+    assert_matrix(adapter_for("lua").as_ref(), None);
+    assert_matrix(adapter_for("go").as_ref(), None);
 }
 
 #[test]
 fn discriminant_enum_profiles() {
     let discriminant = &[VariantCapability::Discriminant][..];
-    assert_matrix(
-        &sigil_stitch::lang::javascript::JavaScript::new(),
-        Some(discriminant),
-    );
-    assert_matrix(
-        &sigil_stitch::lang::python::Python::new(),
-        Some(discriminant),
-    );
-    assert_matrix(
-        &sigil_stitch::lang::typescript::TypeScript::new(),
-        Some(discriminant),
-    );
+    assert_matrix(adapter_for("javascript").as_ref(), Some(discriminant));
+    assert_matrix(adapter_for("python").as_ref(), Some(discriminant));
+    assert_matrix(adapter_for("typescript").as_ref(), Some(discriminant));
 
     let attributed = &[
         VariantCapability::Discriminant,
         VariantCapability::Attributes,
     ][..];
-    assert_matrix(&sigil_stitch::lang::c::C::new(), Some(attributed));
-    assert_matrix(&sigil_stitch::lang::cpp::Cpp::new(), Some(attributed));
-    assert_matrix(&sigil_stitch::lang::csharp::CSharp::new(), Some(attributed));
-    assert_matrix(&sigil_stitch::lang::ruby::Ruby::new(), Some(attributed));
+    assert_matrix(adapter_for("c").as_ref(), Some(attributed));
+    assert_matrix(adapter_for("cpp").as_ref(), Some(attributed));
+    assert_matrix(adapter_for("csharp").as_ref(), Some(attributed));
+    assert_matrix(adapter_for("ruby").as_ref(), Some(attributed));
 }
 
 #[test]
@@ -103,8 +99,8 @@ fn constructor_argument_profiles() {
         VariantCapability::ConstructorArguments,
         VariantCapability::Attributes,
     ][..];
-    assert_matrix(&sigil_stitch::lang::java::Java::new(), Some(expected));
-    assert_matrix(&sigil_stitch::lang::kotlin::Kotlin::new(), Some(expected));
+    assert_matrix(adapter_for("java").as_ref(), Some(expected));
+    assert_matrix(adapter_for("kotlin").as_ref(), Some(expected));
 }
 
 #[test]
@@ -113,8 +109,8 @@ fn algebraic_payload_profiles() {
         VariantCapability::PositionalPayload,
         VariantCapability::RecordPayload,
     ][..];
-    assert_matrix(&sigil_stitch::lang::haskell::Haskell::new(), Some(records));
-    assert_matrix(&sigil_stitch::lang::ocaml::OCaml::new(), Some(records));
+    assert_matrix(adapter_for("haskell").as_ref(), Some(records));
+    assert_matrix(adapter_for("ocaml").as_ref(), Some(records));
 
     let rust = &[
         VariantCapability::Discriminant,
@@ -122,27 +118,27 @@ fn algebraic_payload_profiles() {
         VariantCapability::RecordPayload,
         VariantCapability::Attributes,
     ][..];
-    assert_matrix(&sigil_stitch::lang::rust::Rust::new(), Some(rust));
+    assert_matrix(adapter_for("rust").as_ref(), Some(rust));
 
     let swift = &[
         VariantCapability::PositionalPayload,
         VariantCapability::Attributes,
     ][..];
-    assert_matrix(&sigil_stitch::lang::swift::Swift::new(), Some(swift));
+    assert_matrix(adapter_for("swift").as_ref(), Some(swift));
 }
 
 #[test]
 fn simple_and_attributed_case_profiles() {
     assert_matrix(
-        &sigil_stitch::lang::dart::Dart::new(),
+        adapter_for("dart").as_ref(),
         Some(&[VariantCapability::Attributes]),
     );
     assert_matrix(
-        &sigil_stitch::lang::php::Php::new(),
+        adapter_for("php").as_ref(),
         Some(&[VariantCapability::Attributes]),
     );
     assert_matrix(
-        &sigil_stitch::lang::scala::Scala::new(),
+        adapter_for("scala").as_ref(),
         Some(&[VariantCapability::Attributes]),
     );
 }

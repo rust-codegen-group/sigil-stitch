@@ -3,23 +3,21 @@ mod pretty;
 #[cfg(test)]
 mod tests;
 
-use ::pretty::BoxDoc;
-
-use crate::code_block::{
-    CodeBlock, validate_balanced_indent_markers, validate_no_unresolved_indent_markers,
-};
+use crate::code_block::CodeBlock;
 use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::RendererLang;
+use crate::type_name::TypeName;
+use crate::type_name_lowering::{DiagnosticPath, TypeNameMaterializer};
 use direct::DirectAdapter;
 use pretty::PrettyAdapter;
 
-/// Pass 2 of the three-pass rendering model.
+/// Terminal renderer for fully prepared structured source.
 ///
 /// The renderer owns only stable configuration. Each render call creates one
-/// call-local output adapter and interprets every rewritten node through the
-/// same semantic walker.
+/// call-local output adapter and interprets every node through the same
+/// semantic walker.
 pub struct CodeRenderer<'a> {
     lang: &'a dyn RendererLang,
     imports: &'a ImportGroup,
@@ -37,41 +35,52 @@ impl<'a> CodeRenderer<'a> {
     }
 
     /// Render a CodeBlock to string.
-    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
     pub fn render(&mut self, block: &CodeBlock) -> Result<String, SigilStitchError> {
-        let mut nodes = block.nodes.clone();
-        self.lang.rewrite_nodes(&mut nodes);
-        validate_balanced_indent_markers(&nodes)?;
-        validate_no_unresolved_indent_markers(&nodes)?;
+        let mut materializer = TypeNameMaterializer::new(self.lang);
+        let prepared =
+            materializer.prepare_source_block(block, DiagnosticPath::root("standalone"))?;
+        self.render_prepared(&prepared)
+    }
 
+    pub(crate) fn render_prepared(&self, block: &CodeBlock) -> Result<String, SigilStitchError> {
+        let nodes = &block.nodes;
+        #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
         let indent_unit = self.lang.block_syntax().indent_unit;
-        if contains_soft_break(&nodes) {
+        if contains_soft_break(nodes) {
             let mut adapter = PrettyAdapter::new(indent_unit, self.width);
-            adapter.begin_group()?;
-            self.walk_nodes(&nodes, &mut adapter)?;
+            adapter.begin_group(LayoutGroup::IndependentBreaks)?;
+            self.walk_nodes(nodes, &mut adapter)?;
             adapter.end_group()?;
             adapter.finish()
         } else {
             let mut adapter = DirectAdapter::new(indent_unit, self.width);
-            adapter.begin_group()?;
-            self.walk_nodes(&nodes, &mut adapter)?;
+            adapter.begin_group(LayoutGroup::IndependentBreaks)?;
+            self.walk_nodes(nodes, &mut adapter)?;
             adapter.end_group()?;
             Ok(adapter.finish())
         }
     }
 
-    fn resolve_type_doc(&self, tn: &crate::type_name::TypeName) -> BoxDoc<'static, ()> {
-        let lang = self.lang;
-        let resolve = |module: &str, name: &str| -> String {
-            let resolved = self
-                .imports
-                .resolved_name(module, name)
-                .unwrap_or(name)
-                .to_string();
-            lang.qualify_import_reference(module, name, &resolved)
-        };
-        #[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
-        tn.to_doc_with_lang(&resolve, self.lang)
+    fn resolve_terminal_type(&self, type_name: &TypeName) -> Result<String, SigilStitchError> {
+        match type_name {
+            TypeName::Primitive(name) | TypeName::Raw(name) => Ok(name.clone()),
+            TypeName::Importable {
+                module,
+                name,
+                qualified: false,
+                ..
+            } => {
+                let resolved = self
+                    .imports
+                    .resolved_name(module, name)
+                    .unwrap_or(name)
+                    .to_string();
+                Ok(self.lang.qualify_import_reference(module, name, &resolved))
+            }
+            _ => Err(SigilStitchError::UnexpectedTypeReference {
+                context: "prepared renderer tree".to_string(),
+            }),
+        }
     }
 
     #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
@@ -130,7 +139,9 @@ impl<'a> CodeRenderer<'a> {
         for node in nodes {
             match node {
                 CodeNode::Literal(text) => adapter.structured_text(text)?,
-                CodeNode::TypeRef(tn) => adapter.type_doc(self.resolve_type_doc(tn))?,
+                CodeNode::TypeRef(type_name) => {
+                    adapter.structured_text(&self.resolve_terminal_type(type_name)?)?;
+                }
                 CodeNode::NameRef(name) => {
                     adapter.structured_text(&self.lang.escape_reserved(name))?;
                 }
@@ -142,7 +153,7 @@ impl<'a> CodeRenderer<'a> {
                 }
                 CodeNode::InlineLiteral(text) => adapter.structured_text(text)?,
                 CodeNode::Nested(block) => {
-                    adapter.begin_group()?;
+                    adapter.begin_group(LayoutGroup::IndependentBreaks)?;
                     self.walk_nodes(&block.nodes, adapter)?;
                     adapter.end_group()?;
                 }
@@ -205,7 +216,7 @@ impl<'a> CodeRenderer<'a> {
                     }
                 }
                 CodeNode::Sequence(children) => {
-                    adapter.begin_group()?;
+                    adapter.begin_group(LayoutGroup::ConsistentBreaks)?;
                     self.walk_nodes(children, adapter)?;
                     adapter.end_group()?;
                 }
@@ -215,15 +226,20 @@ impl<'a> CodeRenderer<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
+enum LayoutGroup {
+    IndependentBreaks,
+    ConsistentBreaks,
+}
+
 trait RenderAdapter {
     fn raw_text(&mut self, text: &str) -> Result<(), SigilStitchError>;
     fn ensure_indent(&mut self) -> Result<(), SigilStitchError>;
     fn hard_break(&mut self) -> Result<(), SigilStitchError>;
     fn soft_break(&mut self) -> Result<(), SigilStitchError>;
-    fn type_doc(&mut self, doc: BoxDoc<'static, ()>) -> Result<(), SigilStitchError>;
     fn indent(&mut self) -> Result<(), SigilStitchError>;
     fn dedent(&mut self) -> Result<(), SigilStitchError>;
-    fn begin_group(&mut self) -> Result<(), SigilStitchError>;
+    fn begin_group(&mut self, group: LayoutGroup) -> Result<(), SigilStitchError>;
     fn end_group(&mut self) -> Result<(), SigilStitchError>;
 
     fn structured_text(&mut self, text: &str) -> Result<(), SigilStitchError> {

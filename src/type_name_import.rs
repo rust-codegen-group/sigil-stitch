@@ -78,6 +78,6 @@ pub fn collect_imports(tn: &TypeName, out: &mut Vec<ImportRef>) {
                 collect_imports(lb, out);
             }
         }
-        TypeName::Primitive(_) | TypeName::Raw(_) => {}
+        TypeName::Primitive(_) | TypeName::Raw(_) | TypeName::StringLiteral(_) => {}
     }
 }

@@ -1,6 +1,7 @@
 # TypeName Validation and Lowering
 
-Status: accepted 0.7 design; implementation pending.
+Status: implemented for every current `TypeName` variant, including string
+literal types.
 
 `TypeName` records semantic type-reference structure. It does not describe a
 shared target grammar. One selected language adapter must either lower the
@@ -166,8 +167,8 @@ Several values compose through ordinary union structure:
 
 ```text
 TypeName::Union([
-    TypeName::StringLiteral("active"),
-    TypeName::StringLiteral("inactive"),
+    TypeName::string_literal("active"),
+    TypeName::string_literal("inactive"),
 ])
 ```
 

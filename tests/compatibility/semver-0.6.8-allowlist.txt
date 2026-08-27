@@ -1,1 +1,3 @@
-# No public API breaks from 0.6.8 are approved.
+# TypeName is intentionally extensible in 0.7; exhaustive downstream matches
+# must add a wildcard arm.
+sigil-stitch|enum_marked_non_exhaustive|TypeName

@@ -95,6 +95,7 @@ pub mod testing;
 /// Semantic type references with recursive import tracking.
 pub mod type_name;
 pub(crate) mod type_name_import;
+pub(crate) mod type_name_lowering;
 pub(crate) mod type_name_render;
 
 /// Common re-exports for convenient usage.

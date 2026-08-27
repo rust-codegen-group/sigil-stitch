@@ -30,12 +30,11 @@ intent. Literal text inside a `CodeBlock` is already target syntax and is only
 portable where that syntax is shared.
 
 **Import-aware.** When you use `%T` with a `TypeName::Importable`, the library records
-that import. The current `FileSpec` implementation collects imports from
-materialized code blocks, deduplicates them, and resolves naming conflicts with
-its built-in encounter-order algorithm. The accepted 0.7 design will collect
-imports after source rewrite and type-name lowering and will resolve each peer
-conflict set through a fallible complete-set resolver; that pipeline is not yet
-implemented. You never write ordinary import statements by hand.
+that import. `FileSpec` rewrites and validates each materialized source tree,
+lowers every complete type name, then collects and resolves imports through a
+fallible complete-set resolver. Its default policy uses encounter order only as
+a deterministic tie-break; callers can supply a different borrowed policy for
+one render. You never write ordinary import statements by hand.
 
 **Width-aware.** Place `%W` in a format string to mark a soft line break. When the
 output fits within the target width, `%W` produces a space. When it doesn't fit, `%W`
@@ -108,12 +107,11 @@ There are three levels of abstraction, and you can use whichever fits:
   declaration intent. They carry semantic facts such as visibility, annotations,
   type parameters, and modifiers; the selected adapter validates and lowers
   them to target syntax.
-- **FileSpec** to render a complete file. The current implementation lowers
-  specs, collects and resolves imports, and then asks `CodeRenderer` to rewrite
-  and render each block, including its type references. The accepted 0.7 target
-  moves rewrite and type-name lowering before import collection; see
-  [Architecture](architecture.md) for that explicitly pending pipeline. Pass a
-  target width to `file.render(80)` and get a `String` back.
+- **FileSpec** to render a complete file. It lowers specs, rewrites and validates
+  each source tree, lowers type references, resolves the imports in the prepared
+  blocks, and then renders with no further rewrite or type lowering. See
+  [Architecture](architecture.md) for the complete pipeline. Pass a target width
+  to `file.render(80)` and get a `String` back.
 
 For multi-file output, **ProjectSpec** collects multiple `FileSpec`s and can render
 them all at once or write them to disk.

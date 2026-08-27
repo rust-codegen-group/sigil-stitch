@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 
 use crate::error::SigilStitchError;
+use crate::import::ImportAliasConflictResolver;
 use crate::spec::file_spec::FileSpec;
 
 /// A rendered file produced by [`ProjectSpec::render()`]: path and content pair.
@@ -64,9 +65,29 @@ impl ProjectSpec {
     /// Each file resolves imports independently. File ordering is preserved.
     /// Fails on the first render error, including the filename in the message.
     pub fn render(&self, width: usize) -> Result<Vec<RenderedFile>, SigilStitchError> {
+        self.render_with_resolver(width, None)
+    }
+
+    /// Render every file with one borrowed per-execution alias policy.
+    pub fn render_with_import_alias_resolver(
+        &self,
+        width: usize,
+        resolver: &dyn ImportAliasConflictResolver,
+    ) -> Result<Vec<RenderedFile>, SigilStitchError> {
+        self.render_with_resolver(width, Some(resolver))
+    }
+
+    fn render_with_resolver(
+        &self,
+        width: usize,
+        resolver: Option<&dyn ImportAliasConflictResolver>,
+    ) -> Result<Vec<RenderedFile>, SigilStitchError> {
         let mut rendered = Vec::with_capacity(self.files.len());
         for file in &self.files {
-            let content = file.render(width)?;
+            let content = match resolver {
+                Some(resolver) => file.render_with_import_alias_resolver(width, resolver)?,
+                None => file.render(width)?,
+            };
             rendered.push(RenderedFile {
                 path: file.filename().to_string(),
                 content,
@@ -84,24 +105,41 @@ impl ProjectSpec {
         width: usize,
     ) -> Result<Vec<std::path::PathBuf>, SigilStitchError> {
         let rendered = self.render(width)?;
-
-        let mut written = Vec::with_capacity(rendered.len());
-        for file in &rendered {
-            let full_path = base_dir.join(&file.path);
-            if let Some(parent) = full_path.parent() {
-                std::fs::create_dir_all(parent).map_err(|source| SigilStitchError::Io {
-                    source,
-                    context: format!("creating directory for {}", file.path),
-                })?;
-            }
-            std::fs::write(&full_path, &file.content).map_err(|source| SigilStitchError::Io {
-                source,
-                context: format!("writing file {}", file.path),
-            })?;
-            written.push(full_path);
-        }
-        Ok(written)
+        write_rendered_files(base_dir, &rendered)
     }
+
+    /// Render with a borrowed alias policy, then write only after every file succeeds.
+    pub fn write_to_with_import_alias_resolver(
+        &self,
+        base_dir: &std::path::Path,
+        width: usize,
+        resolver: &dyn ImportAliasConflictResolver,
+    ) -> Result<Vec<std::path::PathBuf>, SigilStitchError> {
+        let rendered = self.render_with_import_alias_resolver(width, resolver)?;
+        write_rendered_files(base_dir, &rendered)
+    }
+}
+
+fn write_rendered_files(
+    base_dir: &std::path::Path,
+    rendered: &[RenderedFile],
+) -> Result<Vec<std::path::PathBuf>, SigilStitchError> {
+    let mut written = Vec::with_capacity(rendered.len());
+    for file in rendered {
+        let full_path = base_dir.join(&file.path);
+        if let Some(parent) = full_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|source| SigilStitchError::Io {
+                source,
+                context: format!("creating directory for {}", file.path),
+            })?;
+        }
+        std::fs::write(&full_path, &file.content).map_err(|source| SigilStitchError::Io {
+            source,
+            context: format!("writing file {}", file.path),
+        })?;
+        written.push(full_path);
+    }
+    Ok(written)
 }
 
 /// Builder for [`ProjectSpec`].

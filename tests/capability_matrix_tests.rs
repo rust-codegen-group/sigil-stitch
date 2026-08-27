@@ -5,6 +5,11 @@ use sigil_stitch::lang::capability::{
 };
 use sigil_stitch::spec::modifiers::TypeKind;
 
+#[path = "shared/languages.rs"]
+mod languages_registry;
+
+use languages_registry::adapter_for;
+
 const ALL_KINDS: [TypeKind; 7] = [
     TypeKind::Class,
     TypeKind::Struct,
@@ -125,9 +130,9 @@ fn capability_profile_builders_preserve_semantic_policy() {
 
 #[test]
 fn empty_matrices_for_shell_and_lua() {
-    assert_matrix(&sigil_stitch::lang::bash::Bash::new(), &[]);
-    assert_matrix(&sigil_stitch::lang::zsh::Zsh::new(), &[]);
-    assert_matrix(&sigil_stitch::lang::lua::Lua::new(), &[]);
+    assert_matrix(adapter_for("bash").as_ref(), &[]);
+    assert_matrix(adapter_for("zsh").as_ref(), &[]);
+    assert_matrix(adapter_for("lua").as_ref(), &[]);
 }
 
 #[test]
@@ -135,7 +140,7 @@ fn c_matrix() {
     let record = &[TypeCapability::RecordFields, TypeCapability::Attributes];
     let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
     assert_matrix(
-        &sigil_stitch::lang::c::C::new(),
+        adapter_for("c").as_ref(),
         &[
             (TypeKind::Struct, record),
             (TypeKind::Class, record),
@@ -159,7 +164,7 @@ fn cpp_matrix() {
     let record_caps = &[TypeCapability::RecordFields, TypeCapability::Attributes];
     let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
     assert_matrix(
-        &sigil_stitch::lang::cpp::Cpp::new(),
+        adapter_for("cpp").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, record_caps),
@@ -202,7 +207,7 @@ fn csharp_matrix() {
     ];
     let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
     assert_matrix(
-        &sigil_stitch::lang::csharp::CSharp::new(),
+        adapter_for("csharp").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, struct_caps),
@@ -233,7 +238,7 @@ fn dart_matrix() {
         TypeCapability::Attributes,
     ];
     assert_matrix(
-        &sigil_stitch::lang::dart::Dart::new(),
+        adapter_for("dart").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, class_caps),
@@ -261,7 +266,7 @@ fn go_matrix() {
     ];
     let contract_caps = &[TypeCapability::Methods, TypeCapability::StructuralEmbedding];
     assert_matrix(
-        &sigil_stitch::lang::go::Go::new(),
+        adapter_for("go").as_ref(),
         &[
             (TypeKind::Struct, struct_caps),
             (TypeKind::Class, struct_caps),
@@ -305,7 +310,7 @@ fn haskell_matrix() {
         TypeCapability::InterfaceImplementation,
     ];
     assert_matrix(
-        &sigil_stitch::lang::haskell::Haskell::new(),
+        adapter_for("haskell").as_ref(),
         &[
             (TypeKind::Struct, data_caps),
             (TypeKind::Class, data_caps),
@@ -347,7 +352,7 @@ fn java_matrix() {
         TypeCapability::Variants,
     ];
     assert_matrix(
-        &sigil_stitch::lang::java::Java::new(),
+        adapter_for("java").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, class_caps),
@@ -381,7 +386,7 @@ fn javascript_matrix() {
         TypeCapability::Variants,
     ];
     assert_matrix(
-        &sigil_stitch::lang::javascript::JavaScript::new(),
+        adapter_for("javascript").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, class_caps),
@@ -428,7 +433,7 @@ fn kotlin_matrix() {
         TypeCapability::Attributes,
     ];
     assert_matrix(
-        &sigil_stitch::lang::kotlin::Kotlin::new(),
+        adapter_for("kotlin").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, class_caps),
@@ -455,7 +460,7 @@ fn ocaml_matrix() {
         TypeCapability::Variants,
     ];
     assert_matrix(
-        &sigil_stitch::lang::ocaml::OCaml::new(),
+        adapter_for("ocaml").as_ref(),
         &[
             (TypeKind::Struct, record_caps),
             (TypeKind::Class, record_caps),
@@ -496,7 +501,7 @@ fn php_matrix() {
         TypeCapability::Variants,
     ];
     assert_matrix(
-        &sigil_stitch::lang::php::Php::new(),
+        adapter_for("php").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, class_caps),
@@ -523,7 +528,7 @@ fn python_matrix() {
         TypeCapability::Variants,
     ];
     assert_matrix(
-        &sigil_stitch::lang::python::Python::new(),
+        adapter_for("python").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, class_caps),
@@ -549,7 +554,7 @@ fn ruby_matrix() {
     let contract_caps = &[TypeCapability::Methods, TypeCapability::Attributes];
     let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
     assert_matrix(
-        &sigil_stitch::lang::ruby::Ruby::new(),
+        adapter_for("ruby").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, class_caps),
@@ -589,7 +594,7 @@ fn rust_matrix() {
         TypeCapability::Attributes,
     ];
     assert_matrix(
-        &sigil_stitch::lang::rust::Rust::new(),
+        adapter_for("rust").as_ref(),
         &[
             (TypeKind::Struct, record_caps),
             (TypeKind::Class, record_caps),
@@ -640,7 +645,7 @@ fn scala_matrix() {
         TypeCapability::Attributes,
     ];
     assert_matrix(
-        &sigil_stitch::lang::scala::Scala::new(),
+        adapter_for("scala").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, class_caps),
@@ -695,7 +700,7 @@ fn swift_matrix() {
         TypeCapability::Variants,
     ];
     assert_matrix(
-        &sigil_stitch::lang::swift::Swift::new(),
+        adapter_for("swift").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, struct_caps),
@@ -726,7 +731,7 @@ fn typescript_matrix() {
         TypeCapability::BoundedPolymorphism,
     ];
     assert_matrix(
-        &sigil_stitch::lang::typescript::TypeScript::new(),
+        adapter_for("typescript").as_ref(),
         &[
             (TypeKind::Class, class_caps),
             (TypeKind::Struct, class_caps),

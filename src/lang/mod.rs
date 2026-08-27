@@ -56,6 +56,7 @@ pub(crate) mod field_lowering;
 mod function_lowering;
 mod go_function_lowering;
 mod haskell_function_lowering;
+mod import_validation;
 mod java_function_lowering;
 mod javascript_function_lowering;
 mod kotlin_function_lowering;
@@ -70,6 +71,7 @@ mod scala_function_lowering;
 mod swift_function_lowering;
 pub(crate) mod type_lowering;
 pub(crate) mod type_members_validation;
+pub(crate) mod type_name_lowering;
 mod typescript_function_lowering;
 pub(crate) mod variant_lowering;
 mod zsh_function_lowering;
@@ -239,6 +241,16 @@ pub trait RendererLang: std::fmt::Debug + 'static {
     /// renderer. Default is no-op.
     fn rewrite_nodes(&self, _nodes: &mut Vec<crate::code_node::CodeNode>) {}
 
+    /// Lower one complete semantic type reference into target-associated
+    /// structured source before import collection and final rendering.
+    ///
+    /// The provided implementation is the frozen pre-0.6.8 grammar bridge for
+    /// external adapters. Built-in and new adapters should override the whole
+    /// operation with language-owned type grammar.
+    fn lower_type_name(&self, type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
+        crate::type_name_lowering::compatibility::lower(self, type_name)
+    }
+
     /// Qualify an import name for rendering in code.
     ///
     /// Default: return the resolved name as-is.
@@ -368,6 +380,25 @@ pub trait CodeLang: RendererLang {
     /// sigil-stitch 0.6.8 inherit a permissive compatibility profile.
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::permissive()
+    }
+
+    /// Validate a complete resolved import group against target-local alias
+    /// grammar and supported import forms before any source text is emitted.
+    fn validate_resolved_imports(&self, imports: &ImportGroup) -> Result<(), SigilStitchError> {
+        for entry in imports.entries() {
+            if entry.is_side_effect || entry.is_wildcard {
+                continue;
+            }
+            let binding = entry.resolved_name();
+            if binding.trim().is_empty() || binding.chars().any(char::is_control) {
+                return Err(SigilStitchError::InvalidResolvedImports {
+                    language: self.file_extension().to_string(),
+                    reason: "a local import binding is blank or contains a control character"
+                        .to_string(),
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Apply target-specific validation to one complete type declaration.
@@ -1076,26 +1107,6 @@ pub trait CodeLang: RendererLang {
     #[expect(deprecated, reason = "0.6.8 compatibility default")]
     fn enum_and_annotation(&self) -> config::EnumAndAnnotationConfig<'_> {
         config::EnumAndAnnotationConfig::default()
-    }
-}
-
-/// Derive a PascalCase namespace alias from a module path.
-///
-/// Used for wildcard imports that need a namespace name
-/// (e.g., `import * as Models from "./models"`).
-pub(crate) fn module_to_alias(module: &str) -> String {
-    let last_segment = module
-        .rsplit(['/', ':', '.', '\\'])
-        .find(|s| !s.is_empty())
-        .unwrap_or(module);
-
-    let mut chars = last_segment.chars();
-    match chars.next() {
-        None => "Module".to_string(),
-        Some(first) => {
-            let upper: String = first.to_uppercase().collect();
-            format!("{upper}{}", chars.as_str())
-        }
     }
 }
 

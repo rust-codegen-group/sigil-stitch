@@ -1,12 +1,10 @@
-use ::pretty::BoxDoc;
 use unicode_width::UnicodeWidthStr;
 
-use super::RenderAdapter;
+use super::{LayoutGroup, RenderAdapter};
 use crate::error::SigilStitchError;
 
 pub(super) struct DirectAdapter<'a> {
     indent_unit: &'a str,
-    width: usize,
     output: String,
     indent_depth: usize,
     current_column: usize,
@@ -14,10 +12,9 @@ pub(super) struct DirectAdapter<'a> {
 }
 
 impl<'a> DirectAdapter<'a> {
-    pub(super) fn new(indent_unit: &'a str, width: usize) -> Self {
+    pub(super) fn new(indent_unit: &'a str, _width: usize) -> Self {
         Self {
             indent_unit,
-            width,
             output: String::new(),
             indent_depth: 0,
             current_column: 0,
@@ -62,31 +59,6 @@ impl RenderAdapter for DirectAdapter<'_> {
         self.raw_text(" ")
     }
 
-    fn type_doc(&mut self, doc: BoxDoc<'static, ()>) -> Result<(), SigilStitchError> {
-        self.ensure_indent()?;
-        let remaining_width = self.width.saturating_sub(self.current_column);
-        let mut buf = Vec::new();
-        doc.render(remaining_width, &mut buf)
-            .map_err(|error| SigilStitchError::Render {
-                context: "CodeRenderer direct TypeRef".to_string(),
-                message: error.to_string(),
-            })?;
-        let rendered = String::from_utf8(buf).map_err(|error| SigilStitchError::Render {
-            context: "CodeRenderer direct TypeRef UTF-8".to_string(),
-            message: error.to_string(),
-        })?;
-
-        for (index, line) in rendered.split('\n').enumerate() {
-            if index > 0 {
-                self.hard_break()?;
-                let indent = self.indent_unit.repeat(self.indent_depth);
-                self.raw_text(&indent)?;
-            }
-            self.raw_text(line)?;
-        }
-        Ok(())
-    }
-
     fn indent(&mut self) -> Result<(), SigilStitchError> {
         self.indent_depth =
             self.indent_depth
@@ -109,7 +81,7 @@ impl RenderAdapter for DirectAdapter<'_> {
         Ok(())
     }
 
-    fn begin_group(&mut self) -> Result<(), SigilStitchError> {
+    fn begin_group(&mut self, _group: LayoutGroup) -> Result<(), SigilStitchError> {
         Ok(())
     }
 

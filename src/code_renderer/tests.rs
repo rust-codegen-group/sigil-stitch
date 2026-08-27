@@ -2,13 +2,15 @@
 
 use super::*;
 use super::{direct::DirectAdapter, pretty::PrettyAdapter};
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::code_block::{CodeBlock, StringLitArg, VerbatimStrArg};
 use crate::import::ImportGroup;
+use crate::lang::CodeLang;
 use crate::lang::config::BlockSyntaxConfig;
 use crate::lang::typescript::TypeScript;
 use crate::type_name::TypeName;
-use ::pretty::BoxDoc;
-
 #[derive(Debug)]
 struct TestLang {
     indent: &'static str,
@@ -131,6 +133,20 @@ fn test_string_literal() {
     )
     .unwrap();
     assert_eq!(render_block(&block, 80), "const x = 'hello'");
+}
+
+#[test]
+fn compatibility_type_lowerer_rejects_string_singletons() {
+    let block = CodeBlock::of("%T", (TypeName::string_literal("active"),)).unwrap();
+    let lang = test_lang("  ");
+    let imports = ImportGroup::new();
+    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+
+    assert!(matches!(
+        renderer.render(&block),
+        Err(SigilStitchError::UnsupportedTypeName { reason, .. })
+            if reason == "the 0.6.8 compatibility lowerer does not support string singleton types"
+    ));
 }
 
 #[test]
@@ -360,13 +376,6 @@ fn direct_adapter_reports_invalid_internal_operations() {
 
     adapter.soft_break().unwrap();
     assert_eq!(adapter.finish(), " ");
-
-    let mut adapter = DirectAdapter::new("  ", 80);
-    assert!(matches!(
-        adapter.type_doc(BoxDoc::fail()),
-        Err(SigilStitchError::Render { context, .. })
-            if context == "CodeRenderer direct TypeRef"
-    ));
 }
 
 #[test]
@@ -384,20 +393,65 @@ fn pretty_adapter_reports_invalid_internal_operations() {
     ));
 
     let mut adapter = PrettyAdapter::new("  ", 80);
-    adapter.begin_group().unwrap();
+    adapter.begin_group(LayoutGroup::IndependentBreaks).unwrap();
     assert!(matches!(
         adapter.finish(),
         Err(SigilStitchError::Render { context, .. })
             if context == "CodeRenderer pretty groups"
     ));
+}
 
-    let mut adapter = PrettyAdapter::new("  ", 80);
-    adapter.type_doc(BoxDoc::fail()).unwrap();
+#[test]
+fn terminal_render_failure_stops_before_later_renderer_events() {
+    #[derive(Debug)]
+    struct FailingRenderLang(Rc<RefCell<Vec<&'static str>>>);
+
+    impl RendererLang for FailingRenderLang {
+        fn file_extension(&self) -> &str {
+            "test"
+        }
+
+        fn line_comment_prefix(&self) -> &str {
+            "//"
+        }
+
+        fn block_open_for_intent(&self, _intent: BlockIntent, _condition: &str) -> Option<&str> {
+            self.0.borrow_mut().push("open");
+            Some("{")
+        }
+
+        fn block_close_for_intent(&self, _intent: BlockIntent, _condition: &str) -> Option<&str> {
+            self.0.borrow_mut().push("close");
+            Some("}")
+        }
+    }
+
+    impl CodeLang for FailingRenderLang {}
+
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let lang = FailingRenderLang(events.clone());
+    let imports = ImportGroup::new();
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
+    let prepared = CodeBlock {
+        nodes: vec![
+            CodeNode::BlockOpenIntent {
+                condition: "if ready".to_string(),
+                intent: BlockIntent::If,
+            },
+            CodeNode::Dedent,
+            CodeNode::BlockCloseIntent {
+                condition: "if ready".to_string(),
+                intent: BlockIntent::If,
+            },
+        ],
+    };
+
     assert!(matches!(
-        adapter.finish(),
+        renderer.render_prepared(&prepared),
         Err(SigilStitchError::Render { context, .. })
-            if context == "CodeRenderer pretty output"
+            if context == "CodeRenderer direct indentation"
     ));
+    assert_eq!(events.borrow().as_slice(), &["open"]);
 }
 
 #[test]
@@ -450,6 +504,21 @@ fn multiline_type_continuations_use_block_indent_once() {
 }
 
 #[test]
+fn lowered_infix_type_sequences_break_consistently() {
+    let union = TypeName::union(vec![
+        TypeName::primitive("Alpha"),
+        TypeName::primitive("Beta"),
+        TypeName::primitive("Gamma"),
+    ]);
+    let block = CodeBlock::of("type Value = %T", (union,)).unwrap();
+
+    assert_eq!(
+        render_block(&block, 20),
+        "type Value = Alpha\n| Beta\n| Gamma"
+    );
+}
+
+#[test]
 fn renderer_state_is_local_after_post_rewrite_validation_error() {
     let lang = TestLang {
         indent: "  ",
@@ -462,7 +531,8 @@ fn renderer_state_is_local_after_post_rewrite_validation_error() {
     let bad = CodeBlock::of("bad", ()).unwrap();
     assert!(matches!(
         renderer.render(&bad),
-        Err(SigilStitchError::UnbalancedIndent { depth: -1 })
+        Err(SigilStitchError::InvalidRewrittenSource { context, reason })
+            if context == "standalone" && reason.contains("depth is -1")
     ));
 
     let good = CodeBlock::of("good", ()).unwrap();

@@ -3,6 +3,11 @@ use sigil_stitch::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionContext, FunctionForm,
 };
 
+#[path = "shared/languages.rs"]
+mod languages_registry;
+
+use languages_registry::adapter_for;
+
 const ALL_CONTEXTS: [FunctionContext; 4] = [
     FunctionContext::TopLevel,
     FunctionContext::ReceiverMethod,
@@ -145,12 +150,20 @@ fn profile_metadata_matrix() {
         (AbstractMethod, DefaultParameters),
     ];
 
-    let c = sigil_stitch::lang::c::C::new();
-    assert_profile_metadata(&c, TopLevel, Function, REQUIRED_TYPES, Optional, none, None);
-
-    let cpp = sigil_stitch::lang::cpp::Cpp::new();
+    let c = adapter_for("c");
     assert_profile_metadata(
-        &cpp,
+        c.as_ref(),
+        TopLevel,
+        Function,
+        REQUIRED_TYPES,
+        Optional,
+        none,
+        None,
+    );
+
+    let cpp = adapter_for("cpp");
+    assert_profile_metadata(
+        cpp.as_ref(),
         TopLevel,
         Function,
         REQUIRED_TYPES,
@@ -159,7 +172,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &cpp,
+        cpp.as_ref(),
         Member,
         Function,
         REQUIRED_TYPES,
@@ -168,7 +181,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &cpp,
+        cpp.as_ref(),
         Member,
         Constructor,
         REQUIRED_PARAMETERS,
@@ -177,7 +190,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &cpp,
+        cpp.as_ref(),
         InterfaceMember,
         Function,
         REQUIRED_TYPES,
@@ -186,7 +199,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &cpp,
+        cpp.as_ref(),
         InterfaceMember,
         Constructor,
         REQUIRED_PARAMETERS,
@@ -195,7 +208,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &cpp,
+        cpp.as_ref(),
         Member,
         Destructor,
         no_required,
@@ -204,7 +217,7 @@ fn profile_metadata_matrix() {
         Some(0),
     );
     assert_profile_metadata(
-        &cpp,
+        cpp.as_ref(),
         InterfaceMember,
         Destructor,
         no_required,
@@ -213,9 +226,9 @@ fn profile_metadata_matrix() {
         Some(0),
     );
 
-    let csharp = sigil_stitch::lang::csharp::CSharp::new();
+    let csharp = adapter_for("csharp");
     assert_profile_metadata(
-        &csharp,
+        csharp.as_ref(),
         Member,
         Function,
         REQUIRED_TYPES,
@@ -224,7 +237,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &csharp,
+        csharp.as_ref(),
         Member,
         Constructor,
         REQUIRED_PARAMETERS,
@@ -233,7 +246,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &csharp,
+        csharp.as_ref(),
         InterfaceMember,
         Function,
         REQUIRED_TYPES,
@@ -242,10 +255,18 @@ fn profile_metadata_matrix() {
         None,
     );
 
-    let dart = sigil_stitch::lang::dart::Dart::new();
-    assert_profile_metadata(&dart, TopLevel, Function, no_required, Required, none, None);
+    let dart = adapter_for("dart");
     assert_profile_metadata(
-        &dart,
+        dart.as_ref(),
+        TopLevel,
+        Function,
+        no_required,
+        Required,
+        none,
+        None,
+    );
+    assert_profile_metadata(
+        dart.as_ref(),
         Member,
         Function,
         no_required,
@@ -254,7 +275,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &dart,
+        dart.as_ref(),
         InterfaceMember,
         Function,
         no_required,
@@ -263,7 +284,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &dart,
+        dart.as_ref(),
         InterfaceMember,
         Constructor,
         no_required,
@@ -272,9 +293,9 @@ fn profile_metadata_matrix() {
         None,
     );
 
-    let go = sigil_stitch::lang::go::Go::new();
+    let go = adapter_for("go");
     assert_profile_metadata(
-        &go,
+        go.as_ref(),
         TopLevel,
         Function,
         REQUIRED_PARAMETERS,
@@ -283,7 +304,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &go,
+        go.as_ref(),
         ReceiverMethod,
         Function,
         REQUIRED_PARAMETERS,
@@ -292,7 +313,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &go,
+        go.as_ref(),
         InterfaceMember,
         Function,
         REQUIRED_PARAMETERS,
@@ -301,9 +322,9 @@ fn profile_metadata_matrix() {
         None,
     );
 
-    let haskell = sigil_stitch::lang::haskell::Haskell::new();
+    let haskell = adapter_for("haskell");
     assert_profile_metadata(
-        &haskell,
+        haskell.as_ref(),
         TopLevel,
         Function,
         no_required,
@@ -312,7 +333,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &haskell,
+        haskell.as_ref(),
         Member,
         Function,
         no_required,
@@ -321,7 +342,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &haskell,
+        haskell.as_ref(),
         InterfaceMember,
         Function,
         REQUIRED_TYPES,
@@ -330,9 +351,9 @@ fn profile_metadata_matrix() {
         None,
     );
 
-    let java = sigil_stitch::lang::java::Java::new();
+    let java = adapter_for("java");
     assert_profile_metadata(
-        &java,
+        java.as_ref(),
         Member,
         Function,
         REQUIRED_TYPES,
@@ -341,7 +362,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &java,
+        java.as_ref(),
         Member,
         Constructor,
         REQUIRED_PARAMETERS,
@@ -350,7 +371,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &java,
+        java.as_ref(),
         InterfaceMember,
         Function,
         REQUIRED_TYPES,
@@ -359,7 +380,7 @@ fn profile_metadata_matrix() {
         None,
     );
 
-    let javascript = sigil_stitch::lang::javascript::JavaScript::new();
+    let javascript = adapter_for("javascript");
     for (context, form) in [
         (TopLevel, Function),
         (Member, Function),
@@ -368,7 +389,7 @@ fn profile_metadata_matrix() {
         (InterfaceMember, Constructor),
     ] {
         assert_profile_metadata(
-            &javascript,
+            javascript.as_ref(),
             context,
             form,
             no_required,
@@ -378,7 +399,7 @@ fn profile_metadata_matrix() {
         );
     }
 
-    let kotlin = sigil_stitch::lang::kotlin::Kotlin::new();
+    let kotlin = adapter_for("kotlin");
     for (context, form, body) in [
         (TopLevel, Function, Required),
         (Member, Function, Required),
@@ -386,7 +407,7 @@ fn profile_metadata_matrix() {
         (InterfaceMember, Function, Optional),
     ] {
         assert_profile_metadata(
-            &kotlin,
+            kotlin.as_ref(),
             context,
             form,
             REQUIRED_PARAMETERS,
@@ -396,9 +417,9 @@ fn profile_metadata_matrix() {
         );
     }
 
-    let ocaml = sigil_stitch::lang::ocaml::OCaml::new();
+    let ocaml = adapter_for("ocaml");
     assert_profile_metadata(
-        &ocaml,
+        ocaml.as_ref(),
         TopLevel,
         Function,
         no_required,
@@ -407,7 +428,7 @@ fn profile_metadata_matrix() {
         None,
     );
 
-    let php = sigil_stitch::lang::php::Php::new();
+    let php = adapter_for("php");
     for (context, form, body) in [
         (TopLevel, Function, Required),
         (Member, Function, Required),
@@ -415,15 +436,23 @@ fn profile_metadata_matrix() {
         (InterfaceMember, Function, Forbidden),
         (InterfaceMember, Constructor, Forbidden),
     ] {
-        assert_profile_metadata(&php, context, form, no_required, body, none, None);
+        assert_profile_metadata(php.as_ref(), context, form, no_required, body, none, None);
     }
 
-    let ruby = sigil_stitch::lang::ruby::Ruby::new();
+    let ruby = adapter_for("ruby");
     for context in [TopLevel, Member, InterfaceMember] {
-        assert_profile_metadata(&ruby, context, Function, no_required, Required, none, None);
+        assert_profile_metadata(
+            ruby.as_ref(),
+            context,
+            Function,
+            no_required,
+            Required,
+            none,
+            None,
+        );
     }
 
-    let rust = sigil_stitch::lang::rust::Rust::new();
+    let rust = adapter_for("rust");
     for (context, form, body) in [
         (TopLevel, Function, Required),
         (TopLevel, Constructor, Required),
@@ -432,17 +461,25 @@ fn profile_metadata_matrix() {
         (InterfaceMember, Function, Optional),
         (InterfaceMember, Constructor, Optional),
     ] {
-        assert_profile_metadata(&rust, context, form, REQUIRED_PARAMETERS, body, none, None);
+        assert_profile_metadata(
+            rust.as_ref(),
+            context,
+            form,
+            REQUIRED_PARAMETERS,
+            body,
+            none,
+            None,
+        );
     }
 
-    let scala = sigil_stitch::lang::scala::Scala::new();
+    let scala = adapter_for("scala");
     for (context, body) in [
         (TopLevel, Required),
         (Member, Required),
         (InterfaceMember, Optional),
     ] {
         assert_profile_metadata(
-            &scala,
+            scala.as_ref(),
             context,
             Function,
             REQUIRED_PARAMETERS,
@@ -452,9 +489,9 @@ fn profile_metadata_matrix() {
         );
     }
 
-    let swift = sigil_stitch::lang::swift::Swift::new();
+    let swift = adapter_for("swift");
     assert_profile_metadata(
-        &swift,
+        swift.as_ref(),
         TopLevel,
         Function,
         REQUIRED_PARAMETERS,
@@ -463,7 +500,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &swift,
+        swift.as_ref(),
         Member,
         Function,
         REQUIRED_PARAMETERS,
@@ -472,7 +509,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &swift,
+        swift.as_ref(),
         Member,
         Constructor,
         REQUIRED_PARAMETERS,
@@ -481,7 +518,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &swift,
+        swift.as_ref(),
         InterfaceMember,
         Function,
         REQUIRED_PARAMETERS,
@@ -490,7 +527,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &swift,
+        swift.as_ref(),
         InterfaceMember,
         Constructor,
         REQUIRED_PARAMETERS,
@@ -499,9 +536,9 @@ fn profile_metadata_matrix() {
         None,
     );
 
-    let typescript = sigil_stitch::lang::typescript::TypeScript::new();
+    let typescript = adapter_for("typescript");
     assert_profile_metadata(
-        &typescript,
+        typescript.as_ref(),
         TopLevel,
         Function,
         no_required,
@@ -510,7 +547,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &typescript,
+        typescript.as_ref(),
         Member,
         Function,
         no_required,
@@ -519,7 +556,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &typescript,
+        typescript.as_ref(),
         Member,
         Constructor,
         no_required,
@@ -528,7 +565,7 @@ fn profile_metadata_matrix() {
         None,
     );
     assert_profile_metadata(
-        &typescript,
+        typescript.as_ref(),
         InterfaceMember,
         Function,
         no_required,
@@ -537,12 +574,10 @@ fn profile_metadata_matrix() {
         None,
     );
 
-    for lang in [
-        &sigil_stitch::lang::bash::Bash::new() as &dyn CodeLang,
-        &sigil_stitch::lang::zsh::Zsh::new(),
-    ] {
+    for id in ["bash", "zsh"] {
+        let lang = adapter_for(id);
         assert_profile_metadata(
-            lang,
+            lang.as_ref(),
             TopLevel,
             Function,
             no_required,
@@ -551,8 +586,9 @@ fn profile_metadata_matrix() {
             Some(0),
         );
     }
+    let lua = adapter_for("lua");
     assert_profile_metadata(
-        &sigil_stitch::lang::lua::Lua::new(),
+        lua.as_ref(),
         TopLevel,
         Function,
         no_required,
@@ -565,15 +601,15 @@ fn profile_metadata_matrix() {
 #[test]
 fn shell_and_lua_matrices() {
     let expected = &[(FunctionContext::TopLevel, FunctionForm::Function, &[][..])];
-    assert_function_matrix(&sigil_stitch::lang::bash::Bash::new(), expected);
-    assert_function_matrix(&sigil_stitch::lang::zsh::Zsh::new(), expected);
-    assert_function_matrix(&sigil_stitch::lang::lua::Lua::new(), expected);
+    assert_function_matrix(adapter_for("bash").as_ref(), expected);
+    assert_function_matrix(adapter_for("zsh").as_ref(), expected);
+    assert_function_matrix(adapter_for("lua").as_ref(), expected);
 }
 
 #[test]
 fn c_matrix() {
     assert_function_matrix(
-        &sigil_stitch::lang::c::C::new(),
+        adapter_for("c").as_ref(),
         &[(
             FunctionContext::TopLevel,
             FunctionForm::Function,
@@ -599,7 +635,7 @@ fn cpp_matrix() {
         FunctionCapability::VirtualMethod,
     ];
     assert_function_matrix(
-        &sigil_stitch::lang::cpp::Cpp::new(),
+        adapter_for("cpp").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,
@@ -663,7 +699,7 @@ fn cpp_matrix() {
 #[test]
 fn csharp_matrix() {
     assert_function_matrix(
-        &sigil_stitch::lang::csharp::CSharp::new(),
+        adapter_for("csharp").as_ref(),
         &[
             (
                 FunctionContext::Member,
@@ -722,7 +758,7 @@ fn dart_matrix() {
         FunctionCapability::StaticMethod,
     ];
     assert_function_matrix(
-        &sigil_stitch::lang::dart::Dart::new(),
+        adapter_for("dart").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,
@@ -767,7 +803,7 @@ fn dart_matrix() {
 #[test]
 fn go_matrix() {
     assert_function_matrix(
-        &sigil_stitch::lang::go::Go::new(),
+        adapter_for("go").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,
@@ -808,7 +844,7 @@ fn haskell_matrix() {
         FunctionCapability::ParametricPolymorphism,
     ];
     assert_function_matrix(
-        &sigil_stitch::lang::haskell::Haskell::new(),
+        adapter_for("haskell").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,
@@ -842,7 +878,7 @@ fn java_matrix() {
         FunctionCapability::StaticMethod,
     ];
     assert_function_matrix(
-        &sigil_stitch::lang::java::Java::new(),
+        adapter_for("java").as_ref(),
         &[
             (FunctionContext::Member, FunctionForm::Function, member),
             (
@@ -874,7 +910,7 @@ fn javascript_matrix() {
         FunctionCapability::VariadicParameters,
     ];
     assert_function_matrix(
-        &sigil_stitch::lang::javascript::JavaScript::new(),
+        adapter_for("javascript").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,
@@ -938,7 +974,7 @@ fn kotlin_matrix() {
         FunctionCapability::ParametricPolymorphism,
     ];
     assert_function_matrix(
-        &sigil_stitch::lang::kotlin::Kotlin::new(),
+        adapter_for("kotlin").as_ref(),
         &[
             (FunctionContext::TopLevel, FunctionForm::Function, top),
             (FunctionContext::Member, FunctionForm::Function, member),
@@ -964,7 +1000,7 @@ fn kotlin_matrix() {
 #[test]
 fn ocaml_matrix() {
     assert_function_matrix(
-        &sigil_stitch::lang::ocaml::OCaml::new(),
+        adapter_for("ocaml").as_ref(),
         &[(
             FunctionContext::TopLevel,
             FunctionForm::Function,
@@ -979,7 +1015,7 @@ fn ocaml_matrix() {
 #[test]
 fn php_matrix() {
     assert_function_matrix(
-        &sigil_stitch::lang::php::Php::new(),
+        adapter_for("php").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,
@@ -1064,7 +1100,7 @@ fn python_matrix() {
         FunctionCapability::TypedParameters,
     ];
     assert_function_matrix(
-        &sigil_stitch::lang::python::Python::new(),
+        adapter_for("python").as_ref(),
         &[
             (FunctionContext::TopLevel, FunctionForm::Function, function),
             (
@@ -1095,7 +1131,7 @@ fn python_matrix() {
 fn ruby_matrix() {
     let capabilities = &[FunctionCapability::DefaultParameters];
     assert_function_matrix(
-        &sigil_stitch::lang::ruby::Ruby::new(),
+        adapter_for("ruby").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,
@@ -1127,7 +1163,7 @@ fn rust_matrix() {
         FunctionCapability::ParametricPolymorphism,
     ];
     assert_function_matrix(
-        &sigil_stitch::lang::rust::Rust::new(),
+        adapter_for("rust").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,
@@ -1186,7 +1222,7 @@ fn scala_matrix() {
         FunctionCapability::HigherKindedPolymorphism,
     ];
     assert_function_matrix(
-        &sigil_stitch::lang::scala::Scala::new(),
+        adapter_for("scala").as_ref(),
         &[
             (FunctionContext::TopLevel, FunctionForm::Function, top),
             (FunctionContext::Member, FunctionForm::Function, member),
@@ -1202,7 +1238,7 @@ fn scala_matrix() {
 #[test]
 fn swift_matrix() {
     assert_function_matrix(
-        &sigil_stitch::lang::swift::Swift::new(),
+        adapter_for("swift").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,
@@ -1277,7 +1313,7 @@ fn swift_matrix() {
 #[test]
 fn typescript_matrix() {
     assert_function_matrix(
-        &sigil_stitch::lang::typescript::TypeScript::new(),
+        adapter_for("typescript").as_ref(),
         &[
             (
                 FunctionContext::TopLevel,

@@ -168,6 +168,12 @@ const ZSH_RESERVED: &[&str] = &[
 ];
 
 impl RendererLang for Zsh {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::zsh(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -252,6 +258,12 @@ const ZSH_FUNCTIONS: &[FunctionCapabilityProfile] =
     ];
 
 impl CodeLang for Zsh {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::reject_aliases(self, imports)
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         // Zsh has no type declaration system; use CodeBlock for shell
         // functions and control flow instead.

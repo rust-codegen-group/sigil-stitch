@@ -1248,7 +1248,8 @@ mod tests {
 
         assert!(matches!(
             section.render_standalone(&TypeScript::new(), 80),
-            Err(crate::error::SigilStitchError::UnbalancedIndent { depth: -1 })
+            Err(crate::error::SigilStitchError::InvalidRewrittenSource { context, reason })
+                if context == "standalone" && reason.contains("depth is -1")
         ));
 
         let mut outer = CodeBlock::builder();

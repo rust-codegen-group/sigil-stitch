@@ -1,0 +1,10 @@
+    Checking sigil-stitch v0.6.8 -> v0.6.8
+
+--- failure enum_marked_non_exhaustive: enum marked #[non_exhaustive] ---
+
+Failed in:
+  enum TypeName in /tmp/current/src/type_name.rs:190
+  enum TypeName in /tmp/current/src/type_name.rs:190
+
+     Summary semver requires new major version
+    Finished [   1.000s] sigil-stitch

@@ -1,4 +1,5 @@
 use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::lang::dart::Dart;
 use sigil_stitch::lang::go::Go;
 use sigil_stitch::lang::java::Java;
@@ -80,6 +81,58 @@ fn test_ts_wildcard_import() {
 }
 
 #[test]
+fn test_ts_deduplicates_passthrough_imports_without_merging_distinct_forms() {
+    let output = FileSpec::builder("app.ts")
+        .add_import(ImportSpec::side_effect("./shared"))
+        .add_import(ImportSpec::side_effect("./shared"))
+        .add_import(ImportSpec::wildcard("./shared"))
+        .add_import(ImportSpec::wildcard("./shared"))
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap();
+
+    assert_eq!(output.matches("import './shared';").count(), 1);
+    assert_eq!(
+        output
+            .matches("import * as Shared from './shared';")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn test_ts_rejects_invalid_wildcard_namespace_binding() {
+    let error = FileSpec::builder("app.ts")
+        .add_import(ImportSpec::wildcard("./123-utils"))
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        SigilStitchError::InvalidResolvedImports { .. }
+    ));
+}
+
+#[test]
+fn test_ts_rejects_wildcard_namespace_binding_collision() {
+    let error = FileSpec::builder("app.ts")
+        .add_import(ImportSpec::wildcard("./utils"))
+        .add_import(ImportSpec::named("./names", "Utils"))
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        SigilStitchError::InvalidResolvedImports { .. }
+    ));
+}
+
+#[test]
 fn test_ts_mixed_explicit_and_auto() {
     let user = TypeName::importable_type("./models", "User");
 
@@ -145,6 +198,37 @@ fn test_js_wildcard_import() {
         .unwrap();
 
     assert!(output.contains("import * as Utils from './utils';"));
+}
+
+#[test]
+fn test_js_rejects_invalid_wildcard_namespace_binding() {
+    let error = FileSpec::builder_with("app.js", JavaScript::new())
+        .add_import(ImportSpec::wildcard("./123-utils"))
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        SigilStitchError::InvalidResolvedImports { .. }
+    ));
+}
+
+#[test]
+fn test_js_rejects_wildcard_namespace_binding_collision() {
+    let error = FileSpec::builder_with("app.js", JavaScript::new())
+        .add_import(ImportSpec::wildcard("./utils"))
+        .add_import(ImportSpec::named("./names", "Utils"))
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        SigilStitchError::InvalidResolvedImports { .. }
+    ));
 }
 
 // ── Rust ──────────────────────────────────────────────────

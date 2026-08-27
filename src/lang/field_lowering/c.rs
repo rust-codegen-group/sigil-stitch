@@ -104,7 +104,10 @@ fn requires_interleaved_declarator(field_type: &crate::type_name::TypeName) -> b
                     .as_deref()
                     .is_some_and(requires_interleaved_declarator)
         }
-        TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => false,
+        TypeName::Importable { .. }
+        | TypeName::Primitive(_)
+        | TypeName::Raw(_)
+        | TypeName::StringLiteral(_) => false,
     }
 }
 

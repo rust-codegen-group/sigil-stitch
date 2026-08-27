@@ -144,6 +144,12 @@ fn strip_local_prefix(module: &str) -> &str {
 }
 
 impl RendererLang for C {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::c(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -248,6 +254,12 @@ const C_FUNCTIONS: &[FunctionCapabilityProfile] = &[FunctionCapabilityProfile::n
 ])];
 
 impl CodeLang for C {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::reject_aliases(self, imports)
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(C_TYPES)

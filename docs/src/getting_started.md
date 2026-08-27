@@ -178,8 +178,8 @@ let ts = TypeScript::new()
 The shared pre-0.6.8 `QuoteStyle` enum and `with_quote_style(...)` setters are
 compatibility APIs, not the model for new language configuration. The accepted
 0.7 target gives TypeScript, JavaScript, and Python separate language-local
-single-quote and double-quote conveniences while preserving the old field for
-source compatibility. See the [legacy appendix](legacy_compatibility_and_migration.md#quote-style-compatibility).
+`with_single_quotes()` and `with_double_quotes()` conveniences while preserving
+the old field for source compatibility. See the [legacy appendix](legacy_compatibility_and_migration.md#quote-style-compatibility).
 
 Language configuration is per-instance, not global: pass the configured language
 into the `FileSpec` / `ProjectSpec` you want rendered with those settings.

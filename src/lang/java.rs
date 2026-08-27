@@ -108,6 +108,12 @@ fn import_group_order(module: &str) -> u8 {
 }
 
 impl RendererLang for Java {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::java(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -290,6 +296,19 @@ const JAVA_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Java {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::reject_aliases(self, imports)?;
+        if imports.entries().iter().any(|entry| entry.is_side_effect) {
+            return Err(crate::error::SigilStitchError::InvalidResolvedImports {
+                language: self.file_extension().to_string(),
+                reason: "Java has no side-effect import form".to_string(),
+            });
+        }
+        Ok(())
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(JAVA_TYPES)

@@ -62,6 +62,9 @@ parse_output() {
       if (record ~ /^method [A-Za-z_][A-Za-z0-9_]* of trait [A-Za-z_][A-Za-z0-9_]*,/) {
         split(record, fields, /[ ,]+/)
         item = fields[5] "::" fields[2]
+      } else if (record ~ /^enum [A-Za-z_][A-Za-z0-9_]* in /) {
+        split(record, fields, /[ ]+/)
+        item = fields[2]
       } else if (record ~ /^function [A-Za-z_][A-Za-z0-9_]* /) {
         split(record, fields, /[ ]+/)
         item = fields[2]

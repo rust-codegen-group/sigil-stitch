@@ -2,10 +2,8 @@ use crate::code_block::CodeBlock;
 use crate::code_node::CodeNode;
 use crate::import::ImportRef;
 
-/// Pass 1 of the three-pass rendering model.
-///
-/// Walks a CodeBlock tree structurally, collecting all `TypeName::Importable`
-/// references. No rendering, no column tracking, no pretty printing.
+/// Walk a prepared CodeBlock tree and collect all terminal import references.
+/// No rendering, column tracking, or pretty printing occurs here.
 pub fn collect_imports(block: &CodeBlock) -> Vec<ImportRef> {
     let mut refs = Vec::new();
     walk_nodes(&block.nodes, &mut refs);

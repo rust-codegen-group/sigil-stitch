@@ -12,11 +12,10 @@ Lowering](declaration_lowering.md) for the ownership decision and [0.6.8 Legacy
 Compatibility and Migration](legacy_compatibility_and_migration.md) for the
 versioned compatibility contract.
 
-The type-name-lowering pass, complete-set fallible import resolver, and direct
-renderer-event methods in this chapter are accepted 0.7 migrations documented
-before implementation. Sections that describe those seams state the target
-architecture; the compatibility appendix records what the current source still
-uses before each behavior-specific cutover.
+The type-name-lowering pass and complete-set fallible import resolver described
+here are implemented. The direct renderer-event methods remain an accepted 0.7
+migration documented before implementation; the compatibility appendix records
+the shared renderer grammar still used before that cutover.
 
 ## Pipeline and Ownership
 

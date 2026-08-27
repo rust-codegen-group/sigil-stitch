@@ -1,8 +1,6 @@
-#[path = "../golden.rs"]
-mod golden;
-
 #[path = "../shared/mod.rs"]
 mod shared;
+use shared::golden;
 
 mod builder_control_flow;
 mod builder_edge_cases;

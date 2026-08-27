@@ -184,6 +184,12 @@ fn strip_local_prefix(module: &str) -> &str {
 }
 
 impl RendererLang for Cpp {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::cpp(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -418,6 +424,12 @@ const CPP_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Cpp {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::reject_aliases(self, imports)
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(CPP_TYPES)

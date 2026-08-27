@@ -100,6 +100,30 @@ const GO_RESERVED: &[&str] = &[
     "var",
 ];
 
+fn is_valid_import_alias(alias: &str) -> bool {
+    use unicode_general_category::{GeneralCategory, get_general_category};
+
+    fn is_letter(character: char) -> bool {
+        use GeneralCategory::*;
+        matches!(
+            get_general_category(character),
+            UppercaseLetter | LowercaseLetter | TitlecaseLetter | ModifierLetter | OtherLetter
+        )
+    }
+
+    let mut characters = alias.chars();
+    alias != "_"
+        && characters
+            .next()
+            .is_some_and(|character| character == '_' || is_letter(character))
+        && characters.all(|character| {
+            character == '_'
+                || is_letter(character)
+                || get_general_category(character) == GeneralCategory::DecimalNumber
+        })
+        && !GO_RESERVED.contains(&alias)
+}
+
 /// Extract the package name from a Go import path.
 ///
 /// `"net/http"` → `"http"`, `"encoding/json"` → `"json"`, `"fmt"` → `"fmt"`.
@@ -223,6 +247,12 @@ impl Go {
 }
 
 impl RendererLang for Go {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::go(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -248,6 +278,15 @@ impl RendererLang for Go {
     fn qualify_import_name(&self, module: &str, resolved_name: &str) -> String {
         let pkg = package_name(module);
         format!("{pkg}.{resolved_name}")
+    }
+
+    fn qualify_import_reference(&self, module: &str, name: &str, resolved_name: &str) -> String {
+        let package = if resolved_name == name {
+            package_name(module)
+        } else {
+            resolved_name
+        };
+        format!("{package}.{name}")
     }
 
     fn module_separator(&self) -> Option<&str> {
@@ -394,6 +433,60 @@ const GO_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Go {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::validate_identifier_aliases(
+            self,
+            imports,
+            is_valid_import_alias,
+        )?;
+
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum ImportMode<'a> {
+            SideEffect,
+            Dot,
+            Named(&'a str),
+        }
+
+        let mut by_module = std::collections::HashMap::new();
+        for entry in imports.entries() {
+            let mode = if entry.is_side_effect {
+                ImportMode::SideEffect
+            } else if entry.is_wildcard {
+                ImportMode::Dot
+            } else {
+                let binding = entry
+                    .alias
+                    .as_deref()
+                    .unwrap_or_else(|| package_name(&entry.module));
+                if !is_valid_import_alias(binding) {
+                    return Err(crate::error::SigilStitchError::InvalidResolvedImports {
+                        language: self.file_extension().to_string(),
+                        reason: format!(
+                            "Go package binding {binding:?} is not a valid import identifier"
+                        ),
+                    });
+                }
+                ImportMode::Named(binding)
+            };
+
+            if by_module
+                .insert(entry.module.as_str(), mode)
+                .is_some_and(|existing| existing != mode)
+            {
+                return Err(crate::error::SigilStitchError::InvalidResolvedImports {
+                    language: self.file_extension().to_string(),
+                    reason: format!(
+                        "Go module {:?} received incompatible package import bindings",
+                        entry.module
+                    ),
+                });
+            }
+        }
+        Ok(())
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(GO_TYPES)

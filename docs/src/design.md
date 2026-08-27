@@ -14,11 +14,10 @@ which explains how data flows through the implementation.
   used by `sigil_quote!`.
 
 Design chapters describe the accepted 0.7 built-in architecture. Declaration
-lowering is implemented; type-name lowering is the next accepted migration and
-is documented before implementation so its public boundary is fixed first.
-Frozen 0.6.8 compatibility lowerers remain for external adapters and legacy
-direct facades; each chapter points to the compatibility appendix where that
-boundary matters.
+lowering, type-name lowering, and complete-set import resolution are
+implemented. Frozen 0.6.8 compatibility lowerers remain for external adapters
+and legacy direct facades; each chapter points to the compatibility appendix
+where that boundary matters.
 
 These chapters document the selected design and its invariants, not a catalogue
 of every rejected alternative. When the history of a hard-to-reverse trade-off

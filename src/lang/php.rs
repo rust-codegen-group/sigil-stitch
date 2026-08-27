@@ -124,7 +124,24 @@ const PHP_RESERVED: &[&str] = &[
     "__method__", "__namespace__", "__trait__",
 ];
 
+fn is_valid_import_alias(alias: &str) -> bool {
+    let mut characters = alias.chars();
+    characters.next().is_some_and(|character| {
+        character == '_' || character.is_ascii_alphabetic() || !character.is_ascii()
+    }) && characters.all(|character| {
+        character == '_' || character.is_ascii_alphanumeric() || !character.is_ascii()
+    }) && !PHP_RESERVED
+        .iter()
+        .any(|reserved| reserved.eq_ignore_ascii_case(alias))
+}
+
 impl RendererLang for Php {
+    fn lower_type_name(
+        &self,
+        type_name: &crate::type_name::TypeName,
+    ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
+        crate::lang::type_name_lowering::php(type_name)
+    }
     fn file_extension(&self) -> &str {
         &self.extension
     }
@@ -336,6 +353,27 @@ const PHP_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Php {
+    fn validate_resolved_imports(
+        &self,
+        imports: &crate::import::ImportGroup,
+    ) -> Result<(), crate::error::SigilStitchError> {
+        crate::lang::import_validation::validate_identifier_aliases(
+            self,
+            imports,
+            is_valid_import_alias,
+        )?;
+        if imports
+            .entries()
+            .iter()
+            .any(|entry| entry.is_side_effect || entry.is_wildcard)
+        {
+            return Err(crate::error::SigilStitchError::InvalidResolvedImports {
+                language: self.file_extension().to_string(),
+                reason: "PHP has no side-effect or wildcard import form".to_string(),
+            });
+        }
+        Ok(())
+    }
     fn capabilities(&self) -> LanguageCapabilities<'_> {
         LanguageCapabilities::strict()
             .with_types(PHP_TYPES)
