@@ -5,7 +5,7 @@ use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
 use crate::spec::modifiers::{TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
-use crate::spec::where_spec::{WhereConstraint, render_type_params};
+use crate::spec::where_spec::{WhereConstraint, render_type_params_for};
 
 pub(super) fn validate_declaration(
     type_: TypeIntent<'_>,
@@ -144,7 +144,7 @@ pub(super) fn type_params<L: CodeLang + ?Sized>(
     type_: &ValidatedType<'_>,
     arguments: &mut Vec<Arg>,
 ) -> String {
-    render_type_params(type_.type_params(), lang, arguments)
+    render_type_params_for(type_.type_params(), lang, arguments)
 }
 
 pub(super) fn emit_fields<L: CodeLang + ?Sized>(

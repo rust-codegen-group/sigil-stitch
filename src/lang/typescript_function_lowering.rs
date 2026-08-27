@@ -116,6 +116,7 @@ fn append_suffixes(signature: &mut SignatureBuilder, function: ValidatedFunction
     }
 }
 
+#[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
 fn finish(
     block: &mut CodeBlockBuilder,
     mut signature: SignatureBuilder,

@@ -9,6 +9,7 @@ use crate::lang::capability::{
     LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -17,6 +18,7 @@ use crate::lang::{CodeLang, FunctionIntent, RendererLang};
 use crate::spec::annotation_spec::AnnotationNameRef;
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::TypeParamSpec;
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::type_name::{AssociatedTypeStyle, FunctionPresentation, TypeName, TypePresentation};
 
 /// Python language implementation.
@@ -58,12 +60,15 @@ pub struct Python {
     pub indent: String,
     /// Quote style for string literals. Python accepts both; `Single` is the
     /// community default (Black defaults to `Double`).
+    #[deprecated(note = "legacy 0.6.8 field; quote selection is language-owned in 0.7")]
+    #[expect(deprecated, reason = "0.6.8 compatibility field")]
     pub quote_style: QuoteStyle,
     /// File extension (default: "py"). Set to "pyi" for stub files.
     pub extension: String,
 }
 
 impl Default for Python {
+    #[expect(deprecated, reason = "0.6.8 quote-style compatibility bridge")]
     fn default() -> Self {
         Self {
             indent: "    ".to_string(),
@@ -80,6 +85,8 @@ impl Python {
     }
 
     /// Set the quote style used for string literals.
+    #[deprecated(note = "legacy 0.6.8 setter; use language-local quote selection in 0.7")]
+    #[expect(deprecated, reason = "0.6.8 compatibility setter")]
     pub fn with_quote_style(mut self, qs: QuoteStyle) -> Self {
         self.quote_style = qs;
         self
@@ -95,6 +102,14 @@ impl Python {
     pub fn with_extension(mut self, s: &str) -> Self {
         self.extension = s.to_string();
         self
+    }
+
+    #[expect(deprecated, reason = "0.6.8 quote compatibility bridge")]
+    fn quote_char(&self) -> char {
+        match self.quote_style {
+            QuoteStyle::Single => '\'',
+            QuoteStyle::Double => '"',
+        }
     }
 }
 
@@ -201,21 +216,22 @@ impl RendererLang for Python {
     }
 
     fn render_string_literal(&self, s: &str) -> String {
-        match self.quote_style {
-            QuoteStyle::Single => format!(
+        match self.quote_char() {
+            '\'' => format!(
                 "'{}'",
                 s.replace('\\', "\\\\")
                     .replace('\'', "\\'")
                     .replace('\n', "\\n")
                     .replace('\t', "\\t")
             ),
-            QuoteStyle::Double => format!(
+            '"' => format!(
                 "\"{}\"",
                 s.replace('\\', "\\\\")
                     .replace('"', "\\\"")
                     .replace('\n', "\\n")
                     .replace('\t', "\\t")
             ),
+            _ => unreachable!("quote compatibility helper returns only supported delimiters"),
         }
     }
 
@@ -228,7 +244,6 @@ impl RendererLang for Python {
         "#"
     }
 
-    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         if condition.trim_end().ends_with(':') {
             Some("")
@@ -251,6 +266,7 @@ impl RendererLang for Python {
 
     // --- Config struct accessors ---
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
             array: TypePresentation::GenericWrap { name: "list" },
@@ -278,6 +294,7 @@ impl RendererLang for Python {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
         GenericSyntaxConfig {
             open: "[",
@@ -289,6 +306,7 @@ impl RendererLang for Python {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             block_open: ":",
@@ -641,6 +659,10 @@ impl CodeLang for Python {
         true
     }
 
+    fn render_newtype_line(&self, _visibility: &str, name: &str, inner: &str) -> String {
+        format!("{name} = NewType(\"{name}\", {inner})")
+    }
+
     fn emit_newtype_decl(
         &self,
         _visibility: &str,
@@ -663,10 +685,12 @@ impl CodeLang for Python {
         ":"
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::UnionWithNone(" | ")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: " -> ",
@@ -677,6 +701,7 @@ impl CodeLang for Python {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             super_type_keyword: "(",
@@ -685,6 +710,7 @@ impl CodeLang for Python {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig {
             variant_separator: "",
@@ -714,6 +740,7 @@ fn render_from_import(module: &str, entries: &[&ImportEntry]) -> String {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
 

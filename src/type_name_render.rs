@@ -1,11 +1,14 @@
 use pretty::BoxDoc;
 
 use crate::lang::RendererLang;
+#[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
 use crate::lang::config::GenericSyntaxConfig;
+#[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
 use crate::type_name::{
     AssociatedTypeStyle, FunctionPresentation, GenericApplicationStyle, TypeName, TypePresentation,
 };
 
+#[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
 pub(crate) fn render_presentation(
     pres: &TypePresentation<'_>,
     inner_docs: Vec<BoxDoc<'static, ()>>,
@@ -60,6 +63,7 @@ pub(crate) fn render_presentation(
     }
 }
 
+#[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
 fn render_function_presentation(
     pres: &FunctionPresentation<'_>,
     param_docs: Vec<BoxDoc<'static, ()>>,
@@ -267,7 +271,6 @@ where
     }
 }
 
-#[cfg(test)]
 pub(crate) fn render_canonical(
     tn: &TypeName,
     width: usize,
@@ -277,15 +280,16 @@ pub(crate) fn render_canonical(
     let mut buf = Vec::new();
     doc.render(width, &mut buf)
         .map_err(|e| crate::error::SigilStitchError::Render {
-            context: "canonical TypeName rendering".to_string(),
+            context: "TypeName::render".to_string(),
             message: e.to_string(),
         })?;
     String::from_utf8(buf).map_err(|e| crate::error::SigilStitchError::Render {
-        context: "canonical TypeName UTF-8 conversion".to_string(),
+        context: "TypeName::render UTF-8 conversion".to_string(),
         message: e.to_string(),
     })
 }
 
+#[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
 pub fn to_doc_with_lang<F>(
     tn: &TypeName,
     resolve: &F,

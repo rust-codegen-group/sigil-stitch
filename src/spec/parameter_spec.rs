@@ -100,6 +100,7 @@ impl ParameterSpec {
     #[deprecated(
         note = "legacy 0.6.8 parameter grammar; use CodeLang::lower_function or CodeLang::lower_type"
     )]
+    #[expect(deprecated, reason = "0.6.8 compatibility facade")]
     pub fn emit_into(&self, cb: &mut CodeBlockBuilder, lang: &dyn CodeLang) {
         let mut fmt = String::new();
         let mut args: Vec<Arg> = Vec::new();

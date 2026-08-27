@@ -8,13 +8,15 @@ use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
     FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
-use crate::spec::where_spec::{TypeParamSpec, render_type_params};
+use crate::spec::where_spec::{TypeParamSpec, render_type_params_for};
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::type_name::{FunctionPresentation, TypeName, TypePresentation, WildcardPresentation};
 
 /// Go language implementation.
@@ -116,7 +118,7 @@ fn is_stdlib(module: &str) -> bool {
 
 impl Go {
     /// Returns true for function-body closes that may continue as an IIFE.
-    #[allow(deprecated)]
+    #[expect(deprecated, reason = "0.6.8 block-node compatibility bridge")]
     fn is_func_block_close(node: &CodeNode) -> bool {
         match node {
             CodeNode::BlockCloseIntent {
@@ -243,7 +245,7 @@ impl RendererLang for Go {
         "//"
     }
 
-    fn qualify_import_name(&self, module: &str, _name: &str, resolved_name: &str) -> String {
+    fn qualify_import_name(&self, module: &str, resolved_name: &str) -> String {
         let pkg = package_name(module);
         format!("{pkg}.{resolved_name}")
     }
@@ -254,6 +256,7 @@ impl RendererLang for Go {
 
     // --- Config struct accessors ---
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
             array: TypePresentation::Prefix { prefix: "[]" },
@@ -287,6 +290,7 @@ impl RendererLang for Go {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
         GenericSyntaxConfig {
             open: "[",
@@ -298,6 +302,7 @@ impl RendererLang for Go {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             indent_unit: &self.indent,
@@ -615,6 +620,10 @@ impl CodeLang for Go {
         }
     }
 
+    fn render_newtype_line(&self, _visibility: &str, name: &str, inner: &str) -> String {
+        format!("type {name} {inner}")
+    }
+
     fn emit_newtype_decl(
         &self,
         _visibility: &str,
@@ -623,7 +632,7 @@ impl CodeLang for Go {
         inner: &TypeName,
     ) -> Result<CodeBlock, SigilStitchError> {
         let mut args = Vec::new();
-        let type_params = render_type_params(type_params, self, &mut args);
+        let type_params = render_type_params_for(type_params, self, &mut args);
         args.push(Arg::TypeName(inner.clone()));
         CodeBlock::of(&format!("type {name}{type_params} %T"), args)
     }
@@ -636,10 +645,12 @@ impl CodeLang for Go {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypePrefix("*")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: " ",
@@ -647,6 +658,7 @@ impl CodeLang for Go {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             type_annotation_separator: " ",
@@ -654,6 +666,7 @@ impl CodeLang for Go {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig {
             variant_separator: "",
@@ -663,6 +676,7 @@ impl CodeLang for Go {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
 
@@ -769,16 +783,10 @@ mod tests {
     #[test]
     fn test_qualify_import_name() {
         let go = Go::new();
+        assert_eq!(go.qualify_import_name("net/http", "Server"), "http.Server");
+        assert_eq!(go.qualify_import_name("fmt", "Println"), "fmt.Println");
         assert_eq!(
-            go.qualify_import_name("net/http", "Server", "Server"),
-            "http.Server"
-        );
-        assert_eq!(
-            go.qualify_import_name("fmt", "Println", "Println"),
-            "fmt.Println"
-        );
-        assert_eq!(
-            go.qualify_import_name("encoding/json", "Marshal", "Marshal"),
+            go.qualify_import_name("encoding/json", "Marshal"),
             "json.Marshal"
         );
     }

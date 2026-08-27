@@ -6,13 +6,16 @@ use crate::lang::capability::{
     FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::spec::where_spec::WhereClauseStyle;
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::type_name::{FunctionPresentation, TypePresentation, WildcardPresentation};
 
 /// Rust language implementation.
@@ -98,6 +101,7 @@ impl RendererLang for Rust {
 
     // --- Config struct accessors ---
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
             array: TypePresentation::GenericWrap { name: "Vec" },
@@ -133,10 +137,12 @@ impl RendererLang for Rust {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
         GenericSyntaxConfig::default()
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             indent_unit: &self.indent,
@@ -529,6 +535,7 @@ impl CodeLang for Rust {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::TypeWrap {
             open: "Option<",
@@ -536,6 +543,7 @@ impl CodeLang for Rust {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: " -> ",
@@ -545,10 +553,12 @@ impl CodeLang for Rust {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig::default()
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig {
             variant_trailing_separator: true,
@@ -560,6 +570,7 @@ impl CodeLang for Rust {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
 

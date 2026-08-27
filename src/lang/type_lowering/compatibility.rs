@@ -11,7 +11,7 @@ use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::type_spec::ValidatedType;
 use crate::spec::where_spec::{
     WhereClauseStyle, WhereConstraint, emit_separate_where_block, emit_where_block,
-    render_type_params,
+    render_type_params_for,
 };
 use crate::type_name::TypeName;
 
@@ -188,7 +188,7 @@ fn lower_split<L: CodeLang + ?Sized>(
         let mut implementation = CodeBlock::builder();
         let mut format = String::from("impl");
         let mut arguments = Vec::new();
-        format.push_str(&render_type_params(
+        format.push_str(&render_type_params_for(
             type_.type_params(),
             lang,
             &mut arguments,
@@ -286,7 +286,7 @@ fn lower_alias<L: CodeLang + ?Sized>(
     let visibility =
         lang.render_visibility(type_.modifiers().visibility, DeclarationContext::TopLevel);
     let keyword = lang.type_keyword(type_.kind());
-    let parameters = render_type_params(type_.type_params(), lang, &mut arguments);
+    let parameters = render_type_params_for(type_.type_params(), lang, &mut arguments);
     let target = type_
         .target_type()
         .cloned()
@@ -407,7 +407,7 @@ fn emit_header<L: CodeLang + ?Sized>(
     format.push_str(lang.type_keyword(type_.kind()));
     format.push(' ');
     format.push_str(type_.name());
-    format.push_str(&render_type_params(
+    format.push_str(&render_type_params_for(
         type_.type_params(),
         lang,
         &mut arguments,

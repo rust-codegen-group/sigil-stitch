@@ -7,6 +7,7 @@ use crate::lang::RendererLang;
 /// inner type docs into the output. The rendering engine in `type_name_render.rs`
 /// interprets these patterns — language implementations never build `BoxDoc`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[deprecated(note = "legacy shared type grammar; implement RendererLang::lower_type_name instead")]
 pub enum TypePresentation<'a> {
     /// `name<P1, P2>` — delimiters from `generic_syntax().open`/`.close`.
     GenericWrap {
@@ -48,6 +49,9 @@ pub enum TypePresentation<'a> {
 
 /// Controls how `TypeName::Generic { base, params }` renders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[deprecated(
+    note = "legacy shared type grammar; implement language-owned TypeName lowering instead"
+)]
 pub enum GenericApplicationStyle {
     /// `Base<P1, P2>` or `Base[P1, P2]` — uses `generic_syntax().open`/`.close`.
     Delimited,
@@ -60,6 +64,7 @@ pub enum GenericApplicationStyle {
 
 /// Syntactic pattern for rendering a function type expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[deprecated(note = "legacy shared type grammar; implement RendererLang::lower_type_name instead")]
 pub struct FunctionPresentation<'a> {
     /// Keyword before the param list (e.g., `"fn"`, `"func"`, `""`).
     pub keyword: &'a str,
@@ -81,6 +86,7 @@ pub struct FunctionPresentation<'a> {
     pub wrapper_close: &'a str,
 }
 
+#[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
 impl Default for FunctionPresentation<'_> {
     fn default() -> Self {
         Self {
@@ -99,6 +105,7 @@ impl Default for FunctionPresentation<'_> {
 
 /// How `TypeName::AssociatedType` renders across languages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[deprecated(note = "legacy shared type grammar; implement RendererLang::lower_type_name instead")]
 pub enum AssociatedTypeStyle<'a> {
     /// Rust-style: `<Base as Qual>::Member` or `Base::Member`.
     QualifiedPath {
@@ -126,6 +133,7 @@ pub enum AssociatedTypeStyle<'a> {
 
 /// How `impl Trait` / `dyn Trait` bounds render.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[deprecated(note = "legacy shared type grammar; implement RendererLang::lower_type_name instead")]
 pub struct BoundsPresentation<'a> {
     /// Keyword prefix (e.g., `"impl "`, `"dyn "`).
     pub keyword: &'a str,
@@ -135,6 +143,7 @@ pub struct BoundsPresentation<'a> {
 
 /// How wildcard types render.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[deprecated(note = "legacy shared type grammar; implement RendererLang::lower_type_name instead")]
 pub struct WildcardPresentation<'a> {
     /// Unbounded wildcard (e.g., `"?"`, `"*"`, `"_"`, `"any"`).
     pub unbounded: &'a str,
@@ -559,6 +568,28 @@ impl TypeName {
         crate::type_name_import::collect_imports(self, out)
     }
 
+    /// Render this type name to the canonical pre-0.6.8 document form.
+    #[deprecated(note = "legacy 0.6.8 terminal facade; use language-owned TypeName lowering")]
+    pub fn to_doc<F>(&self, resolve: &F) -> BoxDoc<'static, ()>
+    where
+        F: Fn(&str, &str) -> String,
+    {
+        crate::type_name_render::to_canonical_doc(self, resolve)
+    }
+
+    /// Render this type name to the canonical pre-0.6.8 string form.
+    #[deprecated(note = "legacy 0.6.8 terminal facade; use language-owned TypeName lowering")]
+    pub fn render<F>(
+        &self,
+        width: usize,
+        resolve: &F,
+    ) -> Result<String, crate::error::SigilStitchError>
+    where
+        F: Fn(&str, &str) -> String,
+    {
+        crate::type_name_render::render_canonical(self, width, resolve)
+    }
+
     #[cfg(test)]
     fn render_canonical<F>(
         &self,
@@ -575,6 +606,7 @@ impl TypeName {
     ///
     /// The `resolve` closure maps `(module, name)` to the import-resolved display
     /// name, including any alias selected by [`ImportGroup`](crate::import::ImportGroup).
+    #[deprecated(note = "legacy 0.6.8 terminal facade; use RendererLang::lower_type_name")]
     pub fn to_doc_with_lang<F>(&self, resolve: &F, lang: &dyn RendererLang) -> BoxDoc<'static, ()>
     where
         F: Fn(&str, &str) -> String,

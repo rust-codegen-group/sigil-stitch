@@ -148,6 +148,7 @@ impl AnnotationSpec {
         self.emit_with(lang)
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility facade")]
     pub(crate) fn emit_with<L: CodeLang + ?Sized>(
         &self,
         lang: &L,

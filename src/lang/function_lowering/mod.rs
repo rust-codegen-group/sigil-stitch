@@ -14,7 +14,7 @@ use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::parameter_spec::ParameterSpec;
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint, render_type_params};
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint, render_type_params_for};
 use crate::type_name::TypeName;
 
 pub(crate) use compatibility::lower as lower_compatibility;
@@ -52,7 +52,7 @@ impl SignatureBuilder {
         params: &[TypeParamSpec],
         lang: &L,
     ) -> bool {
-        let rendered = render_type_params(params, lang, &mut self.args);
+        let rendered = render_type_params_for(params, lang, &mut self.args);
         let present = !rendered.is_empty();
         self.format.push_str(&rendered);
         present

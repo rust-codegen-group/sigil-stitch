@@ -48,6 +48,7 @@ pub mod rewrite;
 
 mod bash_function_lowering;
 mod c_function_lowering;
+mod compatibility_markers;
 mod cpp_function_lowering;
 mod csharp_function_lowering;
 mod dart_function_lowering;
@@ -73,7 +74,7 @@ mod typescript_function_lowering;
 pub(crate) mod variant_lowering;
 mod zsh_function_lowering;
 
-use crate::code_block::{Arg, CodeBlock};
+use crate::code_block::CodeBlock;
 use crate::code_node::BlockIntent;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
@@ -88,20 +89,26 @@ use crate::spec::parameter_spec::ParameterSpec;
 pub use crate::spec::property_spec::{PropertyIntent, ValidatedProperty};
 pub use crate::spec::type_members_intent::TypeMembersIntent;
 pub use crate::spec::type_spec::{TypeIntent, ValidatedType};
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint, render_type_params};
+use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
 use crate::type_name::TypeName;
+use compatibility_markers::LegacyTypeMarkers;
 
 /// Narrow trait for `CodeRenderer` and `TypeName` rendering.
 ///
-/// Implementors must provide:
+/// Implementors must provide only:
 /// - [`file_extension`](Self::file_extension)
 /// - [`line_comment_prefix`](Self::line_comment_prefix)
-/// - [`reserved_words`](Self::reserved_words) (default `&[]` — useless for real languages)
-/// - [`type_presentation`](Self::type_presentation) (rules for compound type rendering)
-/// - [`block_syntax`](Self::block_syntax) (delimiters, indentation, statement terminator)
 ///
-/// The remaining methods have defaults suitable for most brace/double-quote
-/// languages. Override only when your language differs.
+/// Every other method has a default. Some defaults preserve the frozen 0.6.8
+/// external-adapter surface rather than defining a recommended grammar model:
+/// [`type_presentation`](Self::type_presentation),
+/// [`generic_syntax`](Self::generic_syntax), and
+/// [`block_syntax`](Self::block_syntax) are deprecated compatibility accessors.
+/// New adapters should follow the language-owned `lower_type_name()`,
+/// `indent_unit()`, and renderer-event design in the architecture and
+/// language-author guides. Those replacement interfaces land in their own
+/// behavior-specific cutovers; do not extend the compatibility accessors with
+/// new syntax dimensions.
 pub trait RendererLang: std::fmt::Debug + 'static {
     /// File extension for this language (e.g., "ts", "go", "rs").
     fn file_extension(&self) -> &str;
@@ -169,7 +176,14 @@ pub trait RendererLang: std::fmt::Debug + 'static {
         }
     }
 
-    /// Block delimiters, indentation, and statement termination.
+    /// Frozen 0.6.8 block and statement configuration.
+    ///
+    /// This default preserves external-adapter source behavior. It is not the
+    /// extension model for new target grammar.
+    #[deprecated(
+        note = "legacy 0.6.8 renderer grammar; implement the language-owned renderer event methods instead"
+    )]
+    #[expect(deprecated, reason = "0.6.8 compatibility default")]
     fn block_syntax(&self) -> config::BlockSyntaxConfig<'_> {
         config::BlockSyntaxConfig::default()
     }
@@ -201,7 +215,7 @@ pub trait RendererLang: std::fmt::Debug + 'static {
     ///
     /// The default delegates to the legacy [`RendererLang::block_open_for`]
     /// so existing external adapters keep working for both node forms.
-    #[allow(deprecated)]
+    #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
     fn block_open_for_intent(&self, _intent: BlockIntent, condition: &str) -> Option<&str> {
         self.block_open_for(condition)
     }
@@ -216,7 +230,7 @@ pub trait RendererLang: std::fmt::Debug + 'static {
     ///
     /// The default delegates to the legacy [`RendererLang::block_close_for`]
     /// so existing external adapters keep working for both node forms.
-    #[allow(deprecated)]
+    #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
     fn block_close_for_intent(&self, _intent: BlockIntent, condition: &str) -> Option<&str> {
         self.block_close_for(condition)
     }
@@ -229,23 +243,56 @@ pub trait RendererLang: std::fmt::Debug + 'static {
     ///
     /// Default: return the resolved name as-is.
     /// Go overrides this to prefix the package name (e.g., `"http.Server"`).
-    /// Haskell uses the original name to render aliases as qualified references.
-    fn qualify_import_name(&self, _module: &str, _name: &str, resolved_name: &str) -> String {
+    #[deprecated(note = "legacy 0.6.8 hook; use qualify_import_reference")]
+    fn qualify_import_name(&self, _module: &str, resolved_name: &str) -> String {
         resolved_name.to_string()
     }
 
-    /// The separator between module path and type name for qualified inline
-    /// references (e.g., `"::"` for Rust/C++, `"."` for Go/Python/Java).
+    /// Qualify a resolved import reference while retaining its original name.
+    ///
+    /// The provided implementation preserves the 0.6.8 two-argument hook for
+    /// external adapters. Haskell overrides this current hook because its alias
+    /// spelling depends on both the original and resolved names.
+    #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
+    fn qualify_import_reference(
+        &self,
+        module: &str,
+        _original_name: &str,
+        resolved_name: &str,
+    ) -> String {
+        self.qualify_import_name(module, resolved_name)
+    }
+
+    /// Frozen 0.6.8 separator for qualified inline type references.
+    ///
+    /// Examples include `"::"` for Rust/C++ and `"."` for Go/Python/Java.
+    #[deprecated(
+        note = "legacy shared type grammar; implement RendererLang::lower_type_name instead"
+    )]
     fn module_separator(&self) -> Option<&str> {
         None
     }
 
-    /// How each compound `TypeName` variant renders.
+    /// Frozen 0.6.8 compound-type rendering configuration.
+    ///
+    /// This default preserves external-adapter source behavior. It is not the
+    /// extension model for new target type grammar.
+    #[deprecated(
+        note = "legacy shared type grammar; implement RendererLang::lower_type_name instead"
+    )]
+    #[expect(deprecated, reason = "0.6.8 compatibility default")]
     fn type_presentation(&self) -> config::TypePresentationConfig<'_> {
         config::TypePresentationConfig::default()
     }
 
-    /// Generic type parameter delimiters and constraints.
+    /// Frozen 0.6.8 generic-delimiter and constraint configuration.
+    ///
+    /// This default preserves external-adapter source behavior. It is not the
+    /// extension model for new target declaration grammar.
+    #[deprecated(
+        note = "legacy shared declaration grammar; implement complete language-owned lowering instead"
+    )]
+    #[expect(deprecated, reason = "0.6.8 compatibility default")]
     fn generic_syntax(&self) -> config::GenericSyntaxConfig<'_> {
         config::GenericSyntaxConfig::default()
     }
@@ -754,6 +801,9 @@ pub trait CodeLang: RendererLang {
     /// The keyword used to declare a function (e.g., "fn", "function").
     ///
     /// Default: `""`.
+    #[deprecated(
+        note = "legacy 0.6.8 function grammar; implement CodeLang::lower_function instead"
+    )]
     fn function_keyword(&self, _ctx: crate::spec::modifiers::DeclarationContext) -> &str {
         ""
     }
@@ -793,6 +843,9 @@ pub trait CodeLang: RendererLang {
 
     /// Prefix applied to variable names (parameters, fields, properties,
     /// receiver names). Returns `""` by default. PHP returns `"$"`.
+    #[deprecated(
+        note = "legacy 0.6.8 declaration grammar; implement complete language-owned lowering instead"
+    )]
     fn variable_prefix(&self) -> &str {
         ""
     }
@@ -803,6 +856,16 @@ pub trait CodeLang: RendererLang {
     #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn type_kind_suffix(&self, _kind: crate::spec::modifiers::TypeKind) -> &str {
         ""
+    }
+
+    /// Render a newtype declaration line from pre-rendered components.
+    ///
+    /// This exact 0.6.8 hook remains available only for external-adapter and
+    /// direct compatibility use. Current declaration lowering uses
+    /// [`CodeLang::emit_newtype_decl`].
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
+    fn render_newtype_line(&self, vis: &str, name: &str, inner: &str) -> String {
+        format!("{vis}struct {name}({inner});")
     }
 
     /// Emit a newtype declaration while preserving semantic type references.
@@ -816,18 +879,20 @@ pub trait CodeLang: RendererLang {
         type_params: &[TypeParamSpec],
         inner: &TypeName,
     ) -> Result<CodeBlock, SigilStitchError> {
-        let mut args = Vec::new();
-        let type_params = render_type_params(type_params, self, &mut args);
-        args.push(Arg::TypeName(inner.clone()));
-        CodeBlock::of(
-            &format!("{visibility}struct {name}{type_params}(%T);"),
-            args,
-        )
+        let mut markers = LegacyTypeMarkers::new("CodeLang::render_newtype_line");
+        let type_params = markers.render_marked_type_params(type_params, self)?;
+        let inner = markers.mark(inner);
+        #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
+        let output = self.render_newtype_line(visibility, &format!("{name}{type_params}"), &inner);
+        markers.recover(&output)
     }
 
     /// Opening block delimiter for function bodies specifically.
     ///
     /// Default: `" {"`.
+    #[deprecated(
+        note = "legacy 0.6.8 function grammar; implement CodeLang::lower_function instead"
+    )]
     fn fun_block_open(&self) -> &str {
         " {"
     }
@@ -865,6 +930,7 @@ pub trait CodeLang: RendererLang {
     ///
     /// Default: `OptionalFieldStyle::Ignored`.
     #[deprecated(note = "legacy 0.6.8 field grammar; implement CodeLang::lower_fields instead")]
+    #[expect(deprecated, reason = "0.6.8 compatibility default")]
     fn optional_field_style(&self) -> crate::lang::config::OptionalFieldStyle {
         crate::lang::config::OptionalFieldStyle::Ignored
     }
@@ -875,6 +941,7 @@ pub trait CodeLang: RendererLang {
     #[deprecated(
         note = "legacy 0.6.8 property grammar; implement CodeLang::lower_property instead"
     )]
+    #[expect(deprecated, reason = "0.6.8 compatibility default")]
     fn property_style(&self) -> crate::spec::modifiers::PropertyStyle {
         crate::spec::modifiers::PropertyStyle::Accessor
     }
@@ -889,14 +956,35 @@ pub trait CodeLang: RendererLang {
         "get"
     }
 
+    /// Render a type context from complete type parameters.
+    ///
+    /// This exact 0.6.8 string hook is retained for compatibility. Current
+    /// lowering uses [`CodeLang::emit_type_context`].
+    #[deprecated(note = "legacy 0.6.8 generic grammar; implement CodeLang::lower_function instead")]
+    fn render_type_context(&self, _type_params: &[TypeParamSpec]) -> String {
+        String::new()
+    }
+
     /// Emit a type context / constraint prefix for split function signatures.
     ///
     /// Default: no context.
     fn emit_type_context(
         &self,
-        _type_params: &[TypeParamSpec],
+        type_params: &[TypeParamSpec],
     ) -> Result<Option<CodeBlock>, SigilStitchError> {
-        Ok(None)
+        let mut markers = LegacyTypeMarkers::new("CodeLang::render_type_context");
+        let marked = markers.mark_type_params(type_params);
+        #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
+        let output = self.render_type_context(&marked);
+        if output.is_empty() && type_params.is_empty() {
+            return Ok(None);
+        }
+        let block = markers.recover(&output)?;
+        if block.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(block))
+        }
     }
 
     /// Content emitted after `block_open` but before the first field in a type body.
@@ -915,21 +1003,48 @@ pub trait CodeLang: RendererLang {
         String::new()
     }
 
+    /// Render a suffix after a type's closing delimiter.
+    ///
+    /// This exact 0.6.8 string hook is retained for compatibility. Current
+    /// lowering uses [`CodeLang::emit_type_close_suffix`].
+    #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
+    fn render_type_close_suffix(&self, _kind: TypeKind, _impl_types: &[String]) -> String {
+        String::new()
+    }
+
     /// Emit a suffix after the type's closing delimiter (e.g., Haskell `deriving`).
     ///
     /// Default: no suffix.
     #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
     fn emit_type_close_suffix(
         &self,
-        _kind: TypeKind,
-        _impl_types: &[TypeName],
+        kind: TypeKind,
+        impl_types: &[TypeName],
     ) -> Result<Option<CodeBlock>, SigilStitchError> {
-        Ok(None)
+        let mut markers = LegacyTypeMarkers::new("CodeLang::render_type_close_suffix");
+        let marked: Vec<String> = impl_types
+            .iter()
+            .map(|type_name| markers.mark(type_name))
+            .collect();
+        #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
+        let output = self.render_type_close_suffix(kind, &marked);
+        if output.is_empty() && impl_types.is_empty() {
+            return Ok(None);
+        }
+        let block = markers.recover(&output)?;
+        if block.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(block))
+        }
     }
 
     /// Render a type parameter's kind annotation (for higher-kinded types).
     ///
     /// Default: empty string.
+    #[deprecated(
+        note = "legacy 0.6.8 generic grammar; implement complete language-owned lowering instead"
+    )]
     fn render_type_param_kind(&self, _kind: &crate::spec::where_spec::TypeParamKind) -> String {
         String::new()
     }
@@ -940,6 +1055,7 @@ pub trait CodeLang: RendererLang {
     #[deprecated(
         note = "legacy 0.6.8 declaration grammar; implement CodeLang::lower_function instead"
     )]
+    #[expect(deprecated, reason = "0.6.8 compatibility default")]
     fn function_syntax(&self) -> config::FunctionSyntaxConfig<'_> {
         config::FunctionSyntaxConfig::default()
     }
@@ -948,6 +1064,7 @@ pub trait CodeLang: RendererLang {
     #[deprecated(
         note = "legacy 0.6.8 declaration grammar; migrate declarations to language-owned lowering"
     )]
+    #[expect(deprecated, reason = "0.6.8 compatibility default")]
     fn type_decl_syntax(&self) -> config::TypeDeclSyntaxConfig<'_> {
         config::TypeDeclSyntaxConfig::default()
     }
@@ -956,6 +1073,7 @@ pub trait CodeLang: RendererLang {
     #[deprecated(
         note = "legacy 0.6.8 declaration grammar; migrate declarations to language-owned lowering"
     )]
+    #[expect(deprecated, reason = "0.6.8 compatibility default")]
     fn enum_and_annotation(&self) -> config::EnumAndAnnotationConfig<'_> {
         config::EnumAndAnnotationConfig::default()
     }

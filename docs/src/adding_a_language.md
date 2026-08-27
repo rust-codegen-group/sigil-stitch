@@ -2,10 +2,10 @@
 
 This guide follows the accepted 0.7 target interface. Complete type-name
 lowering, fallible import resolution, and direct renderer-event methods are
-documented before their implementation. Until those stages land, the source
-still exposes the compatibility-backed methods described in the legacy
-appendix. Target-state signatures in this chapter are pseudocode contracts, not
-an assertion that each method is already available on `main`.
+documented before their implementation. The current source still exposes the
+compatibility-backed methods described in the legacy appendix. Target-state
+signatures in this chapter are pseudocode contracts, not an assertion that each
+method is already available on `main`.
 
 sigil-stitch supports new languages by implementing two traits: `RendererLang` (renderer-only methods) and `CodeLang` (spec-layer methods). `CodeLang` extends `RendererLang`, so implementing `CodeLang` requires both. If you only need `CodeBlock`-level rendering without specs, `RendererLang` alone is sufficient.
 

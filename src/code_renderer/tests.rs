@@ -1,3 +1,5 @@
+#![expect(deprecated, reason = "0.6.8 renderer compatibility assertions")]
+
 use super::*;
 use super::{direct::DirectAdapter, pretty::PrettyAdapter};
 use crate::code_block::{CodeBlock, StringLitArg, VerbatimStrArg};

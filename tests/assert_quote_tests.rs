@@ -1,4 +1,5 @@
 use sigil_stitch::code_block::{CodeBlock, CodeFragment};
+#[expect(deprecated, reason = "0.6.8 quote compatibility assertion")]
 use sigil_stitch::lang::config::QuoteStyle;
 use sigil_stitch::lang::python::Python;
 use sigil_stitch::lang::typescript::TypeScript;
@@ -20,6 +21,7 @@ fn assert_quote_matches_inline_quote() {
 }
 
 #[test]
+#[expect(deprecated, reason = "0.6.8 quote compatibility assertion")]
 fn assert_rendered_uses_configured_language() {
     let block = sigil_quote!(Python {
         print($S("hi"))

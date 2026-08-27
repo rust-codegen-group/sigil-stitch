@@ -1,0 +1,10 @@
+    Checking sigil-stitch v0.7.0 -> v0.6.8
+
+--- failure trait_method_missing: pub trait method removed or renamed ---
+
+Failed in:
+  method render_newtype_line of trait CodeLang, previously in file /tmp/baseline/src/lang/mod.rs:271
+  method render_newtype_line of trait CodeLang, previously in file /tmp/baseline/src/lang/mod.rs:271
+
+     Summary semver requires new major version
+    Finished [   1.000s] sigil-stitch

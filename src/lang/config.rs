@@ -1,8 +1,13 @@
-//! Shared configuration types used across language implementations.
+//! Frozen 0.6.8 compatibility types for language adapters.
 //!
-//! These types live here (rather than inside individual `src/lang/*.rs` files)
-//! because they represent cross-cutting concepts — quote style, optional-field
-//! semantics, type presentation — that multiple languages express in similar ways.
+//! These types remain at their shared public paths so existing adapters and
+//! language builders keep compiling. They are not a cross-language grammar
+//! model: concrete syntax belongs to the selected language. New adapter work
+//! should follow the language-owned declaration lowering, type-name lowering,
+//! quote handling, and renderer-event designs documented by the architecture
+//! and language-author guides instead of extending these compatibility types.
+
+#![allow(deprecated)] // Frozen 0.6.8 shared-grammar compatibility types.
 
 use crate::spec::fun_spec::{FunctionSignatureStyle, ParamListStyle};
 use crate::spec::modifiers::ConstructorDelegationStyle;
@@ -12,13 +17,15 @@ use crate::type_name::{
     TypePresentation, WildcardPresentation,
 };
 
-/// Quote style for rendering string literals.
+/// Frozen shared quote selector retained for 0.6.8 compatibility.
 ///
-/// Used by `TypeScript`, `JavaScript`, and `Python` where either single or
-/// double quotes are valid and the choice is a project style decision.
-/// Languages with a fixed quote style (Rust, Java, Go, etc.) don't consult
-/// this enum.
+/// Existing `TypeScript`, `JavaScript`, and `Python` builders still accept this
+/// type. New language-owned quote configuration should use a target-local
+/// option rather than extending this shared enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[deprecated(
+    note = "legacy shared quote configuration; use language-local quote selection instead"
+)]
 pub enum QuoteStyle {
     /// Single quotes (`'hello'`).
     #[default]
@@ -73,8 +80,9 @@ pub enum OptionalFieldStyle {
 
 // ── Config structs ─────────────────────────────────────────────────
 
-/// How each compound `TypeName` variant renders.
+/// Frozen 0.6.8 configuration for rendering compound `TypeName` variants.
 #[derive(Debug, Clone, Copy)]
+#[deprecated(note = "legacy shared type grammar; implement RendererLang::lower_type_name instead")]
 pub struct TypePresentationConfig<'a> {
     /// `TypeName::Array(T)` — e.g. `T[]`, `Vec<T>`.
     pub array: TypePresentation<'a>,
@@ -165,8 +173,11 @@ impl Default for TypePresentationConfig<'_> {
     }
 }
 
-/// Generic type parameter delimiters and constraints.
+/// Frozen 0.6.8 configuration for generic delimiters and constraints.
 #[derive(Debug, Clone, Copy)]
+#[deprecated(
+    note = "legacy shared declaration grammar; implement complete language-owned lowering instead"
+)]
 pub struct GenericSyntaxConfig<'a> {
     /// Opening delimiter (e.g. `"<"`, `"["`).
     pub open: &'a str,
@@ -195,8 +206,11 @@ impl Default for GenericSyntaxConfig<'_> {
     }
 }
 
-/// Block delimiters, indentation, and statement termination.
+/// Frozen 0.6.8 configuration for block and statement rendering.
 #[derive(Debug, Clone, Copy)]
+#[deprecated(
+    note = "legacy shared renderer grammar; implement the language-owned renderer event methods instead"
+)]
 pub struct BlockSyntaxConfig<'a> {
     /// Opening block delimiter after a signature (e.g. `" {"`, `":"`).
     pub block_open: &'a str,

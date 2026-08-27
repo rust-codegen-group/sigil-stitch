@@ -162,7 +162,17 @@ impl TypeParamSpec {
 /// Render type parameters into `<T: Bound, U>` form, appending to a format
 /// string and args vec. Returns the format string fragment (empty string if
 /// no type params).
-pub fn render_type_params<L: CodeLang + ?Sized>(
+#[deprecated(note = "legacy 0.6.8 declaration grammar; implement complete language-owned lowering")]
+pub fn render_type_params(
+    params: &[TypeParamSpec],
+    lang: &dyn CodeLang,
+    args: &mut Vec<Arg>,
+) -> String {
+    render_type_params_for(params, lang, args)
+}
+
+#[expect(deprecated, reason = "0.6.8 generic declaration compatibility bridge")]
+pub(crate) fn render_type_params_for<L: CodeLang + ?Sized>(
     params: &[TypeParamSpec],
     lang: &L,
     args: &mut Vec<Arg>,
@@ -235,6 +245,7 @@ pub fn render_type_params<L: CodeLang + ?Sized>(
 /// ```text
 /// \nwhere\n    T: Clone + Send,\n    U: Debug,
 /// ```
+#[expect(deprecated, reason = "0.6.8 declaration grammar compatibility bridge")]
 pub(crate) fn emit_where_block<L: CodeLang + ?Sized>(
     fmt: &mut String,
     args: &mut Vec<Arg>,
@@ -270,6 +281,7 @@ pub(crate) fn emit_where_block<L: CodeLang + ?Sized>(
 /// ```text
 /// \n    where T : IComparable\n    where U : ISerializable
 /// ```
+#[expect(deprecated, reason = "0.6.8 declaration grammar compatibility bridge")]
 pub(crate) fn emit_separate_where_block<L: CodeLang + ?Sized>(
     fmt: &mut String,
     args: &mut Vec<Arg>,

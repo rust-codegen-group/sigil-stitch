@@ -15,6 +15,7 @@ use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapabilityProfile, FunctionContext, FunctionForm,
     LanguageCapabilities,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -147,6 +148,7 @@ impl RendererLang for Lua {
 
     // ── Config accessors ──
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             block_open: "",
@@ -159,7 +161,6 @@ impl RendererLang for Lua {
         }
     }
 
-    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         let t = condition.trim();
         if t.ends_with(" then") || t.ends_with(" do") || t == "else" {
@@ -177,6 +178,7 @@ impl RendererLang for Lua {
         lua_block_open_for_intent(intent, condition)
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
         GenericSyntaxConfig {
             open: "",
@@ -185,6 +187,7 @@ impl RendererLang for Lua {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
             optional_absent_literal: "nil",
@@ -268,6 +271,7 @@ impl CodeLang for Lua {
         "" // Type bodies start on the next line
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             type_before_name: false,
@@ -277,6 +281,7 @@ impl CodeLang for Lua {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: "", // No return type syntax in Lua
@@ -285,6 +290,7 @@ impl CodeLang for Lua {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig {
             readonly_keyword: "",
@@ -294,6 +300,7 @@ impl CodeLang for Lua {
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use crate::import::ImportEntry;
 

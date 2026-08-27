@@ -37,6 +37,7 @@ impl<'a> CodeRenderer<'a> {
     }
 
     /// Render a CodeBlock to string.
+    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
     pub fn render(&mut self, block: &CodeBlock) -> Result<String, SigilStitchError> {
         let mut nodes = block.nodes.clone();
         self.lang.rewrite_nodes(&mut nodes);
@@ -67,23 +68,25 @@ impl<'a> CodeRenderer<'a> {
                 .resolved_name(module, name)
                 .unwrap_or(name)
                 .to_string();
-            lang.qualify_import_name(module, name, &resolved)
+            lang.qualify_import_reference(module, name, &resolved)
         };
+        #[expect(deprecated, reason = "0.6.8 type-name compatibility bridge")]
         tn.to_doc_with_lang(&resolve, self.lang)
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
     fn resolve_block_open<'b>(lang: &'b dyn RendererLang, cond: &str) -> &'b str {
         lang.block_open_for(cond)
             .unwrap_or(lang.block_syntax().block_open)
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
     fn resolve_block_close<'b>(lang: &'b dyn RendererLang, cond: &str) -> &'b str {
         lang.block_close_for(cond)
             .unwrap_or(lang.block_syntax().block_close)
     }
 
+    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
     fn resolve_block_open_intent<'b>(
         lang: &'b dyn RendererLang,
         intent: BlockIntent,
@@ -93,6 +96,7 @@ impl<'a> CodeRenderer<'a> {
             .unwrap_or(lang.block_syntax().block_open)
     }
 
+    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
     fn resolve_block_close_intent<'b>(
         lang: &'b dyn RendererLang,
         intent: BlockIntent,
@@ -117,7 +121,7 @@ impl<'a> CodeRenderer<'a> {
             .join("\n")
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
     fn walk_nodes<A: RenderAdapter>(
         &self,
         nodes: &[CodeNode],

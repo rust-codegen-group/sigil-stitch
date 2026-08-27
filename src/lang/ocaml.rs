@@ -9,12 +9,14 @@ use crate::lang::capability::{
     FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     TypeDeclSyntaxConfig, TypePresentationConfig,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::type_name::{
     AssociatedTypeStyle, FunctionPresentation, GenericApplicationStyle, TypePresentation,
 };
@@ -184,6 +186,7 @@ impl RendererLang for OCaml {
         Some(".")
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
         TypePresentationConfig {
             array: TypePresentation::Postfix { suffix: " list" },
@@ -212,6 +215,7 @@ impl RendererLang for OCaml {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn generic_syntax(&self) -> GenericSyntaxConfig<'_> {
         GenericSyntaxConfig {
             open: "(",
@@ -223,6 +227,7 @@ impl RendererLang for OCaml {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
             block_open: " =",
@@ -234,7 +239,6 @@ impl RendererLang for OCaml {
         }
     }
 
-    #[allow(deprecated)]
     fn block_open_for(&self, condition: &str) -> Option<&str> {
         let t = condition.trim();
         if t.starts_with("module type ") {
@@ -254,7 +258,6 @@ impl RendererLang for OCaml {
         }
     }
 
-    #[allow(deprecated)]
     fn block_close_for(&self, condition: &str) -> Option<&str> {
         let t = condition.trim();
         if t.starts_with("module type ") || t.starts_with("module ") {
@@ -475,6 +478,7 @@ impl CodeLang for OCaml {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn function_syntax(&self) -> FunctionSyntaxConfig<'_> {
         FunctionSyntaxConfig {
             return_type_separator: " : ",
@@ -483,6 +487,7 @@ impl CodeLang for OCaml {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_decl_syntax(&self) -> TypeDeclSyntaxConfig<'_> {
         TypeDeclSyntaxConfig {
             type_annotation_separator: " : ",
@@ -490,12 +495,14 @@ impl CodeLang for OCaml {
         }
     }
 
+    #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn enum_and_annotation(&self) -> EnumAndAnnotationConfig<'_> {
         EnumAndAnnotationConfig::default()
     }
 }
 
 #[cfg(test)]
+#[expect(deprecated, reason = "0.6.8 compatibility assertions")]
 mod tests {
     use super::*;
     use crate::import::ImportEntry;

@@ -180,13 +180,13 @@ explicit variant; it does not reinterpret the string payload as source code.
 Adding `StringLiteral` makes the pre-0.6.8 public `TypeName` enum source
 incompatible for downstream exhaustive matches. The 0.7 change therefore also
 marks `TypeName` as `#[non_exhaustive]` and documents the required wildcard
-match. Stage 2 preserves supported 0.6.8 Rust constructors and captures the
-specific `TypeName` JSON values documented before 0.7 as checked fixtures. This
-is not a promise that every Serde representation remains stable: sigil-stitch
-defines no binary serialization protocol, enum-ordinal contract, struct-field
-order, or serializer-specific byte format. No forward-compatible interpretation
-of unknown serialized variants is added; deserialization returns an error
-instead of changing generated code silently.
+match. The compatibility bridge preserves supported 0.6.8 Rust constructors
+and captures the specific `TypeName` JSON values documented before 0.7 as
+checked fixtures. This is not a promise that every Serde representation remains
+stable: sigil-stitch defines no binary serialization protocol, enum-ordinal
+contract, struct-field order, or serializer-specific byte format. No
+forward-compatible interpretation of unknown serialized variants is added;
+deserialization returns an error instead of changing generated code silently.
 
 `RendererLang::lower_type_name` has a provided compatibility implementation.
 It reproduces pre-0.6.8 behavior for old variants through the frozen
