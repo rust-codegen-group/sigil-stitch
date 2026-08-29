@@ -4,6 +4,10 @@
 
 ### Added
 
+- Complete language-owned renderer events on `RendererLang`:
+  `indent_unit()`, `render_statement_end()`, `render_block_open()`,
+  `render_block_close()`, and `render_branch_transition()`. All built-in
+  adapters implement the complete interface directly.
 - Complete fallible `RendererLang::lower_type_name()` implementations for all
   built-in languages, with intrinsic and adapter-output validation before
   rendering.
@@ -18,6 +22,12 @@
 
 ### Changed
 
+- `CodeRenderer` now obtains indentation, statement suffixes, block delimiters,
+  and branch transitions only through the complete renderer-event interface.
+  Post-0.6.8 adapters should migrate all four fallible events together; the
+  provided defaults remain only for unchanged 0.6.8 adapters. Legacy block
+  nodes remain renderable through the selected adapter's complete events;
+  built-ins route them through their language-owned implementations.
 - Built-in type and function declarations now lower type parameters, bounds,
   lifetimes, higher-kinded parameters, context bounds, and explicit constraint
   clauses entirely in language-owned lowerers. Deprecated
@@ -44,6 +54,10 @@
 
 ### Deprecated
 
+- `RendererLang::block_open_for_intent()` and
+  `RendererLang::block_close_for_intent()` now join `block_syntax()`,
+  `block_open_for()`, and `block_close_for()` as frozen 0.6.8 compatibility
+  hooks. New adapters should implement the complete renderer events.
 - `ImportGroup::resolve()` and `resolve_with_explicit()` remain frozen 0.6.8
   compatibility facades; new code should use the fallible complete-set APIs.
 - The shared `QuoteStyle`, public `quote_style` fields, and

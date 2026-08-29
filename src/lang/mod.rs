@@ -109,9 +109,8 @@ use compatibility_markers::LegacyTypeMarkers;
 /// [`block_syntax`](Self::block_syntax) are deprecated compatibility accessors.
 /// New adapters should follow the language-owned `lower_type_name()`,
 /// `indent_unit()`, and renderer-event design in the architecture and
-/// language-author guides. Those replacement interfaces land in their own
-/// behavior-specific cutovers; do not extend the compatibility accessors with
-/// new syntax dimensions.
+/// language-author guides. Do not extend the compatibility accessors with new
+/// syntax dimensions.
 pub trait RendererLang: std::fmt::Debug + 'static {
     /// File extension for this language (e.g., "ts", "go", "rs").
     fn file_extension(&self) -> &str;
@@ -191,20 +190,107 @@ pub trait RendererLang: std::fmt::Debug + 'static {
         config::BlockSyntaxConfig::default()
     }
 
+    /// Exact indentation bytes used by the final renderer.
+    ///
+    /// The default preserves the frozen 0.6.8 `block_syntax()` behavior for
+    /// external adapters. Built-in and new adapters should return their local
+    /// indentation value directly.
+    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
+    fn indent_unit(&self) -> &str {
+        self.block_syntax().indent_unit
+    }
+
+    /// Render the complete suffix for a statement boundary.
+    ///
+    /// The default preserves the frozen 0.6.8 semicolon configuration for
+    /// external adapters. Built-in and new adapters should own the complete
+    /// suffix locally.
+    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
+    fn render_statement_end(&self) -> Result<&str, SigilStitchError> {
+        Ok(if self.block_syntax().uses_semicolons {
+            ";"
+        } else {
+            ""
+        })
+    }
+
+    /// Render the complete block-opening suffix after `condition`.
+    ///
+    /// The default preserves the frozen 0.6.8 block configuration and hooks.
+    /// Built-in and new adapters should map [`BlockIntent`] through local
+    /// target grammar.
+    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
+    fn render_block_open(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        Ok(self
+            .block_open_for_intent(intent, condition)
+            .unwrap_or(self.block_syntax().block_open))
+    }
+
+    /// Render the complete final closer for a block.
+    ///
+    /// The default preserves the frozen 0.6.8 block configuration and hooks.
+    /// Built-in and new adapters should map [`BlockIntent`] through local
+    /// target grammar.
+    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
+    fn render_block_close(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        Ok(self
+            .block_close_for_intent(intent, condition)
+            .unwrap_or(self.block_syntax().block_close))
+    }
+
+    /// Render the outgoing closer and connector whitespace for a branch.
+    ///
+    /// The incoming branch source and its opener remain separate renderer
+    /// events. The default preserves the frozen 0.6.8 transition behavior for
+    /// external adapters.
+    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
+    fn render_branch_transition(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<String, SigilStitchError> {
+        let syntax = self.block_syntax();
+        if !syntax.close_on_transition {
+            return Ok(String::new());
+        }
+        let close = self
+            .block_close_for_intent(intent, condition)
+            .unwrap_or(syntax.block_close);
+        if close.is_empty() {
+            Ok(String::new())
+        } else {
+            Ok(format!("{close} "))
+        }
+    }
+
     /// Map a control-flow condition to its block-opening delimiter.
     ///
-    /// Legacy path used by old serialized/external string-only block nodes.
-    /// New nodes use [`RendererLang::block_open_for_intent`].
-    #[deprecated(note = "use block_open_for_intent")]
+    /// Retained for unchanged external adapters. The provided
+    /// [`RendererLang::render_block_open`] compatibility default delegates to
+    /// this hook through [`RendererLang::block_open_for_intent`]. Both legacy
+    /// and intent-bearing nodes call the complete renderer event.
+    #[deprecated(note = "use render_block_open")]
     fn block_open_for(&self, _condition: &str) -> Option<&str> {
         None
     }
 
     /// Map a control-flow condition to its block-closing delimiter.
     ///
-    /// Legacy path used by old serialized/external string-only block nodes.
-    /// New nodes use [`RendererLang::block_close_for_intent`].
-    #[deprecated(note = "use block_close_for_intent")]
+    /// Retained for unchanged external adapters. The provided
+    /// [`RendererLang::render_block_close`] and
+    /// [`RendererLang::render_branch_transition`] compatibility defaults
+    /// delegate to this hook through
+    /// [`RendererLang::block_close_for_intent`]. Both legacy and
+    /// intent-bearing nodes call the complete renderer events.
+    #[deprecated(note = "use render_block_close and render_branch_transition")]
     fn block_close_for(&self, _condition: &str) -> Option<&str> {
         None
     }
@@ -212,12 +298,13 @@ pub trait RendererLang: std::fmt::Debug + 'static {
     /// Map a control-flow block intent and condition to its block-opening
     /// delimiter.
     ///
-    /// Called at render time for
-    /// [`crate::code_node::CodeNode::BlockOpenIntent`] nodes. Return
-    /// `Some("...")` to override the default `block_syntax().block_open`.
+    /// Used by the provided [`RendererLang::render_block_open`] compatibility
+    /// default. Return `Some("...")` to override the default
+    /// `block_syntax().block_open`.
     ///
     /// The default delegates to the legacy [`RendererLang::block_open_for`]
     /// so existing external adapters keep working for both node forms.
+    #[deprecated(note = "use render_block_open")]
     #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
     fn block_open_for_intent(&self, _intent: BlockIntent, condition: &str) -> Option<&str> {
         self.block_open_for(condition)
@@ -226,13 +313,14 @@ pub trait RendererLang: std::fmt::Debug + 'static {
     /// Map a control-flow block intent and condition to its block-closing
     /// delimiter.
     ///
-    /// Called at render time for
-    /// [`crate::code_node::CodeNode::BlockCloseIntent`] and
-    /// [`crate::code_node::CodeNode::BranchCloseIntent`] nodes. Return
-    /// `Some("...")` to override the default `block_syntax().block_close`.
+    /// Used by the provided [`RendererLang::render_block_close`] and
+    /// [`RendererLang::render_branch_transition`] compatibility defaults.
+    /// Return `Some("...")` to override the default
+    /// `block_syntax().block_close`.
     ///
     /// The default delegates to the legacy [`RendererLang::block_close_for`]
     /// so existing external adapters keep working for both node forms.
+    #[deprecated(note = "use render_block_close and render_branch_transition")]
     #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
     fn block_close_for_intent(&self, _intent: BlockIntent, condition: &str) -> Option<&str> {
         self.block_close_for(condition)

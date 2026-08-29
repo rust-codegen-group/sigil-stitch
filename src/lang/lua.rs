@@ -45,6 +45,19 @@ fn lua_block_open_for_intent(intent: BlockIntent, condition: &str) -> Option<&'s
     }
 }
 
+fn lua_block_open_from_condition_text(condition: &str) -> Option<&'static str> {
+    let trimmed = condition.trim();
+    if trimmed.ends_with(" then") || trimmed.ends_with(" do") || trimmed == "else" {
+        Some("")
+    } else if trimmed.starts_with("if ") || trimmed.starts_with("elseif ") {
+        Some(" then")
+    } else if trimmed.starts_with("for ") || trimmed.starts_with("while ") {
+        Some(" do")
+    } else {
+        None
+    }
+}
+
 /// Lua language implementation.
 #[derive(Debug, Clone)]
 pub struct Lua {
@@ -128,6 +141,7 @@ fn is_valid_import_alias(alias: &str) -> bool {
         && !LUA_RESERVED.contains(&alias)
 }
 
+#[deny(deprecated)]
 impl RendererLang for Lua {
     fn lower_type_name(
         &self,
@@ -161,7 +175,46 @@ impl RendererLang for Lua {
         Some(".")
     }
 
-    // ── Config accessors ──
+    // ── Language-owned renderer events ──
+
+    fn indent_unit(&self) -> &str {
+        &self.indent
+    }
+
+    fn render_statement_end(&self) -> Result<&str, crate::error::SigilStitchError> {
+        Ok("")
+    }
+
+    fn render_block_open(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        let open = if intent == BlockIntent::Generic {
+            lua_block_open_from_condition_text(condition)
+        } else {
+            lua_block_open_for_intent(intent, condition)
+        };
+        Ok(open.unwrap_or(""))
+    }
+
+    fn render_block_close(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        Ok("end")
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, crate::error::SigilStitchError> {
+        Ok(String::new())
+    }
+
+    // ── Deprecated 0.6.8 config accessors ──
 
     #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
@@ -177,16 +230,7 @@ impl RendererLang for Lua {
     }
 
     fn block_open_for(&self, condition: &str) -> Option<&str> {
-        let t = condition.trim();
-        if t.ends_with(" then") || t.ends_with(" do") || t == "else" {
-            Some("")
-        } else if t.starts_with("if ") || t.starts_with("elseif ") {
-            Some(" then")
-        } else if t.starts_with("for ") || t.starts_with("while ") {
-            Some(" do")
-        } else {
-            None
-        }
+        lua_block_open_from_condition_text(condition)
     }
 
     fn block_open_for_intent(&self, intent: BlockIntent, condition: &str) -> Option<&str> {

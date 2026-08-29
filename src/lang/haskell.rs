@@ -25,6 +25,23 @@ fn haskell_block_open_for_intent(intent: BlockIntent) -> Option<&'static str> {
     }
 }
 
+fn haskell_block_open_from_condition_text(condition: &str) -> Option<&'static str> {
+    let trimmed = condition.trim();
+    if trimmed.starts_with("class ") || trimmed.starts_with("instance ") {
+        Some(" where")
+    } else if trimmed == "do" || trimmed.ends_with(" do") {
+        Some("")
+    } else if trimmed.starts_with("if ") || trimmed.starts_with("else if ") {
+        Some(" then")
+    } else if trimmed == "else" {
+        Some("")
+    } else if trimmed.starts_with("case ") {
+        Some(" of")
+    } else {
+        None
+    }
+}
+
 /// Haskell language implementation.
 ///
 /// Haskell-specific behaviors:
@@ -61,9 +78,9 @@ fn haskell_block_open_for_intent(intent: BlockIntent) -> Option<&'static str> {
 ///
 /// # Known limitations
 ///
-/// - `block_open` returns `" ="` which works for function definitions and type
-///   aliases. Type class declarations automatically get `" where"` via
-///   `block_open_for_intent(BlockIntent::Class | BlockIntent::Instance)`.
+/// - [`RendererLang::render_block_open`] uses `" ="` as its generic fallback for
+///   function definitions and type aliases, while class and instance intents
+///   get `" where"` through Haskell's complete renderer-event implementation.
 /// - Complex multi-param type class constraints (e.g., `MonadReader Env m`) are not
 ///   directly modeled. Use `TypeName::primitive("(MonadIO m, MonadReader Env m) => m String")`
 ///   for complex constrained return types.
@@ -179,6 +196,7 @@ fn import_group_order(module: &str) -> u8 {
     }
 }
 
+#[deny(deprecated)]
 impl RendererLang for Haskell {
     fn lower_type_name(
         &self,
@@ -266,6 +284,43 @@ impl RendererLang for Haskell {
         }
     }
 
+    fn indent_unit(&self) -> &str {
+        &self.indent
+    }
+
+    fn render_statement_end(&self) -> Result<&str, SigilStitchError> {
+        Ok("")
+    }
+
+    fn render_block_open(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        let open = if intent == BlockIntent::Generic {
+            haskell_block_open_from_condition_text(condition)
+        } else {
+            haskell_block_open_for_intent(intent)
+        };
+        Ok(open.unwrap_or(" ="))
+    }
+
+    fn render_block_close(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        Ok("")
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, SigilStitchError> {
+        Ok(String::new())
+    }
+
     #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> crate::lang::config::BlockSyntaxConfig<'_> {
         crate::lang::config::BlockSyntaxConfig {
@@ -279,20 +334,7 @@ impl RendererLang for Haskell {
     }
 
     fn block_open_for(&self, condition: &str) -> Option<&str> {
-        let t = condition.trim();
-        if t.starts_with("class ") || t.starts_with("instance ") {
-            Some(" where")
-        } else if t == "do" || t.ends_with(" do") {
-            Some("")
-        } else if t.starts_with("if ") || t.starts_with("else if ") {
-            Some(" then")
-        } else if t == "else" {
-            Some("")
-        } else if t.starts_with("case ") {
-            Some(" of")
-        } else {
-            None
-        }
+        haskell_block_open_from_condition_text(condition)
     }
 
     fn block_open_for_intent(&self, intent: BlockIntent, _condition: &str) -> Option<&str> {

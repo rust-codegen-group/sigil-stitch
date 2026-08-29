@@ -8,12 +8,18 @@ pub struct BuiltInLanguage {
     /// Primary file extension recognized by `FileSpec`.
     pub extension: &'static str,
     factory: fn() -> Box<dyn CodeLang>,
+    indented_factory: fn(&str) -> Box<dyn CodeLang>,
 }
 
 impl BuiltInLanguage {
     /// Construct a fresh adapter for this language.
     pub fn adapter(self) -> Box<dyn CodeLang> {
         (self.factory)()
+    }
+
+    /// Construct a fresh adapter with exact non-default indentation bytes.
+    pub fn adapter_with_indent(self, indent: &str) -> Box<dyn CodeLang> {
+        (self.indented_factory)(indent)
     }
 }
 
@@ -23,6 +29,11 @@ macro_rules! language {
             id: $id,
             extension: $extension,
             factory: || Box::new(<$path>::new()),
+            indented_factory: |indent| {
+                let mut language = <$path>::new();
+                language.indent = indent.to_string();
+                Box::new(language)
+            },
         }
     };
 }
@@ -96,5 +107,6 @@ fn registry_contains_every_builtin_once() {
             adapter_for(language.id).file_extension(),
             language.extension
         );
+        assert_eq!(language.adapter_with_indent("--->").indent_unit(), "--->");
     }
 }

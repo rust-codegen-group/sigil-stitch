@@ -2,12 +2,9 @@
 
 use super::*;
 use super::{direct::DirectAdapter, pretty::PrettyAdapter};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 use crate::code_block::{CodeBlock, StringLitArg, VerbatimStrArg};
 use crate::import::ImportGroup;
-use crate::lang::CodeLang;
 use crate::lang::config::BlockSyntaxConfig;
 use crate::lang::typescript::TypeScript;
 use crate::type_name::TypeName;
@@ -101,6 +98,85 @@ fn test_if_else() {
     let output = render_block(&builder.build().unwrap(), 80);
     assert!(output.contains("} else {"));
     assert!(output.contains("  return 0;"));
+}
+
+#[test]
+fn legacy_block_nodes_render_through_external_hooks_and_keyword_delimiters() {
+    #[derive(Debug)]
+    struct LegacyBlockLang;
+
+    impl RendererLang for LegacyBlockLang {
+        fn file_extension(&self) -> &str {
+            "legacy"
+        }
+
+        fn line_comment_prefix(&self) -> &str {
+            "//"
+        }
+
+        fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
+            BlockSyntaxConfig {
+                indent_unit: "  ",
+                uses_semicolons: true,
+                block_open: "<legacy-open>",
+                block_close: "<legacy-close>",
+                close_on_transition: true,
+                ..BlockSyntaxConfig::default()
+            }
+        }
+
+        fn block_open_for(&self, condition: &str) -> Option<&str> {
+            if condition.starts_with("if ") {
+                Some(" <legacy-if-open>")
+            } else if condition == "else" {
+                Some(" <legacy-else-open>")
+            } else {
+                None
+            }
+        }
+
+        fn block_close_for(&self, _condition: &str) -> Option<&str> {
+            Some("<legacy-close>")
+        }
+    }
+
+    let block = CodeBlock {
+        nodes: vec![
+            CodeNode::Literal("if legacy".to_string()),
+            CodeNode::BlockOpen("if legacy".to_string()),
+            CodeNode::Newline,
+            CodeNode::Indent,
+            CodeNode::Literal("first".to_string()),
+            CodeNode::StatementEnd,
+            CodeNode::Newline,
+            CodeNode::Dedent,
+            CodeNode::BranchClose("if legacy".to_string()),
+            CodeNode::Literal("else".to_string()),
+            CodeNode::BlockOpen("else".to_string()),
+            CodeNode::Newline,
+            CodeNode::Indent,
+            CodeNode::Literal("second".to_string()),
+            CodeNode::StatementEnd,
+            CodeNode::Newline,
+            CodeNode::Dedent,
+            CodeNode::BlockClose("else".to_string()),
+            CodeNode::Newline,
+        ],
+    };
+    let imports = ImportGroup::new();
+
+    assert_eq!(
+        CodeRenderer::new(&LegacyBlockLang, &imports, 80)
+            .render(&block)
+            .unwrap(),
+        "if legacy <legacy-if-open>\n  first;\n<legacy-close> else <legacy-else-open>\n  second;\n<legacy-close>\n"
+    );
+    assert_eq!(
+        CodeRenderer::new(&crate::lang::bash::Bash::new(), &imports, 80)
+            .render(&block)
+            .unwrap(),
+        "if legacy; then\n    first\nelse\n    second\nfi\n"
+    );
 }
 
 #[test]
@@ -399,59 +475,6 @@ fn pretty_adapter_reports_invalid_internal_operations() {
         Err(SigilStitchError::Render { context, .. })
             if context == "CodeRenderer pretty groups"
     ));
-}
-
-#[test]
-fn terminal_render_failure_stops_before_later_renderer_events() {
-    #[derive(Debug)]
-    struct FailingRenderLang(Rc<RefCell<Vec<&'static str>>>);
-
-    impl RendererLang for FailingRenderLang {
-        fn file_extension(&self) -> &str {
-            "test"
-        }
-
-        fn line_comment_prefix(&self) -> &str {
-            "//"
-        }
-
-        fn block_open_for_intent(&self, _intent: BlockIntent, _condition: &str) -> Option<&str> {
-            self.0.borrow_mut().push("open");
-            Some("{")
-        }
-
-        fn block_close_for_intent(&self, _intent: BlockIntent, _condition: &str) -> Option<&str> {
-            self.0.borrow_mut().push("close");
-            Some("}")
-        }
-    }
-
-    impl CodeLang for FailingRenderLang {}
-
-    let events = Rc::new(RefCell::new(Vec::new()));
-    let lang = FailingRenderLang(events.clone());
-    let imports = ImportGroup::new();
-    let renderer = CodeRenderer::new(&lang, &imports, 80);
-    let prepared = CodeBlock {
-        nodes: vec![
-            CodeNode::BlockOpenIntent {
-                condition: "if ready".to_string(),
-                intent: BlockIntent::If,
-            },
-            CodeNode::Dedent,
-            CodeNode::BlockCloseIntent {
-                condition: "if ready".to_string(),
-                intent: BlockIntent::If,
-            },
-        ],
-    };
-
-    assert!(matches!(
-        renderer.render_prepared(&prepared),
-        Err(SigilStitchError::Render { context, .. })
-            if context == "CodeRenderer direct indentation"
-    ));
-    assert_eq!(events.borrow().as_slice(), &["open"]);
 }
 
 #[test]

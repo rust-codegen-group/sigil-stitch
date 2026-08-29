@@ -12,11 +12,10 @@ Lowering](declaration_lowering.md) for the ownership decision and [0.6.8 Legacy
 Compatibility and Migration](legacy_compatibility_and_migration.md) for the
 versioned compatibility contract.
 
-The type-name-lowering pass, language-owned declaration-generic grammar, and
-complete-set fallible import resolver described here are implemented. The
-direct renderer-event methods remain an accepted 0.7 migration documented
-before implementation; the compatibility appendix records the shared renderer
-grammar still used before that cutover.
+The type-name-lowering pass, language-owned declaration-generic grammar,
+complete-set fallible import resolver, and direct renderer-event methods
+described here are implemented. The compatibility appendix records the frozen
+shared renderer grammar used only by 0.6.8 bridges.
 
 ## Pipeline and Ownership
 
@@ -102,11 +101,11 @@ target and is not a portable cross-language program.
 
 Each supported language implements both traits in its own module
 (`src/lang/typescript.rs`, etc.). Control-flow nodes carry a language-neutral
-`BlockIntent`; in the accepted renderer-event design, each adapter maps that
-intent locally through `render_block_open()`, `render_block_close()`, and
-`render_branch_transition()`. The current source retains intent-aware and
-legacy block hooks as the compatibility bridge; the accepted renderer-event
-interface replaces current-path reads of those hooks. Languages can
+`BlockIntent`; each adapter maps that intent locally through
+`render_block_open()`, `render_block_close()`, and
+`render_branch_transition()`. The renderer calls those complete events
+directly. Intent-aware and legacy block hooks remain only behind the provided
+0.6.8 compatibility defaults. Languages can
 implement `rewrite_nodes()` for structural or literal fixups such as Go IIFE
 `}()` fusion or C++ lambda `};` semicolons. The core invokes this existing
 source-tree seam once per source block after declaration lowering and before
@@ -503,7 +502,7 @@ not rewrite the tree or lower another type root:
 | `Newline` | Emit newline + indent |
 | `BlockOpenIntent` / `BlockCloseIntent` | Map `BlockIntent` + condition through `render_block_open()` / `render_block_close()` |
 | `BranchCloseIntent` | Ask `render_branch_transition()` for the complete outgoing closer and connector whitespace |
-| `BlockOpen` / `BlockClose` / `BranchClose` | Deprecated legacy string-only nodes for old serialized blocks and external adapters |
+| `BlockOpen` / `BlockClose` / `BranchClose` | Deprecated legacy string-only nodes retained for source construction, rendering, and unchanged external adapters; their Serde representation is not versioned |
 | `Sequence(children)` | Recursively render a sub-sequence of nodes |
 
 **Width-aware rendering**: One semantic walker interprets every prepared

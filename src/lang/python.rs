@@ -131,6 +131,14 @@ impl Python {
     }
 }
 
+fn python_block_open_from_condition_text(condition: &str) -> Option<&'static str> {
+    if condition.trim_end().ends_with(':') {
+        Some("")
+    } else {
+        None
+    }
+}
+
 const PYTHON_RESERVED: &[&str] = &[
     "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue",
     "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import",
@@ -233,6 +241,7 @@ fn is_stdlib(module: &str) -> bool {
     PYTHON_STDLIB.contains(&top)
 }
 
+#[deny(deprecated)]
 impl RendererLang for Python {
     fn lower_type_name(
         &self,
@@ -287,11 +296,7 @@ impl RendererLang for Python {
     }
 
     fn block_open_for(&self, condition: &str) -> Option<&str> {
-        if condition.trim_end().ends_with(':') {
-            Some("")
-        } else {
-            None
-        }
+        python_block_open_from_condition_text(condition)
     }
 
     fn block_open_for_intent(&self, _intent: BlockIntent, condition: &str) -> Option<&str> {
@@ -346,6 +351,38 @@ impl RendererLang for Python {
             context_bound_keyword: "",
             ..Default::default()
         }
+    }
+
+    fn indent_unit(&self) -> &str {
+        &self.indent
+    }
+
+    fn render_statement_end(&self) -> Result<&str, crate::error::SigilStitchError> {
+        Ok("")
+    }
+
+    fn render_block_open(
+        &self,
+        _intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        Ok(python_block_open_from_condition_text(condition).unwrap_or(":"))
+    }
+
+    fn render_block_close(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        Ok("")
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, crate::error::SigilStitchError> {
+        Ok(String::new())
     }
 
     #[expect(deprecated, reason = "0.6.8 compatibility implementation")]

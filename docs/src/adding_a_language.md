@@ -1,11 +1,9 @@
 # Adding a Language
 
-This guide uses the implemented complete type-name-lowering and fallible import
-resolution interfaces. The direct renderer-event methods remain an accepted
-0.7 target documented before implementation. The current source still exposes
-the compatibility-backed renderer methods described in the legacy appendix;
-those target-state renderer signatures are pseudocode contracts until their
-cutover lands.
+This guide uses the implemented complete type-name-lowering, fallible import
+resolution, and direct renderer-event interfaces. The current source still
+exposes compatibility-backed renderer defaults described in the legacy
+appendix, but new adapters implement the complete events directly.
 
 sigil-stitch supports new languages by implementing two traits: `RendererLang` (renderer-only methods) and `CodeLang` (spec-layer methods). `CodeLang` extends `RendererLang`, so implementing `CodeLang` requires both. If you only need `CodeBlock`-level rendering without specs, `RendererLang` alone is sufficient.
 
@@ -264,7 +262,7 @@ See the [legacy surface matrix](legacy_compatibility_and_migration.md#legacy-sur
 
 ### Renderer Events
 
-The accepted renderer requests five complete language-owned results:
+The renderer requests five complete language-owned results:
 
 ```text
 indent_unit() -> borrowed indentation bytes
@@ -548,10 +546,10 @@ impl CodeLang for YourLang {
 }
 ```
 
-This target-state walkthrough is intentionally ignored by rustdoc until the
-staged interfaces land. The runnable `CodeLang` rustdoc example in the crate
-compiles as part of `cargo test --doc`; use that current example as the
-executable contract while migrating.
+This abbreviated walkthrough is intentionally ignored by rustdoc because the
+hypothetical adapter omits complete helper implementations. The runnable
+`CodeLang` rustdoc example in the crate compiles as part of `cargo test --doc`;
+use that example as the executable contract while implementing an adapter.
 
 ### 2. Register the module
 

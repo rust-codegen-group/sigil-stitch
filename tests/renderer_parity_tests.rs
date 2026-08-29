@@ -1,5 +1,8 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::code_node::BlockIntent;
+use sigil_stitch::code_node::{BlockIntent, CodeNode};
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::{ImportEntry, ImportGroup};
 use sigil_stitch::lang::CodeLang;
@@ -17,6 +20,669 @@ fn languages() -> impl Iterator<Item = Box<dyn CodeLang>> {
     languages_registry::BUILT_IN_LANGUAGES
         .into_iter()
         .map(|language| language.adapter())
+}
+
+#[derive(Clone, Copy)]
+struct RendererIntentCase {
+    intent: BlockIntent,
+    condition: &'static str,
+}
+
+const RENDERER_INTENT_CASES: &[RendererIntentCase] = &[
+    RendererIntentCase {
+        intent: BlockIntent::Generic,
+        condition: "custom block",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::If,
+        condition: "if ready",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::ElseIf,
+        condition: "elif ready",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Else,
+        condition: "else",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::For,
+        condition: "for item",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::While,
+        condition: "while ready",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Until,
+        condition: "until ready",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Case,
+        condition: "case value",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Match,
+        condition: "match value",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Try,
+        condition: "try value",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Class,
+        condition: "class Widget",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Instance,
+        condition: "instance Widget",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Module,
+        condition: "module Widget",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::ModuleType,
+        condition: "module type Widget",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Do,
+        condition: "do",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Function,
+        condition: "function call",
+    },
+    RendererIntentCase {
+        intent: BlockIntent::Lambda,
+        condition: "lambda value",
+    },
+];
+
+#[derive(Clone, Copy)]
+struct ExpectedRendererEvents {
+    indent: &'static str,
+    statement_end: &'static str,
+    block_open: &'static str,
+    block_close: &'static str,
+    branch_transition: &'static str,
+}
+
+fn expected_renderer_events(language: &str, intent: BlockIntent) -> ExpectedRendererEvents {
+    let (indent, statement_end, default_open, default_close, default_transition) = match language {
+        "bash" => ("    ", "", " {", "}", ""),
+        "c" => ("    ", ";", " {", "}", "} "),
+        "cpp" => ("    ", ";", " {", "}", "} "),
+        "csharp" => ("    ", ";", " {", "}", "} "),
+        "dart" => ("  ", ";", " {", "}", "} "),
+        "go" => ("\t", "", " {", "}", "} "),
+        "haskell" => ("  ", "", " =", "", ""),
+        "java" => ("    ", ";", " {", "}", "} "),
+        "javascript" => ("  ", ";", " {", "}", "} "),
+        "kotlin" => ("    ", "", " {", "}", "} "),
+        "lua" => ("  ", "", "", "end", ""),
+        "ocaml" => ("  ", "", " =", "", ""),
+        "php" => ("    ", ";", " {", "}", "} "),
+        "python" => ("    ", "", ":", "", ""),
+        "ruby" => ("  ", "", "", "end", ""),
+        "rust" => ("    ", ";", " {", "}", "} "),
+        "scala" => ("  ", "", " {", "}", "} "),
+        "swift" => ("    ", "", " {", "}", "} "),
+        "typescript" => ("  ", ";", " {", "}", "} "),
+        "zsh" => ("    ", "", " {", "}", ""),
+        _ => panic!("missing renderer-event expectations for {language}"),
+    };
+
+    let (block_open, block_close, branch_transition) = match (language, intent) {
+        ("bash", BlockIntent::If | BlockIntent::ElseIf) => ("; then", "fi", ""),
+        ("bash", BlockIntent::Else) => ("", "}", ""),
+        ("bash", BlockIntent::For | BlockIntent::While | BlockIntent::Until) => {
+            ("; do", "done", "")
+        }
+        ("bash", BlockIntent::Case) => (" in", "esac", ""),
+        ("haskell", BlockIntent::Class | BlockIntent::Instance) => (" where", "", ""),
+        ("haskell", BlockIntent::Do | BlockIntent::Else) => ("", "", ""),
+        ("haskell", BlockIntent::If | BlockIntent::ElseIf) => (" then", "", ""),
+        ("haskell", BlockIntent::Case) => (" of", "", ""),
+        ("lua", BlockIntent::If | BlockIntent::ElseIf) => (" then", "end", ""),
+        ("lua", BlockIntent::For | BlockIntent::While) => (" do", "end", ""),
+        ("ocaml", BlockIntent::ModuleType) => (" = sig", "end", "end "),
+        ("ocaml", BlockIntent::Module) => (" = struct", "end", "end "),
+        ("ocaml", BlockIntent::Match | BlockIntent::Try | BlockIntent::Else) => ("", "", ""),
+        ("ocaml", BlockIntent::If | BlockIntent::ElseIf) => (" then", "", ""),
+        ("ocaml", BlockIntent::For | BlockIntent::While) => (" do", "done", "done "),
+        ("zsh", BlockIntent::If | BlockIntent::ElseIf) => ("; then", "fi", ""),
+        ("zsh", BlockIntent::Else) => ("", "}", ""),
+        ("zsh", BlockIntent::For | BlockIntent::While | BlockIntent::Until) => ("; do", "done", ""),
+        ("zsh", BlockIntent::Case) => (" in", "esac", ""),
+        _ => (default_open, default_close, default_transition),
+    };
+
+    ExpectedRendererEvents {
+        indent,
+        statement_end,
+        block_open,
+        block_close,
+        branch_transition,
+    }
+}
+
+#[test]
+fn every_builtin_owns_complete_renderer_events() {
+    for descriptor in languages_registry::BUILT_IN_LANGUAGES {
+        let language = descriptor.adapter();
+        for case in RENDERER_INTENT_CASES {
+            let expected = expected_renderer_events(descriptor.id, case.intent);
+            let context = format!("{} {:?}", descriptor.id, case.intent);
+            assert_eq!(language.indent_unit(), expected.indent, "{context}");
+            assert_eq!(
+                language.render_statement_end().unwrap(),
+                expected.statement_end,
+                "{context}"
+            );
+            assert_eq!(
+                language
+                    .render_block_open(case.intent, case.condition)
+                    .unwrap(),
+                expected.block_open,
+                "{context}"
+            );
+            assert_eq!(
+                language
+                    .render_block_close(case.intent, case.condition)
+                    .unwrap(),
+                expected.block_close,
+                "{context}"
+            );
+            assert_eq!(
+                language
+                    .render_branch_transition(case.intent, case.condition)
+                    .unwrap(),
+                expected.branch_transition,
+                "{context}"
+            );
+        }
+    }
+}
+
+fn renderer_intent_block(
+    case: RendererIntentCase,
+    include_transition: bool,
+    soft_break: bool,
+) -> CodeBlock {
+    let mut block = CodeBlock::builder();
+    block.begin_control_flow_with_intent(case.intent, case.condition, ());
+    if soft_break {
+        block.add_statement("call(alpha,%Wbeta)", ());
+    } else {
+        block.add_statement("call(alpha, beta)", ());
+    }
+    if include_transition {
+        block.next_control_flow_with_intent(BlockIntent::Else, "else", ());
+        block.add_statement("fallback()", ());
+    }
+    block.end_control_flow();
+    block.build().unwrap()
+}
+
+fn expected_renderer_intent_output(
+    language: &str,
+    case: RendererIntentCase,
+    include_transition: bool,
+    indent: &str,
+) -> String {
+    let events = expected_renderer_events(language, case.intent);
+    let rendered_close = if language == "cpp" && case.intent == BlockIntent::Lambda {
+        format!("{};", events.block_close)
+    } else {
+        events.block_close.to_string()
+    };
+    if include_transition {
+        let incoming = expected_renderer_events(language, BlockIntent::Else);
+        format!(
+            "{}{}\n{}call(alpha, beta){}\n{}else{}\n{}fallback(){}\n{}\n",
+            case.condition,
+            events.block_open,
+            indent,
+            events.statement_end,
+            events.branch_transition,
+            incoming.block_open,
+            indent,
+            events.statement_end,
+            rendered_close,
+        )
+    } else {
+        format!(
+            "{}{}\n{}call(alpha, beta){}\n{}\n",
+            case.condition, events.block_open, indent, events.statement_end, rendered_close,
+        )
+    }
+}
+
+#[test]
+fn every_builtin_renders_the_exact_intent_matrix_on_both_adapters() {
+    for descriptor in languages_registry::BUILT_IN_LANGUAGES {
+        let language = descriptor.adapter();
+        for case in RENDERER_INTENT_CASES {
+            for include_transition in [false, true] {
+                let expected = expected_renderer_intent_output(
+                    descriptor.id,
+                    *case,
+                    include_transition,
+                    expected_renderer_events(descriptor.id, case.intent).indent,
+                );
+                let context = format!(
+                    "{} {:?} transition={include_transition}",
+                    descriptor.id, case.intent
+                );
+                let direct = renderer_intent_block(*case, include_transition, false)
+                    .render_standalone(language.as_ref(), 240)
+                    .unwrap();
+                assert_eq!(direct, expected, "direct {context}");
+
+                let pretty = renderer_intent_block(*case, include_transition, true)
+                    .render_standalone(language.as_ref(), 240)
+                    .unwrap();
+                assert_eq!(pretty, expected, "pretty {context}");
+            }
+        }
+    }
+}
+
+#[test]
+fn every_builtin_renders_language_owned_non_default_indentation() {
+    const SENTINEL_INDENT: &str = "--->";
+    let case = RendererIntentCase {
+        intent: BlockIntent::If,
+        condition: "if ready",
+    };
+
+    for descriptor in languages_registry::BUILT_IN_LANGUAGES {
+        let language = descriptor.adapter_with_indent(SENTINEL_INDENT);
+        let expected = expected_renderer_intent_output(descriptor.id, case, true, SENTINEL_INDENT);
+
+        assert_eq!(language.indent_unit(), SENTINEL_INDENT, "{}", descriptor.id);
+        assert_eq!(
+            renderer_intent_block(case, true, false)
+                .render_standalone(language.as_ref(), 240)
+                .unwrap(),
+            expected,
+            "direct {}",
+            descriptor.id,
+        );
+        assert_eq!(
+            renderer_intent_block(case, true, true)
+                .render_standalone(language.as_ref(), 240)
+                .unwrap(),
+            expected,
+            "pretty {}",
+            descriptor.id,
+        );
+    }
+}
+
+#[derive(Debug)]
+struct CompleteExternalRenderer;
+
+impl sigil_stitch::lang::RendererLang for CompleteExternalRenderer {
+    fn file_extension(&self) -> &str {
+        "complete"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn indent_unit(&self) -> &str {
+        "--"
+    }
+
+    fn render_statement_end(&self) -> Result<&str, SigilStitchError> {
+        Ok(";")
+    }
+
+    fn render_block_open(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        Ok("<")
+    }
+
+    fn render_block_close(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        Ok(">")
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, SigilStitchError> {
+        Ok("> ".to_string())
+    }
+}
+
+impl CodeLang for CompleteExternalRenderer {}
+
+fn complete_external_renderer_block(soft_break: bool) -> CodeBlock {
+    let mut block = CodeBlock::builder();
+    block.add_statement("first", ());
+    block.begin_control_flow_with_intent(BlockIntent::If, "if ready", ());
+    if soft_break {
+        block.add_statement("call(%Wvalue)", ());
+    } else {
+        block.add_statement("call( value)", ());
+    }
+    block.next_control_flow("else", ());
+    block.add_statement("second", ());
+    block.end_control_flow();
+    block.build().unwrap()
+}
+
+#[test]
+fn complete_external_renderer_uses_only_language_owned_events() {
+    let language = CompleteExternalRenderer;
+    let direct = complete_external_renderer_block(false)
+        .render_standalone(&language, 120)
+        .unwrap();
+    let pretty = complete_external_renderer_block(true)
+        .render_standalone(&language, 120)
+        .unwrap();
+    assert_eq!(pretty, direct);
+    assert_eq!(
+        direct,
+        "first;\nif ready<\n--call( value);\n> else<\n--second;\n>\n"
+    );
+
+    let narrow = complete_external_renderer_block(true)
+        .render_standalone(&language, 8)
+        .unwrap();
+    assert!(narrow.contains("call(\n--value)"), "{narrow}");
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecordedRendererEvent {
+    Statement,
+    Open,
+    Transition,
+    Close,
+}
+
+impl RecordedRendererEvent {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Statement => "statement",
+            Self::Open => "open",
+            Self::Transition => "transition",
+            Self::Close => "close",
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RecordingExternalRenderer {
+    events: Rc<RefCell<Vec<RecordedRendererEvent>>>,
+}
+
+impl sigil_stitch::lang::RendererLang for RecordingExternalRenderer {
+    fn file_extension(&self) -> &str {
+        "recording"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn indent_unit(&self) -> &str {
+        "  "
+    }
+
+    fn render_statement_end(&self) -> Result<&str, SigilStitchError> {
+        self.events
+            .borrow_mut()
+            .push(RecordedRendererEvent::Statement);
+        Ok(";")
+    }
+
+    fn render_block_open(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        self.events.borrow_mut().push(RecordedRendererEvent::Open);
+        Ok(" {")
+    }
+
+    fn render_block_close(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        self.events.borrow_mut().push(RecordedRendererEvent::Close);
+        Ok("}")
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, SigilStitchError> {
+        self.events
+            .borrow_mut()
+            .push(RecordedRendererEvent::Transition);
+        Ok("} ".to_string())
+    }
+}
+
+impl CodeLang for RecordingExternalRenderer {}
+
+fn recorded_branch(label: &str, soft_break: bool) -> CodeBlock {
+    let condition = if soft_break {
+        format!("{label}%Wcondition")
+    } else {
+        format!("{label} condition")
+    };
+    let mut block = CodeBlock::builder();
+    block.begin_control_flow_with_intent(BlockIntent::If, &condition, ());
+    block.add_statement("first", ());
+    block.next_control_flow_with_intent(BlockIntent::Else, "else", ());
+    block.add_statement("second", ());
+    block.end_control_flow();
+    block.build().unwrap()
+}
+
+fn nested_and_sequenced_event_block(soft_break: bool) -> CodeBlock {
+    let nested = recorded_branch("nested", soft_break);
+    let mut sequenced = recorded_branch("sequence", false);
+    let sequence_nodes = std::mem::take(sequenced.nodes_mut());
+
+    let mut root = CodeBlock::builder();
+    root.add_code(nested);
+    let mut root = root.build().unwrap();
+    root.nodes_mut().push(CodeNode::Sequence(sequence_nodes));
+    root
+}
+
+#[test]
+fn public_nested_and_sequence_blocks_preserve_renderer_event_order() {
+    let expected_events = [
+        RecordedRendererEvent::Open,
+        RecordedRendererEvent::Statement,
+        RecordedRendererEvent::Transition,
+        RecordedRendererEvent::Open,
+        RecordedRendererEvent::Statement,
+        RecordedRendererEvent::Close,
+        RecordedRendererEvent::Open,
+        RecordedRendererEvent::Statement,
+        RecordedRendererEvent::Transition,
+        RecordedRendererEvent::Open,
+        RecordedRendererEvent::Statement,
+        RecordedRendererEvent::Close,
+    ];
+    let expected_wide = "nested condition {\n  first;\n} else {\n  second;\n}\nsequence condition {\n  first;\n} else {\n  second;\n}\n";
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let language = RecordingExternalRenderer {
+        events: events.clone(),
+    };
+
+    assert_eq!(
+        nested_and_sequenced_event_block(false)
+            .render_standalone(&language, 80)
+            .unwrap(),
+        expected_wide,
+    );
+    assert_eq!(events.borrow().as_slice(), expected_events);
+
+    events.borrow_mut().clear();
+    let pretty = nested_and_sequenced_event_block(true);
+    assert_eq!(
+        pretty.render_standalone(&language, 80).unwrap(),
+        expected_wide,
+    );
+    assert_eq!(events.borrow().as_slice(), expected_events);
+
+    events.borrow_mut().clear();
+    assert_eq!(
+        pretty.render_standalone(&language, 10).unwrap(),
+        "nested\ncondition {\n  first;\n} else {\n  second;\n}\nsequence condition {\n  first;\n} else {\n  second;\n}\n",
+    );
+    assert_eq!(events.borrow().as_slice(), expected_events);
+}
+
+#[derive(Debug)]
+struct FailingExternalRenderer {
+    events: Rc<RefCell<Vec<RecordedRendererEvent>>>,
+    failing_event: RecordedRendererEvent,
+}
+
+impl FailingExternalRenderer {
+    fn record(&self, event: RecordedRendererEvent) -> Result<(), SigilStitchError> {
+        self.events.borrow_mut().push(event);
+        if self.failing_event == event {
+            Err(SigilStitchError::Render {
+                context: event.label().to_string(),
+                message: "intentional renderer event failure".to_string(),
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl sigil_stitch::lang::RendererLang for FailingExternalRenderer {
+    fn file_extension(&self) -> &str {
+        "failing"
+    }
+
+    fn line_comment_prefix(&self) -> &str {
+        "//"
+    }
+
+    fn indent_unit(&self) -> &str {
+        "  "
+    }
+
+    fn render_statement_end(&self) -> Result<&str, SigilStitchError> {
+        self.record(RecordedRendererEvent::Statement)?;
+        Ok(";")
+    }
+
+    fn render_block_open(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        self.record(RecordedRendererEvent::Open)?;
+        Ok(" {")
+    }
+
+    fn render_block_close(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        self.record(RecordedRendererEvent::Close)?;
+        Ok("}")
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, SigilStitchError> {
+        self.record(RecordedRendererEvent::Transition)?;
+        Ok("} ".to_string())
+    }
+}
+
+impl CodeLang for FailingExternalRenderer {}
+
+fn fallible_renderer_event_block(soft_break: bool) -> CodeBlock {
+    let mut block = CodeBlock::builder();
+    if soft_break {
+        block.add("prefix%W", ());
+    } else {
+        block.add("prefix ", ());
+    }
+    block.add_statement("before", ());
+    block.begin_control_flow_with_intent(BlockIntent::If, "if ready", ());
+    block.next_control_flow_with_intent(BlockIntent::Else, "else", ());
+    block.end_control_flow();
+    block.build().unwrap()
+}
+
+#[test]
+fn public_rendering_stops_at_the_first_renderer_event_failure() {
+    for soft_break in [false, true] {
+        for (failing_event, expected_events) in [
+            (
+                RecordedRendererEvent::Statement,
+                vec![RecordedRendererEvent::Statement],
+            ),
+            (
+                RecordedRendererEvent::Open,
+                vec![
+                    RecordedRendererEvent::Statement,
+                    RecordedRendererEvent::Open,
+                ],
+            ),
+            (
+                RecordedRendererEvent::Transition,
+                vec![
+                    RecordedRendererEvent::Statement,
+                    RecordedRendererEvent::Open,
+                    RecordedRendererEvent::Transition,
+                ],
+            ),
+            (
+                RecordedRendererEvent::Close,
+                vec![
+                    RecordedRendererEvent::Statement,
+                    RecordedRendererEvent::Open,
+                    RecordedRendererEvent::Transition,
+                    RecordedRendererEvent::Open,
+                    RecordedRendererEvent::Close,
+                ],
+            ),
+        ] {
+            let events = Rc::new(RefCell::new(Vec::new()));
+            let language = FailingExternalRenderer {
+                events: events.clone(),
+                failing_event,
+            };
+
+            assert!(matches!(
+                fallible_renderer_event_block(soft_break).render_standalone(&language, 80),
+                Err(SigilStitchError::Render { context, .. })
+                    if context == failing_event.label()
+            ));
+            assert_eq!(events.borrow().as_slice(), expected_events);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -693,7 +1359,6 @@ fn every_builtin_validates_resolved_aliases_against_its_import_form() {
 }
 
 #[test]
-#[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
 fn direct_and_pretty_adapters_preserve_all_language_indentation() {
     let direct = CodeBlock::of("call(alpha, beta)\n%>body%<", ()).unwrap();
     let pretty = CodeBlock::of("call(%>alpha,%Wbeta%<)\n%>body%<", ()).unwrap();
@@ -709,7 +1374,7 @@ fn direct_and_pretty_adapters_preserve_all_language_indentation() {
         );
 
         let narrow = pretty.render_standalone(lang.as_ref(), 8).unwrap();
-        let indent = lang.block_syntax().indent_unit;
+        let indent = lang.indent_unit();
         assert!(
             narrow.contains(&format!("\n{indent}beta)")),
             "wrapped argument lost indentation for .{}:\n{narrow}",
@@ -821,7 +1486,7 @@ fn language_rewrites_run_before_the_pretty_adapter() {
     assert!(lua_output.contains("object:method() next"), "{lua_output}");
 }
 
-fn if_intent_block(soft_break: bool) -> CodeBlock {
+fn if_else_intent_block(soft_break: bool) -> CodeBlock {
     let mut block = CodeBlock::builder();
     block.begin_control_flow_with_intent(BlockIntent::If, "if (x > 0)", ());
     if soft_break {
@@ -829,15 +1494,16 @@ fn if_intent_block(soft_break: bool) -> CodeBlock {
     } else {
         block.add_statement("call(alpha, beta)", ());
     }
+    block.next_control_flow_with_intent(BlockIntent::Else, "else", ());
+    block.add_statement("fallback()", ());
     block.end_control_flow();
     block.build().unwrap()
 }
 
 #[test]
-#[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
-fn intent_blocks_match_across_direct_and_pretty_adapters() {
-    let direct = if_intent_block(false);
-    let pretty = if_intent_block(true);
+fn intent_block_transitions_match_across_direct_and_pretty_adapters() {
+    let direct = if_else_intent_block(false);
+    let pretty = if_else_intent_block(true);
 
     for lang in languages() {
         let wide_direct = direct.render_standalone(lang.as_ref(), 240).unwrap();
@@ -850,7 +1516,7 @@ fn intent_blocks_match_across_direct_and_pretty_adapters() {
         );
 
         let narrow = pretty.render_standalone(lang.as_ref(), 8).unwrap();
-        let indent = lang.block_syntax().indent_unit;
+        let indent = lang.indent_unit();
         assert!(
             narrow.contains(&format!("\n{indent}beta)")),
             "wrapped intent block body lost indentation for .{}:\n{narrow}",

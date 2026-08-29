@@ -132,7 +132,6 @@ fn append_suffixes(signature: &mut SignatureBuilder, function: ValidatedFunction
     }
 }
 
-#[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
 fn append_where_constraints(
     signature: &mut SignatureBuilder,
     lang: &CSharp,
@@ -147,7 +146,7 @@ fn append_where_constraints(
         }
         emitted = true;
         signature.push_literal("\n");
-        signature.push_literal(lang.block_syntax().indent_unit);
+        signature.push_literal(lang.indent_unit());
         signature.push_literal("where ");
         signature.push_literal(type_param.name());
         signature.push_literal(" : ");

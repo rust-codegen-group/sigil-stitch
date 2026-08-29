@@ -66,9 +66,12 @@ type-presentation bridge for external adapters written against 0.6.8.
 
 Complete-set fallible import resolution and language-local quote handling are
 also implemented. Built-in declaration-generic grammar has moved out of
-`GenericSyntaxConfig`; only direct renderer events still need to move out of
-`BlockSyntaxConfig`. The source-read inventory below names each remaining
-reader and the behavior that retires its current-path use.
+`GenericSyntaxConfig`. Final rendering now calls `indent_unit()`,
+`render_statement_end()`, `render_block_open()`, `render_block_close()`, and
+`render_branch_transition()` directly. Every built-in adapter owns all five
+operations. Their provided defaults are the only renderer path that interprets
+legacy block configuration and hooks for an unchanged 0.6.8 external adapter.
+The source-read inventory below names each retained compatibility reader.
 
 The provided external-adapter lowerers remain private implementation details.
 They freeze 0.6.8 behavior; they are not examples for new adapters.
@@ -86,8 +89,8 @@ inventory whenever a reader moves behind a frozen compatibility boundary.
 | `RendererLang::module_separator()` | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only qualified-name grammar | Built-ins own qualified-name spelling; the old accessor remains only in the frozen type bridge and direct facade |
 | `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in type rendering | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only type grammar | Built-ins own generic type application locally; the frozen bridge and direct facade retain the old delimiters and placement |
 | `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in declarations | `src/spec/where_spec.rs`, `src/lang/function_lowering/compatibility.rs`, `src/lang/type_lowering/compatibility.rs`, `src/lang/compatibility_markers.rs`, and the deprecated direct newtype facades in `src/lang/{go,kotlin,scala}.rs` | Compatibility-only declaration grammar | Built-in complete lowerers own type-parameter, bound, lifetime, kind, context-bound, and constraint-clause grammar; the named compatibility modules and direct facades retain the frozen 0.6.8 read |
-| `BlockSyntaxConfig::indent_unit` | `src/code_renderer.rs`, `src/spec/where_spec.rs`, and `src/lang/csharp_function_lowering.rs` | Renderer mechanics when indenting; compatibility declaration layout in `where_spec`; one remaining built-in declaration-layout read in C# | Renderer events route renderer mechanics through `indent_unit()` and move the C# layout byte to the target-owned indentation operation; compatibility lowerers retain their bridge reads |
-| `BlockSyntaxConfig::{uses_semicolons, block_open, block_close, close_on_transition}` | `src/code_renderer.rs` and `src/lang/typescript_function_lowering.rs`; the field, function, property, and type compatibility modules also read them | Language-owned renderer-event or declaration grammar in current built-in paths; compatibility-only grammar in compatibility modules | Renderer events replace current renderer reads; complete declaration lowerers own built-in grammar, while frozen compatibility modules continue to interpret old adapters |
+| `BlockSyntaxConfig::indent_unit` | `src/spec/where_spec.rs` reads it only in deprecated direct where-clause helpers; compatibility lowerers and the provided renderer-event defaults retain their bridge reads | Compatibility-only declaration and renderer behavior | `indent_unit()` owns final-renderer indentation and built-in declaration lowerers use target-local indentation; compatibility paths retain the frozen field |
+| `BlockSyntaxConfig::{uses_semicolons, block_open, block_close, close_on_transition}` | Only compatibility lowerers and the provided renderer-event defaults consume these fields in production | Compatibility-only renderer and declaration grammar | Complete renderer events and declaration lowerers own built-in grammar; frozen compatibility paths continue to interpret old adapters |
 | `BlockSyntaxConfig::{field_terminator, type_close_terminator, bases_close}` | Only `src/lang/field_lowering/compatibility.rs` and `src/lang/type_lowering/compatibility.rs` consume these fields in production | Compatibility-only declaration grammar | No current replacement config; complete declaration lowerers own these bytes locally and the old fields remain frozen |
 | `FunctionSyntaxConfig`, `OptionalFieldStyle`, `PropertyStyle`, and `property_getter_keyword()` | The function, field, property, and type compatibility modules consume the applicable surfaces | Compatibility-only declaration grammar | Already outside built-in complete lowerers; retain only for the deprecated 0.6.8 bridge |
 | `TypeDeclSyntaxConfig` | The function, field, property, and type compatibility modules read it; deprecated `ParameterSpec::emit_into()` also reads it for the direct 0.6.8 parameter facade | Compatibility-only declaration grammar | Complete built-in lowerers already own these bytes; retain the reads only in frozen compatibility modules and the deprecated direct facade |
@@ -96,7 +99,8 @@ inventory whenever a reader moves behind a frozen compatibility boundary.
 
 Built-in unit tests that directly inspect config-return values are temporary
 migration expectations, not additional production readers.
-`tests/renderer_parity_tests.rs` also protects legacy indentation compatibility;
+`tests/renderer_parity_tests.rs` protects the exact built-in renderer-event
+matrix, direct/pretty parity, and legacy indentation compatibility;
 the field/property custom-adapter tests exercise compatibility defaults; and
 `tests/assert_quote_tests.rs` plus the three language unit suites protect the
 quote shim. Definitions and overrides under `src/lang/*.rs` remain until the
@@ -118,7 +122,7 @@ corresponding compatibility surface can be removed in a future major version.
 | Properties | `property_style()`, `property_getter_keyword()`, `PropertyStyle` | The provided `lower_property()` freezes the old property emitter | `PropertyContext`, property capabilities, and complete `lower_property()` |
 | Variants | `VariantContext`, `.value()`, `VariantValueFormat`, `variants_before_fields` | Only permissive external adapters retain ownerless positional lowering; strict built-ins require an owner and complete sequence | Add variants to `TypeSpec`; use `.discriminant()` or `.constructor_argument()` |
 | Variant payload builders | `.associated_type()`, `.add_field()` | Deprecated aliases remain available | `.positional_payload()`, `.record_payload_field()` |
-| Renderer events and block nodes | `block_syntax()`, `BlockSyntaxConfig`, `block_open_for()`, `block_close_for()`, intent-aware bridge hooks, and legacy serialized block nodes | Provided event defaults interpret old config and hooks; old nodes and external adapters remain renderable | `BlockIntent`, `indent_unit()`, `render_statement_end()`, `render_block_open()`, `render_block_close()`, and `render_branch_transition()` |
+| Renderer events and block nodes | `block_syntax()`, `BlockSyntaxConfig`, `block_open_for()`, `block_close_for()`, intent-aware bridge hooks, and legacy string-only block nodes | Provided event defaults interpret old config and hooks; old nodes remain source-constructible and renderable, unchanged external adapters remain compatible, and no versioned Serde representation is promised | `BlockIntent`, `indent_unit()`, `render_statement_end()`, `render_block_open()`, `render_block_close()`, and `render_branch_transition()` |
 
 Direct `FieldSpec::emit()` and `PropertySpec::emit()` remain public facades. Their
 `DeclarationContext` input is retained only as a compatibility payload. Prefer
@@ -130,12 +134,11 @@ affect validity.
 The legacy structs mix renderer mechanics with type-expression and declaration
 grammar. Built-in type-name and declaration lowering no longer read
 `type_presentation()` or `generic_syntax()`; only the frozen external-adapter
-bridges and direct compatibility facades do. Current renderer paths still read
-`block_syntax()` where listed above. Complete language-local lowerers own type
-and declaration grammar, while direct renderer-event methods plus
-`indent_unit()` replace final-renderer reads. Frozen compatibility lowerers may
-continue interpreting the old values; none of these structs receives new
-fields or variants.
+bridges and direct compatibility facades do. Final renderer paths no longer
+read `block_syntax()`. Complete language-local lowerers own type and declaration
+grammar, while direct renderer-event methods plus `indent_unit()` own final
+rendering. Frozen compatibility defaults and lowerers may continue interpreting
+the old values; none of these structs receives new fields or variants.
 
 ### `TypePresentationConfig` and `GenericSyntaxConfig`
 

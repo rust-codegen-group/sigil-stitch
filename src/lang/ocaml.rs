@@ -41,6 +41,39 @@ fn ocaml_block_close_for_intent(intent: BlockIntent) -> Option<&'static str> {
     }
 }
 
+fn ocaml_block_open_from_condition_text(condition: &str) -> Option<&'static str> {
+    let trimmed = condition.trim();
+    if trimmed.starts_with("module type ") {
+        Some(" = sig")
+    } else if trimmed.starts_with("module ") {
+        Some(" = struct")
+    } else if trimmed.starts_with("match ")
+        || trimmed.starts_with("try ")
+        || trimmed.ends_with(" with")
+    {
+        Some("")
+    } else if trimmed.starts_with("if ") || trimmed.starts_with("else if ") {
+        Some(" then")
+    } else if trimmed == "else" {
+        Some("")
+    } else if trimmed.starts_with("for ") || trimmed.starts_with("while ") {
+        Some(" do")
+    } else {
+        None
+    }
+}
+
+fn ocaml_block_close_from_condition_text(condition: &str) -> Option<&'static str> {
+    let trimmed = condition.trim();
+    if trimmed.starts_with("module type ") || trimmed.starts_with("module ") {
+        Some("end")
+    } else if trimmed.starts_with("for ") || trimmed.starts_with("while ") {
+        Some("done")
+    } else {
+        None
+    }
+}
+
 /// OCaml language implementation.
 ///
 /// OCaml-specific behaviors:
@@ -154,6 +187,7 @@ const OCAML_RESERVED: &[&str] = &[
     "virtual", "when", "while", "with",
 ];
 
+#[deny(deprecated)]
 impl RendererLang for OCaml {
     fn lower_type_name(
         &self,
@@ -233,6 +267,53 @@ impl RendererLang for OCaml {
         }
     }
 
+    fn indent_unit(&self) -> &str {
+        &self.indent
+    }
+
+    fn render_statement_end(&self) -> Result<&str, SigilStitchError> {
+        Ok("")
+    }
+
+    fn render_block_open(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        let open = if intent == BlockIntent::Generic {
+            ocaml_block_open_from_condition_text(condition)
+        } else {
+            ocaml_block_open_for_intent(intent)
+        };
+        Ok(open.unwrap_or(" ="))
+    }
+
+    fn render_block_close(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        let close = if intent == BlockIntent::Generic {
+            ocaml_block_close_from_condition_text(condition)
+        } else {
+            ocaml_block_close_for_intent(intent)
+        };
+        Ok(close.unwrap_or(""))
+    }
+
+    fn render_branch_transition(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<String, SigilStitchError> {
+        let close = self.render_block_close(intent, condition)?;
+        if close.is_empty() {
+            Ok(String::new())
+        } else {
+            Ok(format!("{close} "))
+        }
+    }
+
     #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
@@ -246,33 +327,11 @@ impl RendererLang for OCaml {
     }
 
     fn block_open_for(&self, condition: &str) -> Option<&str> {
-        let t = condition.trim();
-        if t.starts_with("module type ") {
-            Some(" = sig")
-        } else if t.starts_with("module ") {
-            Some(" = struct")
-        } else if t.starts_with("match ") || t.starts_with("try ") || t.ends_with(" with") {
-            Some("")
-        } else if t.starts_with("if ") || t.starts_with("else if ") {
-            Some(" then")
-        } else if t == "else" {
-            Some("")
-        } else if t.starts_with("for ") || t.starts_with("while ") {
-            Some(" do")
-        } else {
-            None
-        }
+        ocaml_block_open_from_condition_text(condition)
     }
 
     fn block_close_for(&self, condition: &str) -> Option<&str> {
-        let t = condition.trim();
-        if t.starts_with("module type ") || t.starts_with("module ") {
-            Some("end")
-        } else if t.starts_with("for ") || t.starts_with("while ") {
-            Some("done")
-        } else {
-            None
-        }
+        ocaml_block_close_from_condition_text(condition)
     }
 
     fn block_open_for_intent(&self, intent: BlockIntent, _condition: &str) -> Option<&str> {
