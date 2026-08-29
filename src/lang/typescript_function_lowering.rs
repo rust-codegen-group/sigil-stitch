@@ -142,7 +142,6 @@ fn append_suffixes(signature: &mut SignatureBuilder, function: ValidatedFunction
     }
 }
 
-#[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
 fn finish(
     block: &mut CodeBlockBuilder,
     mut signature: SignatureBuilder,
@@ -150,8 +149,9 @@ fn finish(
     function: ValidatedFunction<'_>,
 ) -> Result<(), SigilStitchError> {
     let Some(body) = function.body() else {
-        if lang.block_syntax().uses_semicolons {
-            signature.push_literal(";");
+        let suffix = lang.render_statement_end()?;
+        if !suffix.is_empty() {
+            signature.push_literal(suffix);
         }
         signature.append_to(block);
         block.add_line();

@@ -708,12 +708,14 @@ sigil_quote!(TypeScript {
 ## Context-Aware Block Delimiters
 
 The parser classifies each `{ ... }` header into a language-neutral
-`BlockIntent`. In the accepted 0.7 renderer, the selected adapter maps that
-intent through complete `render_block_open()`, `render_block_close()`, and
-`render_branch_transition()` operations. The current source routes the same
-intent through the frozen `block_syntax()` and block-hook bridge until the
-renderer-event migration lands. For example, Bash maps `if` to `then`/`fi` and
-`for` to `do`/`done`, while Haskell maps `class` to `where`:
+`BlockIntent`. The selected adapter maps that intent through complete
+`render_block_open()`, `render_block_close()`, and
+`render_branch_transition()` operations. The frozen `block_syntax()` and
+block-hook bridge remains only behind the provided defaults for unchanged 0.6.8
+external adapters. Legacy nodes remain renderable through the selected
+adapter's complete operations; built-ins do not use those defaults. For
+example, Bash maps `if` to `then`/`fi` and `for` to `do`/`done`, while Haskell
+maps `class` to `where`:
 
 ```rust
 # extern crate sigil_stitch;

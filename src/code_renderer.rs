@@ -44,8 +44,7 @@ impl<'a> CodeRenderer<'a> {
 
     pub(crate) fn render_prepared(&self, block: &CodeBlock) -> Result<String, SigilStitchError> {
         let nodes = &block.nodes;
-        #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
-        let indent_unit = self.lang.block_syntax().indent_unit;
+        let indent_unit = self.lang.indent_unit();
         if contains_soft_break(nodes) {
             let mut adapter = PrettyAdapter::new(indent_unit, self.width);
             adapter.begin_group(LayoutGroup::IndependentBreaks)?;
@@ -83,38 +82,6 @@ impl<'a> CodeRenderer<'a> {
         }
     }
 
-    #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
-    fn resolve_block_open<'b>(lang: &'b dyn RendererLang, cond: &str) -> &'b str {
-        lang.block_open_for(cond)
-            .unwrap_or(lang.block_syntax().block_open)
-    }
-
-    #[expect(deprecated, reason = "0.6.8 compatibility bridge")]
-    fn resolve_block_close<'b>(lang: &'b dyn RendererLang, cond: &str) -> &'b str {
-        lang.block_close_for(cond)
-            .unwrap_or(lang.block_syntax().block_close)
-    }
-
-    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
-    fn resolve_block_open_intent<'b>(
-        lang: &'b dyn RendererLang,
-        intent: BlockIntent,
-        cond: &str,
-    ) -> &'b str {
-        lang.block_open_for_intent(intent, cond)
-            .unwrap_or(lang.block_syntax().block_open)
-    }
-
-    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
-    fn resolve_block_close_intent<'b>(
-        lang: &'b dyn RendererLang,
-        intent: BlockIntent,
-        cond: &str,
-    ) -> &'b str {
-        lang.block_close_for_intent(intent, cond)
-            .unwrap_or(lang.block_syntax().block_close)
-    }
-
     fn resolve_comment(lang: &dyn RendererLang, text: &str) -> String {
         let prefix = lang.line_comment_prefix();
         let suffix = lang.line_comment_suffix();
@@ -130,7 +97,7 @@ impl<'a> CodeRenderer<'a> {
             .join("\n")
     }
 
-    #[expect(deprecated, reason = "0.6.8 renderer compatibility bridge")]
+    #[expect(deprecated, reason = "legacy block node compatibility bridge")]
     fn walk_nodes<A: RenderAdapter>(
         &self,
         nodes: &[CodeNode],
@@ -168,51 +135,52 @@ impl<'a> CodeRenderer<'a> {
                 CodeNode::Dedent => adapter.dedent()?,
                 CodeNode::StatementBegin => adapter.ensure_indent()?,
                 CodeNode::StatementEnd => {
-                    if self.lang.block_syntax().uses_semicolons {
-                        adapter.structured_text(";")?;
+                    let suffix = self.lang.render_statement_end()?;
+                    if !suffix.is_empty() {
+                        adapter.structured_text(suffix)?;
                     }
                 }
                 CodeNode::Newline => adapter.hard_break()?,
                 CodeNode::BlockOpen(condition) => {
-                    let open = Self::resolve_block_open(self.lang, condition);
+                    let open = self
+                        .lang
+                        .render_block_open(BlockIntent::Generic, condition)?;
                     if !open.is_empty() {
                         adapter.structured_text(open)?;
                     }
                 }
                 CodeNode::BlockClose(condition) => {
-                    let close = Self::resolve_block_close(self.lang, condition);
+                    let close = self
+                        .lang
+                        .render_block_close(BlockIntent::Generic, condition)?;
                     if !close.is_empty() {
                         adapter.structured_text(close)?;
                     }
                 }
                 CodeNode::BranchClose(condition) => {
-                    if self.lang.block_syntax().close_on_transition {
-                        let close = Self::resolve_block_close(self.lang, condition);
-                        if !close.is_empty() {
-                            adapter.structured_text(close)?;
-                            adapter.structured_text(" ")?;
-                        }
+                    let transition = self
+                        .lang
+                        .render_branch_transition(BlockIntent::Generic, condition)?;
+                    if !transition.is_empty() {
+                        adapter.structured_text(&transition)?;
                     }
                 }
                 CodeNode::BlockOpenIntent { condition, intent } => {
-                    let open = Self::resolve_block_open_intent(self.lang, *intent, condition);
+                    let open = self.lang.render_block_open(*intent, condition)?;
                     if !open.is_empty() {
                         adapter.structured_text(open)?;
                     }
                 }
                 CodeNode::BlockCloseIntent { condition, intent } => {
-                    let close = Self::resolve_block_close_intent(self.lang, *intent, condition);
+                    let close = self.lang.render_block_close(*intent, condition)?;
                     if !close.is_empty() {
                         adapter.structured_text(close)?;
                     }
                 }
                 CodeNode::BranchCloseIntent { condition, intent } => {
-                    if self.lang.block_syntax().close_on_transition {
-                        let close = Self::resolve_block_close_intent(self.lang, *intent, condition);
-                        if !close.is_empty() {
-                            adapter.structured_text(close)?;
-                            adapter.structured_text(" ")?;
-                        }
+                    let transition = self.lang.render_branch_transition(*intent, condition)?;
+                    if !transition.is_empty() {
+                        adapter.structured_text(&transition)?;
                     }
                 }
                 CodeNode::Sequence(children) => {

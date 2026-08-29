@@ -115,20 +115,24 @@ pub(crate) enum FormatPart {
     StatementEnd,
     /// Newline.
     Newline,
-    /// Block open delimiter — resolved at render time via `lang.block_open_for(condition)`
-    /// falling back to `lang.block_syntax().block_open`. Carries the condition text
-    /// from `begin_control_flow` (e.g., `"if x > 0"`, `"for i in range(10)"`).
+    /// Legacy block open delimiter carrying only condition text. The renderer
+    /// supplies [`crate::lang::BlockIntent::Generic`] to
+    /// [`crate::lang::RendererLang::render_block_open`]. Carries the condition
+    /// text from `begin_control_flow` (e.g., `"if x > 0"`,
+    /// `"for i in range(10)"`).
     /// Empty string means no condition (e.g., a bare `{ }` block).
     BlockOpen(String),
-    /// Terminal block close delimiter — resolved at render time via
-    /// `lang.block_close_for(condition)` falling back to `lang.block_syntax().block_close`.
-    /// Carries the condition from the matching `begin_control_flow`.
+    /// Legacy terminal block close delimiter carrying only condition text. The
+    /// renderer supplies [`crate::lang::BlockIntent::Generic`] to
+    /// [`crate::lang::RendererLang::render_block_close`]. Carries the condition
+    /// from the matching `begin_control_flow`.
     /// Emits: closer only.
     BlockClose(String),
     /// Non-terminal block close before a branch keyword (`else`, `elif`, `catch`).
     /// Like `BlockClose` but emits closer + space (not newline) so the branch
     /// keyword continues on the same line (e.g., `} else {`).
-    /// Suppressed when `block_syntax().close_on_transition` is `false`.
+    /// The selected adapter returns the complete transition text through
+    /// [`crate::lang::RendererLang::render_branch_transition`].
     BranchClose(String),
 }
 
@@ -412,7 +416,8 @@ impl CodeBlockBuilder {
         self
     }
 
-    /// Add a statement (wraps in %[...%] and appends language semicolon).
+    /// Add a statement (wraps in `%[`...`%]`, appends the complete
+    /// language-owned statement-end suffix, and adds a newline).
     pub fn add_statement(&mut self, format: &str, args: impl IntoArgs) -> &mut Self {
         self.nodes.push(CodeNode::StatementBegin);
         self.add(format, args);
@@ -512,8 +517,8 @@ impl CodeBlockBuilder {
     ///
     /// Used when the block is nested inside a `Statement::Statement` via
     /// `%L` (e.g., expression braces in format strings). The outer
-    /// `add_statement` provides both `;` via `StatementEnd` and `\n` via
-    /// `Newline`.
+    /// `add_statement` provides both the language-owned suffix via
+    /// `StatementEnd` and `\n` via `Newline`.
     pub fn end_control_flow_no_newline(&mut self) -> &mut Self {
         let frame = self.block_stack.pop().unwrap_or_else(BlockFrame::fallback);
         self.nodes.push(CodeNode::Dedent);

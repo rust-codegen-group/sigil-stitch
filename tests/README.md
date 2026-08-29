@@ -21,16 +21,20 @@ The integration suites are grouped by the contract they protect:
   imported bound aliases, wide/narrow rendering, and strict missing-lowerer
   failure.
 - `tests/renderer_parity_tests.rs` covers all built-in languages on the direct
-  and pretty renderer paths, resolved-import validation, and the exact output
-  or rejection for every current `TypeName` variant in every built-in language.
+  and pretty renderer paths, the exact five-operation renderer-event matrix, a
+  fully migrated external adapter that does not use legacy block config,
+  non-default built-in indentation, nested and sequenced event ordering,
+  fail-closed external event errors, resolved-import validation, and the exact
+  output or rejection for every current `TypeName` variant in every built-in
+  language.
   Every cross-language parity or capability matrix consumes the canonical
   20-adapter inventory in `tests/shared/languages.rs`; the exact type-grammar
   expectations are duplicated here deliberately as integration evidence for
   the language-owned lowerers.
 - `tests/file_spec_tests.rs` owns complete-file pipeline traces and fail-closed
   ordering. Its stateful external adapter records validation, custom-spec
-  emission, source rewrite, per-root type lowering, and terminal block-renderer
-  calls. Its pipeline matrices cross preserve, remove, replace, and introduce
+  emission, source rewrite, per-root type lowering, and all four renderer
+  events. Its pipeline matrices cross preserve, remove, replace, and introduce
   rewrite effects with root, nested, and sequence positions; cover headers,
   stored code, one-block specs, and every block from multi-block specs; and
   verify primitive, importable, compound, invalid, and target-derived raw import
@@ -103,3 +107,8 @@ The compatibility fixtures live under `tests/compatibility/`. Their manifest
 is bounded to public behavior supported from 0.6.8; they must not acquire
 binary-serialization, enum-ordinal, field-order, or general cross-version
 Serde promises.
+
+Renderer-event ordering and failures are exercised through public `CodeBlock`
+construction and external adapters in `renderer_parity_tests.rs`. The same
+ordered statement/open/transition/close trace runs through both adapters and
+proves that rendering stops at the first language error.

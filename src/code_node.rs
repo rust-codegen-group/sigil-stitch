@@ -208,33 +208,36 @@ pub enum CodeNode {
     Dedent,
     /// Statement begin marker (`%[`). Triggers `ensure_indent()`.
     StatementBegin,
-    /// Statement end marker (`%]`). Emits `;` if the language uses semicolons.
+    /// Statement end marker (`%]`). Requests the complete language-owned
+    /// statement-end suffix, which may be `;`, another suffix, or empty.
     StatementEnd,
     /// Hard newline.
     Newline,
     /// Legacy block open delimiter carrying only condition text.
     ///
-    /// Kept for public serialization and external-adapter compatibility. New
-    /// code should use [`CodeNode::BlockOpenIntent`].
+    /// Retained for source construction and rendering compatibility, including
+    /// unchanged external adapters. Its Serde representation is not versioned.
+    /// New code should use [`CodeNode::BlockOpenIntent`].
     #[deprecated(note = "use CodeNode::BlockOpenIntent")]
     BlockOpen(String),
     /// Legacy terminal block close delimiter carrying only condition text.
     ///
-    /// Kept for public serialization and external-adapter compatibility. New
-    /// code should use [`CodeNode::BlockCloseIntent`].
+    /// Retained for source construction and rendering compatibility, including
+    /// unchanged external adapters. Its Serde representation is not versioned.
+    /// New code should use [`CodeNode::BlockCloseIntent`].
     #[deprecated(note = "use CodeNode::BlockCloseIntent")]
     BlockClose(String),
     /// Legacy non-terminal block close before a branch keyword.
     ///
-    /// Kept for public serialization and external-adapter compatibility. New
-    /// code should use [`CodeNode::BranchCloseIntent`].
+    /// Retained for source construction and rendering compatibility, including
+    /// unchanged external adapters. Its Serde representation is not versioned.
+    /// New code should use [`CodeNode::BranchCloseIntent`].
     #[deprecated(note = "use CodeNode::BranchCloseIntent")]
     BranchClose(String),
     /// Block open delimiter carrying the condition text and its structural
     /// intent. At render time the renderer calls
-    /// `lang.block_open_for_intent(intent, condition)` — if it returns
-    /// `Some(s)`, emit `s`; otherwise fall back to
-    /// `lang.block_syntax().block_open`.
+    /// [`crate::lang::RendererLang::render_block_open`] for the complete
+    /// target-language suffix.
     BlockOpenIntent {
         /// Raw condition format text from the matching builder call.
         condition: String,
@@ -244,8 +247,8 @@ pub enum CodeNode {
     /// Terminal block close delimiter carrying the condition text and its
     /// structural intent.
     ///
-    /// Emits: the closer only (no semicolon, no newline — those come from
-    /// `StatementEnd` and `Newline` nodes that follow).
+    /// Emits: the closer only (no statement-end suffix or newline — those come
+    /// from `StatementEnd` and `Newline` nodes that follow).
     BlockCloseIntent {
         /// Raw condition format text from the matching builder call.
         condition: String,
@@ -255,9 +258,9 @@ pub enum CodeNode {
     /// Non-terminal block close before a branch keyword (`else`, `elif`,
     /// `catch`), carrying structural intent.
     ///
-    /// Like [`CodeNode::BlockCloseIntent`] but emits closer + space (not
-    /// newline) so the branch keyword continues on the same line. Suppressed
-    /// when `block_syntax().close_on_transition` is `false`.
+    /// Like [`CodeNode::BlockCloseIntent`] but asks
+    /// [`crate::lang::RendererLang::render_branch_transition`] for the complete
+    /// outgoing closer and connector whitespace before the branch keyword.
     BranchCloseIntent {
         /// Raw condition format text from the matching builder call.
         condition: String,
@@ -503,16 +506,18 @@ mod tests {
 
     #[test]
     #[allow(deprecated)]
-    fn legacy_block_nodes_keep_their_serde_shape() {
-        let old = vec![CodeNode::BlockOpen("if x".to_string())];
-        assert_eq!(
-            serde_json::to_value(&old).unwrap(),
-            serde_json::json!([
-                {"BlockOpen": "if x"}
-            ])
-        );
-        let decoded: Vec<CodeNode> = serde_json::from_str(r#"[{"BlockOpen":"if x"}]"#).unwrap();
+    fn legacy_block_nodes_round_trip_through_current_serde() {
+        // This verifies the current derives, not a versioned representation.
+        let nodes = vec![
+            CodeNode::BlockOpen("if x".to_string()),
+            CodeNode::BranchClose("if x".to_string()),
+            CodeNode::BlockClose("if x".to_string()),
+        ];
+        let json = serde_json::to_string(&nodes).unwrap();
+        let decoded: Vec<CodeNode> = serde_json::from_str(&json).unwrap();
         assert!(matches!(&decoded[0], CodeNode::BlockOpen(s) if s == "if x"));
+        assert!(matches!(&decoded[1], CodeNode::BranchClose(s) if s == "if x"));
+        assert!(matches!(&decoded[2], CodeNode::BlockClose(s) if s == "if x"));
     }
 
     #[test]

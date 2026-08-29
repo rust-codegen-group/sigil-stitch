@@ -183,6 +183,7 @@ fn strip_local_prefix(module: &str) -> &str {
     module.strip_prefix("./").unwrap_or(module)
 }
 
+#[deny(deprecated)]
 impl RendererLang for Cpp {
     fn lower_type_name(
         &self,
@@ -249,6 +250,38 @@ impl RendererLang for Cpp {
 
     fn module_separator(&self) -> Option<&str> {
         Some("::")
+    }
+
+    fn indent_unit(&self) -> &str {
+        &self.indent
+    }
+
+    fn render_statement_end(&self) -> Result<&str, crate::error::SigilStitchError> {
+        Ok(";")
+    }
+
+    fn render_block_open(
+        &self,
+        _intent: crate::code_node::BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        Ok(" {")
+    }
+
+    fn render_block_close(
+        &self,
+        _intent: crate::code_node::BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        Ok("}")
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: crate::code_node::BlockIntent,
+        _condition: &str,
+    ) -> Result<String, crate::error::SigilStitchError> {
+        Ok("} ".to_string())
     }
 
     #[expect(deprecated, reason = "0.6.8 compatibility implementation")]

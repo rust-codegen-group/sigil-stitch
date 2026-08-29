@@ -180,7 +180,9 @@ enum PipelineEvent {
     Emit(SpecOrigin),
     Rewrite(SourceLocation),
     Lower(TypeName),
+    RenderStatement,
     RenderOpen,
+    RenderTransition,
     RenderClose,
 }
 
@@ -305,14 +307,40 @@ impl RendererLang for PipelineLang {
         CodeBlock::of("%T", (terminal,))
     }
 
-    fn block_open_for_intent(&self, _intent: BlockIntent, _condition: &str) -> Option<&str> {
-        self.events.borrow_mut().push(PipelineEvent::RenderOpen);
-        Some("{")
+    fn render_statement_end(&self) -> Result<&str, SigilStitchError> {
+        self.events
+            .borrow_mut()
+            .push(PipelineEvent::RenderStatement);
+        Ok(";")
     }
 
-    fn block_close_for_intent(&self, _intent: BlockIntent, _condition: &str) -> Option<&str> {
+    fn render_block_open(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
+        self.events.borrow_mut().push(PipelineEvent::RenderOpen);
+        Ok("{")
+    }
+
+    fn render_block_close(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<&str, SigilStitchError> {
         self.events.borrow_mut().push(PipelineEvent::RenderClose);
-        Some("}")
+        Ok("}")
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, SigilStitchError> {
+        self.events
+            .borrow_mut()
+            .push(PipelineEvent::RenderTransition);
+        Ok("} ".to_string())
     }
 }
 
@@ -410,6 +438,8 @@ fn control_flow_with_type(type_name: TypeName) -> CodeBlock {
     let mut block = CodeBlock::builder();
     block.begin_control_flow("if ready", ());
     block.add_statement("value: %T", (type_name,));
+    block.next_control_flow("else", ());
+    block.add_statement("fallback", ());
     block.end_control_flow();
     block.build().unwrap()
 }
@@ -557,6 +587,10 @@ fn file_validation_and_render_record_the_complete_pipeline_trace() {
             PipelineEvent::Rewrite(SourceLocation::Unlabelled),
             PipelineEvent::Lower(type_name),
             PipelineEvent::RenderOpen,
+            PipelineEvent::RenderStatement,
+            PipelineEvent::RenderTransition,
+            PipelineEvent::RenderOpen,
+            PipelineEvent::RenderStatement,
             PipelineEvent::RenderClose,
         ]
     );
@@ -579,6 +613,10 @@ fn standalone_render_records_rewrite_lowering_and_terminal_renderer_events_once(
             PipelineEvent::Rewrite(SourceLocation::Unlabelled),
             PipelineEvent::Lower(type_name),
             PipelineEvent::RenderOpen,
+            PipelineEvent::RenderStatement,
+            PipelineEvent::RenderTransition,
+            PipelineEvent::RenderOpen,
+            PipelineEvent::RenderStatement,
             PipelineEvent::RenderClose,
         ]
     );

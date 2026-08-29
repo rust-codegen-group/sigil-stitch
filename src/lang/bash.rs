@@ -57,8 +57,9 @@ fn bash_block_close_for_intent(intent: BlockIntent) -> Option<&'static str> {
     }
 }
 
-/// Legacy string-only opener classification for old serialized/external nodes.
-fn bash_block_open_for_legacy(condition: &str) -> Option<&'static str> {
+/// Language-local opener fallback inferred from condition text for Generic
+/// intents and source-constructed legacy nodes.
+fn bash_block_open_from_condition_text(condition: &str) -> Option<&'static str> {
     let raw = condition.trim();
     let t = raw.trim_end_matches(';').trim();
     if t.ends_with("; then")
@@ -87,8 +88,9 @@ fn bash_block_open_for_legacy(condition: &str) -> Option<&'static str> {
     }
 }
 
-/// Legacy string-only closer classification for old serialized/external nodes.
-fn bash_block_close_for_legacy(condition: &str) -> Option<&'static str> {
+/// Language-local closer fallback inferred from condition text for Generic
+/// intents and source-constructed legacy nodes.
+fn bash_block_close_from_condition_text(condition: &str) -> Option<&'static str> {
     let t = condition.trim().trim_end_matches(';').trim();
     if t.starts_with("if ") || t.starts_with("elif ") || t == "else" {
         Some("fi")
@@ -115,8 +117,10 @@ fn bash_block_close_for_legacy(condition: &str) -> Option<&'static str> {
 /// # Control Flow
 ///
 /// Bash uses keyword-based block delimiters that vary per construct (`then`/`fi`,
-/// `do`/`done`, `in`/`esac`). `block_open_for_intent`/`block_close_for_intent`
-/// map the language-neutral `BlockIntent` locally to the correct delimiters:
+/// `do`/`done`, `in`/`esac`). [`RendererLang::render_block_open`] and
+/// [`RendererLang::render_block_close`] map the language-neutral [`BlockIntent`]
+/// locally to the correct delimiters, while
+/// [`RendererLang::render_branch_transition`] handles branch boundaries:
 ///
 /// ```text
 /// // Builder API — begin_control_flow/end_control_flow work directly:
@@ -184,6 +188,7 @@ const BASH_RESERVED: &[&str] = &[
     "select", "shift", "source", "then", "time", "trap", "typeset", "unset", "until", "while",
 ];
 
+#[deny(deprecated)]
 impl RendererLang for Bash {
     fn lower_type_name(
         &self,
@@ -221,7 +226,7 @@ impl RendererLang for Bash {
         "#"
     }
 
-    // --- Config struct accessors ---
+    // --- Deprecated 0.6.8 config accessors ---
 
     #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
@@ -237,6 +242,52 @@ impl RendererLang for Bash {
         }
     }
 
+    // --- Language-owned renderer events ---
+
+    fn indent_unit(&self) -> &str {
+        &self.indent
+    }
+
+    fn render_statement_end(&self) -> Result<&str, crate::error::SigilStitchError> {
+        Ok("")
+    }
+
+    fn render_block_open(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        let open = if intent == BlockIntent::Generic {
+            bash_block_open_from_condition_text(condition)
+        } else {
+            bash_block_open_for_intent(intent, condition)
+        };
+        Ok(open.unwrap_or(" {"))
+    }
+
+    fn render_block_close(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        let close = if intent == BlockIntent::Generic {
+            bash_block_close_from_condition_text(condition)
+        } else {
+            bash_block_close_for_intent(intent)
+        };
+        Ok(close.unwrap_or("}"))
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, crate::error::SigilStitchError> {
+        Ok(String::new())
+    }
+
+    // --- Deprecated 0.6.8 renderer compatibility hooks ---
+
     #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
@@ -249,11 +300,11 @@ impl RendererLang for Bash {
     }
 
     fn block_open_for(&self, condition: &str) -> Option<&str> {
-        bash_block_open_for_legacy(condition)
+        bash_block_open_from_condition_text(condition)
     }
 
     fn block_close_for(&self, condition: &str) -> Option<&str> {
-        bash_block_close_for_legacy(condition)
+        bash_block_close_from_condition_text(condition)
     }
 
     fn block_open_for_intent(&self, intent: BlockIntent, condition: &str) -> Option<&str> {

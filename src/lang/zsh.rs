@@ -57,8 +57,9 @@ fn zsh_block_close_for_intent(intent: BlockIntent) -> Option<&'static str> {
     }
 }
 
-/// Legacy string-only opener classification for old serialized/external nodes.
-fn zsh_block_open_for_legacy(condition: &str) -> Option<&'static str> {
+/// Language-local opener fallback inferred from condition text for Generic
+/// intents and source-constructed legacy nodes.
+fn zsh_block_open_from_condition_text(condition: &str) -> Option<&'static str> {
     let raw = condition.trim();
     let t = raw.trim_end_matches(';').trim();
     if t.ends_with("; then")
@@ -87,8 +88,9 @@ fn zsh_block_open_for_legacy(condition: &str) -> Option<&'static str> {
     }
 }
 
-/// Legacy string-only closer classification for old serialized/external nodes.
-fn zsh_block_close_for_legacy(condition: &str) -> Option<&'static str> {
+/// Language-local closer fallback inferred from condition text for Generic
+/// intents and source-constructed legacy nodes.
+fn zsh_block_close_from_condition_text(condition: &str) -> Option<&'static str> {
     let t = condition.trim().trim_end_matches(';').trim();
     if t.starts_with("if ") || t.starts_with("elif ") || t == "else" {
         Some("fi")
@@ -167,6 +169,7 @@ const ZSH_RESERVED: &[&str] = &[
     "zle", "zmodload", "zshexit", "zstyle",
 ];
 
+#[deny(deprecated)]
 impl RendererLang for Zsh {
     fn lower_type_name(
         &self,
@@ -206,7 +209,7 @@ impl RendererLang for Zsh {
         "#"
     }
 
-    // --- Config struct accessors ---
+    // --- Deprecated 0.6.8 config accessors ---
 
     #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn type_presentation(&self) -> TypePresentationConfig<'_> {
@@ -222,6 +225,52 @@ impl RendererLang for Zsh {
         }
     }
 
+    // --- Language-owned renderer events ---
+
+    fn indent_unit(&self) -> &str {
+        &self.indent
+    }
+
+    fn render_statement_end(&self) -> Result<&str, crate::error::SigilStitchError> {
+        Ok("")
+    }
+
+    fn render_block_open(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        let open = if intent == BlockIntent::Generic {
+            zsh_block_open_from_condition_text(condition)
+        } else {
+            zsh_block_open_for_intent(intent, condition)
+        };
+        Ok(open.unwrap_or(" {"))
+    }
+
+    fn render_block_close(
+        &self,
+        intent: BlockIntent,
+        condition: &str,
+    ) -> Result<&str, crate::error::SigilStitchError> {
+        let close = if intent == BlockIntent::Generic {
+            zsh_block_close_from_condition_text(condition)
+        } else {
+            zsh_block_close_for_intent(intent)
+        };
+        Ok(close.unwrap_or("}"))
+    }
+
+    fn render_branch_transition(
+        &self,
+        _intent: BlockIntent,
+        _condition: &str,
+    ) -> Result<String, crate::error::SigilStitchError> {
+        Ok(String::new())
+    }
+
+    // --- Deprecated 0.6.8 renderer compatibility hooks ---
+
     #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
     fn block_syntax(&self) -> BlockSyntaxConfig<'_> {
         BlockSyntaxConfig {
@@ -234,11 +283,11 @@ impl RendererLang for Zsh {
     }
 
     fn block_open_for(&self, condition: &str) -> Option<&str> {
-        zsh_block_open_for_legacy(condition)
+        zsh_block_open_from_condition_text(condition)
     }
 
     fn block_close_for(&self, condition: &str) -> Option<&str> {
-        zsh_block_close_for_legacy(condition)
+        zsh_block_close_from_condition_text(condition)
     }
 
     fn block_open_for_intent(&self, intent: BlockIntent, condition: &str) -> Option<&str> {
