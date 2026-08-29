@@ -321,6 +321,7 @@ const SCALA_TYPES: &[TypeCapabilityProfile] = &[
             TypeCapability::Attributes,
             // Variants = enum cases
             TypeCapability::Variants,
+            TypeCapability::ClosedSum,
         ],
     ),
     TypeCapabilityProfile::new(

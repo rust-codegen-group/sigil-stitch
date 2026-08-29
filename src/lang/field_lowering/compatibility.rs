@@ -19,6 +19,13 @@ pub(crate) fn lower<L: CodeLang + ?Sized>(
         | crate::lang::capability::FieldContext::VariantRecordPayload(kind) => {
             lang.type_member_declaration_context(kind)
         }
+        crate::lang::capability::FieldContext::ClosedSumRecordPayload => {
+            return Err(SigilStitchError::UnsupportedFieldContext {
+                language: lang.file_extension().to_string(),
+                context: fields.context(),
+                owner_name: fields.owner_name().map(str::to_string),
+            });
+        }
     };
     let mut block = CodeBlock::builder();
     for field in fields.fields() {

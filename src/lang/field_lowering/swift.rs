@@ -21,6 +21,9 @@ const CAPABILITIES: &[FieldCapability] = &[
     FieldCapability::StaticField,
     FieldCapability::ReadOnly,
 ];
+const PAYLOAD_CAPABILITIES: &[FieldCapability] =
+    &[FieldCapability::ExplicitType, FieldCapability::ReadOnly];
+const PAYLOAD_REQUIRED: &[FieldCapability] = &[FieldCapability::ExplicitType];
 pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
     FieldCapabilityProfile::new(
         FieldContext::Direct(DeclarationContext::Member),
@@ -28,6 +31,8 @@ pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
     ),
     FieldCapabilityProfile::new(FieldContext::TypeMember(TypeKind::Class), CAPABILITIES),
     FieldCapabilityProfile::new(FieldContext::TypeMember(TypeKind::Struct), CAPABILITIES),
+    FieldCapabilityProfile::new(FieldContext::ClosedSumRecordPayload, PAYLOAD_CAPABILITIES)
+        .with_required_capabilities(PAYLOAD_REQUIRED),
 ];
 
 pub(crate) fn is_valid_identifier(name: &str) -> bool {
@@ -106,6 +111,17 @@ pub(crate) fn collect_validation_errors(
     collect_invalid_identifiers(lang, fields, is_valid_identifier, errors);
     collect_escaped_name_collisions(lang, fields, errors);
     for field in fields.fields() {
+        if fields.context() == FieldContext::ClosedSumRecordPayload
+            && (!field.doc().is_empty() || field.modifiers().visibility != Visibility::Inherited)
+        {
+            errors.push(SigilStitchError::InvalidField {
+                language: lang.file_extension().to_string(),
+                field_name: field.name().to_string(),
+                context: fields.context(),
+                reason: "Swift enum-case record payloads require undocumented inherited-visibility labels"
+                    .to_string(),
+            });
+        }
         if field.name() == "_" {
             errors.push(SigilStitchError::InvalidField {
                 language: lang.file_extension().to_string(),
@@ -167,6 +183,21 @@ pub(crate) fn lower(
     fields: ValidatedFields<'_>,
 ) -> Result<CodeBlock, SigilStitchError> {
     let mut block = CodeBlock::builder();
+    if fields.context() == FieldContext::ClosedSumRecordPayload {
+        for (index, field) in fields.fields().iter().enumerate() {
+            if index > 0 {
+                block.add(", ", ());
+            }
+            block.add(
+                "%L: %T",
+                (
+                    lang.escape_field_name(field.name()),
+                    field.field_type().clone(),
+                ),
+            );
+        }
+        return block.build();
+    }
     for field in fields.fields() {
         emit_doc(&mut block, lang, field);
         emit_annotations(&mut block, field, "@", "")?;

@@ -352,6 +352,77 @@ let type_spec = TypeSpec::builder("Direction", TypeKind::Enum)
 # }
 ```
 
+### Closed sums
+
+Use `TypeSpec::closed_sum()` when the variants are a complete set of cases
+rather than value-enum entries. Cases may be unit-shaped, carry positional
+types, or carry named record fields. This is declaration intent: each adapter
+chooses native enum, algebraic-data-type, nested sealed-hierarchy, or sibling
+case syntax locally.
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
+# use sigil_stitch::spec::field_spec::FieldSpec;
+# fn main() {
+let outcome = TypeSpec::closed_sum("Outcome")
+    .add_variant(EnumVariantSpec::new("Empty").unwrap())
+    .add_variant(
+        EnumVariantSpec::builder("Value")
+            .positional_payload(TypeName::primitive("Payload"))
+            .build()
+            .unwrap(),
+    )
+    .add_variant(
+        EnumVariantSpec::builder("Failure")
+            .record_payload_field(FieldSpec::of(
+                "code",
+                TypeName::primitive("FailureCode"),
+            ))
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
+
+assert!(outcome.is_closed_sum());
+assert_eq!(outcome.kind(), TypeKind::Enum);
+# }
+```
+
+`TypeSpec::builder(name, TypeKind::Enum)` remains the ordinary value-enum
+entry point. Closed sums reject discriminants, deprecated variant values, enum
+constructor arguments, and opaque members that could add unvalidated cases.
+Wire discriminator values and serialization tags remain caller data or
+annotations; they do not change which case declaration is generated.
+
+The built-in support matrix is:
+
+| Target | Representation | Empty sum |
+|--------|----------------|-----------|
+| Rust | Native enum | Native empty enum |
+| Swift | Native enum | Native empty enum |
+| Haskell | Data declaration | Rejected without an `EmptyDataDecls` file contract |
+| OCaml | Native variant | Native `type name = |` declaration |
+| Scala | Scala 3 enum | Rejected |
+| Java | Sealed interface with nested singleton and record cases | Rejected |
+| Kotlin | Private-constructor sealed class with nested data cases | Supported |
+| Dart | Sealed root with root-qualified final sibling cases | Rejected |
+
+Other built-ins reject closed-sum intent instead of widening it to `Object`,
+`Any`, an open hierarchy, or an ordinary value enum. Root features such as
+methods, contracts, attributes, and type parameters still require the
+selected target's ordinary type capability. Rust, Haskell, and OCaml preserve
+the supported generic forms; Scala rejects generic closed sums until every
+case can preserve the root type arguments, and the other targets reject any
+generic combination not present in their enum capability profile.
+
+Calling `TypeSpec::closed_sum(name).build()` with no cases requests a named
+empty sum. It is not the unit type and does not add a `TypeName::Never`
+reference. A target accepts this form only when it can emit that named
+uninhabited declaration exactly.
+
 ## PropertySpec
 
 `PropertySpec` describes a computed value with read and/or write behavior. It

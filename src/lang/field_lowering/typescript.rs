@@ -315,6 +315,13 @@ pub(crate) fn lower(
         FieldContext::TypeMember(_) | FieldContext::VariantRecordPayload(_) => {
             DeclarationContext::Member
         }
+        FieldContext::ClosedSumRecordPayload => {
+            return Err(SigilStitchError::UnsupportedFieldContext {
+                language: lang.file_extension().to_string(),
+                context: fields.context(),
+                owner_name: fields.owner_name().map(str::to_string),
+            });
+        }
     };
     for field in fields.fields() {
         emit_doc(&mut block, lang, field);

@@ -38,6 +38,8 @@ pub enum TypeCapability {
     PrimaryConstructorParameters,
     /// Sum-type variants.
     Variants,
+    /// A declaration whose complete set of named cases is closed.
+    ClosedSum,
     /// Declaration metadata / attributes.
     Attributes,
 }
@@ -55,6 +57,8 @@ pub enum FieldContext {
     TypeMember(TypeKind),
     /// Named fields carried by one algebraic variant record payload.
     VariantRecordPayload(TypeKind),
+    /// Named fields carried by one closed-sum case record payload.
+    ClosedSumRecordPayload,
 }
 
 /// A semantic capability of a field declaration.

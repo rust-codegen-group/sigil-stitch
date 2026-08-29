@@ -69,6 +69,11 @@ target and is not a portable cross-language program.
   declaration's preamble, header, relationships, body order, primary
   constructor, close, and output cardinality while reusing complete child
   lowerers for child grammar.
+  Closed sums use this same complete-type seam. The semantic type view tells
+  the adapter that the declaration is a closed sum; the adapter validates its
+  complete case set and chooses one declaration, nested case declarations, or
+  several sibling blocks. There is no separate nesting or sealed-syntax
+  interface.
   After crate-owned validation against
   the selected adapter, `validate_function()` may add target-local checks to a
   classified `FunctionIntent`. sigil-stitch then constructs a
@@ -238,9 +243,37 @@ compatibility path; strict built-ins reject ownerless direct emission because
 caller-supplied first/last flags cannot prove valid separators or section
 termination.
 
+A closed sum reuses the unit, positional-payload, and record-payload variant
+data, but it is not an ordinary value enum. Its dedicated construction entry
+point records closed-sum semantics without adding a variant to the pre-0.6.8
+`TypeKind` enum. The adapter-facing type views expose that semantic fact, and a
+closed-sum capability opts a target into validation and lowering. Closed-sum
+case validation is separate from ordinary enum-entry profiles: accepting a
+record case for a Java sealed hierarchy must not make record payloads valid on
+an ordinary Java enum.
+
+The case sequence may be empty. That declaration is the empty sum, a named
+uninhabited type. It is not unit or `void`. A Never reference or bottom type
+may also have no values, but it belongs to type-expression and subtype
+semantics rather than declaring this caller-named case set. The shared model
+therefore does not identify the two. A target may reuse a canonical empty type
+only when doing so exactly preserves the requested declaration, including its
+name and valid use positions; otherwise it rejects the empty shape even when
+it supports non-empty closed sums.
+
+For non-empty sums, `Case(T)` means a generated named case carrying `T`; it
+does not enroll an existing `T` declaration as a nominal subtype. Java may
+therefore lower cases inside one public sealed root, while Kotlin may use a
+private-constructor sealed root with nested cases to close the hierarchy within
+the generated module. Those choices remain language-local and do not justify
+a shared nested-declaration model. Wire discriminators, serialization tags,
+and identifier derivation remain caller or annotation concerns.
+
 Fields are lowered as one `FieldSequenceIntent`. Its `FieldContext`
-distinguishes direct emission, ordinary type members, and variant record
-payloads without carrying punctuation or a new placement policy. The
+distinguishes direct emission, ordinary type members, ordinary variant record
+payloads, and closed-sum case record payloads without carrying punctuation or
+a new placement policy. Keeping the two payload contexts separate prevents a
+sealed-hierarchy representation from widening ordinary enum behavior. The
 `Direct(DeclarationContext)` payload preserves only the pre-0.6.8 direct-field
 placement input as a narrow compatibility exception; it is not a reusable
 target-grammar abstraction. Field capability profiles declare which semantic

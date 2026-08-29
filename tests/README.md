@@ -15,6 +15,12 @@ The integration suites are grouped by the contract they protect:
   capability profiles.
 - `tests/*_lowering_tests.rs` checks complete declaration lowering and
   fail-closed validation.
+- `tests/closed_sum_tests.rs` is the cross-language closed-sum integration
+  suite. It covers the semantic builder and adapter views, exact supported and
+  empty output, structured rejection, ordinary-enum isolation, malformed
+  deserialized values, aggregate case and record-field failures, generic
+  combinations, payload imports and alias rejection, and wide/narrow renderer
+  behavior for native, nested, and sibling representations.
 - `tests/declaration_generic_lowering_tests.rs` owns the canonical 20-language
   type/function declaration matrix for zero, one, many, bounded, lifetime,
   higher-kinded, context-bound, and explicit-constraint cases. It also checks
@@ -75,6 +81,7 @@ cargo test --test field_capability_matrix_tests
 cargo test --test function_capability_matrix_tests
 cargo test --test property_capability_matrix_tests
 cargo test --test variant_capability_matrix_tests
+cargo test --test closed_sum_tests
 cargo test --test renderer_parity_tests
 cargo test --test declaration_generic_lowering_tests
 cargo test --test typescript shared::golden::tests

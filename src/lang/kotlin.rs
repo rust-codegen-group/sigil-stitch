@@ -342,6 +342,7 @@ const KOTLIN_TYPES: &[TypeCapabilityProfile] = &[
             TypeCapability::Attributes,
             // Variants = enum entries
             TypeCapability::Variants,
+            TypeCapability::ClosedSum,
         ],
     ),
     TypeCapabilityProfile::new(

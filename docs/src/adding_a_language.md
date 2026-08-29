@@ -128,13 +128,26 @@ keywords, delimiters, placement, or separator policy. Omit the owner profile if
 the language cannot represent variants for that `TypeKind`; use an empty
 capability list when simple variants are valid but no richer form is.
 
+Closed sums use `TypeKind::Enum` only as their backward-compatible declaration
+carrier. Advertise `TypeCapability::ClosedSum` on that type profile only when
+the adapter can preserve a complete case set. This capability does not grant
+ordinary enum entries positional or record payloads: closed-sum case
+validation branches on `VariantIntent::is_closed_sum()` and remains separate
+from `VariantCapabilityProfile`. A permissive compatibility adapter cannot
+advertise or lower the later semantic form.
+
 Field profiles are keyed by `FieldContext`: direct member emission, ordinary
-members of one `TypeKind`, or record payloads of one variant owner kind. They
-distinguish explicit type information, initializers, attributes, static and
-readonly fields, and `OptionalPresence`. Add `ExplicitType` to the required set
-only where an untyped field cannot be valid. Optional presence means the member
-may be absent; value nullability is expressed separately with
-`TypeName::Optional`.
+members of one `TypeKind`, record payloads of one ordinary variant owner kind,
+or closed-sum case record payloads. They distinguish explicit type information,
+initializers, attributes, static and readonly fields, and `OptionalPresence`.
+Add `ExplicitType` to the required set only where an untyped field cannot be
+valid. Optional presence means the member may be absent; value nullability is
+expressed separately with `TypeName::Optional`.
+
+Named fields on a closed-sum case use
+`FieldContext::ClosedSumRecordPayload`. Give this context its own exact field
+profile and lower it through `ValidatedFields`; do not widen the ordinary enum
+record-payload profile to reuse the syntax of a sealed hierarchy.
 
 Property profiles are keyed by `PropertyContext`: direct member emission or a
 member of one owning `TypeKind`. They distinguish explicit type information,
@@ -181,6 +194,17 @@ variant lowerer derives positions and owns its sequence grammar; the type
 lowerer chooses the sequence's placement. Use
 `AnnotationSpec::emit_with_syntax()` when a local annotation spelling must keep
 an importable annotation name as a structured `%T` reference.
+
+For a closed sum, `validate_type()` decides whether the root features, empty
+shape, and generic combinations are representable, while
+`collect_variant_validation_errors()` checks the complete case sequence and
+target-local case identifiers. The complete `lower_type()` implementation
+then owns the whole topology: it may reuse private case or field helpers, but
+it returns all nested or sibling declarations together and never routes the
+new form through the compatibility type lowerer. `ValidatedType::variants()`
+is present even for an intentional zero-case sum. Keep payload types in `%T`
+slots so nested Java/Kotlin and sibling Dart cases participate in the ordinary
+type-name-lowering and import-resolution passes.
 
 `CodeLang::validate_fields()` and `CodeLang::lower_fields()` form the
 corresponding complete-sequence seam for fields. `FieldSequenceIntent` exposes

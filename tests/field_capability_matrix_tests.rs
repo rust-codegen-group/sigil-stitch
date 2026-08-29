@@ -38,6 +38,7 @@ const ALL_CONTEXTS: &[FieldContext] = &[
     FieldContext::VariantRecordPayload(TypeKind::Enum),
     FieldContext::VariantRecordPayload(TypeKind::TypeAlias),
     FieldContext::VariantRecordPayload(TypeKind::Newtype),
+    FieldContext::ClosedSumRecordPayload,
 ];
 
 #[derive(Clone, Copy)]
@@ -113,7 +114,7 @@ const TS_CONTRACT: &[FieldCapability] = &[ExplicitType, ReadOnly, OptionalPresen
 #[test]
 fn built_in_field_matrices_are_exhaustive() {
     use DeclarationContext::{InterfaceMember, Member, TopLevel};
-    use FieldContext::{Direct, TypeMember, VariantRecordPayload};
+    use FieldContext::{ClosedSumRecordPayload, Direct, TypeMember, VariantRecordPayload};
     use TypeKind::{Class, Enum, Interface, Struct, Trait};
 
     assert_matrix(
@@ -154,6 +155,7 @@ fn built_in_field_matrices_are_exhaustive() {
             profile(Direct(Member), DYNAMIC_FULL, &[]),
             profile(TypeMember(Class), DYNAMIC_FULL, &[]),
             profile(TypeMember(Struct), DYNAMIC_FULL, &[]),
+            profile(ClosedSumRecordPayload, IMMUTABLE_FIELDS, EXPLICIT),
         ],
     );
     assert_matrix(
@@ -171,6 +173,7 @@ fn built_in_field_matrices_are_exhaustive() {
             profile(TypeMember(Struct), IMMUTABLE_FIELDS, EXPLICIT),
             profile(TypeMember(Class), IMMUTABLE_FIELDS, EXPLICIT),
             profile(VariantRecordPayload(Enum), IMMUTABLE_FIELDS, EXPLICIT),
+            profile(ClosedSumRecordPayload, IMMUTABLE_FIELDS, EXPLICIT),
         ],
     );
     assert_matrix(
@@ -180,6 +183,7 @@ fn built_in_field_matrices_are_exhaustive() {
             profile(TypeMember(Class), FULL_TYPED, EXPLICIT),
             profile(TypeMember(Struct), FULL_TYPED, EXPLICIT),
             profile(TypeMember(Enum), FULL_TYPED, EXPLICIT),
+            profile(ClosedSumRecordPayload, IMMUTABLE_FIELDS, EXPLICIT),
         ],
     );
     assert_matrix(
@@ -201,6 +205,7 @@ fn built_in_field_matrices_are_exhaustive() {
             profile(TypeMember(Class), VALUE_FIELDS, &[]),
             profile(TypeMember(Struct), VALUE_FIELDS, &[]),
             profile(TypeMember(Enum), VALUE_FIELDS, &[]),
+            profile(ClosedSumRecordPayload, IMMUTABLE_FIELDS, EXPLICIT),
         ],
     );
     assert_matrix(
@@ -210,6 +215,7 @@ fn built_in_field_matrices_are_exhaustive() {
             profile(TypeMember(Struct), IMMUTABLE_FIELDS, EXPLICIT),
             profile(TypeMember(Class), IMMUTABLE_FIELDS, EXPLICIT),
             profile(VariantRecordPayload(Enum), IMMUTABLE_FIELDS, EXPLICIT),
+            profile(ClosedSumRecordPayload, IMMUTABLE_FIELDS, EXPLICIT),
         ],
     );
     assert_matrix(
@@ -239,6 +245,7 @@ fn built_in_field_matrices_are_exhaustive() {
             profile(TypeMember(Struct), RUST_FIELDS, EXPLICIT),
             profile(TypeMember(Class), RUST_FIELDS, EXPLICIT),
             profile(VariantRecordPayload(Enum), RUST_FIELDS, EXPLICIT),
+            profile(ClosedSumRecordPayload, RUST_FIELDS, EXPLICIT),
         ],
     );
     assert_matrix(
@@ -248,6 +255,7 @@ fn built_in_field_matrices_are_exhaustive() {
             profile(TypeMember(Class), VALUE_FIELDS, &[]),
             profile(TypeMember(Struct), VALUE_FIELDS, &[]),
             profile(TypeMember(Enum), VALUE_FIELDS, &[]),
+            profile(ClosedSumRecordPayload, IMMUTABLE_FIELDS, EXPLICIT),
         ],
     );
     assert_matrix(
@@ -256,6 +264,7 @@ fn built_in_field_matrices_are_exhaustive() {
             profile(Direct(Member), DYNAMIC_FULL, &[]),
             profile(TypeMember(Class), DYNAMIC_FULL, &[]),
             profile(TypeMember(Struct), DYNAMIC_FULL, &[]),
+            profile(ClosedSumRecordPayload, IMMUTABLE_FIELDS, EXPLICIT),
         ],
     );
     assert_matrix(

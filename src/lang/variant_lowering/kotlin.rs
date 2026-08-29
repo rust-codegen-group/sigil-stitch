@@ -23,6 +23,23 @@ pub(crate) fn collect_validation_errors(
     variants: VariantIntent<'_>,
     errors: &mut Vec<SigilStitchError>,
 ) {
+    if variants.is_closed_sum() {
+        for variant in variants.variants() {
+            if !crate::lang::field_lowering::kotlin::is_valid_identifier(variant.name())
+                || crate::lang::RendererLang::reserved_words(lang).contains(&variant.name())
+                || variant.name() == variants.owner_name()
+            {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: variants.owner_name().to_string(),
+                    reason: format!(
+                        "Kotlin closed-sum case {:?} is not a valid distinct nested type name",
+                        variant.name()
+                    ),
+                });
+            }
+        }
+        return;
+    }
     if variants.has_opaque_members() {
         return;
     }

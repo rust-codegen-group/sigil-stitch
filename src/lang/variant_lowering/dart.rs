@@ -26,6 +26,26 @@ pub(crate) fn collect_validation_errors(
         &variants,
         errors,
     );
+    if variants.is_closed_sum() {
+        for variant in variants.variants() {
+            let generated_name = format!("{}{}", variants.owner_name(), variant.name());
+            if !crate::lang::type_lowering::dart::is_identifier(variant.name())
+                || crate::lang::RendererLang::reserved_words(lang).contains(&variant.name())
+                || !crate::lang::type_lowering::dart::is_identifier(&generated_name)
+                || crate::lang::RendererLang::reserved_words(lang)
+                    .contains(&generated_name.as_str())
+                || generated_name == variants.owner_name()
+            {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: variants.owner_name().to_string(),
+                    reason: format!(
+                        "Dart closed-sum case {:?} does not produce a valid distinct root-qualified type name",
+                        variant.name()
+                    ),
+                });
+            }
+        }
+    }
 }
 
 pub(crate) fn lower(

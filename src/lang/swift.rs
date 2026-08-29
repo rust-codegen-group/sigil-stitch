@@ -341,6 +341,7 @@ const SWIFT_TYPES: &[TypeCapabilityProfile] = &[
             TypeCapability::Attributes,
             // Variants = enum cases
             TypeCapability::Variants,
+            TypeCapability::ClosedSum,
         ],
     ),
 ];

@@ -114,7 +114,7 @@ corresponding compatibility surface can be removed in a future major version.
 | Type expressions | `type_presentation()`, `TypePresentationConfig`, `TypePresentation`, `FunctionPresentation`, `generic_syntax()`, `GenericSyntaxConfig`, qualified-name presentation accessors, and `TypeName::to_doc_with_lang()` | The provided `lower_type_name()` reproduces 0.6.8 output for old `TypeName` variants and rejects `StringLiteral` or any later variant; the direct document method remains only as a deprecated terminal facade | Implement complete fallible `RendererLang::lower_type_name()` and keep imports in the returned `CodeBlock` |
 | `TypeName` matching and documented JSON values | Exhaustive matches over the pre-0.6.8 variants; concrete `TypeName` JSON values documented before 0.7 | Supported Rust constructors remain; checked fixtures preserve the documented JSON values. Generic Serde support does not promise compatibility for other representations, binary encodings, enum ordinals, field order, or serializer bytes | Add a wildcard arm to downstream matches; do not reinterpret unknown data or rely on an undocumented wire format |
 | Functions | `function_keyword()`, `fun_block_open()`, `function_syntax()`, `FunctionSyntaxConfig`, `ParamListStyle`, `FunctionSignatureStyle`, `ConstructorDelegationStyle`, and `WhereClauseStyle` | The provided `lower_function()` interprets them for external adapters | `validate_function()` and complete `lower_function()` |
-| Types | `type_keyword()`, `methods_inside_type_body()`, `type_kind_suffix()`, `emit_newtype_decl()`, `type_header_block_open()`, `type_body_prefix()` / `type_body_suffix()`, `emit_type_close_suffix()`, `abstract_type_modifier_is_valid()`, `type_decl_syntax()`, and type-emitter reads of `function_syntax()` / `enum_and_annotation()` | The provided `lower_type()` interprets them only for permissive external adapters | `validate_type()` and complete `lower_type()` |
+| Types | `type_keyword()`, `methods_inside_type_body()`, `type_kind_suffix()`, `emit_newtype_decl()`, `type_header_block_open()`, `type_body_prefix()` / `type_body_suffix()`, `emit_type_close_suffix()`, `abstract_type_modifier_is_valid()`, `type_decl_syntax()`, and type-emitter reads of `function_syntax()` / `enum_and_annotation()` | The provided `lower_type()` interprets them only for permissive external adapters and does not infer later closed-sum intent | `validate_type()`, complete `lower_type()`, and the dedicated closed-sum builder |
 | Type parameters | `generic_syntax()`, `render_type_params()`, `render_type_param_kind()`, and `ParameterSpec::emit_into()` | The provided permissive declaration lowerers and direct facades preserve frozen 0.6.8 grammar | Complete language-owned type and function lowering; strict adapters without a complete function lowerer fail with `MissingFunctionLowerer` |
 | Variable spelling | `variable_prefix()` | Frozen function, field, property, and type compatibility lowerers interpret the adapter's prefix | Complete language-owned declaration lowering |
 | Preambles | `doc_before_annotations()`, `doc_comment_inside_body()` | Frozen compatibility lowerers may read them | Emit documentation and attributes in each complete lowerer |
@@ -229,6 +229,25 @@ semantic singleton form is available. Exact fixtures cover the `TypeName` JSON
 values documented before 0.7. No other Serde representation or binary format
 receives a cross-version guarantee. Deserializing an unknown variant remains
 an error; it is never reinterpreted as another type.
+
+### Closed sums
+
+Use the dedicated closed-sum builder for a complete set of unit, positional,
+or record cases. Do not encode this intent as `TypeKind::Enum` plus a sealed
+flag, discriminants, or constructor arguments. The 0.6.8 `TypeKind` enum stays
+unchanged; ordinary enum construction and matching remain source-compatible.
+
+A zero-case closed sum is a named uninhabited declaration. A target may use a
+canonical empty type only when that representation preserves the declaration's
+name and valid use positions exactly. The shared model does not add a Never
+type reference or equate declaration intent with bottom-subtype semantics in
+this feature. Targets without an exact named empty-sum declaration reject that
+shape.
+
+Closed-sum intent is new in 0.7 and has no mixed-version interpretation.
+Producers, consumers of newly serialized specs, and external adapters using
+the new semantic views must upgrade together. This requirement does not create
+a general cross-version Serde or binary-format contract.
 
 ### Enum variants
 

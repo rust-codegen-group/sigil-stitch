@@ -332,6 +332,68 @@ The change should be confined to that adapter, its private helpers, and its
 tests. If the change requires a new shared placement enum and new branches in a
 generic spec emitter, target grammar has crossed the seam.
 
+## Closed Sum Declarations
+
+A closed sum is a type declaration with a complete ordered set of named cases.
+The set itself is semantic intent; `sealed`, `enum`, `data`, nesting, and
+sibling placement are possible target representations rather than shared
+configuration.
+
+The public construction entry point is a dedicated closed-sum builder over the
+existing `TypeSpecBuilder`. It does not add `ClosedSum` to the pre-0.6.8
+`TypeKind` enum and does not expose a combinable `sealed` or
+`variant_set_semantics` setter. Read-only `TypeIntent` and `ValidatedType`
+queries carry the fact to strict adapters. `TypeCapability::ClosedSum` is the
+opt-in representability capability; ordinary enum profiles and lowering remain
+unchanged.
+
+Closed sums reuse the existing case data:
+
+| Case shape | Meaning |
+|------------|---------|
+| No cases | Empty sum; a named uninhabited type |
+| Unit case | One named alternative with no carried data |
+| Positional payload | One named alternative carrying types in order |
+| Record payload | One named alternative carrying named typed fields |
+
+Discriminants, legacy variant values, and enum-entry constructor arguments are
+invalid on a closed sum. They describe a value representation or an expression
+evaluated at an enum declaration, not data carried by a sum case. Structured
+and opaque case annotations remain metadata, while wire discriminators and
+serialization tagging stay in the caller or its annotations.
+
+An empty closed sum declares a named uninhabited type. It is not the unit type:
+the empty sum has no values, while the empty product or unit type has exactly
+one. A Never reference or bottom type can likewise have no values, but it is a
+type-expression or subtype concept rather than a declaration of this named
+case set. This feature does not add `TypeName::Never` or treat the two concepts
+as shared semantic identity. A target may reuse its canonical empty type only
+if the result preserves the requested name and every valid use position; it
+otherwise rejects the empty form even if it supports non-empty closed sums.
+
+`Case(T)` always means a generated case that carries `T`. It does not claim
+that an existing declaration for `T` is a subtype of the root. Nominal
+membership of pre-existing types has different declaration ownership and is
+outside this interface.
+
+Complete type lowering owns the output topology. Rust, Swift, Haskell, OCaml,
+and Scala can use native algebraic declarations. Java uses one public sealed
+root with nested case declarations so one generated file does not contain
+several public top-level types. Kotlin uses a private-constructor sealed class
+with nested `data object` and `data class` cases so no additional direct case
+can be declared elsewhere in the same module. Dart uses a sealed root and
+generated final cases. Every other built-in returns a structured
+unsupported-intent error until it has an accepted exact representation; no
+adapter widens a closed sum to `Object`, `Any`, an open hierarchy, or an
+ordinary enum.
+
+Support for the empty shape is validated separately from general closed-sum
+support because several targets require additional language features or lack
+an exact named uninhabited declaration. Each accepted case shape still follows the existing
+intrinsic validation, target capability checks, complete target-local
+validation, non-empty `CodeBlock` output checks, type-name lowering, import
+resolution, and rendering pipeline.
+
 ## Compatibility and Migration
 
 Public declaration grammar that was already part of the 0.6.8 adapter surface
