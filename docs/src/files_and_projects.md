@@ -158,7 +158,17 @@ for file in &rendered {
 # }
 ```
 
-Each file resolves imports independently. `render()` returns `Vec<RenderedFile>` with `path` and `content` fields. `write_to()` creates parent directories as needed.
+`ProjectSpec::validate()` checks every file in project order and returns one
+`ProjectSpecValidation` error containing each invalid file's complete
+`FileSpec::validate()` failure. Member errors remain grouped inside their
+`FileSpecValidation` error. `render()` performs this complete validation before
+rendering any file, and `write_to()` renders the whole project in memory before
+creating directories or files. A validation failure therefore returns all
+known file diagnostics and performs no writes.
+
+After validation, each file resolves imports independently. `render()` returns
+`Vec<RenderedFile>` with `path` and `content` fields. `write_to()` creates
+parent directories as needed only after every file renders successfully.
 
 ## End-to-End Example
 

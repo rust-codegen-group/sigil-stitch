@@ -40,6 +40,10 @@ The integration suites are grouped by the contract they protect:
   verify primitive, importable, compound, invalid, and target-derived raw import
   metadata without rewriting opaque bytes. The same suite covers standalone
   rendering and borrowed resolver behavior.
+- `tests/project_spec_tests.rs` owns cross-file orchestration: ordered
+  aggregation preserves each file's complete member diagnostics, validation
+  finishes before any file emission, and validation or later render failures
+  leave the filesystem untouched.
 - `tests/import_spec_tests.rs` exercises public target import forms. The focused
   unit matrix in `src/import.rs` owns conflict-set construction, resolver
   validation, semantic identity deduplication, and stable passthrough ordering.

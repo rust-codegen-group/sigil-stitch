@@ -4,6 +4,8 @@
 
 ### Added
 
+- `ProjectSpec::validate()` and project-wide validation diagnostics that retain
+  every invalid filename and its complete ordered `FileSpec` errors.
 - Complete language-owned renderer events on `RendererLang`:
   `indent_unit()`, `render_statement_end()`, `render_block_open()`,
   `render_block_close()`, and `render_branch_transition()`. All built-in
@@ -22,6 +24,9 @@
 
 ### Changed
 
+- `ProjectSpec::render()` now validates every file before rendering any file;
+  `write_to()` therefore performs no filesystem writes when project validation
+  fails.
 - `CodeRenderer` now obtains indentation, statement suffixes, block delimiters,
   and branch transitions only through the complete renderer-event interface.
   Post-0.6.8 adapters should migrate all four fallible events together; the

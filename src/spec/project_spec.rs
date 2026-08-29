@@ -2,8 +2,9 @@
 //!
 //! `ProjectSpec` orchestrates rendering multiple `FileSpec`s as a unit,
 //! returning an in-memory collection of rendered files or writing them
-//! to the filesystem. It validates cross-file invariants (e.g. no
-//! duplicate filenames) that individual `FileSpec`s cannot check alone.
+//! to the filesystem. It validates cross-file invariants (e.g. no duplicate
+//! filenames) at build time and aggregates every file's model-validation
+//! failure before rendering begins.
 
 use std::collections::HashMap;
 
@@ -25,7 +26,8 @@ pub struct RenderedFile {
 /// `ProjectSpec` orchestrates rendering multiple [`FileSpec`]s, returning an
 /// in-memory collection of [`RenderedFile`]s or writing them to the filesystem.
 /// Each file resolves imports independently. Cross-file invariants — such as
-/// unique filenames — are validated at build time.
+/// unique filenames — are validated at build time. Model validation covers the
+/// complete file sequence before any file is rendered.
 ///
 /// # Examples
 ///
@@ -60,10 +62,35 @@ impl ProjectSpec {
         ProjectSpecBuilder { files: Vec::new() }
     }
 
+    /// Validate every file in the project.
+    ///
+    /// Validation is collected rather than fail-fast: every file is checked
+    /// in project order, and each invalid file contributes its complete
+    /// [`FileSpec::validate()`] failure to one
+    /// [`SigilStitchError::ProjectSpecValidation`].
+    pub fn validate(&self) -> Result<(), SigilStitchError> {
+        let errors = self
+            .files
+            .iter()
+            .filter_map(|file| file.validate().err())
+            .collect::<Vec<_>>();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            let invalid_file_count = errors.len();
+            Err(SigilStitchError::ProjectSpecValidation {
+                invalid_file_count,
+                errors,
+            })
+        }
+    }
+
     /// Render all files and return their paths and contents.
     ///
-    /// Each file resolves imports independently. File ordering is preserved.
-    /// Fails on the first render error, including the filename in the message.
+    /// The complete project is validated before any file is rendered. Each
+    /// file then resolves imports independently, and file ordering is
+    /// preserved. Post-validation render failures remain fail-fast.
     pub fn render(&self, width: usize) -> Result<Vec<RenderedFile>, SigilStitchError> {
         self.render_with_resolver(width, None)
     }
@@ -82,12 +109,11 @@ impl ProjectSpec {
         width: usize,
         resolver: Option<&dyn ImportAliasConflictResolver>,
     ) -> Result<Vec<RenderedFile>, SigilStitchError> {
+        self.validate()?;
+
         let mut rendered = Vec::with_capacity(self.files.len());
         for file in &self.files {
-            let content = match resolver {
-                Some(resolver) => file.render_with_import_alias_resolver(width, resolver)?,
-                None => file.render(width)?,
-            };
+            let content = file.render_validated_with_resolver(width, resolver)?;
             rendered.push(RenderedFile {
                 path: file.filename().to_string(),
                 content,

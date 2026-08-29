@@ -322,6 +322,18 @@ pub enum SigilStitchError {
         errors: Vec<SigilStitchError>,
     },
 
+    /// A ProjectSpec contains one or more invalid files.
+    ///
+    /// Each entry is the complete validation failure returned by one
+    /// [`FileSpec`](crate::spec::file_spec::FileSpec), in project file order.
+    #[snafu(display("ProjectSpec has {invalid_file_count} invalid file(s): {errors:?}"))]
+    ProjectSpecValidation {
+        /// The number of invalid files. Equal to `errors.len()`.
+        invalid_file_count: usize,
+        /// One complete validation failure per invalid file.
+        errors: Vec<SigilStitchError>,
+    },
+
     /// A type kind used an abstract modifier that its language does not permit.
     #[snafu(display(
         "language {language:?} does not allow an abstract modifier on {kind:?} type {type_name:?}"
