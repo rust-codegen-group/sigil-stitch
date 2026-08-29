@@ -192,6 +192,14 @@ impl FileSpec {
     ) -> Result<String, SigilStitchError> {
         self.validate()?;
 
+        self.render_validated_with_resolver(width, resolver)
+    }
+
+    pub(crate) fn render_validated_with_resolver(
+        &self,
+        width: usize,
+        resolver: Option<&dyn ImportAliasConflictResolver>,
+    ) -> Result<String, SigilStitchError> {
         let lang: &dyn CodeLang =
             self.lang
                 .as_deref()

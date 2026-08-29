@@ -1,14 +1,63 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 use sigil_stitch::code_block::CodeBlock;
+use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::{
     ImportAliasAssignment, ImportAliasConflictResolver, ImportAliasConflicts, ImportAliasRejection,
 };
+use sigil_stitch::lang::CodeLang;
+use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::Visibility;
 use sigil_stitch::spec::project_spec::ProjectSpec;
 use sigil_stitch::type_name::TypeName;
+
+#[derive(Debug)]
+struct ProjectValidationProbe {
+    label: &'static str,
+    validation_events: Rc<RefCell<Vec<&'static str>>>,
+    emission_count: Rc<Cell<usize>>,
+    validation_errors: &'static [&'static str],
+}
+
+impl Emittable for ProjectValidationProbe {
+    fn collect_validation_errors(&self, _lang: &dyn CodeLang, errors: &mut Vec<SigilStitchError>) {
+        self.validation_events.borrow_mut().push(self.label);
+        errors.extend(
+            self.validation_errors
+                .iter()
+                .map(|message| SigilStitchError::Render {
+                    context: format!("validating {}", self.label),
+                    message: (*message).to_string(),
+                }),
+        );
+    }
+
+    fn emit_members(&self, _lang: &dyn CodeLang) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        self.emission_count.set(self.emission_count.get() + 1);
+        Ok(vec![CodeBlock::of(self.label, ())?])
+    }
+}
+
+fn validation_probe_file(
+    filename: &str,
+    label: &'static str,
+    validation_events: Rc<RefCell<Vec<&'static str>>>,
+    emission_count: Rc<Cell<usize>>,
+    validation_errors: &'static [&'static str],
+) -> FileSpec {
+    FileSpec::builder(filename)
+        .add_spec(ProjectValidationProbe {
+            label,
+            validation_events,
+            emission_count,
+            validation_errors,
+        })
+        .build()
+        .unwrap()
+}
 
 // ── Empty project ───────────────────────────────────────
 
@@ -87,6 +136,168 @@ fn test_file_ordering_preserved() {
     let rendered = pb.build().unwrap().render(80).unwrap();
     let paths: Vec<&str> = rendered.iter().map(|r| r.path.as_str()).collect();
     assert_eq!(paths, vec!["c.ts", "a.ts", "b.ts"]);
+}
+
+#[test]
+fn project_validation_aggregates_complete_file_errors_in_project_order() {
+    let validation_events = Rc::new(RefCell::new(Vec::new()));
+    let emission_count = Rc::new(Cell::new(0));
+    let project = ProjectSpec::builder()
+        .add_file(validation_probe_file(
+            "first.ts",
+            "first",
+            validation_events.clone(),
+            emission_count.clone(),
+            &["first-a", "first-b"],
+        ))
+        .add_file(validation_probe_file(
+            "valid.ts",
+            "valid",
+            validation_events.clone(),
+            emission_count.clone(),
+            &[],
+        ))
+        .add_file(validation_probe_file(
+            "third.ts",
+            "third",
+            validation_events.clone(),
+            emission_count.clone(),
+            &["third-a"],
+        ))
+        .build()
+        .unwrap();
+
+    let error = project.validate().unwrap_err();
+    let display = error.to_string();
+    let mut remaining_display = display.as_str();
+    for expected in [
+        "ProjectSpec has 2 invalid file(s):",
+        "FileSpecValidation { filename: \"first.ts\", error_count: 2",
+        "message: \"first-a\"",
+        "message: \"first-b\"",
+        "FileSpecValidation { filename: \"third.ts\", error_count: 1",
+        "message: \"third-a\"",
+    ] {
+        let Some((_, remaining)) = remaining_display.split_once(expected) else {
+            panic!("expected {expected:?} in order within {display:?}");
+        };
+        remaining_display = remaining;
+    }
+
+    let SigilStitchError::ProjectSpecValidation {
+        invalid_file_count,
+        errors,
+    } = error
+    else {
+        panic!("expected ProjectSpecValidation");
+    };
+
+    assert_eq!(invalid_file_count, 2);
+    assert_eq!(errors.len(), 2);
+    let SigilStitchError::FileSpecValidation {
+        filename,
+        error_count,
+        errors: member_errors,
+    } = &errors[0]
+    else {
+        panic!("expected first FileSpecValidation");
+    };
+    assert_eq!(filename, "first.ts");
+    assert_eq!(*error_count, 2);
+    assert!(member_errors[0].to_string().contains("first-a"));
+    assert!(member_errors[1].to_string().contains("first-b"));
+
+    let SigilStitchError::FileSpecValidation {
+        filename,
+        error_count,
+        errors: member_errors,
+    } = &errors[1]
+    else {
+        panic!("expected third FileSpecValidation");
+    };
+    assert_eq!(filename, "third.ts");
+    assert_eq!(*error_count, 1);
+    assert!(member_errors[0].to_string().contains("third-a"));
+    assert_eq!(
+        validation_events.borrow().as_slice(),
+        &["first", "valid", "third"]
+    );
+    assert_eq!(emission_count.get(), 0);
+}
+
+#[test]
+fn project_render_validates_every_file_before_emitting_any_file() {
+    let validation_events = Rc::new(RefCell::new(Vec::new()));
+    let emission_count = Rc::new(Cell::new(0));
+    let project = ProjectSpec::builder()
+        .add_file(validation_probe_file(
+            "valid.ts",
+            "valid",
+            validation_events.clone(),
+            emission_count.clone(),
+            &[],
+        ))
+        .add_file(validation_probe_file(
+            "invalid.ts",
+            "invalid",
+            validation_events.clone(),
+            emission_count.clone(),
+            &["invalid member"],
+        ))
+        .build()
+        .unwrap();
+
+    let error = project.render(80).unwrap_err();
+
+    assert!(matches!(
+        error,
+        SigilStitchError::ProjectSpecValidation {
+            invalid_file_count: 1,
+            ..
+        }
+    ));
+    assert_eq!(validation_events.borrow().as_slice(), &["valid", "invalid"]);
+    assert_eq!(emission_count.get(), 0);
+}
+
+#[test]
+fn project_write_performs_no_writes_when_validation_fails() {
+    let validation_events = Rc::new(RefCell::new(Vec::new()));
+    let emission_count = Rc::new(Cell::new(0));
+    let project = ProjectSpec::builder()
+        .add_file(validation_probe_file(
+            "nested/valid.ts",
+            "valid",
+            validation_events.clone(),
+            emission_count.clone(),
+            &[],
+        ))
+        .add_file(validation_probe_file(
+            "nested/invalid.ts",
+            "invalid",
+            validation_events,
+            emission_count.clone(),
+            &["invalid member"],
+        ))
+        .build()
+        .unwrap();
+    let output_dir = std::env::temp_dir().join(format!(
+        "sigil_stitch_project_validation_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&output_dir);
+
+    let error = project.write_to(&output_dir, 80).unwrap_err();
+
+    assert!(matches!(
+        error,
+        SigilStitchError::ProjectSpecValidation {
+            invalid_file_count: 1,
+            ..
+        }
+    ));
+    assert_eq!(emission_count.get(), 0);
+    assert!(!output_dir.exists());
 }
 
 // ── Render error includes filename ──────────────────────
