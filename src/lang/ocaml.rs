@@ -354,6 +354,7 @@ const OCAML_VARIANT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::ParametricPolymorphism,
     // Variants = constructors
     TypeCapability::Variants,
+    TypeCapability::ClosedSum,
 ];
 const OCAML_TYPES: &[TypeCapabilityProfile] = &[
     TypeCapabilityProfile::new(TypeKind::Struct, OCAML_RECORD_CAPABILITIES),

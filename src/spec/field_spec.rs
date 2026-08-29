@@ -57,6 +57,19 @@ impl<'a> FieldSequenceIntent<'a> {
         }
     }
 
+    pub(crate) fn closed_sum_record_payload(
+        fields: &'a [FieldSpec],
+        owner_name: &'a str,
+        variant_name: &'a str,
+    ) -> Self {
+        Self {
+            fields,
+            context: FieldContext::ClosedSumRecordPayload,
+            owner_name: Some(owner_name),
+            variant_name: Some(variant_name),
+        }
+    }
+
     /// Fields in declaration order.
     pub fn fields(&self) -> &'a [FieldSpec] {
         self.fields

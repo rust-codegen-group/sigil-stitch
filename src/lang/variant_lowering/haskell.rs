@@ -30,6 +30,30 @@ pub(crate) fn collect_validation_errors(
 ) {
     let language = crate::lang::RendererLang::file_extension(lang);
     collect_legacy_value_errors(language, &variants, errors);
+    if variants.is_closed_sum() {
+        for variant in variants.variants() {
+            if !crate::lang::type_lowering::haskell::starts_uppercase(variant.name())
+                || crate::lang::RendererLang::reserved_words(lang).contains(&variant.name())
+            {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: variants.owner_name().to_string(),
+                    reason: format!(
+                        "Haskell closed-sum case {:?} is not a valid data-constructor name",
+                        variant.name()
+                    ),
+                });
+            }
+            if !variant.annotations().is_empty() || !variant.annotation_specs().is_empty() {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: variants.owner_name().to_string(),
+                    reason: format!(
+                        "Haskell closed-sum case {:?} does not support annotations",
+                        variant.name()
+                    ),
+                });
+            }
+        }
+    }
     let mut record_selectors = std::collections::HashMap::new();
     for variant in variants.variants() {
         for field in variant.record_payload() {
@@ -76,12 +100,20 @@ pub(crate) fn lower(
         } else if !variant.record_payload().is_empty() {
             block.add(" { ", ());
             block.add_code(FieldSpec::lower_sequence(
-                FieldSequenceIntent::variant_record_payload(
-                    variant.record_payload(),
-                    variants.owner_name(),
-                    variants.owner_kind(),
-                    variant.name(),
-                ),
+                if variants.is_closed_sum() {
+                    FieldSequenceIntent::closed_sum_record_payload(
+                        variant.record_payload(),
+                        variants.owner_name(),
+                        variant.name(),
+                    )
+                } else {
+                    FieldSequenceIntent::variant_record_payload(
+                        variant.record_payload(),
+                        variants.owner_name(),
+                        variants.owner_kind(),
+                        variant.name(),
+                    )
+                },
                 lang,
             )?);
             block.add(" }", ());

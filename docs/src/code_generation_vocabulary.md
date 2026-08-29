@@ -49,6 +49,25 @@ parameters and constraints, type relationships, primary-constructor
 parameters, variants, and member families without choosing their source order
 or spelling.
 
+### Closed sum
+
+A type declaration whose complete ordered set of named cases is part of its
+semantic intent. Each case is unit-shaped or carries positional or named
+record data. A closed sum may contain no cases: the empty sum is uninhabited.
+The declaration does not prescribe whether a target uses an enum, algebraic
+data type, sealed root with generated case declarations, nested declarations,
+or sibling declarations.
+
+The zero-case form declares a named uninhabited type. A particular target may
+have a Never or bottom type with the same absence of values, but that is a
+type-expression or subtype concept rather than this caller-named declaration.
+The shared model does not equate them; a target may reuse such a type only if
+it preserves the declaration's name and every valid use position.
+
+Closed-sum intent is not a `sealed` modifier or an enum-formatting option. A
+case carrying a `TypeName` owns that payload relationship; it does not assert
+that an already-declared type is a nominal subtype of the sum root.
+
 ### Validated type
 
 A crate-constructed view whose type-level intent and every child declaration
@@ -90,8 +109,11 @@ complete sequence so it can validate collisions and own sequence-level grammar.
 ### Field context
 
 The semantic role in which a field sequence appears: direct emission, ordinary
-type members, or a variant record payload. It identifies representability; it
-does not prescribe placement, punctuation, or separators. The
+type members, an ordinary variant record payload, or a closed-sum case record
+payload. Keeping the payload contexts distinct prevents support for generated
+closed-sum cases from widening ordinary enum behavior. A field context
+identifies representability; it does not prescribe placement, punctuation, or
+separators. The
 `Direct(DeclarationContext)` payload retains only the pre-0.6.8 direct-emission
 placement input. It is a narrow compatibility exception, not a reusable
 placement or target-grammar model.
@@ -147,6 +169,10 @@ presence of non-variant members. A variant lowerer handles the sequence as a
 whole; the owning type lowerer chooses where that sequence appears relative to
 other member families. Non-variant members include fields, properties,
 methods, embedded types, and opaque members.
+
+For a closed sum, an empty sequence is meaningful rather than missing input:
+it declares an empty sum. Ordinary value-enum validation remains independent
+and may continue to require at least one member for a particular target.
 
 ## Variant Data
 

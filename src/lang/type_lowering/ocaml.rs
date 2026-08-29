@@ -52,7 +52,8 @@ pub(crate) fn validate(lang: &OCaml, type_: TypeIntent<'_>) -> Result<(), SigilS
     {
         return Err(invalid(type_, "OCaml does not permit an empty record type"));
     }
-    if type_.kind() == TypeKind::Enum
+    if !type_.is_closed_sum()
+        && type_.kind() == TypeKind::Enum
         && type_.variants().is_empty()
         && type_.extra_members().is_empty()
     {
@@ -98,6 +99,15 @@ pub(crate) fn lower(
             block.add("%<", ());
         }
         TypeKind::Enum => {
+            if type_.is_closed_sum()
+                && type_
+                    .variants()
+                    .is_some_and(|variants| variants.variants().is_empty())
+            {
+                block.add(" |", ());
+                block.add_line();
+                return Ok(vec![block.build()?]);
+            }
             block.add_line();
             block.add("%>", ());
             common::emit_variants(&mut block, lang, &type_)?;

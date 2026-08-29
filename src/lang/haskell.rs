@@ -382,6 +382,7 @@ const HASKELL_TYPES: &[TypeCapabilityProfile] = &[
             TypeCapability::BoundedPolymorphism,
             // Variants = data constructors
             TypeCapability::Variants,
+            TypeCapability::ClosedSum,
             TypeCapability::InterfaceImplementation,
         ],
     ),

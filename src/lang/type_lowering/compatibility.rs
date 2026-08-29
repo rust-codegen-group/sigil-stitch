@@ -19,6 +19,13 @@ pub(crate) fn lower<L: CodeLang + ?Sized>(
     lang: &L,
     type_: ValidatedType<'_>,
 ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+    if type_.is_closed_sum() {
+        return Err(SigilStitchError::UnsupportedTypeCapabilities {
+            language: lang.file_extension().to_string(),
+            type_name: type_.name().to_string(),
+            capabilities: vec![crate::lang::capability::TypeCapability::ClosedSum],
+        });
+    }
     match type_.kind() {
         TypeKind::TypeAlias => return Ok(vec![lower_alias(lang, &type_)?]),
         TypeKind::Newtype => return Ok(vec![lower_newtype(lang, &type_)?]),
@@ -595,4 +602,29 @@ fn emit_type_close<L: CodeLang + ?Sized>(
         block.add("%<", ());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::rust::Rust;
+    use crate::spec::enum_variant_spec::EnumVariantSpec;
+    use crate::spec::type_spec::TypeSpec;
+
+    #[test]
+    fn compatibility_lowering_defensively_rejects_closed_sum_intent() {
+        let type_ = TypeSpec::closed_sum("Outcome")
+            .add_variant(EnumVariantSpec::new("Value").unwrap())
+            .build()
+            .unwrap();
+        let lang = Rust::new();
+        let validated = type_.validate_complete(&lang).unwrap();
+        let error = lower(&lang, validated).unwrap_err();
+
+        assert!(matches!(
+            error,
+            SigilStitchError::UnsupportedTypeCapabilities { capabilities, .. }
+                if capabilities == vec![crate::lang::capability::TypeCapability::ClosedSum]
+        ));
+    }
 }

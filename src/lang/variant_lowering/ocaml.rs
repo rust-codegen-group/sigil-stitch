@@ -29,6 +29,33 @@ pub(crate) fn collect_validation_errors(
         &variants,
         errors,
     );
+    if variants.is_closed_sum() {
+        for variant in variants.variants() {
+            let mut characters = variant.name().chars();
+            let valid = characters.next().is_some_and(char::is_uppercase)
+                && characters.all(|character| {
+                    character == '_' || character == '\'' || character.is_alphanumeric()
+                });
+            if !valid || crate::lang::RendererLang::reserved_words(lang).contains(&variant.name()) {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: variants.owner_name().to_string(),
+                    reason: format!(
+                        "OCaml closed-sum case {:?} is not a valid constructor name",
+                        variant.name()
+                    ),
+                });
+            }
+            if !variant.annotations().is_empty() || !variant.annotation_specs().is_empty() {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: variants.owner_name().to_string(),
+                    reason: format!(
+                        "OCaml closed-sum case {:?} does not support annotations",
+                        variant.name()
+                    ),
+                });
+            }
+        }
+    }
 }
 
 pub(crate) fn lower(
@@ -57,12 +84,20 @@ pub(crate) fn lower(
         } else if !variant.record_payload().is_empty() {
             block.add(" of { ", ());
             block.add_code(FieldSpec::lower_sequence(
-                FieldSequenceIntent::variant_record_payload(
-                    variant.record_payload(),
-                    variants.owner_name(),
-                    variants.owner_kind(),
-                    variant.name(),
-                ),
+                if variants.is_closed_sum() {
+                    FieldSequenceIntent::closed_sum_record_payload(
+                        variant.record_payload(),
+                        variants.owner_name(),
+                        variant.name(),
+                    )
+                } else {
+                    FieldSequenceIntent::variant_record_payload(
+                        variant.record_payload(),
+                        variants.owner_name(),
+                        variants.owner_kind(),
+                        variant.name(),
+                    )
+                },
                 lang,
             )?);
             block.add(" }", ());

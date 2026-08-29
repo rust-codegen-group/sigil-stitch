@@ -84,11 +84,13 @@ A struct field or class property: name, type, visibility, static/readonly flags,
 
 Fields are validated and lowered as a complete ordered sequence. The selected
 adapter receives a semantic context for direct emission, ordinary type members,
-or a variant record payload. It can therefore validate sibling name collisions
-and own sequence-level grammar such as access sections and separators. Every
-built-in declares explicit field capability profiles; an unsupported context,
-modifier, annotation form, tag, or type requirement returns an error before
-lowering.
+an ordinary variant record payload, or a closed-sum case record payload. The
+payload contexts stay separate so supporting a generated closed-sum case does
+not grant that shape to an ordinary enum. The adapter can therefore validate
+sibling name collisions and own sequence-level grammar such as access sections
+and separators. Every built-in declares explicit field capability profiles; an
+unsupported context, modifier, annotation form, tag, or type requirement
+returns an error before lowering.
 
 ```rust
 # extern crate sigil_stitch;

@@ -277,6 +277,7 @@ const DART_TYPES: &[TypeCapabilityProfile] = &[
         &[
             // Variants = enum values
             TypeCapability::Variants,
+            TypeCapability::ClosedSum,
         ],
     ),
     TypeCapabilityProfile::new(

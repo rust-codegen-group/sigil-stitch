@@ -34,6 +34,8 @@ pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
         PAYLOAD_CAPABILITIES,
     )
     .with_required_capabilities(REQUIRED),
+    FieldCapabilityProfile::new(FieldContext::ClosedSumRecordPayload, PAYLOAD_CAPABILITIES)
+        .with_required_capabilities(REQUIRED),
 ];
 
 fn is_valid_identifier(name: &str) -> bool {
@@ -72,12 +74,14 @@ pub(crate) fn collect_validation_errors(
                 reason: "Rust reserves this identifier in field position".to_string(),
             });
         }
-        let visibility_is_valid =
-            if matches!(fields.context(), FieldContext::VariantRecordPayload(_)) {
-                field.modifiers().visibility == Visibility::Inherited
-            } else {
-                !matches!(field.modifiers().visibility, Visibility::Protected)
-            };
+        let visibility_is_valid = if matches!(
+            fields.context(),
+            FieldContext::VariantRecordPayload(_) | FieldContext::ClosedSumRecordPayload
+        ) {
+            field.modifiers().visibility == Visibility::Inherited
+        } else {
+            !matches!(field.modifiers().visibility, Visibility::Protected)
+        };
         if !visibility_is_valid {
             errors.push(SigilStitchError::InvalidField {
                 language: lang.file_extension().to_string(),
@@ -104,12 +108,15 @@ pub(crate) fn lower(
     fields: ValidatedFields<'_>,
 ) -> Result<CodeBlock, SigilStitchError> {
     let mut block = CodeBlock::builder();
-    let payload = matches!(fields.context(), FieldContext::VariantRecordPayload(_));
+    let payload = matches!(
+        fields.context(),
+        FieldContext::VariantRecordPayload(_) | FieldContext::ClosedSumRecordPayload
+    );
     let declaration_context = match fields.context() {
         FieldContext::Direct(context) => context,
-        FieldContext::TypeMember(_) | FieldContext::VariantRecordPayload(_) => {
-            DeclarationContext::Member
-        }
+        FieldContext::TypeMember(_)
+        | FieldContext::VariantRecordPayload(_)
+        | FieldContext::ClosedSumRecordPayload => DeclarationContext::Member,
     };
     for field in fields.fields() {
         emit_doc(&mut block, lang, field);

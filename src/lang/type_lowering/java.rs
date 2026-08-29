@@ -6,6 +6,7 @@ use crate::code_block::{Arg, CodeBlock};
 use crate::error::SigilStitchError;
 use crate::lang::java::Java;
 use crate::lang::{CodeLang, RendererLang};
+use crate::spec::field_spec::{FieldSequenceIntent, FieldSpec};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
 use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
@@ -100,6 +101,29 @@ pub(crate) fn validate(lang: &Java, type_: TypeIntent<'_>) -> Result<(), SigilSt
             reason: "Java classes may extend at most one superclass".to_string(),
         });
     }
+    if type_.is_closed_sum() {
+        if type_.variants().is_empty() {
+            return Err(SigilStitchError::InvalidTypeDeclaration {
+                type_name: type_.name().to_string(),
+                reason: "Java sealed closed sums require at least one permitted case".to_string(),
+            });
+        }
+        if !type_.fields().is_empty()
+            || !type_.properties().is_empty()
+            || !type_.methods().is_empty()
+            || !type_.embedded_types().is_empty()
+            || !type_.extra_members().is_empty()
+            || !type_.primary_constructor_parameters().is_empty()
+            || !type_.nominal_super_types().is_empty()
+            || !type_.implemented_types().is_empty()
+        {
+            return Err(SigilStitchError::InvalidTypeDeclaration {
+                type_name: type_.name().to_string(),
+                reason: "Java closed sums currently support only root documentation, annotations, and cases"
+                    .to_string(),
+            });
+        }
+    }
     Ok(())
 }
 
@@ -107,6 +131,9 @@ pub(crate) fn lower(
     lang: &Java,
     type_: ValidatedType<'_>,
 ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+    if type_.is_closed_sum() {
+        return Ok(vec![lower_closed_sum(lang, &type_)?]);
+    }
     let mut block = CodeBlock::builder();
     common::emit_doc(&mut block, lang, &type_);
     common::emit_structured_annotations(&mut block, &type_, "@", "")?;
@@ -169,6 +196,68 @@ pub(crate) fn lower(
     block.add("%<}", ());
     block.add_line();
     Ok(vec![block.build()?])
+}
+
+fn lower_closed_sum(lang: &Java, type_: &ValidatedType<'_>) -> Result<CodeBlock, SigilStitchError> {
+    let variants = type_
+        .variants()
+        .expect("validated closed sums retain their complete case set");
+    let mut block = CodeBlock::builder();
+    common::emit_doc(&mut block, lang, type_);
+    common::emit_structured_annotations(&mut block, type_, "@", "")?;
+    common::emit_raw_annotations(&mut block, type_);
+    block.add(
+        &format!(
+            "{}sealed interface {} {{",
+            lang.render_visibility(type_.modifiers().visibility, DeclarationContext::TopLevel),
+            type_.name()
+        ),
+        (),
+    );
+    block.add_line();
+    block.add("%>", ());
+    for (index, variant) in variants.variants().iter().enumerate() {
+        if index > 0 {
+            block.add_line();
+        }
+        crate::lang::variant_lowering::emit_doc(&mut block, lang, variant);
+        crate::lang::variant_lowering::emit_structured_annotations(&mut block, variant, "@", "")?;
+        crate::lang::variant_lowering::emit_raw_annotations(&mut block, variant);
+        if variant.positional_payload().is_empty() && variant.record_payload().is_empty() {
+            block.add(
+                &format!(
+                    "enum {} implements {} {{ INSTANCE }}",
+                    variant.name(),
+                    type_.name()
+                ),
+                (),
+            );
+        } else {
+            block.add(&format!("record {}(", variant.name()), ());
+            if !variant.positional_payload().is_empty() {
+                for (payload_index, payload) in variant.positional_payload().iter().enumerate() {
+                    if payload_index > 0 {
+                        block.add(", ", ());
+                    }
+                    block.add(&format!("%T value{payload_index}"), payload.clone());
+                }
+            } else {
+                block.add_code(FieldSpec::lower_sequence(
+                    FieldSequenceIntent::closed_sum_record_payload(
+                        variant.record_payload(),
+                        type_.name(),
+                        variant.name(),
+                    ),
+                    lang,
+                )?);
+            }
+            block.add(&format!(") implements {} {{}}", type_.name()), ());
+        }
+        block.add_line();
+    }
+    block.add("%<}", ());
+    block.add_line();
+    block.build()
 }
 
 fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> String {

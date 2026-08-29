@@ -336,6 +336,7 @@ const JAVA_TYPES: &[TypeCapabilityProfile] = &[
             TypeCapability::Attributes,
             // Variants = enum constants
             TypeCapability::Variants,
+            TypeCapability::ClosedSum,
         ],
     ),
 ];

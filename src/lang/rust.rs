@@ -294,6 +294,7 @@ const RUST_TYPES: &[TypeCapabilityProfile] = &[
             TypeCapability::Attributes,
             // Variants = enum variants
             TypeCapability::Variants,
+            TypeCapability::ClosedSum,
         ],
     ),
     TypeCapabilityProfile::new(
@@ -550,7 +551,7 @@ impl CodeLang for Rust {
         variants: crate::lang::VariantIntent<'_>,
         errors: &mut Vec<crate::error::SigilStitchError>,
     ) {
-        crate::lang::variant_lowering::rust::collect_validation_errors(variants, errors);
+        crate::lang::variant_lowering::rust::collect_validation_errors(self, variants, errors);
     }
 
     fn lower_variants(

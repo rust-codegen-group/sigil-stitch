@@ -20,7 +20,7 @@ const ALL_KINDS: [TypeKind; 7] = [
     TypeKind::Newtype,
 ];
 
-const ALL_CAPABILITIES: [TypeCapability; 12] = [
+const ALL_CAPABILITIES: [TypeCapability; 13] = [
     TypeCapability::RecordFields,
     TypeCapability::AccessorMethods,
     TypeCapability::Methods,
@@ -32,6 +32,7 @@ const ALL_CAPABILITIES: [TypeCapability; 12] = [
     TypeCapability::HigherKindedPolymorphism,
     TypeCapability::PrimaryConstructorParameters,
     TypeCapability::Variants,
+    TypeCapability::ClosedSum,
     TypeCapability::Attributes,
 ];
 
@@ -244,7 +245,10 @@ fn dart_matrix() {
             (TypeKind::Struct, class_caps),
             (TypeKind::Interface, contract_caps),
             (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, &[TypeCapability::Variants]),
+            (
+                TypeKind::Enum,
+                &[TypeCapability::Variants, TypeCapability::ClosedSum],
+            ),
             (
                 TypeKind::TypeAlias,
                 &[
@@ -302,6 +306,7 @@ fn haskell_matrix() {
         TypeCapability::ParametricPolymorphism,
         TypeCapability::BoundedPolymorphism,
         TypeCapability::Variants,
+        TypeCapability::ClosedSum,
         TypeCapability::InterfaceImplementation,
     ];
     let newtype_caps = &[
@@ -350,6 +355,7 @@ fn java_matrix() {
         TypeCapability::InterfaceImplementation,
         TypeCapability::Attributes,
         TypeCapability::Variants,
+        TypeCapability::ClosedSum,
     ];
     assert_matrix(
         adapter_for("java").as_ref(),
@@ -426,6 +432,7 @@ fn kotlin_matrix() {
         TypeCapability::PrimaryConstructorParameters,
         TypeCapability::Attributes,
         TypeCapability::Variants,
+        TypeCapability::ClosedSum,
     ];
     let newtype_caps = &[
         TypeCapability::ParametricPolymorphism,
@@ -458,6 +465,7 @@ fn ocaml_matrix() {
     let variant_caps = &[
         TypeCapability::ParametricPolymorphism,
         TypeCapability::Variants,
+        TypeCapability::ClosedSum,
     ];
     assert_matrix(
         adapter_for("ocaml").as_ref(),
@@ -586,6 +594,7 @@ fn rust_matrix() {
         TypeCapability::BoundedPolymorphism,
         TypeCapability::Attributes,
         TypeCapability::Variants,
+        TypeCapability::ClosedSum,
     ];
     let alias_caps = &[TypeCapability::ParametricPolymorphism];
     let newtype_caps = &[
@@ -637,6 +646,7 @@ fn scala_matrix() {
         TypeCapability::HigherKindedPolymorphism,
         TypeCapability::Attributes,
         TypeCapability::Variants,
+        TypeCapability::ClosedSum,
     ];
     let newtype_caps = &[
         TypeCapability::ParametricPolymorphism,
@@ -698,6 +708,7 @@ fn swift_matrix() {
         TypeCapability::InterfaceImplementation,
         TypeCapability::Attributes,
         TypeCapability::Variants,
+        TypeCapability::ClosedSum,
     ];
     assert_matrix(
         adapter_for("swift").as_ref(),

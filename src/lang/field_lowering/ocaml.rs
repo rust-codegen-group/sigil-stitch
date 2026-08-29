@@ -31,6 +31,8 @@ pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
         CAPABILITIES,
     )
     .with_required_capabilities(REQUIRED),
+    FieldCapabilityProfile::new(FieldContext::ClosedSumRecordPayload, CAPABILITIES)
+        .with_required_capabilities(REQUIRED),
 ];
 
 fn is_valid_identifier(name: &str) -> bool {
@@ -73,8 +75,10 @@ pub(crate) fn collect_validation_errors(
                     .to_string(),
             });
         }
-        if matches!(fields.context(), FieldContext::VariantRecordPayload(_))
-            && !field.doc().is_empty()
+        if matches!(
+            fields.context(),
+            FieldContext::VariantRecordPayload(_) | FieldContext::ClosedSumRecordPayload
+        ) && !field.doc().is_empty()
         {
             errors.push(SigilStitchError::InvalidField {
                 language: lang.file_extension().to_string(),
@@ -93,7 +97,10 @@ pub(crate) fn lower(
     fields: ValidatedFields<'_>,
 ) -> Result<CodeBlock, SigilStitchError> {
     let mut block = CodeBlock::builder();
-    let payload = matches!(fields.context(), FieldContext::VariantRecordPayload(_));
+    let payload = matches!(
+        fields.context(),
+        FieldContext::VariantRecordPayload(_) | FieldContext::ClosedSumRecordPayload
+    );
     for (index, field) in fields.fields().iter().enumerate() {
         if !payload {
             emit_doc(&mut block, lang, field);

@@ -106,7 +106,94 @@ pub(crate) fn validate(lang: &Rust, type_: TypeIntent<'_>) -> Result<(), SigilSt
             ));
         }
     }
+    if type_.is_closed_sum() {
+        for parameter in type_.type_params() {
+            let occurs_in_case = type_.variants().iter().any(|variant| {
+                variant
+                    .positional_payload()
+                    .iter()
+                    .chain(
+                        variant
+                            .record_payload()
+                            .iter()
+                            .map(|field| field.field_type()),
+                    )
+                    .any(|payload| type_name_contains_parameter(payload, parameter.name()))
+            });
+            if !occurs_in_case {
+                return Err(invalid_parameter(
+                    type_,
+                    parameter.name(),
+                    "Rust closed-sum type parameters must occur in at least one case payload",
+                ));
+            }
+        }
+    }
     Ok(())
+}
+
+fn type_name_contains_parameter(type_name: &crate::type_name::TypeName, parameter: &str) -> bool {
+    use crate::type_name::TypeName;
+
+    match type_name {
+        TypeName::Primitive(name) | TypeName::Raw(name) => name == parameter,
+        TypeName::Array(inner)
+        | TypeName::ReadonlyArray(inner)
+        | TypeName::Pointer(inner)
+        | TypeName::Slice(inner)
+        | TypeName::Optional(inner) => type_name_contains_parameter(inner, parameter),
+        TypeName::Reference {
+            inner, lifetime, ..
+        } => {
+            lifetime.as_deref() == Some(parameter) || type_name_contains_parameter(inner, parameter)
+        }
+        TypeName::Generic { base, params } => {
+            type_name_contains_parameter(base, parameter)
+                || params
+                    .iter()
+                    .any(|value| type_name_contains_parameter(value, parameter))
+        }
+        TypeName::Union(types)
+        | TypeName::Intersection(types)
+        | TypeName::Tuple(types)
+        | TypeName::ImplTrait { bounds: types }
+        | TypeName::DynTrait { bounds: types } => types
+            .iter()
+            .any(|value| type_name_contains_parameter(value, parameter)),
+        TypeName::Map { key, value } => {
+            type_name_contains_parameter(key, parameter)
+                || type_name_contains_parameter(value, parameter)
+        }
+        TypeName::Function {
+            params,
+            return_type,
+        } => {
+            params
+                .iter()
+                .any(|value| type_name_contains_parameter(value, parameter))
+                || type_name_contains_parameter(return_type, parameter)
+        }
+        TypeName::AssociatedType {
+            base, qualifier, ..
+        } => {
+            type_name_contains_parameter(base, parameter)
+                || qualifier
+                    .as_deref()
+                    .is_some_and(|value| type_name_contains_parameter(value, parameter))
+        }
+        TypeName::Wildcard {
+            upper_bound,
+            lower_bound,
+        } => {
+            upper_bound
+                .as_deref()
+                .is_some_and(|value| type_name_contains_parameter(value, parameter))
+                || lower_bound
+                    .as_deref()
+                    .is_some_and(|value| type_name_contains_parameter(value, parameter))
+        }
+        TypeName::Importable { .. } | TypeName::StringLiteral(_) => false,
+    }
 }
 
 pub(crate) fn lower(

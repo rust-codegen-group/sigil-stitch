@@ -100,6 +100,19 @@ pub(crate) fn validate(lang: &Scala, type_: TypeIntent<'_>) -> Result<(), SigilS
             reason: "Scala classes may inherit from at most one superclass".to_string(),
         });
     }
+    if type_.is_closed_sum() && type_.variants().is_empty() {
+        return Err(SigilStitchError::InvalidTypeDeclaration {
+            type_name: type_.name().to_string(),
+            reason: "Scala closed sums require at least one case".to_string(),
+        });
+    }
+    if type_.is_closed_sum() && !type_.type_params().is_empty() {
+        return Err(SigilStitchError::InvalidTypeDeclaration {
+            type_name: type_.name().to_string(),
+            reason: "Scala closed sums with type parameters are unsupported until every case can preserve the root type arguments"
+                .to_string(),
+        });
+    }
     Ok(())
 }
 
