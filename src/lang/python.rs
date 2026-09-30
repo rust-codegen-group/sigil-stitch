@@ -6,8 +6,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
-    LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-    VariantCapabilityProfile,
+    LanguageCapabilities, TypeCapability, TypeDeclarationCapability, TypeKindCapabilityProfile,
+    VariantCapability, VariantCapabilityProfile,
 };
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
@@ -399,43 +399,51 @@ impl RendererLang for Python {
     }
 }
 
+const PY_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
 const PY_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = class/instance fields
     TypeCapability::RecordFields,
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = base classes
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = additional bases
     TypeCapability::InterfaceImplementation,
-    // Attributes = decorators
-    TypeCapability::Attributes,
 ];
-const PY_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, PY_CLASS_CAPABILITIES),
+const PY_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        PY_CLASS_DECLARATION_CAPABILITIES,
+        PY_CLASS_CAPABILITIES,
+    ),
     // Struct/Interface/Trait are represented as Python classes.
-    TypeCapabilityProfile::new(TypeKind::Struct, PY_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, PY_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, PY_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        PY_CLASS_DECLARATION_CAPABILITIES,
+        PY_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        PY_CLASS_DECLARATION_CAPABILITIES,
+        PY_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        PY_CLASS_DECLARATION_CAPABILITIES,
+        PY_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
+        &[],
         &[
-            // Methods = methods
             TypeCapability::Methods,
-            // NominalSubtyping = base classes
             TypeCapability::NominalSubtyping,
-            // Variants = enum members
             TypeCapability::Variants,
         ],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::TypeAlias,
-        &[
-            // ParametricPolymorphism = type parameters (`TypeVar`)
-            TypeCapability::ParametricPolymorphism,
-        ],
+        &[TypeDeclarationCapability::ParametricPolymorphism],
+        &[],
     ),
-    TypeCapabilityProfile::new(TypeKind::Newtype, &[]),
+    TypeKindCapabilityProfile::new(TypeKind::Newtype, &[], &[]),
 ];
 
 const PY_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(

@@ -29,8 +29,8 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-    VariantCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeDeclarationCapability,
+    TypeKindCapabilityProfile, VariantCapability, VariantCapabilityProfile,
 };
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
@@ -185,44 +185,36 @@ impl RendererLang for Ruby {
     }
 }
 
-const RUBY_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // Methods = methods
-    TypeCapability::Methods,
-    // NominalSubtyping = `<`
-    TypeCapability::NominalSubtyping,
-    // Attributes = annotations are not native; raw blocks remain available
-    TypeCapability::Attributes,
-];
-const RUBY_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, RUBY_CLASS_CAPABILITIES),
+const RUBY_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
+const RUBY_CLASS_CAPABILITIES: &[TypeCapability] =
+    &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+const RUBY_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        RUBY_CLASS_DECLARATION_CAPABILITIES,
+        RUBY_CLASS_CAPABILITIES,
+    ),
     // Struct is represented as a Ruby class.
-    TypeCapabilityProfile::new(TypeKind::Struct, RUBY_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        RUBY_CLASS_DECLARATION_CAPABILITIES,
+        RUBY_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Interface,
-        &[
-            // Methods = methods
-            TypeCapability::Methods,
-            // Attributes = annotations are not native; raw blocks remain available
-            TypeCapability::Attributes,
-        ],
+        &[TypeDeclarationCapability::Attributes],
+        &[TypeCapability::Methods],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Trait,
-        &[
-            // Methods = methods
-            TypeCapability::Methods,
-            // Attributes = annotations are not native; raw blocks remain available
-            TypeCapability::Attributes,
-        ],
+        &[TypeDeclarationCapability::Attributes],
+        &[TypeCapability::Methods],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
-        &[
-            // Variants = constants on the class object
-            TypeCapability::Variants,
-            // Attributes = annotations are not native; raw blocks remain available
-            TypeCapability::Attributes,
-        ],
+        &[TypeDeclarationCapability::Attributes],
+        &[TypeCapability::Variants],
     ),
 ];
 

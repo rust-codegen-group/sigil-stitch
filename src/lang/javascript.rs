@@ -5,8 +5,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-    VariantCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeDeclarationCapability,
+    TypeKindCapabilityProfile, VariantCapability, VariantCapabilityProfile,
 };
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
@@ -349,42 +349,52 @@ impl RendererLang for JavaScript {
     }
 }
 
+const JS_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
 const JS_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = class fields
     TypeCapability::RecordFields,
-    // AccessorMethods = get/set accessors
     TypeCapability::AccessorMethods,
-    // Methods = class methods
     TypeCapability::Methods,
-    // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
-    // Attributes = decorators
-    TypeCapability::Attributes,
 ];
+const JS_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
 const JS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::RecordFields,
     TypeCapability::AccessorMethods,
     TypeCapability::Methods,
     TypeCapability::NominalSubtyping,
-    TypeCapability::Attributes,
 ];
-const JS_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, JS_CLASS_CAPABILITIES),
+const JS_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        JS_CLASS_DECLARATION_CAPABILITIES,
+        JS_CLASS_CAPABILITIES,
+    ),
     // Struct is represented as a JavaScript class.
-    TypeCapabilityProfile::new(TypeKind::Struct, JS_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, JS_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, JS_CONTRACT_CAPABILITIES),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        JS_CLASS_DECLARATION_CAPABILITIES,
+        JS_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        JS_CONTRACT_DECLARATION_CAPABILITIES,
+        JS_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        JS_CONTRACT_DECLARATION_CAPABILITIES,
+        JS_CONTRACT_CAPABILITIES,
+    ),
     // Enum is represented as a class with static members.
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
+        &[],
         &[
-            // RecordFields = ordinary class fields
             TypeCapability::RecordFields,
-            // AccessorMethods = get/set accessors
             TypeCapability::AccessorMethods,
-            // Methods = class methods
             TypeCapability::Methods,
-            // Variants = enum-like static class members
             TypeCapability::Variants,
         ],
     ),

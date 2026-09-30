@@ -6,7 +6,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeDeclarationCapability,
+    TypeKindCapabilityProfile,
 };
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
@@ -391,38 +392,48 @@ impl RendererLang for Go {
 }
 
 // Go has no native Enum; TypeKind::Enum is intentionally unsupported.
+const GO_STRUCT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+];
 const GO_STRUCT_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = struct fields
     TypeCapability::RecordFields,
-    // StructuralEmbedding = embedded fields / embedded interfaces
-    TypeCapability::StructuralEmbedding,
-    // ParametricPolymorphism = type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = constraints in type parameter declarations
-    TypeCapability::BoundedPolymorphism,
-];
-const GO_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    // Methods = interface methods
-    TypeCapability::Methods,
-    // StructuralEmbedding = embedded interfaces
     TypeCapability::StructuralEmbedding,
 ];
-const GO_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Struct, GO_STRUCT_CAPABILITIES),
+const GO_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[];
+const GO_CONTRACT_CAPABILITIES: &[TypeCapability] =
+    &[TypeCapability::Methods, TypeCapability::StructuralEmbedding];
+const GO_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        GO_STRUCT_DECLARATION_CAPABILITIES,
+        GO_STRUCT_CAPABILITIES,
+    ),
     // Class is represented as a Go struct.
-    TypeCapabilityProfile::new(TypeKind::Class, GO_STRUCT_CAPABILITIES),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        GO_STRUCT_DECLARATION_CAPABILITIES,
+        GO_STRUCT_CAPABILITIES,
+    ),
     // Trait is represented as a Go interface.
-    TypeCapabilityProfile::new(TypeKind::Interface, GO_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, GO_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::TypeAlias, &[]),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        GO_CONTRACT_DECLARATION_CAPABILITIES,
+        GO_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        GO_CONTRACT_DECLARATION_CAPABILITIES,
+        GO_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(TypeKind::TypeAlias, &[], &[]),
+    TypeKindCapabilityProfile::new(
         TypeKind::Newtype,
         &[
-            // ParametricPolymorphism = type parameters
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = constraints in type parameter declarations
-            TypeCapability::BoundedPolymorphism,
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
         ],
+        &[],
     ),
 ];
 

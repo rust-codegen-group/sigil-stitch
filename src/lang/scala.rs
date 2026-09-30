@@ -4,8 +4,9 @@ use crate::code_block::{Arg, CodeBlock};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
-    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    ClosedSumCapabilityProfile, ClosedSumCaseForm, FunctionBodyPolicy, FunctionCapability,
+    FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
+    TypeDeclarationCapability, TypeKindCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
@@ -264,87 +265,83 @@ impl RendererLang for Scala {
     }
 }
 
+const SCALA_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::HigherKindedPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
 const SCALA_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = fields
     TypeCapability::RecordFields,
-    // AccessorMethods = accessors
     TypeCapability::AccessorMethods,
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = `with`
     TypeCapability::InterfaceImplementation,
-    // ParametricPolymorphism = type parameters
-    TypeCapability::ParametricPolymorphism,
-    TypeCapability::HigherKindedPolymorphism,
-    // BoundedPolymorphism = context/view bounds and type bounds
-    TypeCapability::BoundedPolymorphism,
-    // PrimaryConstructorParameters = primary constructor parameters
     TypeCapability::PrimaryConstructorParameters,
-    // Attributes = annotations
-    TypeCapability::Attributes,
 ];
-const SCALA_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    // Methods = methods
-    TypeCapability::Methods,
-    // NominalSubtyping = `extends`
-    TypeCapability::NominalSubtyping,
-    // ParametricPolymorphism = type parameters
-    TypeCapability::ParametricPolymorphism,
-    TypeCapability::HigherKindedPolymorphism,
-    // BoundedPolymorphism = context/view bounds and type bounds
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = annotations
-    TypeCapability::Attributes,
+const SCALA_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::HigherKindedPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
-const SCALA_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, SCALA_CLASS_CAPABILITIES),
+const SCALA_CONTRACT_CAPABILITIES: &[TypeCapability] =
+    &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+const SCALA_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        SCALA_CLASS_DECLARATION_CAPABILITIES,
+        SCALA_CLASS_CAPABILITIES,
+    ),
     // Struct is represented as a Scala case class.
-    TypeCapabilityProfile::new(TypeKind::Struct, SCALA_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, SCALA_CONTRACT_CAPABILITIES),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        SCALA_CLASS_DECLARATION_CAPABILITIES,
+        SCALA_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        SCALA_CONTRACT_DECLARATION_CAPABILITIES,
+        SCALA_CONTRACT_CAPABILITIES,
+    ),
     // Interface is represented as a Scala trait.
-    TypeCapabilityProfile::new(TypeKind::Interface, SCALA_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        SCALA_CONTRACT_DECLARATION_CAPABILITIES,
+        SCALA_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
         &[
-            // RecordFields = fields
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::HigherKindedPolymorphism,
+            TypeDeclarationCapability::Attributes,
+        ],
+        &[
             TypeCapability::RecordFields,
-            // AccessorMethods = accessors
             TypeCapability::AccessorMethods,
-            // Methods = methods
             TypeCapability::Methods,
-            // ParametricPolymorphism = type parameters
-            TypeCapability::ParametricPolymorphism,
-            TypeCapability::HigherKindedPolymorphism,
-            // Attributes = annotations
-            TypeCapability::Attributes,
-            // Variants = enum cases
             TypeCapability::Variants,
-            TypeCapability::ClosedSum,
         ],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
-            // ParametricPolymorphism = type parameters
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = inline upper bounds
-            TypeCapability::BoundedPolymorphism,
-            TypeCapability::HigherKindedPolymorphism,
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
+            TypeDeclarationCapability::HigherKindedPolymorphism,
         ],
+        &[],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Newtype,
         &[
-            // ParametricPolymorphism = type parameters
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = inline upper bounds
-            TypeCapability::BoundedPolymorphism,
-            TypeCapability::HigherKindedPolymorphism,
-            // Attributes = annotations
-            TypeCapability::Attributes,
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
+            TypeDeclarationCapability::HigherKindedPolymorphism,
+            TypeDeclarationCapability::Attributes,
         ],
+        &[],
     ),
 ];
 
@@ -352,6 +349,29 @@ const SCALA_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::
     TypeKind::Enum,
     &[VariantCapability::Attributes],
 )];
+const SCALA_CLOSED_SUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::HigherKindedPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
+const SCALA_CLOSED_SUM_FORMS: &[ClosedSumCaseForm] = &[
+    ClosedSumCaseForm::Unit,
+    ClosedSumCaseForm::PositionalPayload,
+    ClosedSumCaseForm::RecordPayload,
+];
+const SCALA_CLOSED_SUM: ClosedSumCapabilityProfile<'static> = ClosedSumCapabilityProfile::new(
+    SCALA_CLOSED_SUM_DECLARATION_CAPABILITIES,
+    SCALA_CLOSED_SUM_FORMS,
+    false,
+)
+.with_record_fields(
+    crate::lang::capability::FieldCapabilityProfile::new(
+        crate::lang::capability::FieldContext::ClosedSumRecordPayload,
+        crate::lang::field_lowering::scala::PAYLOAD_CAPABILITIES,
+    )
+    .with_required_capabilities(crate::lang::field_lowering::scala::PAYLOAD_REQUIRED),
+);
 
 const SCALA_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // Attributes = annotations
@@ -427,6 +447,7 @@ impl CodeLang for Scala {
             .with_types(SCALA_TYPES)
             .with_functions(SCALA_FUNCTIONS)
             .with_variants(SCALA_VARIANTS)
+            .with_closed_sum(SCALA_CLOSED_SUM)
             .with_fields(crate::lang::field_lowering::scala::PROFILES)
             .with_properties(crate::lang::property_lowering::scala::PROFILES)
     }
@@ -435,11 +456,25 @@ impl CodeLang for Scala {
         crate::lang::type_lowering::scala::validate(self, type_)
     }
 
+    fn validate_closed_sum(
+        &self,
+        closed_sum: crate::lang::ClosedSumIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::closed_sum_lowering::scala::validate(self, closed_sum)
+    }
+
     fn lower_type(
         &self,
         type_: crate::lang::ValidatedType<'_>,
     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         crate::lang::type_lowering::scala::lower(self, type_)
+    }
+
+    fn lower_closed_sum(
+        &self,
+        closed_sum: crate::lang::ValidatedClosedSum<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::closed_sum_lowering::scala::lower(self, closed_sum)
     }
 
     fn lower_function(

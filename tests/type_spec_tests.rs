@@ -9,7 +9,7 @@ use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::ImportGroup;
 use sigil_stitch::lang::capability::{
     FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
-    TypeCapabilityProfile,
+    TypeDeclarationCapability, TypeKindCapabilityProfile,
 };
 use sigil_stitch::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, TypeDeclSyntaxConfig,
@@ -223,8 +223,8 @@ impl RendererLang for StrictMissingTypeLang {
     }
 }
 
-const STRICT_MISSING_TYPES: &[TypeCapabilityProfile<'_>] =
-    &[TypeCapabilityProfile::new(TypeKind::Class, &[])];
+const STRICT_MISSING_TYPES: &[TypeKindCapabilityProfile<'_>] =
+    &[TypeKindCapabilityProfile::new(TypeKind::Class, &[], &[])];
 
 impl CodeLang for StrictMissingTypeLang {
     fn capabilities(&self) -> LanguageCapabilities<'_> {
@@ -301,8 +301,9 @@ impl RendererLang for TypeProbeLang {
     }
 }
 
-const PROBE_TYPES: &[TypeCapabilityProfile<'_>] = &[TypeCapabilityProfile::new(
+const PROBE_TYPES: &[TypeKindCapabilityProfile<'_>] = &[TypeKindCapabilityProfile::new(
     TypeKind::Class,
+    &[],
     &[TypeCapability::Methods],
 )];
 const PROBE_FUNCTIONS: &[FunctionCapabilityProfile<'_>] = &[FunctionCapabilityProfile::new(
@@ -1336,11 +1337,11 @@ fn unsupported_newtype_type_parameters_fail_instead_of_being_dropped() {
         assert!(
             matches!(
                 error,
-                SigilStitchError::UnsupportedTypeCapabilities {
+                SigilStitchError::UnsupportedTypeDeclarationCapabilities {
                     ref capabilities,
                     ..
-                } if capabilities.contains(&TypeCapability::ParametricPolymorphism)
-                    && capabilities.contains(&TypeCapability::BoundedPolymorphism)
+                } if capabilities.contains(&TypeDeclarationCapability::ParametricPolymorphism)
+                    && capabilities.contains(&TypeDeclarationCapability::BoundedPolymorphism)
             ),
             "{error}"
         );

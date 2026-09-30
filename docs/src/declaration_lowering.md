@@ -339,15 +339,19 @@ The set itself is semantic intent; `sealed`, `enum`, `data`, nesting, and
 sibling placement are possible target representations rather than shared
 configuration.
 
-The public construction entry point is a dedicated closed-sum builder over the
-existing `TypeSpecBuilder`. It does not add `ClosedSum` to the pre-0.6.8
-`TypeKind` enum and does not expose a combinable `sealed` or
-`variant_set_semantics` setter. Read-only `TypeIntent` and `ValidatedType`
-queries carry the fact to strict adapters. `TypeCapability::ClosedSum` is the
-opt-in representability capability; ordinary enum profiles and lowering remain
+The public construction entry point is `ClosedSumSpec::builder(...)` with
+`ClosedSumCaseSpec` cases. It is a sibling of `TypeSpec`, not an enum mode and
+not a modifier on `TypeSpecBuilder`. `ClosedSumCapabilityProfile` is the
+opt-in representability profile; ordinary enum profiles and lowering remain
 unchanged.
 
-Closed sums reuse the existing case data:
+Both declaration families use `TypeDeclarationCapability` for polymorphism
+and root attributes. Ordinary `TypeKindCapabilityProfile`s keep those features
+separate from ordinary `TypeCapability` values. Closed-sum case forms and
+scoped record fields live only in `ClosedSumCapabilityProfile`. Case metadata
+does not request root attributes; each target validates and places it locally.
+
+Closed sums describe these case shapes independently of ordinary enum storage:
 
 | Case shape | Meaning |
 |------------|---------|
@@ -376,7 +380,7 @@ that an existing declaration for `T` is a subtype of the root. Nominal
 membership of pre-existing types has different declaration ownership and is
 outside this interface.
 
-Complete type lowering owns the output topology. Rust, Swift, Haskell, OCaml,
+Complete ClosedSum lowering owns the output topology. Rust, Swift, Haskell, OCaml,
 and Scala can use native algebraic declarations. Java uses one public sealed
 root with nested case declarations so one generated file does not contain
 several public top-level types. Kotlin uses a private-constructor sealed class

@@ -15,8 +15,8 @@ use super::{collect_invalid_identifiers, collect_name_collisions_by, emit_annota
 
 const CAPABILITIES: &[FieldCapability] =
     &[FieldCapability::ExplicitType, FieldCapability::Attributes];
-const REQUIRED: &[FieldCapability] = &[FieldCapability::ExplicitType];
-const PAYLOAD_CAPABILITIES: &[FieldCapability] =
+pub(crate) const REQUIRED: &[FieldCapability] = &[FieldCapability::ExplicitType];
+pub(crate) const PAYLOAD_CAPABILITIES: &[FieldCapability] =
     &[FieldCapability::ExplicitType, FieldCapability::Attributes];
 
 pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
@@ -34,8 +34,6 @@ pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
         PAYLOAD_CAPABILITIES,
     )
     .with_required_capabilities(REQUIRED),
-    FieldCapabilityProfile::new(FieldContext::ClosedSumRecordPayload, PAYLOAD_CAPABILITIES)
-        .with_required_capabilities(REQUIRED),
 ];
 
 fn is_valid_identifier(name: &str) -> bool {

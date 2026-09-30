@@ -103,12 +103,17 @@ contract.
 Extends `RendererLang` with the additional methods needed by the spec layer.
 
 Implement `capabilities()` for new adapters. Return a local
-`LanguageCapabilities::strict()` matrix, add `TypeCapabilityProfile`s with
+`LanguageCapabilities::strict()` matrix, add `TypeKindCapabilityProfile`s with
 `with_types()`, add `FunctionCapabilityProfile`s with `with_functions()`, and
 add `FieldCapabilityProfile`s with `with_fields()`,
 `PropertyCapabilityProfile`s with `with_properties()`, and
 `VariantCapabilityProfile`s with `with_variants()` for every supported
 declaration context or owning type kind.
+Ordinary type profiles take separate declaration-wide and ordinary-kind
+capability slices. `TypeDeclarationCapability` owns polymorphism and root
+attributes; `TypeCapability` owns fields, methods, relationships, constructors,
+and variants. Missing declaration-wide capabilities are reported before
+ordinary-kind capabilities, without suppressing either diagnostic group.
 Function profiles are keyed by both context (`TopLevel`, `ReceiverMethod`,
 `Member`, or `InterfaceMember`) and form (`Function`, `Constructor`, or
 `Destructor`). Omit a profile when that combination is unsupported. Include
@@ -128,13 +133,20 @@ keywords, delimiters, placement, or separator policy. Omit the owner profile if
 the language cannot represent variants for that `TypeKind`; use an empty
 capability list when simple variants are valid but no richer form is.
 
-Closed sums use `TypeKind::Enum` only as their backward-compatible declaration
-carrier. Advertise `TypeCapability::ClosedSum` on that type profile only when
-the adapter can preserve a complete case set. This capability does not grant
-ordinary enum entries positional or record payloads: closed-sum case
-validation branches on `VariantIntent::is_closed_sum()` and remains separate
-from `VariantCapabilityProfile`. A permissive compatibility adapter cannot
-advertise or lower the later semantic form.
+Closed sums are a dedicated `ClosedSumSpec` declaration family. Advertise a
+`ClosedSumCapabilityProfile` with `LanguageCapabilities::with_closed_sum(...)`
+only when the adapter can preserve a complete case set. The profile lists
+supported unit, positional, and record case forms, declaration-wide
+capabilities, and whether an empty sum is representable. It does not change
+ordinary enum profiles, and `permissive()` does not opt an adapter into this
+new family.
+
+Implement `CodeLang::validate_closed_sum()` and
+`CodeLang::lower_closed_sum()` in the language module. Validation receives the
+complete `ClosedSumIntent`; lowering receives a crate-constructed
+`ValidatedClosedSum` and returns every target block, including nested or
+sibling case declarations. Keep all payload `TypeName` values in `%T` slots so
+the normal materialization, import, and renderer pipeline can process them.
 
 Field profiles are keyed by `FieldContext`: direct member emission, ordinary
 members of one `TypeKind`, record payloads of one ordinary variant owner kind,
@@ -195,16 +207,13 @@ lowerer chooses the sequence's placement. Use
 `AnnotationSpec::emit_with_syntax()` when a local annotation spelling must keep
 an importable annotation name as a structured `%T` reference.
 
-For a closed sum, `validate_type()` decides whether the root features, empty
-shape, and generic combinations are representable, while
-`collect_variant_validation_errors()` checks the complete case sequence and
-target-local case identifiers. The complete `lower_type()` implementation
-then owns the whole topology: it may reuse private case or field helpers, but
-it returns all nested or sibling declarations together and never routes the
-new form through the compatibility type lowerer. `ValidatedType::variants()`
-is present even for an intentional zero-case sum. Keep payload types in `%T`
-slots so nested Java/Kotlin and sibling Dart cases participate in the ordinary
-type-name-lowering and import-resolution passes.
+Closed-sum validation and lowering own the complete declaration topology. Do
+not route the new family through `validate_type()`, `validate_variants()`, or
+the compatibility type/variant lowerers. A lowerer may reuse private field
+helpers, but it returns all nested or sibling declarations together. Record
+payloads use the dedicated `FieldContext::ClosedSumRecordPayload` profile,
+configured with `ClosedSumCapabilityProfile::with_record_fields(...)`; this
+context is never inferred from ordinary field profiles.
 
 `CodeLang::validate_fields()` and `CodeLang::lower_fields()` form the
 corresponding complete-sequence seam for fields. `FieldSequenceIntent` exposes
@@ -346,7 +355,7 @@ use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::ImportGroup;
 use sigil_stitch::lang::capability::{
     FieldCapability, FieldCapabilityProfile, FieldContext, LanguageCapabilities,
-    TypeCapability, TypeCapabilityProfile,
+    TypeCapability, TypeKindCapabilityProfile,
 };
 use sigil_stitch::lang::{
     BlockIntent, CodeLang, RendererLang, TypeIntent, ValidatedFields,
@@ -371,9 +380,10 @@ const FIELD_CAPABILITIES: &[FieldCapability] = &[
 ];
 const REQUIRED_FIELD_CAPABILITIES: &[FieldCapability] =
     &[FieldCapability::ExplicitType];
-const TYPE_PROFILES: &[TypeCapabilityProfile<'_>] = &[
-    TypeCapabilityProfile::new(
+const TYPE_PROFILES: &[TypeKindCapabilityProfile<'_>] = &[
+    TypeKindCapabilityProfile::new(
         TypeKind::Class,
+        &[],
         &[TypeCapability::RecordFields],
     ),
 ];

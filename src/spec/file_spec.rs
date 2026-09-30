@@ -4,6 +4,7 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportAliasConflictResolver, ImportGroup};
 use crate::import_collector;
 use crate::lang::CodeLang;
+use crate::spec::closed_sum_spec::ClosedSumSpec;
 use crate::spec::emittable::Emittable;
 use crate::spec::fun_spec::FunSpec;
 use crate::spec::import_spec::ImportSpec;
@@ -11,6 +12,66 @@ use crate::spec::modifiers::DeclarationContext;
 use crate::spec::type_spec::TypeSpec;
 use crate::type_name::TypeName;
 use crate::type_name_lowering::{DiagnosticPath, TypeNameMaterializer};
+
+#[cfg(test)]
+mod storage_tests {
+    use super::*;
+    use crate::spec::closed_sum_case_spec::ClosedSumCaseSpec;
+    use crate::spec::modifiers::TypeKind;
+
+    fn sum() -> ClosedSumSpec {
+        ClosedSumSpec::builder("Outcome")
+            .add_case(ClosedSumCaseSpec::new("Ready").unwrap())
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn first_class_and_extension_closed_sums_have_distinct_storage() {
+        let file = FileSpec::builder("outcome.rs")
+            .add_closed_sum(sum())
+            .add_spec(sum())
+            .build()
+            .unwrap();
+        assert!(
+            matches!(&file.members[0], StoredFileMember::ClosedSum(s) if s.name() == "Outcome")
+        );
+        assert!(matches!(&file.members[1], StoredFileMember::Spec(_)));
+    }
+
+    #[test]
+    fn public_members_preserve_their_storage_routes() {
+        let block = || CodeBlock::of("code", ()).unwrap();
+        let members = [
+            FileMember::Code(block()),
+            FileMember::RawContent("raw".into()),
+            FileMember::RawContentWithImports {
+                content: "Payload".into(),
+                types: vec![TypeName::importable("model", "Payload")],
+            },
+            FileMember::Type(
+                TypeSpec::builder("Record", TypeKind::Struct)
+                    .build()
+                    .unwrap(),
+            ),
+            FileMember::Fun(FunSpec::builder("run").build().unwrap()),
+            FileMember::Spec(Box::new(sum())),
+        ];
+        let mut builder = FileSpec::builder("outcome.rs");
+        for member in members {
+            builder = builder.add_member(member);
+        }
+        let file = builder.build().unwrap();
+        assert!(matches!(&file.members[0], StoredFileMember::Code(b) if !b.is_empty()));
+        assert!(matches!(&file.members[1], StoredFileMember::RawContent(s) if s == "raw"));
+        assert!(
+            matches!(&file.members[2], StoredFileMember::RawContentWithImports { content, types } if content == "Payload" && types.len() == 1)
+        );
+        assert!(matches!(&file.members[3], StoredFileMember::Type(_)));
+        assert!(matches!(&file.members[4], StoredFileMember::Fun(_)));
+        assert!(matches!(&file.members[5], StoredFileMember::Spec(_)));
+    }
+}
 
 /// A member of a file.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -40,6 +101,36 @@ pub enum FileMember {
     /// this variant is skipped during serde round-trips.
     #[serde(skip)]
     Spec(Box<dyn Emittable>),
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+enum StoredFileMember {
+    Code(CodeBlock),
+    RawContent(String),
+    RawContentWithImports {
+        content: String,
+        types: Vec<TypeName>,
+    },
+    Type(TypeSpec),
+    Fun(FunSpec),
+    ClosedSum(ClosedSumSpec),
+    #[serde(skip)]
+    Spec(Box<dyn Emittable>),
+}
+
+impl From<FileMember> for StoredFileMember {
+    fn from(member: FileMember) -> Self {
+        match member {
+            FileMember::Code(block) => Self::Code(block),
+            FileMember::RawContent(content) => Self::RawContent(content),
+            FileMember::RawContentWithImports { content, types } => {
+                Self::RawContentWithImports { content, types }
+            }
+            FileMember::Type(spec) => Self::Type(spec),
+            FileMember::Fun(spec) => Self::Fun(spec),
+            FileMember::Spec(spec) => Self::Spec(spec),
+        }
+    }
 }
 
 /// A complete source file with automatic import management.
@@ -74,7 +165,7 @@ pub enum FileMember {
 pub struct FileSpec {
     filename: String,
     header: Option<CodeBlock>,
-    members: Vec<FileMember>,
+    members: Vec<StoredFileMember>,
     explicit_imports: Vec<ImportSpec>,
     #[serde(skip)]
     lang: Option<Box<dyn CodeLang>>,
@@ -143,16 +234,19 @@ impl FileSpec {
         let mut errors = Vec::new();
         for member in &self.members {
             match member {
-                FileMember::Type(spec) => spec.collect_validation_errors(lang, &mut errors),
-                FileMember::Fun(spec) => {
+                StoredFileMember::Type(spec) => spec.collect_validation_errors(lang, &mut errors),
+                StoredFileMember::ClosedSum(spec) => {
+                    spec.collect_validation_errors(lang, &mut errors)
+                }
+                StoredFileMember::Fun(spec) => {
                     if let Err(error) = spec.validate(lang, DeclarationContext::TopLevel) {
                         errors.push(error);
                     }
                 }
-                FileMember::Spec(spec) => spec.collect_validation_errors(lang, &mut errors),
-                FileMember::Code(_)
-                | FileMember::RawContent(_)
-                | FileMember::RawContentWithImports { .. } => {}
+                StoredFileMember::Spec(spec) => spec.collect_validation_errors(lang, &mut errors),
+                StoredFileMember::Code(_)
+                | StoredFileMember::RawContent(_)
+                | StoredFileMember::RawContentWithImports { .. } => {}
             }
         }
 
@@ -228,17 +322,20 @@ impl FileSpec {
         let mut emitted = Vec::with_capacity(self.members.len());
         for member in &self.members {
             emitted.push(match member {
-                FileMember::Code(block) => Emitted::Blocks(vec![block.clone()]),
-                FileMember::RawContent(s) => Emitted::Raw(s.clone()),
-                FileMember::RawContentWithImports { content, types } => Emitted::RawWithImports {
-                    content: content.clone(),
-                    types: types.clone(),
-                },
-                FileMember::Type(spec) => Emitted::Blocks(spec.emit(lang)?),
-                FileMember::Fun(spec) => {
+                StoredFileMember::Code(block) => Emitted::Blocks(vec![block.clone()]),
+                StoredFileMember::RawContent(s) => Emitted::Raw(s.clone()),
+                StoredFileMember::RawContentWithImports { content, types } => {
+                    Emitted::RawWithImports {
+                        content: content.clone(),
+                        types: types.clone(),
+                    }
+                }
+                StoredFileMember::Type(spec) => Emitted::Blocks(spec.emit(lang)?),
+                StoredFileMember::ClosedSum(spec) => Emitted::Blocks(spec.emit(lang)?),
+                StoredFileMember::Fun(spec) => {
                     Emitted::Blocks(vec![spec.emit(lang, DeclarationContext::TopLevel)?])
                 }
-                FileMember::Spec(spec) => Emitted::Blocks(spec.emit_members(lang)?),
+                StoredFileMember::Spec(spec) => Emitted::Blocks(spec.emit_members(lang)?),
             });
         }
 
@@ -381,7 +478,7 @@ impl FileSpec {
 pub struct FileSpecBuilder {
     filename: String,
     header: Option<CodeBlock>,
-    members: Vec<FileMember>,
+    members: Vec<StoredFileMember>,
     explicit_imports: Vec<ImportSpec>,
     lang: Option<Box<dyn CodeLang>>,
 }
@@ -395,14 +492,14 @@ impl FileSpecBuilder {
 
     /// Add a CodeBlock member.
     pub fn add_code(mut self, block: CodeBlock) -> Self {
-        self.members.push(FileMember::Code(block));
+        self.members.push(StoredFileMember::Code(block));
         self
     }
 
     /// Add raw content (no import tracking).
     pub fn add_raw(mut self, content: &str) -> Self {
         self.members
-            .push(FileMember::RawContent(content.to_string()));
+            .push(StoredFileMember::RawContent(content.to_string()));
         self
     }
 
@@ -411,7 +508,7 @@ impl FileSpecBuilder {
     /// The content is emitted verbatim (no substitution). The types are walked
     /// during import collection so the correct import statements are generated.
     pub fn add_raw_with_imports(mut self, content: &str, types: Vec<TypeName>) -> Self {
-        self.members.push(FileMember::RawContentWithImports {
+        self.members.push(StoredFileMember::RawContentWithImports {
             content: content.to_string(),
             types,
         });
@@ -420,25 +517,31 @@ impl FileSpecBuilder {
 
     /// Add a generic member.
     pub fn add_member(mut self, member: FileMember) -> Self {
-        self.members.push(member);
+        self.members.push(member.into());
         self
     }
 
     /// Add a type declaration (struct, class, interface, trait, enum).
     pub fn add_type(mut self, spec: TypeSpec) -> Self {
-        self.members.push(FileMember::Type(spec));
+        self.members.push(StoredFileMember::Type(spec));
+        self
+    }
+
+    /// Add a first-class closed-sum declaration.
+    pub fn add_closed_sum(mut self, spec: ClosedSumSpec) -> Self {
+        self.members.push(StoredFileMember::ClosedSum(spec));
         self
     }
 
     /// Add a top-level function.
     pub fn add_function(mut self, spec: FunSpec) -> Self {
-        self.members.push(FileMember::Fun(spec));
+        self.members.push(StoredFileMember::Fun(spec));
         self
     }
 
     /// Add a custom spec that implements [`Emittable`].
     pub fn add_spec(mut self, spec: impl Emittable + 'static) -> Self {
-        self.members.push(FileMember::Spec(Box::new(spec)));
+        self.members.push(StoredFileMember::Spec(Box::new(spec)));
         self
     }
 

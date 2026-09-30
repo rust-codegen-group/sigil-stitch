@@ -1,6 +1,6 @@
 //! Complete language-owned type-declaration lowering.
 
-mod common;
+pub(crate) mod common;
 mod compatibility;
 
 pub(crate) mod c;

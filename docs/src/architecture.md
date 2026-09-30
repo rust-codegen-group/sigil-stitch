@@ -69,11 +69,12 @@ target and is not a portable cross-language program.
   declaration's preamble, header, relationships, body order, primary
   constructor, close, and output cardinality while reusing complete child
   lowerers for child grammar.
-  Closed sums use this same complete-type seam. The semantic type view tells
-  the adapter that the declaration is a closed sum; the adapter validates its
-  complete case set and chooses one declaration, nested case declarations, or
-  several sibling blocks. There is no separate nesting or sealed-syntax
-  interface.
+  Closed sums use a separate complete-declaration seam:
+  `validate_closed_sum()` and `lower_closed_sum(ValidatedClosedSum)`. The
+  dedicated view tells the adapter that the declaration is a closed sum; the
+  adapter validates its complete case set and chooses one declaration, nested
+  case declarations, or several sibling blocks. There is no shared nesting or
+  sealed-syntax interface.
   After crate-owned validation against
   the selected adapter, `validate_function()` may add target-local checks to a
   classified `FunctionIntent`. sigil-stitch then constructs a
@@ -243,14 +244,12 @@ compatibility path; strict built-ins reject ownerless direct emission because
 caller-supplied first/last flags cannot prove valid separators or section
 termination.
 
-A closed sum reuses the unit, positional-payload, and record-payload variant
-data, but it is not an ordinary value enum. Its dedicated construction entry
-point records closed-sum semantics without adding a variant to the pre-0.6.8
-`TypeKind` enum. The adapter-facing type views expose that semantic fact, and a
-closed-sum capability opts a target into validation and lowering. Closed-sum
-case validation is separate from ordinary enum-entry profiles: accepting a
-record case for a Java sealed hierarchy must not make record payloads valid on
-an ordinary Java enum.
+A closed sum is a sibling declaration family to `TypeSpec`; it reuses the
+unit, positional-payload, and record-payload *shapes* without reusing ordinary
+enum storage or lowering. `ClosedSumCapabilityProfile` opts a target into
+validation and lowering. Closed-sum case validation is separate from ordinary
+enum-entry profiles: accepting a record case for a Java sealed hierarchy must
+not make record payloads valid on an ordinary Java enum.
 
 The case sequence may be empty. That declaration is the empty sum, a named
 uninhabited type. It is not unit or `void`. A Never reference or bottom type

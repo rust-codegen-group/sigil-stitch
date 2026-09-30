@@ -396,8 +396,8 @@ fn typescript_contracts_reject_decorators_that_cannot_be_emitted() {
         .unwrap();
     assert!(matches!(
         type_.emit(&sigil_stitch::lang::typescript::TypeScript::new()),
-        Err(SigilStitchError::UnsupportedTypeCapabilities { capabilities, .. })
-            if capabilities == vec![sigil_stitch::lang::capability::TypeCapability::Attributes]
+        Err(SigilStitchError::UnsupportedTypeDeclarationCapabilities { capabilities, .. })
+            if capabilities == vec![sigil_stitch::lang::capability::TypeDeclarationCapability::Attributes]
     ));
 }
 

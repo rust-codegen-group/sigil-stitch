@@ -6,8 +6,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
-    LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-    VariantCapabilityProfile,
+    LanguageCapabilities, TypeCapability, TypeDeclarationCapability, TypeKindCapabilityProfile,
+    VariantCapability, VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -299,43 +299,52 @@ impl RendererLang for Cpp {
     }
 }
 
+const CPP_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
 const CPP_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = data members
     TypeCapability::RecordFields,
-    // Methods = member functions
     TypeCapability::Methods,
-    // NominalSubtyping = public inheritance
     TypeCapability::NominalSubtyping,
-    // ParametricPolymorphism = templates
-    TypeCapability::ParametricPolymorphism,
-    // Attributes = [[attribute]]
-    TypeCapability::Attributes,
 ];
-const CPP_RECORD_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = data members
-    TypeCapability::RecordFields,
-    // Attributes = [[attribute]]
-    TypeCapability::Attributes,
-];
-const CPP_ENUM_CAPABILITIES: &[TypeCapability] = &[
-    // Variants = enumerators
-    TypeCapability::Variants,
-    // Attributes = [[attribute]]
-    TypeCapability::Attributes,
-];
-const CPP_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, CPP_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Struct, CPP_RECORD_CAPABILITIES),
+const CPP_RECORD_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
+const CPP_RECORD_CAPABILITIES: &[TypeCapability] = &[TypeCapability::RecordFields];
+const CPP_ENUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
+const CPP_ENUM_CAPABILITIES: &[TypeCapability] = &[TypeCapability::Variants];
+const CPP_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        CPP_CLASS_DECLARATION_CAPABILITIES,
+        CPP_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        CPP_RECORD_DECLARATION_CAPABILITIES,
+        CPP_RECORD_CAPABILITIES,
+    ),
     // Interface/Trait are represented as C++ classes.
-    TypeCapabilityProfile::new(TypeKind::Interface, CPP_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, CPP_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Enum, CPP_ENUM_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        CPP_CLASS_DECLARATION_CAPABILITIES,
+        CPP_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        CPP_CLASS_DECLARATION_CAPABILITIES,
+        CPP_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Enum,
+        CPP_ENUM_DECLARATION_CAPABILITIES,
+        CPP_ENUM_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::TypeAlias,
-        &[
-            // ParametricPolymorphism = templates
-            TypeCapability::ParametricPolymorphism,
-        ],
+        &[TypeDeclarationCapability::ParametricPolymorphism],
+        &[],
     ),
 ];
 

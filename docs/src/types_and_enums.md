@@ -354,48 +354,39 @@ let type_spec = TypeSpec::builder("Direction", TypeKind::Enum)
 
 ### Closed sums
 
-Use `TypeSpec::closed_sum()` when the variants are a complete set of cases
-rather than value-enum entries. Cases may be unit-shaped, carry positional
-types, or carry named record fields. This is declaration intent: each adapter
-chooses native enum, algebraic-data-type, nested sealed-hierarchy, or sibling
-case syntax locally.
+Use `ClosedSumSpec` when the declaration carries a complete set of cases rather
+than value-enum entries. Cases may be unit-shaped, carry positional types, or
+carry named record fields. This is declaration intent: each adapter chooses
+native enum, algebraic-data-type, nested sealed-hierarchy, or sibling case
+syntax locally.
 
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
-# use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
+# use sigil_stitch::spec::closed_sum_case_spec::ClosedSumCaseSpec;
 # use sigil_stitch::spec::field_spec::FieldSpec;
 # fn main() {
-let outcome = TypeSpec::closed_sum("Outcome")
-    .add_variant(EnumVariantSpec::new("Empty").unwrap())
-    .add_variant(
-        EnumVariantSpec::builder("Value")
-            .positional_payload(TypeName::primitive("Payload"))
-            .build()
-            .unwrap(),
-    )
-    .add_variant(
-        EnumVariantSpec::builder("Failure")
-            .record_payload_field(FieldSpec::of(
-                "code",
-                TypeName::primitive("FailureCode"),
-            ))
-            .build()
-            .unwrap(),
-    )
+let outcome = ClosedSumSpec::builder("Outcome")
+    .add_case(ClosedSumCaseSpec::unit("Empty").unwrap())
+    .add_case(ClosedSumCaseSpec::positional(
+        "Value",
+        vec![TypeName::primitive("Payload")],
+    ).unwrap())
+    .add_case(ClosedSumCaseSpec::record(
+        "Failure",
+        vec![FieldSpec::of("code", TypeName::primitive("FailureCode"))],
+    ).unwrap())
     .build()
     .unwrap();
-
-assert!(outcome.is_closed_sum());
-assert_eq!(outcome.kind(), TypeKind::Enum);
 # }
 ```
 
 `TypeSpec::builder(name, TypeKind::Enum)` remains the ordinary value-enum
-entry point. Closed sums reject discriminants, deprecated variant values, enum
-constructor arguments, and opaque members that could add unvalidated cases.
-Wire discriminator values and serialization tags remain caller data or
-annotations; they do not change which case declaration is generated.
+entry point. Closed-sum cases intentionally have no discriminant, legacy
+variant value, or enum constructor-argument fields: those concepts belong to
+ordinary enum entries rather than named sum cases. Wire discriminator values
+and serialization tags remain caller data or annotations; they do not change
+which case declaration is generated.
 
 The built-in support matrix is:
 
@@ -411,14 +402,15 @@ The built-in support matrix is:
 | Dart | Sealed root with root-qualified final sibling cases | Rejected |
 
 Other built-ins reject closed-sum intent instead of widening it to `Object`,
-`Any`, an open hierarchy, or an ordinary value enum. Root features such as
-methods, contracts, attributes, and type parameters still require the
-selected target's ordinary type capability. Rust, Haskell, and OCaml preserve
-the supported generic forms; Scala rejects generic closed sums until every
-case can preserve the root type arguments, and the other targets reject any
-generic combination not present in their enum capability profile.
+`Any`, an open hierarchy, or an ordinary value enum. Root annotations, type
+parameters, and constraints require the selected target's
+`ClosedSumCapabilityProfile`; case annotations use the same declaration
+capability. Rust, Haskell, and OCaml preserve the supported generic forms;
+Scala rejects generic closed sums until every case can preserve the root type
+arguments, and the other targets reject generic forms not present in their
+closed-sum profile.
 
-Calling `TypeSpec::closed_sum(name).build()` with no cases requests a named
+Calling `ClosedSumSpec::builder(name).build()` with no cases requests a named
 empty sum. It is not the unit type and does not add a `TypeName::Never`
 reference. A target accepts this form only when it can emit that named
 uninhabited declaration exactly.

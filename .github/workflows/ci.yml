@@ -80,7 +80,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-semver-checks@0.49.0
+          tool: cargo-semver-checks@0.50.0
       - uses: taiki-e/install-action@just
       - run: just semver-check
 

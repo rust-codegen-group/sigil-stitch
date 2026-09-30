@@ -15,12 +15,19 @@ The integration suites are grouped by the contract they protect:
   capability profiles.
 - `tests/*_lowering_tests.rs` checks complete declaration lowering and
   fail-closed validation.
-- `tests/closed_sum_tests.rs` is the cross-language closed-sum integration
-  suite. It covers the semantic builder and adapter views, exact supported and
-  empty output, structured rejection, ordinary-enum isolation, malformed
-  deserialized values, aggregate case and record-field failures, generic
-  combinations, payload imports and alias rejection, and wide/narrow renderer
-  behavior for native, nested, and sibling representations.
+- `tests/closed_sum_spec_tests.rs` covers the dedicated closed-sum builders,
+  adapter views, first-class and extension file routes, scoped record-field
+  capabilities, supported and empty output, target constraints and visibility,
+  annotation validation, and same-version Serde round-trips.
+- `tests/closed_sum_validation_tests.rs` covers malformed deserialized payloads,
+  deterministic intrinsic/duplicate/profile error ordering, diagnostic parity
+  between file routes, unsupported-form field-validation boundaries, and
+  exactly-once lowering with error and empty-output rejection.
+- `tests/closed_sum_lowering_tests.rs` preserves language-owned output and
+  rejection regressions: ordinary-enum isolation, case identifiers and field
+  metadata, supported generic combinations, nested parameter occurrence,
+  payload imports and alias conflicts, caller-owned wire tags, and wide/narrow
+  rendering for native, nested, and sibling representations.
 - `tests/declaration_generic_lowering_tests.rs` owns the canonical 20-language
   type/function declaration matrix for zero, one, many, bounded, lifetime,
   higher-kinded, context-bound, and explicit-constraint cases. It also checks
@@ -50,6 +57,20 @@ The integration suites are grouped by the contract they protect:
   aggregation preserves each file's complete member diagnostics, validation
   finishes before any file emission, and validation or later render failures
   leave the filesystem untouched.
+- `tests/closed_sum_file_spec_tests.rs` checks first-class same-version file
+  serialization, rejection of type-erased spec serialization, and an ordered
+  project trace: all models validate, the earlier file renders in memory,
+  a failing declaration lowerer skips preparation and later files, and no
+  destination file changes. Private file-storage unit tests check all public
+  member conversions and first-class versus extension-spec routing.
+- `tests/closed_sum_regression_tests.rs` covers target-local record names and
+  normalized parameters, ordered declaration/type and case-form/record
+  diagnostics, and case-only Dart metadata. The closed-sum lowering suite
+  checks positional and record imports in all eight adapters, including
+  direct and pretty rendering for the algebraic lowerers.
+- `tests/closed_sum_contract_tests.rs` checks complete validated views,
+  declaration/case metadata preservation, malformed same-version JSON,
+  intrinsic builder failures, and target-owned generic and lifetime grammar.
 - `tests/import_spec_tests.rs` exercises public target import forms. The focused
   unit matrix in `src/import.rs` owns conflict-set construction, resolver
   validation, semantic identity deduplication, and stable passthrough ordering.
@@ -81,7 +102,9 @@ cargo test --test field_capability_matrix_tests
 cargo test --test function_capability_matrix_tests
 cargo test --test property_capability_matrix_tests
 cargo test --test variant_capability_matrix_tests
-cargo test --test closed_sum_tests
+cargo test --test closed_sum_spec_tests
+cargo test --test closed_sum_validation_tests
+cargo test --test closed_sum_lowering_tests
 cargo test --test renderer_parity_tests
 cargo test --test declaration_generic_lowering_tests
 cargo test --test typescript shared::golden::tests

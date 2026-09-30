@@ -2,8 +2,9 @@ use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
-    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    ClosedSumCapabilityProfile, ClosedSumCaseForm, FunctionBodyPolicy, FunctionCapability,
+    FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
+    TypeDeclarationCapability, TypeKindCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
@@ -252,68 +253,64 @@ impl RendererLang for Rust {
     }
 }
 
-const RUST_RECORD_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = struct fields
-    TypeCapability::RecordFields,
-    // Methods = impl methods
-    TypeCapability::Methods,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = trait bounds
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = `#[attr]`
-    TypeCapability::Attributes,
+const RUST_RECORD_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
-const RUST_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    // Methods = impl methods
-    TypeCapability::Methods,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = trait bounds
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = `#[attr]`
-    TypeCapability::Attributes,
+const RUST_RECORD_CAPABILITIES: &[TypeCapability] =
+    &[TypeCapability::RecordFields, TypeCapability::Methods];
+const RUST_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
-const RUST_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Struct, RUST_RECORD_CAPABILITIES),
+const RUST_CONTRACT_CAPABILITIES: &[TypeCapability] = &[TypeCapability::Methods];
+const RUST_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        RUST_RECORD_DECLARATION_CAPABILITIES,
+        RUST_RECORD_CAPABILITIES,
+    ),
     // Class is represented as a Rust struct plus an impl block.
-    TypeCapabilityProfile::new(TypeKind::Class, RUST_RECORD_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, RUST_CONTRACT_CAPABILITIES),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        RUST_RECORD_DECLARATION_CAPABILITIES,
+        RUST_RECORD_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        RUST_CONTRACT_DECLARATION_CAPABILITIES,
+        RUST_CONTRACT_CAPABILITIES,
+    ),
     // Interface is represented as a Rust trait.
-    TypeCapabilityProfile::new(TypeKind::Interface, RUST_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        RUST_CONTRACT_DECLARATION_CAPABILITIES,
+        RUST_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
         &[
-            // Methods = impl methods
-            TypeCapability::Methods,
-            // ParametricPolymorphism = generic type parameters
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = trait bounds
-            TypeCapability::BoundedPolymorphism,
-            // Attributes = `#[attr]`
-            TypeCapability::Attributes,
-            // Variants = enum variants
-            TypeCapability::Variants,
-            TypeCapability::ClosedSum,
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
+            TypeDeclarationCapability::Attributes,
         ],
+        &[TypeCapability::Methods, TypeCapability::Variants],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::TypeAlias,
-        &[
-            // ParametricPolymorphism = generic type parameters
-            TypeCapability::ParametricPolymorphism,
-        ],
+        &[TypeDeclarationCapability::ParametricPolymorphism],
+        &[],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Newtype,
         &[
-            // ParametricPolymorphism = generic type parameters
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = trait bounds
-            TypeCapability::BoundedPolymorphism,
-            // Attributes = `#[attr]`
-            TypeCapability::Attributes,
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
+            TypeDeclarationCapability::Attributes,
         ],
+        &[],
     ),
 ];
 
@@ -326,6 +323,28 @@ const RUST_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::n
         VariantCapability::Attributes,
     ],
 )];
+const RUST_CLOSED_SUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
+const RUST_CLOSED_SUM_FORMS: &[ClosedSumCaseForm] = &[
+    ClosedSumCaseForm::Unit,
+    ClosedSumCaseForm::PositionalPayload,
+    ClosedSumCaseForm::RecordPayload,
+];
+const RUST_CLOSED_SUM: ClosedSumCapabilityProfile<'static> = ClosedSumCapabilityProfile::new(
+    RUST_CLOSED_SUM_DECLARATION_CAPABILITIES,
+    RUST_CLOSED_SUM_FORMS,
+    true,
+)
+.with_record_fields(
+    crate::lang::capability::FieldCapabilityProfile::new(
+        crate::lang::capability::FieldContext::ClosedSumRecordPayload,
+        crate::lang::field_lowering::rust::PAYLOAD_CAPABILITIES,
+    )
+    .with_required_capabilities(crate::lang::field_lowering::rust::REQUIRED),
+);
 
 const RUST_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = async fn
@@ -401,6 +420,7 @@ impl CodeLang for Rust {
             .with_types(RUST_TYPES)
             .with_functions(RUST_FUNCTIONS)
             .with_variants(RUST_VARIANTS)
+            .with_closed_sum(RUST_CLOSED_SUM)
             .with_fields(crate::lang::field_lowering::rust::PROFILES)
     }
 
@@ -408,11 +428,25 @@ impl CodeLang for Rust {
         crate::lang::type_lowering::rust::validate(self, type_)
     }
 
+    fn validate_closed_sum(
+        &self,
+        closed_sum: crate::lang::ClosedSumIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::closed_sum_lowering::rust::validate(self, closed_sum)
+    }
+
     fn lower_type(
         &self,
         type_: crate::lang::ValidatedType<'_>,
     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         crate::lang::type_lowering::rust::lower(self, type_)
+    }
+
+    fn lower_closed_sum(
+        &self,
+        closed_sum: crate::lang::ValidatedClosedSum<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::closed_sum_lowering::rust::lower(self, closed_sum)
     }
 
     fn lower_function(
@@ -537,21 +571,6 @@ impl CodeLang for Rust {
         fields: crate::lang::ValidatedFields<'_>,
     ) -> Result<CodeBlock, SigilStitchError> {
         crate::lang::field_lowering::rust::lower(self, fields)
-    }
-
-    fn validate_variants(
-        &self,
-        variants: crate::lang::VariantIntent<'_>,
-    ) -> Result<(), crate::error::SigilStitchError> {
-        crate::lang::variant_lowering::rust::validate(self, variants)
-    }
-
-    fn collect_variant_validation_errors(
-        &self,
-        variants: crate::lang::VariantIntent<'_>,
-        errors: &mut Vec<crate::error::SigilStitchError>,
-    ) {
-        crate::lang::variant_lowering::rust::collect_validation_errors(self, variants, errors);
     }
 
     fn lower_variants(

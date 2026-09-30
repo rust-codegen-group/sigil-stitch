@@ -6,7 +6,7 @@ use sigil_stitch::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use sigil_stitch::code_renderer::CodeRenderer;
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::{ImportEntry, ImportGroup, ImportRef};
-use sigil_stitch::lang::capability::{LanguageCapabilities, TypeCapabilityProfile};
+use sigil_stitch::lang::capability::{LanguageCapabilities, TypeKindCapabilityProfile};
 use sigil_stitch::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     OptionalFieldStyle, QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
@@ -401,8 +401,8 @@ fn marker_recovery_fails_closed_for_lossy_or_invalid_hooks() {
 #[derive(Debug)]
 struct StrictIncompleteAdapter;
 
-const STRICT_TYPES: &[TypeCapabilityProfile<'_>] =
-    &[TypeCapabilityProfile::new(TypeKind::Struct, &[])];
+const STRICT_TYPES: &[TypeKindCapabilityProfile<'_>] =
+    &[TypeKindCapabilityProfile::new(TypeKind::Struct, &[], &[])];
 
 impl RendererLang for StrictIncompleteAdapter {
     fn file_extension(&self) -> &str {

@@ -12,9 +12,9 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
 use super::{collect_escaped_name_collisions, collect_invalid_identifiers, emit_doc};
 
-const CAPABILITIES: &[FieldCapability] =
+pub(crate) const CAPABILITIES: &[FieldCapability] =
     &[FieldCapability::ExplicitType, FieldCapability::ReadOnly];
-const REQUIRED: &[FieldCapability] = &[FieldCapability::ExplicitType];
+pub(crate) const REQUIRED: &[FieldCapability] = &[FieldCapability::ExplicitType];
 
 pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
     FieldCapabilityProfile::new(
@@ -31,8 +31,6 @@ pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
         CAPABILITIES,
     )
     .with_required_capabilities(REQUIRED),
-    FieldCapabilityProfile::new(FieldContext::ClosedSumRecordPayload, CAPABILITIES)
-        .with_required_capabilities(REQUIRED),
 ];
 
 fn is_valid_identifier(name: &str) -> bool {

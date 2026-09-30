@@ -4,7 +4,7 @@ use sigil_stitch::code_block::CodeBlock;
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::lang::capability::{
     FieldCapability, FieldCapabilityProfile, FieldContext, LanguageCapabilities, TypeCapability,
-    TypeCapabilityProfile, VariantCapability, VariantCapabilityProfile,
+    TypeKindCapabilityProfile, VariantCapability, VariantCapabilityProfile,
 };
 use sigil_stitch::lang::config::{EnumAndAnnotationConfig, VariantValueFormat};
 use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedType, ValidatedVariants, VariantIntent};
@@ -94,8 +94,9 @@ struct SemanticViewLang;
 #[derive(Debug)]
 struct EmbeddedMemberViewLang;
 
-const EMBEDDED_MEMBER_TYPES: &[TypeCapabilityProfile<'_>] = &[TypeCapabilityProfile::new(
+const EMBEDDED_MEMBER_TYPES: &[TypeKindCapabilityProfile<'_>] = &[TypeKindCapabilityProfile::new(
     TypeKind::Enum,
+    &[],
     &[
         TypeCapability::Variants,
         TypeCapability::StructuralEmbedding,
@@ -143,8 +144,9 @@ impl CodeLang for EmbeddedMemberViewLang {
     }
 }
 
-const SEMANTIC_TYPES: &[TypeCapabilityProfile<'_>] = &[TypeCapabilityProfile::new(
+const SEMANTIC_TYPES: &[TypeKindCapabilityProfile<'_>] = &[TypeKindCapabilityProfile::new(
     TypeKind::Enum,
+    &[],
     &[TypeCapability::Variants],
 )];
 const SEMANTIC_VARIANTS: &[VariantCapabilityProfile<'_>] = &[VariantCapabilityProfile::new(

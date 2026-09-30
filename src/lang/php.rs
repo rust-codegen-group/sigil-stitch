@@ -47,8 +47,8 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-    VariantCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeDeclarationCapability,
+    TypeKindCapabilityProfile, VariantCapability, VariantCapabilityProfile,
 };
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
@@ -238,67 +238,54 @@ impl RendererLang for Php {
     }
 }
 
+const PHP_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
 const PHP_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = properties
     TypeCapability::RecordFields,
-    // AccessorMethods = promoted/accessor properties
     TypeCapability::AccessorMethods,
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = `implements`
     TypeCapability::InterfaceImplementation,
-    // Attributes = PHP attributes
-    TypeCapability::Attributes,
 ];
-const PHP_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, PHP_CLASS_CAPABILITIES),
+const PHP_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        PHP_CLASS_DECLARATION_CAPABILITIES,
+        PHP_CLASS_CAPABILITIES,
+    ),
     // Struct is represented as a PHP class.
-    TypeCapabilityProfile::new(TypeKind::Struct, PHP_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        PHP_CLASS_DECLARATION_CAPABILITIES,
+        PHP_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Interface,
-        &[
-            // Methods = methods
-            TypeCapability::Methods,
-            // NominalSubtyping = `extends`
-            TypeCapability::NominalSubtyping,
-            // Attributes = PHP attributes
-            TypeCapability::Attributes,
-        ],
+        &[TypeDeclarationCapability::Attributes],
+        &[TypeCapability::Methods, TypeCapability::NominalSubtyping],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Trait,
+        &[TypeDeclarationCapability::Attributes],
         &[
-            // RecordFields = properties
             TypeCapability::RecordFields,
-            // AccessorMethods = promoted/accessor properties
             TypeCapability::AccessorMethods,
-            // Methods = methods
             TypeCapability::Methods,
-            // Attributes = PHP attributes
-            TypeCapability::Attributes,
         ],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
+        &[TypeDeclarationCapability::Attributes],
         &[
-            // Methods = methods
             TypeCapability::Methods,
-            // InterfaceImplementation = `implements`
             TypeCapability::InterfaceImplementation,
-            // Attributes = PHP attributes
-            TypeCapability::Attributes,
-            // Variants = enum cases
             TypeCapability::Variants,
         ],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Newtype,
-        &[
-            // Attributes = PHP attributes
-            TypeCapability::Attributes,
-        ],
+        &[TypeDeclarationCapability::Attributes],
+        &[],
     ),
 ];
 

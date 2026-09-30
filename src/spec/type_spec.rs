@@ -53,8 +53,6 @@ use crate::type_name::TypeName;
 pub struct TypeSpec {
     pub(crate) name: String,
     pub(crate) kind: TypeKind,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub(crate) closed_sum: bool,
     pub(crate) modifiers: Modifiers,
     pub(crate) doc: Vec<String>,
     #[serde(default)]
@@ -76,10 +74,6 @@ pub struct TypeSpec {
     pub(crate) where_constraints: Vec<WhereConstraint>,
 }
 
-fn is_false(value: &bool) -> bool {
-    !*value
-}
-
 /// Read-only semantic intent for one complete type declaration.
 ///
 /// Only `TypeSpec` constructs this view. It exposes declaration facts without
@@ -90,7 +84,7 @@ pub struct TypeIntent<'a> {
 }
 
 impl<'a> TypeIntent<'a> {
-    fn new(spec: &'a TypeSpec) -> Self {
+    pub(crate) fn new(spec: &'a TypeSpec) -> Self {
         Self { spec }
     }
 
@@ -102,11 +96,6 @@ impl<'a> TypeIntent<'a> {
     /// Semantic declaration kind.
     pub fn kind(self) -> TypeKind {
         self.spec.kind
-    }
-
-    /// Whether this declaration is a closed sum.
-    pub fn is_closed_sum(self) -> bool {
-        self.spec.closed_sum
     }
 
     /// Type-level semantic modifiers.
@@ -237,11 +226,6 @@ impl<'a> ValidatedType<'a> {
         self.intent.kind()
     }
 
-    /// Whether this declaration is a closed sum.
-    pub fn is_closed_sum(&self) -> bool {
-        self.intent.is_closed_sum()
-    }
-
     /// Type-level semantic modifiers.
     pub fn modifiers(&self) -> &'a Modifiers {
         self.intent.modifiers()
@@ -307,7 +291,7 @@ impl<'a> ValidatedType<'a> {
         self.intent.extra_members()
     }
 
-    /// Validated variant sequence, including an intentional empty closed sum.
+    /// Validated ordinary variant sequence, when one was declared.
     pub fn variants(&self) -> Option<&ValidatedVariants<'a>> {
         self.variants.as_ref()
     }
@@ -326,19 +310,9 @@ impl<'a> ValidatedType<'a> {
 impl TypeSpec {
     /// Create a new builder for a type declaration with the given name and kind.
     pub fn builder(name: &str, kind: TypeKind) -> TypeSpecBuilder {
-        Self::builder_with_closed_sum(name, kind, false)
-    }
-
-    /// Create a builder for a type with a complete set of named cases.
-    pub fn closed_sum(name: &str) -> TypeSpecBuilder {
-        Self::builder_with_closed_sum(name, TypeKind::Enum, true)
-    }
-
-    fn builder_with_closed_sum(name: &str, kind: TypeKind, closed_sum: bool) -> TypeSpecBuilder {
         TypeSpecBuilder {
             name: name.to_string(),
             kind,
-            closed_sum,
             modifiers: Modifiers::default(),
             doc: Vec::new(),
             embedded_types: Vec::new(),
@@ -367,11 +341,6 @@ impl TypeSpec {
         self.kind
     }
 
-    /// Whether this declaration is a closed sum.
-    pub fn is_closed_sum(&self) -> bool {
-        self.closed_sum
-    }
-
     /// Validate this type against the language capability matrix.
     ///
     /// Type-level validation and method validation are checked in declaration
@@ -397,7 +366,7 @@ impl TypeSpec {
         self.collect_type_capability_errors(lang, errors);
         lang.collect_type_validation_errors(intent, errors);
 
-        if self.closed_sum || !self.variants.is_empty() {
+        if !self.variants.is_empty() {
             let has_non_variant_members = !self.fields.is_empty()
                 || !self.properties.is_empty()
                 || !self.methods.is_empty()
@@ -406,7 +375,6 @@ impl TypeSpec {
             EnumVariantSpec::collect_sequence_validation_errors(
                 &self.name,
                 self.kind,
-                self.closed_sum,
                 &self.variants,
                 self.variant_owner_context(lang, has_non_variant_members),
                 lang,
@@ -500,12 +468,11 @@ impl TypeSpec {
             || !self.methods.is_empty()
             || !self.embedded_types.is_empty()
             || !self.extra_members.is_empty();
-        let variants = (self.closed_sum || !self.variants.is_empty())
+        let variants = (!self.variants.is_empty())
             .then(|| {
                 EnumVariantSpec::validate_sequence(
                     &self.name,
                     self.kind,
-                    self.closed_sum,
                     &self.variants,
                     self.variant_owner_context(lang, has_non_variant_members),
                     lang,
@@ -599,51 +566,6 @@ impl TypeSpec {
                 type_name: self.name.clone(),
                 modifiers: invalid_modifiers,
             });
-        }
-
-        if self.closed_sum && self.kind != TypeKind::Enum {
-            errors.push(SigilStitchError::InvalidTypeDeclaration {
-                type_name: self.name.clone(),
-                reason: "closed-sum intent requires the enum declaration carrier".to_string(),
-            });
-        }
-        if self.closed_sum {
-            if !self.extra_members.is_empty() {
-                errors.push(SigilStitchError::InvalidTypeDeclaration {
-                    type_name: self.name.clone(),
-                    reason: "closed-sum declarations must not contain opaque members that could add unvalidated cases"
-                        .to_string(),
-                });
-            }
-            for variant in &self.variants {
-                if variant.legacy_value().is_some() {
-                    errors.push(SigilStitchError::InvalidTypeDeclaration {
-                        type_name: self.name.clone(),
-                        reason: format!(
-                            "closed-sum case {:?} must not declare a legacy value",
-                            variant.name()
-                        ),
-                    });
-                }
-                if variant.discriminant().is_some() {
-                    errors.push(SigilStitchError::InvalidTypeDeclaration {
-                        type_name: self.name.clone(),
-                        reason: format!(
-                            "closed-sum case {:?} must not declare a discriminant",
-                            variant.name()
-                        ),
-                    });
-                }
-                if !variant.constructor_arguments().is_empty() {
-                    errors.push(SigilStitchError::InvalidTypeDeclaration {
-                        type_name: self.name.clone(),
-                        reason: format!(
-                            "closed-sum case {:?} must not declare enum constructor arguments",
-                            variant.name()
-                        ),
-                    });
-                }
-            }
         }
 
         for (index, annotation) in self.annotations.iter().enumerate() {
@@ -773,7 +695,7 @@ impl TypeSpec {
             }
         }
 
-        if !self.closed_sum && self.kind == TypeKind::Enum && !self.primary_constructor.is_empty() {
+        if self.kind == TypeKind::Enum && !self.primary_constructor.is_empty() {
             let constructor_arity = ConstructorArity::from_parameters(&self.primary_constructor);
             for variant in &self.variants {
                 let argument_count = if variant.constructor_arguments().is_empty() {
@@ -803,22 +725,31 @@ impl TypeSpec {
         let language = lang.file_extension().to_string();
 
         if !capabilities.supports_type_kind(self.kind) {
-            if self.closed_sum {
-                errors.push(SigilStitchError::UnsupportedTypeCapabilities {
-                    language,
-                    type_name: self.name.clone(),
-                    capabilities: vec![TypeCapability::ClosedSum],
-                });
-            } else {
-                errors.push(SigilStitchError::UnsupportedTypeKind {
-                    language,
-                    kind: self.kind,
-                    type_name: self.name.clone(),
-                });
-            }
+            errors.push(SigilStitchError::UnsupportedTypeKind {
+                language,
+                kind: self.kind,
+                type_name: self.name.clone(),
+            });
             return;
         }
 
+        let declaration_missing: Vec<_> = super::type_declaration::requested_capabilities(
+            &self.type_params,
+            &self.where_constraints,
+            !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
+        )
+        .into_iter()
+        .filter(|capability| {
+            !capabilities.supports_type_declaration_capability(self.kind, *capability)
+        })
+        .collect();
+        if !declaration_missing.is_empty() {
+            errors.push(SigilStitchError::UnsupportedTypeDeclarationCapabilities {
+                language: language.clone(),
+                type_name: self.name.clone(),
+                capabilities: declaration_missing,
+            });
+        }
         let mut missing = Vec::new();
         let require = |capability: TypeCapability, condition: bool, missing: &mut Vec<_>| {
             if condition && !capabilities.supports_type_capability(self.kind, capability) {
@@ -858,43 +789,13 @@ impl TypeSpec {
             &mut missing,
         );
         require(
-            TypeCapability::ParametricPolymorphism,
-            !self.type_params.is_empty(),
-            &mut missing,
-        );
-        require(
-            TypeCapability::BoundedPolymorphism,
-            !self.where_constraints.is_empty()
-                || self
-                    .type_params
-                    .iter()
-                    .any(|param| !param.bounds().is_empty() || !param.context_bounds().is_empty()),
-            &mut missing,
-        );
-        require(
-            TypeCapability::HigherKindedPolymorphism,
-            self.type_params.iter().any(|param| param.kind().is_some()),
-            &mut missing,
-        );
-        require(
             TypeCapability::PrimaryConstructorParameters,
             !self.primary_constructor.is_empty(),
             &mut missing,
         );
         require(
             TypeCapability::Variants,
-            !self.closed_sum && !self.variants.is_empty(),
-            &mut missing,
-        );
-        if self.closed_sum
-            && (capabilities.type_validation_is_permissive()
-                || !capabilities.supports_type_capability(self.kind, TypeCapability::ClosedSum))
-        {
-            missing.push(TypeCapability::ClosedSum);
-        }
-        require(
-            TypeCapability::Attributes,
-            !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
+            !self.variants.is_empty(),
             &mut missing,
         );
         if !missing.is_empty() {
@@ -929,7 +830,6 @@ impl TypeSpec {
 pub struct TypeSpecBuilder {
     name: String,
     kind: TypeKind,
-    closed_sum: bool,
     modifiers: Modifiers,
     doc: Vec<String>,
     embedded_types: Vec<TypeName>,
@@ -1120,7 +1020,7 @@ impl TypeSpecBuilder {
 
         // Validate enum consistency between primary-constructor parameters and
         // enum-entry constructor arguments.
-        if !self.closed_sum && self.kind == TypeKind::Enum && !self.primary_constructor.is_empty() {
+        if self.kind == TypeKind::Enum && !self.primary_constructor.is_empty() {
             let constructor_arity = ConstructorArity::from_parameters(&self.primary_constructor);
             if let Some(variant) = self.variants.iter().find(|variant| {
                 let argument_count = if variant.constructor_arguments.is_empty() {
@@ -1143,7 +1043,6 @@ impl TypeSpecBuilder {
         Ok(TypeSpec {
             name: self.name,
             kind: self.kind,
-            closed_sum: self.closed_sum,
             modifiers: self.modifiers,
             doc: self.doc,
             embedded_types: self.embedded_types,

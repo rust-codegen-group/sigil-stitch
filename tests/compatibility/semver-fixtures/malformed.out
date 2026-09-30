@@ -3,6 +3,6 @@
 --- failure trait_method_missing: pub trait method removed or renamed ---
 
 Failed in:
-  this record does not match cargo-semver-checks 0.49.0
+  this record does not match cargo-semver-checks output
 
      Summary semver requires new major version

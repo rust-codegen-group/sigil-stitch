@@ -55,7 +55,7 @@ The compatibility bridge restores the exact 0.6.8 source signatures touched by
 this migration and marks the shared grammar surface deprecated. A checked
 external-adapter fixture overrides the complete old trait surface, the finite
 documented `TypeName` JSON set is checked as `serde_json::Value`, and
-`cargo-semver-checks 0.49.0` currently reports no unapproved break from tag
+`cargo-semver-checks 0.50.0` currently reports no unapproved break from tag
 `0.6.8`. The compatibility manifest and fixtures live under
 `tests/compatibility/`.
 
@@ -355,7 +355,7 @@ just semver-check
 The first command compiles the old adapter as an external crate, checks the
 restored signatures and structural marker bridges, and compares the bounded
 JSON fixtures. The second command tests the report parser and then compares the
-complete `cargo-semver-checks 0.49.0` record set with the checked allowlist.
+complete `cargo-semver-checks 0.50.0` record set with the checked allowlist.
 Missing, duplicate, malformed, and unexpected approved records fail closed.
 
 For a migrated family, keep tests for:

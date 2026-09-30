@@ -39,7 +39,7 @@ pub(super) fn validate_declaration(
     Ok(())
 }
 
-pub(super) fn is_identifier(name: &str) -> bool {
+pub(crate) fn is_identifier(name: &str) -> bool {
     let mut chars = name.chars();
     chars
         .next()

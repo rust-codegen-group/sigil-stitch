@@ -5,8 +5,9 @@ use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
-    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    ClosedSumCapabilityProfile, ClosedSumCaseForm, FunctionBodyPolicy, FunctionCapability,
+    FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
+    TypeDeclarationCapability, TypeKindCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
@@ -346,62 +347,66 @@ impl RendererLang for Haskell {
     }
 }
 
+const HASKELL_DATA_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+];
 const HASKELL_DATA_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = record fields
     TypeCapability::RecordFields,
-    // ParametricPolymorphism = type variables
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = class contexts / constraints
-    TypeCapability::BoundedPolymorphism,
-    // Variants = data constructors
     TypeCapability::Variants,
-    // impl_types render as `deriving (...)`.
     TypeCapability::InterfaceImplementation,
 ];
-const HASKELL_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    // Methods = class methods
-    TypeCapability::Methods,
-    // ParametricPolymorphism = type variables
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = class contexts / constraints
-    TypeCapability::BoundedPolymorphism,
+const HASKELL_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
 ];
-const HASKELL_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Struct, HASKELL_DATA_CAPABILITIES),
+const HASKELL_CONTRACT_CAPABILITIES: &[TypeCapability] = &[TypeCapability::Methods];
+const HASKELL_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        HASKELL_DATA_DECLARATION_CAPABILITIES,
+        HASKELL_DATA_CAPABILITIES,
+    ),
     // Class is represented as a Haskell data declaration.
-    TypeCapabilityProfile::new(TypeKind::Class, HASKELL_DATA_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, HASKELL_CONTRACT_CAPABILITIES),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        HASKELL_DATA_DECLARATION_CAPABILITIES,
+        HASKELL_DATA_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        HASKELL_CONTRACT_DECLARATION_CAPABILITIES,
+        HASKELL_CONTRACT_CAPABILITIES,
+    ),
     // Interface is represented as a Haskell class.
-    TypeCapabilityProfile::new(TypeKind::Interface, HASKELL_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        HASKELL_CONTRACT_DECLARATION_CAPABILITIES,
+        HASKELL_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
         &[
-            // ParametricPolymorphism = type variables
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = class contexts / constraints
-            TypeCapability::BoundedPolymorphism,
-            // Variants = data constructors
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
+        ],
+        &[
             TypeCapability::Variants,
-            TypeCapability::ClosedSum,
             TypeCapability::InterfaceImplementation,
         ],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::TypeAlias,
-        &[
-            // ParametricPolymorphism = type variables
-            TypeCapability::ParametricPolymorphism,
-        ],
+        &[TypeDeclarationCapability::ParametricPolymorphism],
+        &[],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Newtype,
         &[
-            // ParametricPolymorphism = type variables
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = class contexts / constraints
-            TypeCapability::BoundedPolymorphism,
-            TypeCapability::InterfaceImplementation,
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
         ],
+        &[TypeCapability::InterfaceImplementation],
     ),
 ];
 
@@ -412,6 +417,27 @@ const HASKELL_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile
         VariantCapability::RecordPayload,
     ],
 )];
+const HASKELL_CLOSED_SUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+];
+const HASKELL_CLOSED_SUM_FORMS: &[ClosedSumCaseForm] = &[
+    ClosedSumCaseForm::Unit,
+    ClosedSumCaseForm::PositionalPayload,
+    ClosedSumCaseForm::RecordPayload,
+];
+const HASKELL_CLOSED_SUM: ClosedSumCapabilityProfile<'static> = ClosedSumCapabilityProfile::new(
+    HASKELL_CLOSED_SUM_DECLARATION_CAPABILITIES,
+    HASKELL_CLOSED_SUM_FORMS,
+    false,
+)
+.with_record_fields(
+    crate::lang::capability::FieldCapabilityProfile::new(
+        crate::lang::capability::FieldContext::ClosedSumRecordPayload,
+        crate::lang::field_lowering::haskell::CAPABILITIES,
+    )
+    .with_required_capabilities(crate::lang::field_lowering::haskell::REQUIRED),
+);
 
 const HASKELL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // BoundedPolymorphism = class constraints
@@ -469,6 +495,7 @@ impl CodeLang for Haskell {
             .with_types(HASKELL_TYPES)
             .with_functions(HASKELL_FUNCTIONS)
             .with_variants(HASKELL_VARIANTS)
+            .with_closed_sum(HASKELL_CLOSED_SUM)
             .with_fields(crate::lang::field_lowering::haskell::PROFILES)
     }
 
@@ -476,11 +503,25 @@ impl CodeLang for Haskell {
         crate::lang::type_lowering::haskell::validate(self, type_)
     }
 
+    fn validate_closed_sum(
+        &self,
+        closed_sum: crate::lang::ClosedSumIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::closed_sum_lowering::haskell::validate(self, closed_sum)
+    }
+
     fn lower_type(
         &self,
         type_: crate::lang::ValidatedType<'_>,
     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         crate::lang::type_lowering::haskell::lower(self, type_)
+    }
+
+    fn lower_closed_sum(
+        &self,
+        closed_sum: crate::lang::ValidatedClosedSum<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::closed_sum_lowering::haskell::lower(self, closed_sum)
     }
 
     fn lower_function(
