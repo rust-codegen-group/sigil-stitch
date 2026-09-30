@@ -21,9 +21,9 @@ const CAPABILITIES: &[FieldCapability] = &[
     FieldCapability::StaticField,
     FieldCapability::ReadOnly,
 ];
-const PAYLOAD_CAPABILITIES: &[FieldCapability] =
+pub(crate) const PAYLOAD_CAPABILITIES: &[FieldCapability] =
     &[FieldCapability::ExplicitType, FieldCapability::ReadOnly];
-const PAYLOAD_REQUIRED: &[FieldCapability] = &[FieldCapability::ExplicitType];
+pub(crate) const PAYLOAD_REQUIRED: &[FieldCapability] = &[FieldCapability::ExplicitType];
 pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
     FieldCapabilityProfile::new(
         FieldContext::Direct(DeclarationContext::Member),
@@ -31,8 +31,6 @@ pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
     ),
     FieldCapabilityProfile::new(FieldContext::TypeMember(TypeKind::Class), CAPABILITIES),
     FieldCapabilityProfile::new(FieldContext::TypeMember(TypeKind::Struct), CAPABILITIES),
-    FieldCapabilityProfile::new(FieldContext::ClosedSumRecordPayload, PAYLOAD_CAPABILITIES)
-        .with_required_capabilities(PAYLOAD_REQUIRED),
 ];
 
 pub(crate) fn is_valid_identifier(name: &str) -> bool {

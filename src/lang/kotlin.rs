@@ -4,8 +4,9 @@ use crate::code_block::{Arg, CodeBlock};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
-    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    ClosedSumCapabilityProfile, ClosedSumCaseForm, FunctionBodyPolicy, FunctionCapability,
+    FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
+    TypeDeclarationCapability, TypeKindCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
@@ -284,84 +285,77 @@ impl RendererLang for Kotlin {
     }
 }
 
+const KOTLIN_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
 const KOTLIN_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = properties and backing fields
     TypeCapability::RecordFields,
-    // AccessorMethods = get/set accessors
     TypeCapability::AccessorMethods,
-    // Methods = member functions
     TypeCapability::Methods,
-    // NominalSubtyping = supertypes (`:`)
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = interfaces in the same supertype list
     TypeCapability::InterfaceImplementation,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic constraints
-    TypeCapability::BoundedPolymorphism,
-    // PrimaryConstructorParameters = primary constructor parameters
     TypeCapability::PrimaryConstructorParameters,
-    // Attributes = annotations
-    TypeCapability::Attributes,
+];
+const KOTLIN_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
 const KOTLIN_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    // AccessorMethods = get/set accessors
     TypeCapability::AccessorMethods,
-    // Methods = member functions
     TypeCapability::Methods,
-    // NominalSubtyping = supertypes (`:`)
     TypeCapability::NominalSubtyping,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic constraints
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = annotations
-    TypeCapability::Attributes,
 ];
-const KOTLIN_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, KOTLIN_CLASS_CAPABILITIES),
+const KOTLIN_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        KOTLIN_CLASS_DECLARATION_CAPABILITIES,
+        KOTLIN_CLASS_CAPABILITIES,
+    ),
     // Struct is represented as a Kotlin data class.
-    TypeCapabilityProfile::new(TypeKind::Struct, KOTLIN_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, KOTLIN_CONTRACT_CAPABILITIES),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        KOTLIN_CLASS_DECLARATION_CAPABILITIES,
+        KOTLIN_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        KOTLIN_CONTRACT_DECLARATION_CAPABILITIES,
+        KOTLIN_CONTRACT_CAPABILITIES,
+    ),
     // Trait is represented as a Kotlin interface.
-    TypeCapabilityProfile::new(TypeKind::Trait, KOTLIN_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        KOTLIN_CONTRACT_DECLARATION_CAPABILITIES,
+        KOTLIN_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
+        &[TypeDeclarationCapability::Attributes],
         &[
-            // RecordFields = properties and backing fields
             TypeCapability::RecordFields,
-            // AccessorMethods = get/set accessors
             TypeCapability::AccessorMethods,
-            // Methods = member functions
             TypeCapability::Methods,
-            // InterfaceImplementation = implemented interfaces in the supertype list
             TypeCapability::InterfaceImplementation,
-            // PrimaryConstructorParameters = primary constructor parameters
             TypeCapability::PrimaryConstructorParameters,
-            // Attributes = annotations
-            TypeCapability::Attributes,
-            // Variants = enum entries
             TypeCapability::Variants,
-            TypeCapability::ClosedSum,
         ],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::TypeAlias,
-        &[
-            // ParametricPolymorphism = generic type parameters
-            TypeCapability::ParametricPolymorphism,
-        ],
+        &[TypeDeclarationCapability::ParametricPolymorphism],
+        &[],
     ),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
         TypeKind::Newtype,
         &[
-            // ParametricPolymorphism = generic type parameters
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = upper bounds on value-class parameters
-            TypeCapability::BoundedPolymorphism,
-            // Attributes = annotations
-            TypeCapability::Attributes,
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
+            TypeDeclarationCapability::Attributes,
         ],
+        &[],
     ),
 ];
 
@@ -372,6 +366,25 @@ const KOTLIN_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile:
         VariantCapability::Attributes,
     ],
 )];
+const KOTLIN_CLOSED_SUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
+const KOTLIN_CLOSED_SUM_FORMS: &[ClosedSumCaseForm] = &[
+    ClosedSumCaseForm::Unit,
+    ClosedSumCaseForm::PositionalPayload,
+    ClosedSumCaseForm::RecordPayload,
+];
+const KOTLIN_CLOSED_SUM: ClosedSumCapabilityProfile<'static> = ClosedSumCapabilityProfile::new(
+    KOTLIN_CLOSED_SUM_DECLARATION_CAPABILITIES,
+    KOTLIN_CLOSED_SUM_FORMS,
+    true,
+)
+.with_record_fields(
+    crate::lang::capability::FieldCapabilityProfile::new(
+        crate::lang::capability::FieldContext::ClosedSumRecordPayload,
+        crate::lang::field_lowering::kotlin::PAYLOAD_CAPABILITIES,
+    )
+    .with_required_capabilities(crate::lang::field_lowering::kotlin::PAYLOAD_REQUIRED),
+);
 
 const KOTLIN_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = suspend
@@ -473,6 +486,7 @@ impl CodeLang for Kotlin {
             .with_types(KOTLIN_TYPES)
             .with_functions(KOTLIN_FUNCTIONS)
             .with_variants(KOTLIN_VARIANTS)
+            .with_closed_sum(KOTLIN_CLOSED_SUM)
             .with_fields(crate::lang::field_lowering::kotlin::PROFILES)
             .with_properties(crate::lang::property_lowering::kotlin::PROFILES)
     }
@@ -481,11 +495,25 @@ impl CodeLang for Kotlin {
         crate::lang::type_lowering::kotlin::validate(self, type_)
     }
 
+    fn validate_closed_sum(
+        &self,
+        closed_sum: crate::lang::ClosedSumIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::closed_sum_lowering::kotlin::validate(self, closed_sum)
+    }
+
     fn lower_type(
         &self,
         type_: crate::lang::ValidatedType<'_>,
     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         crate::lang::type_lowering::kotlin::lower(self, type_)
+    }
+
+    fn lower_closed_sum(
+        &self,
+        closed_sum: crate::lang::ValidatedClosedSum<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::closed_sum_lowering::kotlin::lower(self, closed_sum)
     }
 
     fn validate_fields(

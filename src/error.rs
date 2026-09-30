@@ -3,8 +3,9 @@
 use snafu::prelude::*;
 
 use crate::lang::capability::{
-    FieldCapability, FieldContext, FunctionCapability, FunctionContext, FunctionForm,
-    PropertyCapability, PropertyContext, TypeCapability, VariantCapability,
+    ClosedSumCaseForm, FieldCapability, FieldContext, FunctionCapability, FunctionContext,
+    FunctionForm, PropertyCapability, PropertyContext, TypeCapability, TypeDeclarationCapability,
+    VariantCapability,
 };
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
@@ -241,6 +242,118 @@ pub enum SigilStitchError {
         type_name: String,
         /// The unsupported semantic capabilities.
         capabilities: Vec<TypeCapability>,
+    },
+
+    /// A language does not support one or more declaration-wide capabilities.
+    #[snafu(display(
+        "language {language:?} does not support declaration capabilities {capabilities:?} for type {type_name:?}"
+    ))]
+    UnsupportedTypeDeclarationCapabilities {
+        /// The language file extension.
+        language: String,
+        /// The type being emitted.
+        type_name: String,
+        /// The unsupported declaration-wide capabilities.
+        capabilities: Vec<TypeDeclarationCapability>,
+    },
+
+    /// The requested declaration is not a supported ClosedSum family.
+    #[snafu(display("language {language:?} does not support ClosedSum declaration {type_name:?}"))]
+    UnsupportedClosedSum {
+        /// The language file extension.
+        language: String,
+        /// The type being emitted.
+        type_name: String,
+    },
+
+    /// A ClosedSum case name was declared more than once.
+    #[snafu(display("duplicate ClosedSum case {case_name:?} in type {type_name:?}"))]
+    DuplicateClosedSumCaseName {
+        /// The owning ClosedSum name.
+        type_name: String,
+        /// The duplicated case name.
+        case_name: String,
+    },
+
+    /// A ClosedSum case payload is malformed independent of a language target.
+    #[snafu(display("invalid ClosedSum case payload for {case_name:?} ({form:?}): {reason}"))]
+    InvalidClosedSumCasePayload {
+        /// The case name.
+        case_name: String,
+        /// The payload form that failed validation.
+        form: ClosedSumCaseForm,
+        /// Why the payload is malformed.
+        reason: String,
+    },
+
+    /// A ClosedSum record payload repeats a field name.
+    #[snafu(display("duplicate ClosedSum record field {field_name:?} in case {case_name:?}"))]
+    DuplicateClosedSumRecordFieldName {
+        /// The case name.
+        case_name: String,
+        /// The duplicated field name.
+        field_name: String,
+    },
+
+    /// A language-local ClosedSum case rule failed.
+    #[snafu(display(
+        "invalid ClosedSum case {case_name:?} in {type_name:?} for language {language:?}: {reason}"
+    ))]
+    InvalidClosedSumCase {
+        /// The language file extension.
+        language: String,
+        /// The owning type name.
+        type_name: String,
+        /// The case name.
+        case_name: String,
+        /// Why the target cannot represent this case.
+        reason: String,
+    },
+
+    /// A language does not support one ClosedSum case form.
+    #[snafu(display(
+        "language {language:?} does not support ClosedSum case form {form:?} for {type_name:?}::{case_name:?}"
+    ))]
+    UnsupportedClosedSumCaseForm {
+        /// The language file extension.
+        language: String,
+        /// The owning type name.
+        type_name: String,
+        /// The case name.
+        case_name: String,
+        /// The rejected case form.
+        form: ClosedSumCaseForm,
+    },
+
+    /// A language cannot represent an empty ClosedSum.
+    #[snafu(display("language {language:?} does not support empty ClosedSum {type_name:?}"))]
+    UnsupportedEmptyClosedSum {
+        /// The language file extension.
+        language: String,
+        /// The type being emitted.
+        type_name: String,
+    },
+
+    /// A strict adapter advertised ClosedSum support but omitted its complete lowerer.
+    #[snafu(display("language {language:?} has no complete ClosedSum lowerer for {type_name:?}"))]
+    MissingClosedSumLowerer {
+        /// The language file extension.
+        language: String,
+        /// The type being emitted.
+        type_name: String,
+    },
+
+    /// A ClosedSum lowerer returned no declaration output.
+    #[snafu(display(
+        "language {language:?} returned empty ClosedSum output for {type_name:?} at block {block_index:?}"
+    ))]
+    EmptyClosedSumLowering {
+        /// The language file extension.
+        language: String,
+        /// The type being emitted.
+        type_name: String,
+        /// `None` for no blocks, `Some(index)` for an empty block.
+        block_index: Option<usize>,
     },
 
     /// A strict adapter declared type support but omitted complete type lowering.

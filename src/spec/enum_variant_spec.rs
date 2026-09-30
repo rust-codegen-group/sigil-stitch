@@ -101,7 +101,6 @@ impl VariantOwnerContext {
 pub struct VariantIntent<'a> {
     owner_name: &'a str,
     owner_kind: TypeKind,
-    closed_sum: bool,
     variants: &'a [EnumVariantSpec],
     owner_context: VariantOwnerContext,
 }
@@ -110,14 +109,12 @@ impl<'a> VariantIntent<'a> {
     fn new(
         owner_name: &'a str,
         owner_kind: TypeKind,
-        closed_sum: bool,
         variants: &'a [EnumVariantSpec],
         owner_context: VariantOwnerContext,
     ) -> Self {
         Self {
             owner_name,
             owner_kind,
-            closed_sum,
             variants,
             owner_context,
         }
@@ -131,11 +128,6 @@ impl<'a> VariantIntent<'a> {
     /// Kind of declaration that owns this sequence.
     pub fn owner_kind(&self) -> TypeKind {
         self.owner_kind
-    }
-
-    /// Whether this sequence is the complete case set of a closed sum.
-    pub fn is_closed_sum(&self) -> bool {
-        self.closed_sum
     }
 
     /// Variants in declaration order.
@@ -382,7 +374,6 @@ impl EnumVariantSpec {
     pub(crate) fn validate_sequence<'a>(
         owner_name: &'a str,
         owner_kind: TypeKind,
-        closed_sum: bool,
         variants: &'a [Self],
         owner_context: VariantOwnerContext,
         lang: &dyn CodeLang,
@@ -391,7 +382,6 @@ impl EnumVariantSpec {
         Self::collect_sequence_validation_errors(
             owner_name,
             owner_kind,
-            closed_sum,
             variants,
             owner_context.clone(),
             lang,
@@ -403,7 +393,6 @@ impl EnumVariantSpec {
         Ok(ValidatedVariants::new(VariantIntent::new(
             owner_name,
             owner_kind,
-            closed_sum,
             variants,
             owner_context,
         )))
@@ -412,14 +401,12 @@ impl EnumVariantSpec {
     pub(crate) fn collect_sequence_validation_errors(
         owner_name: &str,
         owner_kind: TypeKind,
-        closed_sum: bool,
         variants: &[Self],
         owner_context: VariantOwnerContext,
         lang: &dyn CodeLang,
         errors: &mut Vec<SigilStitchError>,
     ) {
-        let intent =
-            VariantIntent::new(owner_name, owner_kind, closed_sum, variants, owner_context);
+        let intent = VariantIntent::new(owner_name, owner_kind, variants, owner_context);
         let mut seen_variant_names = std::collections::HashSet::new();
         let mut reported_variant_names = std::collections::HashSet::new();
         for variant in variants {
@@ -438,35 +425,6 @@ impl EnumVariantSpec {
         }
 
         let capabilities = lang.capabilities();
-        if closed_sum {
-            let supported = !capabilities.type_validation_is_permissive()
-                && capabilities.supports_type_capability(
-                    owner_kind,
-                    crate::lang::capability::TypeCapability::ClosedSum,
-                );
-            for variant in variants {
-                if !variant.record_payload().is_empty() {
-                    let field_intent = FieldSequenceIntent::closed_sum_record_payload(
-                        variant.record_payload(),
-                        owner_name,
-                        variant.name(),
-                    );
-                    if supported {
-                        FieldSpec::collect_sequence_validation_errors(field_intent, lang, errors);
-                    } else {
-                        FieldSpec::collect_sequence_intrinsic_validation_errors(
-                            field_intent,
-                            errors,
-                        );
-                    }
-                }
-            }
-            if supported {
-                lang.collect_variant_validation_errors(intent, errors);
-            }
-            return;
-        }
-
         if !capabilities.supports_variant_owner(owner_kind) {
             errors.push(SigilStitchError::UnsupportedVariantOwner {
                 language: lang.file_extension().to_string(),
@@ -962,10 +920,9 @@ mod tests {
         ];
 
         for lang in languages {
-            let invalid =
-                VariantIntent::new("Owner", TypeKind::Enum, false, &legacy, context.clone());
+            let invalid = VariantIntent::new("Owner", TypeKind::Enum, &legacy, context.clone());
             assert!(lang.validate_variants(invalid).is_err());
-            let valid = VariantIntent::new("Owner", TypeKind::Enum, false, &plain, context.clone());
+            let valid = VariantIntent::new("Owner", TypeKind::Enum, &plain, context.clone());
             assert!(lang.validate_variants(valid).is_ok());
         }
 
@@ -992,14 +949,8 @@ mod tests {
             .is_err()
         );
         assert!(
-            rust.validate_variants(VariantIntent::new(
-                "Owner",
-                TypeKind::Enum,
-                false,
-                &plain,
-                context,
-            ))
-            .is_ok()
+            rust.validate_variants(VariantIntent::new("Owner", TypeKind::Enum, &plain, context))
+                .is_ok()
         );
     }
 }

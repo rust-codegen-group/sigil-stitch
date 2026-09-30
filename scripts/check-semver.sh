@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly EXPECTED_VERSION="cargo-semver-checks 0.49.0"
+readonly EXPECTED_VERSION="cargo-semver-checks 0.50.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly DEFAULT_ALLOWLIST="${REPO_ROOT}/tests/compatibility/semver-0.6.8-allowlist.txt"
@@ -173,9 +173,9 @@ compare_output() (
   local unexpected="${comparison_dir}/unexpected.txt"
 
   validate_completed_output "${semver_output}" || die \
-    "cargo-semver-checks 0.49.0 output was malformed"
+    "${EXPECTED_VERSION} output was malformed"
   parse_output "${semver_output}" "${parsed_raw}" || die \
-    "cargo-semver-checks 0.49.0 output was malformed"
+    "${EXPECTED_VERSION} output was malformed"
   LC_ALL=C sort -u "${parsed_raw}" > "${actual}"
 
   normalize_allowlist "${allowlist_file}" "${approved_raw}" || die "semver allowlist was malformed"

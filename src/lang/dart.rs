@@ -4,8 +4,9 @@ use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
-    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    ClosedSumCapabilityProfile, ClosedSumCaseForm, FunctionBodyPolicy, FunctionCapability,
+    FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
+    TypeDeclarationCapability, TypeKindCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
@@ -235,59 +236,58 @@ impl RendererLang for Dart {
     }
 }
 
+const DART_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
 const DART_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = instance fields
     TypeCapability::RecordFields,
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = `implements`
     TypeCapability::InterfaceImplementation,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = `T extends Bound`
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = metadata annotations
-    TypeCapability::Attributes,
+];
+const DART_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
 const DART_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = `implements`
     TypeCapability::InterfaceImplementation,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = `T extends Bound`
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = metadata annotations
-    TypeCapability::Attributes,
 ];
-const DART_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, DART_CLASS_CAPABILITIES),
-    // Struct is represented as a Dart class.
-    TypeCapabilityProfile::new(TypeKind::Struct, DART_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, DART_CONTRACT_CAPABILITIES),
-    // Trait is represented as a Dart abstract class.
-    TypeCapabilityProfile::new(TypeKind::Trait, DART_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(
-        TypeKind::Enum,
-        &[
-            // Variants = enum values
-            TypeCapability::Variants,
-            TypeCapability::ClosedSum,
-        ],
+const DART_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        DART_CLASS_DECLARATION_CAPABILITIES,
+        DART_CLASS_CAPABILITIES,
     ),
-    TypeCapabilityProfile::new(
+    // Struct is represented as a Dart class.
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        DART_CLASS_DECLARATION_CAPABILITIES,
+        DART_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        DART_CONTRACT_DECLARATION_CAPABILITIES,
+        DART_CONTRACT_CAPABILITIES,
+    ),
+    // Trait is represented as a Dart abstract class.
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        DART_CONTRACT_DECLARATION_CAPABILITIES,
+        DART_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(TypeKind::Enum, &[], &[TypeCapability::Variants]),
+    TypeKindCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
-            // ParametricPolymorphism = generic type parameters
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = `T extends Bound`
-            TypeCapability::BoundedPolymorphism,
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
         ],
+        &[],
     ),
 ];
 
@@ -295,6 +295,24 @@ const DART_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::n
     TypeKind::Enum,
     &[VariantCapability::Attributes],
 )];
+const DART_CLOSED_SUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[];
+const DART_CLOSED_SUM_FORMS: &[ClosedSumCaseForm] = &[
+    ClosedSumCaseForm::Unit,
+    ClosedSumCaseForm::PositionalPayload,
+    ClosedSumCaseForm::RecordPayload,
+];
+const DART_CLOSED_SUM: ClosedSumCapabilityProfile<'static> = ClosedSumCapabilityProfile::new(
+    DART_CLOSED_SUM_DECLARATION_CAPABILITIES,
+    DART_CLOSED_SUM_FORMS,
+    false,
+)
+.with_record_fields(
+    crate::lang::capability::FieldCapabilityProfile::new(
+        crate::lang::capability::FieldContext::ClosedSumRecordPayload,
+        crate::lang::field_lowering::dart::PAYLOAD_CAPABILITIES,
+    )
+    .with_required_capabilities(crate::lang::field_lowering::dart::PAYLOAD_REQUIRED),
+);
 
 const DART_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = async
@@ -395,6 +413,7 @@ impl CodeLang for Dart {
             .with_types(DART_TYPES)
             .with_functions(DART_FUNCTIONS)
             .with_variants(DART_VARIANTS)
+            .with_closed_sum(DART_CLOSED_SUM)
             .with_fields(crate::lang::field_lowering::dart::PROFILES)
     }
 
@@ -402,11 +421,25 @@ impl CodeLang for Dart {
         crate::lang::type_lowering::dart::validate(self, type_)
     }
 
+    fn validate_closed_sum(
+        &self,
+        closed_sum: crate::lang::ClosedSumIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::closed_sum_lowering::dart::validate(self, closed_sum)
+    }
+
     fn lower_type(
         &self,
         type_: crate::lang::ValidatedType<'_>,
     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         crate::lang::type_lowering::dart::lower(self, type_)
+    }
+
+    fn lower_closed_sum(
+        &self,
+        closed_sum: crate::lang::ValidatedClosedSum<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::closed_sum_lowering::dart::lower(self, closed_sum)
     }
 
     fn lower_function(

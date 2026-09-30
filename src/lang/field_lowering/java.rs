@@ -21,8 +21,8 @@ const CAPABILITIES: &[FieldCapability] = &[
     FieldCapability::StaticField,
     FieldCapability::ReadOnly,
 ];
-const REQUIRED: &[FieldCapability] = &[FieldCapability::ExplicitType];
-const PAYLOAD_CAPABILITIES: &[FieldCapability] =
+pub(crate) const REQUIRED: &[FieldCapability] = &[FieldCapability::ExplicitType];
+pub(crate) const PAYLOAD_CAPABILITIES: &[FieldCapability] =
     &[FieldCapability::ExplicitType, FieldCapability::ReadOnly];
 
 pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
@@ -36,8 +36,6 @@ pub(crate) const PROFILES: &[FieldCapabilityProfile] = &[
     FieldCapabilityProfile::new(FieldContext::TypeMember(TypeKind::Struct), CAPABILITIES)
         .with_required_capabilities(REQUIRED),
     FieldCapabilityProfile::new(FieldContext::TypeMember(TypeKind::Enum), CAPABILITIES)
-        .with_required_capabilities(REQUIRED),
-    FieldCapabilityProfile::new(FieldContext::ClosedSumRecordPayload, PAYLOAD_CAPABILITIES)
         .with_required_capabilities(REQUIRED),
 ];
 
@@ -88,6 +86,26 @@ pub(crate) fn collect_validation_errors(
     collect_invalid_identifiers(lang, fields, is_valid_identifier, errors);
     collect_escaped_name_collisions(lang, fields, errors);
     for field in fields.fields() {
+        if fields.context() == FieldContext::ClosedSumRecordPayload
+            && matches!(
+                field.name(),
+                "clone"
+                    | "finalize"
+                    | "getClass"
+                    | "hashCode"
+                    | "notify"
+                    | "notifyAll"
+                    | "toString"
+                    | "wait"
+            )
+        {
+            errors.push(SigilStitchError::InvalidField {
+                language: lang.file_extension().to_string(),
+                field_name: field.name().to_string(),
+                context: fields.context(),
+                reason: "Java forbids this record component name".to_string(),
+            });
+        }
         if fields.context() == FieldContext::ClosedSumRecordPayload
             && (!field.doc().is_empty() || field.modifiers().visibility != Visibility::Inherited)
         {

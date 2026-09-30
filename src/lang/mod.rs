@@ -48,6 +48,7 @@ pub mod rewrite;
 
 mod bash_function_lowering;
 mod c_function_lowering;
+pub(crate) mod closed_sum_lowering;
 mod compatibility_markers;
 mod cpp_function_lowering;
 mod csharp_constraints;
@@ -83,6 +84,9 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionContext, FunctionForm, LanguageCapabilities,
+};
+pub use crate::spec::closed_sum_spec::{
+    ClosedSumCaseIntent, ClosedSumIntent, ValidatedClosedSum, ValidatedClosedSumCase,
 };
 pub use crate::spec::enum_variant_spec::{ValidatedVariants, VariantIntent};
 pub use crate::spec::field_spec::{FieldSequenceIntent, ValidatedFields};
@@ -414,7 +418,7 @@ pub trait RendererLang: std::fmt::Debug + 'static {
 /// use sigil_stitch::code_block::CodeBlock;
 /// use sigil_stitch::error::SigilStitchError;
 /// use sigil_stitch::lang::capability::{
-///     LanguageCapabilities, TypeCapabilityProfile,
+///     LanguageCapabilities, TypeKindCapabilityProfile,
 /// };
 /// use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedType};
 /// use sigil_stitch::spec::file_spec::FileSpec;
@@ -430,8 +434,8 @@ pub trait RendererLang: std::fmt::Debug + 'static {
 ///     fn line_comment_prefix(&self) -> &str { "//" }
 /// }
 ///
-/// const TYPES: &[TypeCapabilityProfile<'_>] =
-///     &[TypeCapabilityProfile::new(TypeKind::TypeAlias, &[])];
+/// const TYPES: &[TypeKindCapabilityProfile<'_>] =
+///     &[TypeKindCapabilityProfile::new(TypeKind::TypeAlias, &[], &[])];
 ///
 /// impl CodeLang for ExampleLang {
 ///     fn capabilities(&self) -> LanguageCapabilities<'_> {
@@ -511,6 +515,25 @@ pub trait CodeLang: RendererLang {
         }
     }
 
+    /// Apply target-specific validation to one complete ClosedSum declaration.
+    fn validate_closed_sum(
+        &self,
+        _closed_sum: ClosedSumIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        Ok(())
+    }
+
+    /// Collect target-specific ClosedSum validation failures.
+    fn collect_closed_sum_validation_errors(
+        &self,
+        closed_sum: ClosedSumIntent<'_>,
+        errors: &mut Vec<SigilStitchError>,
+    ) {
+        if let Err(error) = self.validate_closed_sum(closed_sum) {
+            errors.push(error);
+        }
+    }
+
     /// Lower one fully validated type declaration into structured output.
     ///
     /// Permissive pre-0.6.8 adapters retain frozen compatibility lowering.
@@ -528,6 +551,20 @@ pub trait CodeLang: RendererLang {
                 type_name: type_.name().to_string(),
             })
         }
+    }
+
+    /// Lower one fully validated ClosedSum declaration into structured output.
+    ///
+    /// The default fails closed. A language must override this seam when it
+    /// advertises ClosedSum support; its grammar remains language-owned.
+    fn lower_closed_sum(
+        &self,
+        closed_sum: ValidatedClosedSum<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        Err(SigilStitchError::MissingClosedSumLowerer {
+            language: self.file_extension().to_string(),
+            type_name: closed_sum.name().to_string(),
+        })
     }
 
     /// Semantic capability represented by the legacy `is_abstract` modifier.

@@ -384,7 +384,7 @@ fn type_declaration_generic_matrix_covers_zero_one_and_many_parameters() {
                     assert!(
                         matches!(
                             result,
-                            Err(SigilStitchError::UnsupportedTypeCapabilities { .. })
+                            Err(SigilStitchError::UnsupportedTypeDeclarationCapabilities { .. })
                         ),
                         "{}: {result:?}",
                         language.id
@@ -1453,7 +1453,7 @@ fn bounded_type_parameter_matrix_uses_exact_local_grammar_or_rejects() {
             assert!(
                 matches!(
                     result,
-                    Err(SigilStitchError::UnsupportedTypeCapabilities { .. })
+                    Err(SigilStitchError::UnsupportedTypeDeclarationCapabilities { .. })
                 ),
                 "{}: {result:?}",
                 language.id

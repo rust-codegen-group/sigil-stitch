@@ -4,8 +4,9 @@ use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
-    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    ClosedSumCapabilityProfile, ClosedSumCaseForm, FunctionBodyPolicy, FunctionCapability,
+    FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
+    TypeDeclarationCapability, TypeKindCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
@@ -284,64 +285,64 @@ impl RendererLang for Swift {
     }
 }
 
+const SWIFT_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
 const SWIFT_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = stored properties
     TypeCapability::RecordFields,
-    // AccessorMethods = computed properties
     TypeCapability::AccessorMethods,
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = superclass/protocol inheritance (`:`)
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = protocol conformance in the inheritance list
     TypeCapability::InterfaceImplementation,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic constraints
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = attributes
-    TypeCapability::Attributes,
+];
+const SWIFT_STRUCT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
 const SWIFT_STRUCT_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = stored properties
     TypeCapability::RecordFields,
-    // AccessorMethods = computed properties
     TypeCapability::AccessorMethods,
-    // Methods = methods
     TypeCapability::Methods,
-    // InterfaceImplementation = protocol conformance (`:`)
     TypeCapability::InterfaceImplementation,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic constraints
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = attributes
-    TypeCapability::Attributes,
 ];
-const SWIFT_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    TypeCapability::Methods,
-    TypeCapability::NominalSubtyping,
-    TypeCapability::ParametricPolymorphism,
-    TypeCapability::BoundedPolymorphism,
-    TypeCapability::Attributes,
+const SWIFT_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
-const SWIFT_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, SWIFT_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Struct, SWIFT_STRUCT_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, SWIFT_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, SWIFT_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(
+const SWIFT_CONTRACT_CAPABILITIES: &[TypeCapability] =
+    &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+const SWIFT_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        SWIFT_CLASS_DECLARATION_CAPABILITIES,
+        SWIFT_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        SWIFT_STRUCT_DECLARATION_CAPABILITIES,
+        SWIFT_STRUCT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        SWIFT_CONTRACT_DECLARATION_CAPABILITIES,
+        SWIFT_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        SWIFT_CONTRACT_DECLARATION_CAPABILITIES,
+        SWIFT_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
+        &[TypeDeclarationCapability::Attributes],
         &[
-            // Methods = methods
             TypeCapability::Methods,
-            // InterfaceImplementation = protocol conformance
             TypeCapability::InterfaceImplementation,
-            // Attributes = attributes
-            TypeCapability::Attributes,
-            // Variants = enum cases
             TypeCapability::Variants,
-            TypeCapability::ClosedSum,
         ],
     ),
 ];
@@ -353,6 +354,25 @@ const SWIFT_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::
         VariantCapability::Attributes,
     ],
 )];
+const SWIFT_CLOSED_SUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
+const SWIFT_CLOSED_SUM_FORMS: &[ClosedSumCaseForm] = &[
+    ClosedSumCaseForm::Unit,
+    ClosedSumCaseForm::PositionalPayload,
+    ClosedSumCaseForm::RecordPayload,
+];
+const SWIFT_CLOSED_SUM: ClosedSumCapabilityProfile<'static> = ClosedSumCapabilityProfile::new(
+    SWIFT_CLOSED_SUM_DECLARATION_CAPABILITIES,
+    SWIFT_CLOSED_SUM_FORMS,
+    true,
+)
+.with_record_fields(
+    crate::lang::capability::FieldCapabilityProfile::new(
+        crate::lang::capability::FieldContext::ClosedSumRecordPayload,
+        crate::lang::field_lowering::swift::PAYLOAD_CAPABILITIES,
+    )
+    .with_required_capabilities(crate::lang::field_lowering::swift::PAYLOAD_REQUIRED),
+);
 
 const SWIFT_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AsyncEffect = async
@@ -471,6 +491,7 @@ impl CodeLang for Swift {
             .with_types(SWIFT_TYPES)
             .with_functions(SWIFT_FUNCTIONS)
             .with_variants(SWIFT_VARIANTS)
+            .with_closed_sum(SWIFT_CLOSED_SUM)
             .with_fields(crate::lang::field_lowering::swift::PROFILES)
             .with_properties(crate::lang::property_lowering::swift::PROFILES)
     }
@@ -479,11 +500,25 @@ impl CodeLang for Swift {
         crate::lang::type_lowering::swift::validate(self, type_)
     }
 
+    fn validate_closed_sum(
+        &self,
+        closed_sum: crate::lang::ClosedSumIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::closed_sum_lowering::swift::validate(self, closed_sum)
+    }
+
     fn lower_type(
         &self,
         type_: crate::lang::ValidatedType<'_>,
     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         crate::lang::type_lowering::swift::lower(self, type_)
+    }
+
+    fn lower_closed_sum(
+        &self,
+        closed_sum: crate::lang::ValidatedClosedSum<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::closed_sum_lowering::swift::lower(self, closed_sum)
     }
 
     fn lower_function(

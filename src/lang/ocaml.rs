@@ -5,8 +5,9 @@ use crate::code_node::BlockIntent;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
-    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    ClosedSumCapabilityProfile, ClosedSumCaseForm, FunctionBodyPolicy, FunctionCapability,
+    FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
+    TypeDeclarationCapability, TypeKindCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
@@ -343,30 +344,33 @@ impl RendererLang for OCaml {
     }
 }
 
-const OCAML_RECORD_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = record labels
-    TypeCapability::RecordFields,
-    // ParametricPolymorphism = type parameters
-    TypeCapability::ParametricPolymorphism,
-];
-const OCAML_VARIANT_CAPABILITIES: &[TypeCapability] = &[
-    // ParametricPolymorphism = type parameters
-    TypeCapability::ParametricPolymorphism,
-    // Variants = constructors
-    TypeCapability::Variants,
-    TypeCapability::ClosedSum,
-];
-const OCAML_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Struct, OCAML_RECORD_CAPABILITIES),
+const OCAML_RECORD_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::ParametricPolymorphism];
+const OCAML_RECORD_CAPABILITIES: &[TypeCapability] = &[TypeCapability::RecordFields];
+const OCAML_VARIANT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::ParametricPolymorphism];
+const OCAML_VARIANT_CAPABILITIES: &[TypeCapability] = &[TypeCapability::Variants];
+const OCAML_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        OCAML_RECORD_DECLARATION_CAPABILITIES,
+        OCAML_RECORD_CAPABILITIES,
+    ),
     // Class is represented as an OCaml record type.
-    TypeCapabilityProfile::new(TypeKind::Class, OCAML_RECORD_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Enum, OCAML_VARIANT_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        OCAML_RECORD_DECLARATION_CAPABILITIES,
+        OCAML_RECORD_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Enum,
+        OCAML_VARIANT_DECLARATION_CAPABILITIES,
+        OCAML_VARIANT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::TypeAlias,
-        &[
-            // ParametricPolymorphism = type parameters
-            TypeCapability::ParametricPolymorphism,
-        ],
+        &[TypeDeclarationCapability::ParametricPolymorphism],
+        &[],
     ),
 ];
 
@@ -377,6 +381,25 @@ const OCAML_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::
         VariantCapability::RecordPayload,
     ],
 )];
+const OCAML_CLOSED_SUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::ParametricPolymorphism];
+const OCAML_CLOSED_SUM_FORMS: &[ClosedSumCaseForm] = &[
+    ClosedSumCaseForm::Unit,
+    ClosedSumCaseForm::PositionalPayload,
+    ClosedSumCaseForm::RecordPayload,
+];
+const OCAML_CLOSED_SUM: ClosedSumCapabilityProfile<'static> = ClosedSumCapabilityProfile::new(
+    OCAML_CLOSED_SUM_DECLARATION_CAPABILITIES,
+    OCAML_CLOSED_SUM_FORMS,
+    true,
+)
+.with_record_fields(
+    crate::lang::capability::FieldCapabilityProfile::new(
+        crate::lang::capability::FieldContext::ClosedSumRecordPayload,
+        crate::lang::field_lowering::ocaml::CAPABILITIES,
+    )
+    .with_required_capabilities(crate::lang::field_lowering::ocaml::REQUIRED),
+);
 
 const OCAML_FUNCTIONS: &[FunctionCapabilityProfile] = &[FunctionCapabilityProfile::new(
     FunctionContext::TopLevel,
@@ -407,6 +430,7 @@ impl CodeLang for OCaml {
             .with_types(OCAML_TYPES)
             .with_functions(OCAML_FUNCTIONS)
             .with_variants(OCAML_VARIANTS)
+            .with_closed_sum(OCAML_CLOSED_SUM)
             .with_fields(crate::lang::field_lowering::ocaml::PROFILES)
     }
 
@@ -414,11 +438,25 @@ impl CodeLang for OCaml {
         crate::lang::type_lowering::ocaml::validate(self, type_)
     }
 
+    fn validate_closed_sum(
+        &self,
+        closed_sum: crate::lang::ClosedSumIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::closed_sum_lowering::ocaml::validate(self, closed_sum)
+    }
+
     fn lower_type(
         &self,
         type_: crate::lang::ValidatedType<'_>,
     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         crate::lang::type_lowering::ocaml::lower(self, type_)
+    }
+
+    fn lower_closed_sum(
+        &self,
+        closed_sum: crate::lang::ValidatedClosedSum<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::closed_sum_lowering::ocaml::lower(self, closed_sum)
     }
 
     fn lower_function(

@@ -108,13 +108,16 @@ pub mod prelude {
     pub use crate::code_template::{CodeTemplate, ParamKind};
     pub use crate::error::SigilStitchError;
     pub use crate::lang::capability::{
-        FieldCapability, FieldCapabilityProfile, FieldContext, FunctionBodyPolicy,
-        FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
-        LanguageCapabilities, PropertyCapability, PropertyCapabilityProfile, PropertyContext,
-        TypeCapability, TypeCapabilityProfile, VariantCapability, VariantCapabilityProfile,
+        ClosedSumCapabilityProfile, ClosedSumCaseForm, FieldCapability, FieldCapabilityProfile,
+        FieldContext, FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile,
+        FunctionContext, FunctionForm, LanguageCapabilities, PropertyCapability,
+        PropertyCapabilityProfile, PropertyContext, TypeCapability, TypeDeclarationCapability,
+        TypeKindCapabilityProfile, VariantCapability, VariantCapabilityProfile,
     };
     pub use crate::lang::{CodeLang, RendererLang};
     pub use crate::spec::annotation_spec::AnnotationSpec;
+    pub use crate::spec::closed_sum_case_spec::ClosedSumCaseSpec;
+    pub use crate::spec::closed_sum_spec::{ClosedSumSpec, ValidatedClosedSumCase};
     pub use crate::spec::emittable::Emittable;
     pub use crate::spec::enum_variant_spec::EnumVariantSpec;
     pub use crate::spec::field_spec::FieldSpec;

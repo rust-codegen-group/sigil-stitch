@@ -1,5 +1,9 @@
 /// Annotation specifications (e.g., `@Override`, `#[derive(...)]`).
 pub mod annotation_spec;
+/// Dedicated closed-sum case declarations.
+pub mod closed_sum_case_spec;
+/// Dedicated closed-sum type declarations.
+pub mod closed_sum_spec;
 /// Trait for spec types that can emit themselves as top-level file members.
 pub mod emittable;
 /// Enum variant specifications.
@@ -20,6 +24,7 @@ pub mod parameter_spec;
 pub mod project_spec;
 /// Computed property specifications (getters/setters).
 pub mod property_spec;
+mod type_declaration;
 /// Owner-level semantic evidence for cross-member validation.
 pub mod type_members_intent;
 /// Type declaration specifications (struct, class, interface, trait, enum).

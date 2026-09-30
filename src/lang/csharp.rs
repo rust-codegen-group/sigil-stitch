@@ -3,8 +3,8 @@ use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-    VariantCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeDeclarationCapability,
+    TypeKindCapabilityProfile, VariantCapability, VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -222,61 +222,59 @@ impl RendererLang for CSharp {
     }
 }
 
+const CS_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
 const CS_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = fields
     TypeCapability::RecordFields,
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = base classes and interfaces (`:`)
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = interfaces in the combined base list
     TypeCapability::InterfaceImplementation,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic constraints (`where`)
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = `[Attribute]`
-    TypeCapability::Attributes,
+];
+const CS_STRUCT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
 const CS_STRUCT_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = fields
     TypeCapability::RecordFields,
-    // Methods = methods
     TypeCapability::Methods,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic constraints (`where`)
-    TypeCapability::BoundedPolymorphism,
-    // InterfaceImplementation = implemented interfaces (`:`)
     TypeCapability::InterfaceImplementation,
-    // Attributes = `[Attribute]`
-    TypeCapability::Attributes,
 ];
-const CS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    // Methods = methods
-    TypeCapability::Methods,
-    // NominalSubtyping = base classes and interfaces (`:`)
-    TypeCapability::NominalSubtyping,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic constraints (`where`)
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = `[Attribute]`
-    TypeCapability::Attributes,
+const CS_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
-const CS_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, CS_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Struct, CS_STRUCT_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, CS_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, CS_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(
+const CS_CONTRACT_CAPABILITIES: &[TypeCapability] =
+    &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+const CS_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        CS_CLASS_DECLARATION_CAPABILITIES,
+        CS_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        CS_STRUCT_DECLARATION_CAPABILITIES,
+        CS_STRUCT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        CS_CONTRACT_DECLARATION_CAPABILITIES,
+        CS_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        CS_CONTRACT_DECLARATION_CAPABILITIES,
+        CS_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
-        &[
-            // Variants = enum members
-            TypeCapability::Variants,
-            // Attributes = `[Attribute]`
-            TypeCapability::Attributes,
-        ],
+        &[TypeDeclarationCapability::Attributes],
+        &[TypeCapability::Variants],
     ),
 ];
 

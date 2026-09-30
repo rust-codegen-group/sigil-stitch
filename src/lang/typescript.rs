@@ -3,8 +3,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-    VariantCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeDeclarationCapability,
+    TypeKindCapabilityProfile, VariantCapability, VariantCapabilityProfile,
 };
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::lang::config::{
@@ -394,58 +394,58 @@ impl RendererLang for TypeScript {
     }
 }
 
+const TS_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
 const TS_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = properties/fields
     TypeCapability::RecordFields,
-    // AccessorMethods = get/set accessors
     TypeCapability::AccessorMethods,
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = `implements`
     TypeCapability::InterfaceImplementation,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic constraints
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = decorators
-    TypeCapability::Attributes,
+];
+const TS_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
 ];
 const TS_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = properties/fields
     TypeCapability::RecordFields,
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic constraints
-    TypeCapability::BoundedPolymorphism,
 ];
-const TS_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, TS_CLASS_CAPABILITIES),
-    // Struct is represented as a TypeScript class.
-    TypeCapabilityProfile::new(TypeKind::Struct, TS_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, TS_CONTRACT_CAPABILITIES),
-    // Trait is represented as a TypeScript interface.
-    TypeCapabilityProfile::new(TypeKind::Trait, TS_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(
-        TypeKind::Enum,
-        &[
-            // Variants = enum members
-            TypeCapability::Variants,
-        ],
+const TS_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        TS_CLASS_DECLARATION_CAPABILITIES,
+        TS_CLASS_CAPABILITIES,
     ),
-    TypeCapabilityProfile::new(
+    // Struct is represented as a TypeScript class.
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        TS_CLASS_DECLARATION_CAPABILITIES,
+        TS_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        TS_CONTRACT_DECLARATION_CAPABILITIES,
+        TS_CONTRACT_CAPABILITIES,
+    ),
+    // Trait is represented as a TypeScript interface.
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        TS_CONTRACT_DECLARATION_CAPABILITIES,
+        TS_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(TypeKind::Enum, &[], &[TypeCapability::Variants]),
+    TypeKindCapabilityProfile::new(
         TypeKind::TypeAlias,
         &[
-            // ParametricPolymorphism = generic type parameters
-            TypeCapability::ParametricPolymorphism,
-            // BoundedPolymorphism = `extends` constraints on alias parameters
-            TypeCapability::BoundedPolymorphism,
+            TypeDeclarationCapability::ParametricPolymorphism,
+            TypeDeclarationCapability::BoundedPolymorphism,
         ],
+        &[],
     ),
 ];
 

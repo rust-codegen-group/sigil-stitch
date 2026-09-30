@@ -4,8 +4,9 @@ use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::capability::{
-    FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
+    ClosedSumCapabilityProfile, ClosedSumCaseForm, FunctionBodyPolicy, FunctionCapability,
+    FunctionCapabilityProfile, FunctionContext, FunctionForm, LanguageCapabilities, TypeCapability,
+    TypeDeclarationCapability, TypeKindCapabilityProfile, VariantCapability,
     VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
@@ -288,55 +289,55 @@ impl RendererLang for Java {
     }
 }
 
+const JAVA_CLASS_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
+];
 const JAVA_CLASS_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = fields
     TypeCapability::RecordFields,
-    // Methods = methods
     TypeCapability::Methods,
-    // NominalSubtyping = `extends`
     TypeCapability::NominalSubtyping,
-    // InterfaceImplementation = `implements`
     TypeCapability::InterfaceImplementation,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic bounds (`extends`)
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = annotations
-    TypeCapability::Attributes,
 ];
-const JAVA_CONTRACT_CAPABILITIES: &[TypeCapability] = &[
-    // Methods = methods
-    TypeCapability::Methods,
-    // NominalSubtyping = `extends`
-    TypeCapability::NominalSubtyping,
-    // ParametricPolymorphism = generic type parameters
-    TypeCapability::ParametricPolymorphism,
-    // BoundedPolymorphism = generic bounds (`extends`)
-    TypeCapability::BoundedPolymorphism,
-    // Attributes = annotations
-    TypeCapability::Attributes,
+const JAVA_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
-const JAVA_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Class, JAVA_CLASS_CAPABILITIES),
+const JAVA_CONTRACT_CAPABILITIES: &[TypeCapability] =
+    &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+const JAVA_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        JAVA_CLASS_DECLARATION_CAPABILITIES,
+        JAVA_CLASS_CAPABILITIES,
+    ),
     // Struct is represented as a Java class.
-    TypeCapabilityProfile::new(TypeKind::Struct, JAVA_CLASS_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Interface, JAVA_CONTRACT_CAPABILITIES),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        JAVA_CLASS_DECLARATION_CAPABILITIES,
+        JAVA_CLASS_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        JAVA_CONTRACT_DECLARATION_CAPABILITIES,
+        JAVA_CONTRACT_CAPABILITIES,
+    ),
     // Trait is represented as a Java interface.
-    TypeCapabilityProfile::new(TypeKind::Trait, JAVA_CONTRACT_CAPABILITIES),
-    TypeCapabilityProfile::new(
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        JAVA_CONTRACT_DECLARATION_CAPABILITIES,
+        JAVA_CONTRACT_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
         TypeKind::Enum,
+        &[TypeDeclarationCapability::Attributes],
         &[
-            // RecordFields = fields
             TypeCapability::RecordFields,
-            // Methods = methods
             TypeCapability::Methods,
-            // InterfaceImplementation = `implements`
             TypeCapability::InterfaceImplementation,
-            // Attributes = annotations
-            TypeCapability::Attributes,
-            // Variants = enum constants
             TypeCapability::Variants,
-            TypeCapability::ClosedSum,
         ],
     ),
 ];
@@ -348,6 +349,25 @@ const JAVA_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::n
         VariantCapability::Attributes,
     ],
 )];
+const JAVA_CLOSED_SUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
+const JAVA_CLOSED_SUM_FORMS: &[ClosedSumCaseForm] = &[
+    ClosedSumCaseForm::Unit,
+    ClosedSumCaseForm::PositionalPayload,
+    ClosedSumCaseForm::RecordPayload,
+];
+const JAVA_CLOSED_SUM: ClosedSumCapabilityProfile<'static> = ClosedSumCapabilityProfile::new(
+    JAVA_CLOSED_SUM_DECLARATION_CAPABILITIES,
+    JAVA_CLOSED_SUM_FORMS,
+    false,
+)
+.with_record_fields(
+    crate::lang::capability::FieldCapabilityProfile::new(
+        crate::lang::capability::FieldContext::ClosedSumRecordPayload,
+        crate::lang::field_lowering::java::PAYLOAD_CAPABILITIES,
+    )
+    .with_required_capabilities(crate::lang::field_lowering::java::REQUIRED),
+);
 
 const JAVA_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // AbstractMethod = abstract
@@ -442,6 +462,7 @@ impl CodeLang for Java {
             .with_types(JAVA_TYPES)
             .with_functions(JAVA_FUNCTIONS)
             .with_variants(JAVA_VARIANTS)
+            .with_closed_sum(JAVA_CLOSED_SUM)
             .with_fields(crate::lang::field_lowering::java::PROFILES)
     }
 
@@ -449,11 +470,25 @@ impl CodeLang for Java {
         crate::lang::type_lowering::java::validate(self, type_)
     }
 
+    fn validate_closed_sum(
+        &self,
+        closed_sum: crate::lang::ClosedSumIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::closed_sum_lowering::java::validate(self, closed_sum)
+    }
+
     fn lower_type(
         &self,
         type_: crate::lang::ValidatedType<'_>,
     ) -> Result<Vec<CodeBlock>, SigilStitchError> {
         crate::lang::type_lowering::java::lower(self, type_)
+    }
+
+    fn lower_closed_sum(
+        &self,
+        closed_sum: crate::lang::ValidatedClosedSum<'_>,
+    ) -> Result<Vec<CodeBlock>, SigilStitchError> {
+        crate::lang::closed_sum_lowering::java::lower(self, closed_sum)
     }
 
     fn lower_function(

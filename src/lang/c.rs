@@ -5,8 +5,8 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportEntry, ImportGroup};
 use crate::lang::capability::{
     FunctionCapability, FunctionCapabilityProfile, FunctionContext, FunctionForm,
-    LanguageCapabilities, TypeCapability, TypeCapabilityProfile, VariantCapability,
-    VariantCapabilityProfile,
+    LanguageCapabilities, TypeCapability, TypeDeclarationCapability, TypeKindCapabilityProfile,
+    VariantCapability, VariantCapabilityProfile,
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -235,27 +235,41 @@ impl RendererLang for C {
     }
 }
 
-const C_RECORD_CAPABILITIES: &[TypeCapability] = &[
-    // RecordFields = struct members
-    TypeCapability::RecordFields,
-    // Attributes = __attribute__ annotations
-    TypeCapability::Attributes,
-];
-const C_ENUM_CAPABILITIES: &[TypeCapability] = &[
-    // Variants = enumerators
-    TypeCapability::Variants,
-    // Attributes = __attribute__ annotations
-    TypeCapability::Attributes,
-];
-const C_TYPES: &[TypeCapabilityProfile] = &[
-    TypeCapabilityProfile::new(TypeKind::Struct, C_RECORD_CAPABILITIES),
+const C_RECORD_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
+const C_RECORD_CAPABILITIES: &[TypeCapability] = &[TypeCapability::RecordFields];
+const C_ENUM_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] =
+    &[TypeDeclarationCapability::Attributes];
+const C_ENUM_CAPABILITIES: &[TypeCapability] = &[TypeCapability::Variants];
+const C_TYPES: &[TypeKindCapabilityProfile] = &[
+    TypeKindCapabilityProfile::new(
+        TypeKind::Struct,
+        C_RECORD_DECLARATION_CAPABILITIES,
+        C_RECORD_CAPABILITIES,
+    ),
     // Class is represented as a C struct.
-    TypeCapabilityProfile::new(TypeKind::Class, C_RECORD_CAPABILITIES),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Class,
+        C_RECORD_DECLARATION_CAPABILITIES,
+        C_RECORD_CAPABILITIES,
+    ),
     // Interface/Trait are represented as C structs.
-    TypeCapabilityProfile::new(TypeKind::Interface, C_RECORD_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Trait, C_RECORD_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::Enum, C_ENUM_CAPABILITIES),
-    TypeCapabilityProfile::new(TypeKind::TypeAlias, &[]),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Interface,
+        C_RECORD_DECLARATION_CAPABILITIES,
+        C_RECORD_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Trait,
+        C_RECORD_DECLARATION_CAPABILITIES,
+        C_RECORD_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(
+        TypeKind::Enum,
+        C_ENUM_DECLARATION_CAPABILITIES,
+        C_ENUM_CAPABILITIES,
+    ),
+    TypeKindCapabilityProfile::new(TypeKind::TypeAlias, &[], &[]),
 ];
 
 const C_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(

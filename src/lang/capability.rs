@@ -6,6 +6,94 @@
 
 use crate::spec::modifiers::{DeclarationContext, TypeKind};
 
+/// A declaration-wide semantic capability shared by concrete declaration
+/// families. These values describe caller intent, never target syntax.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum TypeDeclarationCapability {
+    /// Universally quantified type parameters.
+    ParametricPolymorphism,
+    /// Bounded or constrained type parameters.
+    BoundedPolymorphism,
+    /// Type parameters that range over type constructors.
+    HigherKindedPolymorphism,
+    /// Structured or opaque declaration metadata.
+    Attributes,
+}
+
+/// Semantic case forms supported by a closed-sum declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ClosedSumCaseForm {
+    /// A named case without payload data.
+    Unit,
+    /// A named case with ordered payload types.
+    PositionalPayload,
+    /// A named case with typed fields.
+    RecordPayload,
+}
+
+/// Capability profile for one complete closed-sum declaration family.
+#[derive(Debug, Clone, Copy)]
+pub struct ClosedSumCapabilityProfile<'a> {
+    declaration_capabilities: &'a [TypeDeclarationCapability],
+    case_forms: &'a [ClosedSumCaseForm],
+    supports_empty_sum: bool,
+    record_fields: Option<FieldCapabilityProfile<'a>>,
+}
+
+impl<'a> ClosedSumCapabilityProfile<'a> {
+    /// Create a profile for declaration-wide capabilities and case forms.
+    pub const fn new(
+        declaration_capabilities: &'a [TypeDeclarationCapability],
+        case_forms: &'a [ClosedSumCaseForm],
+        supports_empty_sum: bool,
+    ) -> Self {
+        Self {
+            declaration_capabilities,
+            case_forms,
+            supports_empty_sum,
+            record_fields: None,
+        }
+    }
+
+    /// Add the field capability profile for closed-sum record payloads.
+    pub const fn with_record_fields(mut self, profile: FieldCapabilityProfile<'a>) -> Self {
+        self.record_fields = Some(profile);
+        self
+    }
+
+    /// Declaration-wide capabilities required by this profile.
+    pub const fn declaration_capabilities(self) -> &'a [TypeDeclarationCapability] {
+        self.declaration_capabilities
+    }
+
+    /// Case forms accepted by this profile.
+    pub const fn case_forms(self) -> &'a [ClosedSumCaseForm] {
+        self.case_forms
+    }
+
+    /// Whether the target can represent an empty closed sum.
+    pub const fn supports_empty_sum(self) -> bool {
+        self.supports_empty_sum
+    }
+
+    /// Field profile scoped to closed-sum record payloads, when present.
+    pub const fn record_fields(self) -> Option<FieldCapabilityProfile<'a>> {
+        self.record_fields
+    }
+
+    /// Whether this profile supports one declaration-wide capability.
+    pub fn supports_declaration_capability(self, capability: TypeDeclarationCapability) -> bool {
+        self.declaration_capabilities.contains(&capability)
+    }
+
+    /// Whether this profile accepts one closed-sum case form.
+    pub fn supports_case_form(self, form: ClosedSumCaseForm) -> bool {
+        self.case_forms.contains(&form)
+    }
+}
+
 /// A semantic capability of a type declaration.
 ///
 /// # Naming invariant
@@ -28,20 +116,10 @@ pub enum TypeCapability {
     NominalSubtyping,
     /// Implementation of a contract / interface / type class.
     InterfaceImplementation,
-    /// Universally quantified type parameters.
-    ParametricPolymorphism,
-    /// Bounded or constrained type parameters.
-    BoundedPolymorphism,
-    /// Type parameters that range over type constructors.
-    HigherKindedPolymorphism,
     /// Parameters introduced directly by a declaration constructor.
     PrimaryConstructorParameters,
     /// Sum-type variants.
     Variants,
-    /// A declaration whose complete set of named cases is closed.
-    ClosedSum,
-    /// Declaration metadata / attributes.
-    Attributes,
 }
 
 /// The semantic context in which a complete field sequence is emitted.
@@ -249,17 +327,26 @@ impl<'a> VariantCapabilityProfile<'a> {
     }
 }
 
-/// Capability profile for one [`TypeKind`].
+/// Capability profile for one ordinary [`TypeKind`]-owned declaration family.
 #[derive(Debug, Clone, Copy)]
-pub struct TypeCapabilityProfile<'a> {
+pub struct TypeKindCapabilityProfile<'a> {
     kind: TypeKind,
+    declaration_capabilities: &'a [TypeDeclarationCapability],
     capabilities: &'a [TypeCapability],
 }
 
-impl<'a> TypeCapabilityProfile<'a> {
+impl<'a> TypeKindCapabilityProfile<'a> {
     /// Create a capability profile for one type kind.
-    pub const fn new(kind: TypeKind, capabilities: &'a [TypeCapability]) -> Self {
-        Self { kind, capabilities }
+    pub const fn new(
+        kind: TypeKind,
+        declaration_capabilities: &'a [TypeDeclarationCapability],
+        capabilities: &'a [TypeCapability],
+    ) -> Self {
+        Self {
+            kind,
+            declaration_capabilities,
+            capabilities,
+        }
     }
 
     /// The type kind this profile describes.
@@ -270,6 +357,11 @@ impl<'a> TypeCapabilityProfile<'a> {
     /// Whether this kind supports the given semantic capability.
     pub fn supports(self, capability: TypeCapability) -> bool {
         self.capabilities.contains(&capability)
+    }
+
+    /// Whether this kind supports a declaration-wide capability.
+    pub fn supports_declaration_capability(self, capability: TypeDeclarationCapability) -> bool {
+        self.declaration_capabilities.contains(&capability)
     }
 }
 
@@ -503,7 +595,8 @@ impl<T> CapabilityProfiles<'_, T> {
 /// their previous behavior.
 #[derive(Debug, Clone, Copy)]
 pub struct LanguageCapabilities<'a> {
-    types: CapabilityProfiles<'a, TypeCapabilityProfile<'a>>,
+    types: CapabilityProfiles<'a, TypeKindCapabilityProfile<'a>>,
+    closed_sum: Option<ClosedSumCapabilityProfile<'a>>,
     functions: CapabilityProfiles<'a, FunctionCapabilityProfile<'a>>,
     variants: CapabilityProfiles<'a, VariantCapabilityProfile<'a>>,
     fields: CapabilityProfiles<'a, FieldCapabilityProfile<'a>>,
@@ -515,6 +608,7 @@ impl<'a> LanguageCapabilities<'a> {
     pub const fn strict() -> Self {
         Self {
             types: CapabilityProfiles::Strict(&[]),
+            closed_sum: None,
             functions: CapabilityProfiles::Strict(&[]),
             variants: CapabilityProfiles::Strict(&[]),
             fields: CapabilityProfiles::Strict(&[]),
@@ -523,7 +617,7 @@ impl<'a> LanguageCapabilities<'a> {
     }
 
     /// Add strict type-declaration profiles.
-    pub const fn with_types(mut self, profiles: &'a [TypeCapabilityProfile<'a>]) -> Self {
+    pub const fn with_types(mut self, profiles: &'a [TypeKindCapabilityProfile<'a>]) -> Self {
         self.types = CapabilityProfiles::Strict(profiles);
         self
     }
@@ -556,11 +650,41 @@ impl<'a> LanguageCapabilities<'a> {
     pub const fn permissive() -> Self {
         Self {
             types: CapabilityProfiles::Permissive,
+            closed_sum: None,
             functions: CapabilityProfiles::Permissive,
             variants: CapabilityProfiles::Permissive,
             fields: CapabilityProfiles::Permissive,
             properties: CapabilityProfiles::Permissive,
         }
+    }
+
+    /// Add an explicit complete ClosedSum capability profile.
+    pub const fn with_closed_sum(mut self, profile: ClosedSumCapabilityProfile<'a>) -> Self {
+        self.closed_sum = Some(profile);
+        self
+    }
+
+    /// Return the explicit ClosedSum profile, when the adapter provides one.
+    pub const fn closed_sum_profile(&self) -> Option<ClosedSumCapabilityProfile<'a>> {
+        self.closed_sum
+    }
+
+    /// Whether this adapter advertises a ClosedSum case form.
+    pub fn supports_closed_sum_form(&self, form: ClosedSumCaseForm) -> bool {
+        self.closed_sum
+            .is_some_and(|profile| profile.supports_case_form(form))
+    }
+
+    /// Whether this adapter advertises a ClosedSum declaration capability.
+    pub fn supports_closed_sum_capability(&self, capability: TypeDeclarationCapability) -> bool {
+        self.closed_sum
+            .is_some_and(|profile| profile.supports_declaration_capability(capability))
+    }
+
+    /// Whether the adapter has explicitly configured ClosedSum record fields.
+    pub fn closed_sum_record_fields(&self) -> Option<FieldCapabilityProfile<'a>> {
+        self.closed_sum
+            .and_then(ClosedSumCapabilityProfile::record_fields)
     }
 
     /// Whether any profile declares this type kind.
@@ -577,6 +701,20 @@ impl<'a> LanguageCapabilities<'a> {
                 .iter()
                 .find(|profile| profile.kind() == kind)
                 .is_some_and(|profile| profile.supports(capability))
+        })
+    }
+
+    /// Whether an ordinary type kind supports a declaration-wide capability.
+    pub fn supports_type_declaration_capability(
+        &self,
+        kind: TypeKind,
+        capability: TypeDeclarationCapability,
+    ) -> bool {
+        self.types.resolve(true, |profiles| {
+            profiles
+                .iter()
+                .find(|profile| profile.kind() == kind)
+                .is_some_and(|profile| profile.supports_declaration_capability(capability))
         })
     }
 
@@ -721,6 +859,11 @@ impl<'a> LanguageCapabilities<'a> {
 
     /// Whether this language declares a profile for `context`.
     pub fn supports_field_context(&self, context: FieldContext) -> bool {
+        if context == FieldContext::ClosedSumRecordPayload {
+            return self
+                .closed_sum_record_fields()
+                .is_some_and(|profile| profile.context() == context);
+        }
         self.fields.resolve(true, |profiles| {
             profiles.iter().any(|profile| profile.context() == context)
         })
@@ -732,6 +875,11 @@ impl<'a> LanguageCapabilities<'a> {
         context: FieldContext,
         capability: FieldCapability,
     ) -> bool {
+        if context == FieldContext::ClosedSumRecordPayload {
+            return self.closed_sum_record_fields().is_some_and(|profile| {
+                profile.context() == context && profile.supports(capability)
+            });
+        }
         self.fields.resolve(true, |profiles| {
             profiles
                 .iter()
@@ -742,6 +890,12 @@ impl<'a> LanguageCapabilities<'a> {
 
     /// Required capabilities for every field in `context`.
     pub fn required_field_capabilities(&self, context: FieldContext) -> &[FieldCapability] {
+        if context == FieldContext::ClosedSumRecordPayload {
+            return self
+                .closed_sum_record_fields()
+                .filter(|profile| profile.context() == context)
+                .map_or(&[], |profile| profile.required_capabilities());
+        }
         self.fields.resolve(&[], |profiles| {
             profiles
                 .iter()
@@ -818,8 +972,9 @@ mod tests {
 
     #[test]
     fn strict_matrix_checks_profiles_and_capabilities() {
-        const TYPES: &[TypeCapabilityProfile] = &[TypeCapabilityProfile::new(
+        const TYPES: &[TypeKindCapabilityProfile] = &[TypeKindCapabilityProfile::new(
             TypeKind::Struct,
+            &[],
             &[TypeCapability::RecordFields],
         )];
         const INCOMPATIBLE: &[(FunctionCapability, FunctionCapability)] = &[(

@@ -65,7 +65,7 @@ pub(crate) fn validate(lang: &Haskell, type_: TypeIntent<'_>) -> Result<(), Sigi
     }
     if type_.kind() == TypeKind::Enum
         && type_.variants().is_empty()
-        && (type_.is_closed_sum() || type_.extra_members().is_empty())
+        && type_.extra_members().is_empty()
     {
         return Err(invalid(
             type_,

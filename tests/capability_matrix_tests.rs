@@ -1,7 +1,8 @@
 use sigil_stitch::lang::CodeLang;
 use sigil_stitch::lang::capability::{
     FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile, FunctionContext,
-    FunctionForm, LanguageCapabilities, TypeCapability, TypeCapabilityProfile,
+    FunctionForm, LanguageCapabilities, TypeCapability, TypeDeclarationCapability,
+    TypeKindCapabilityProfile,
 };
 use sigil_stitch::spec::modifiers::TypeKind;
 
@@ -20,26 +21,30 @@ const ALL_KINDS: [TypeKind; 7] = [
     TypeKind::Newtype,
 ];
 
-const ALL_CAPABILITIES: [TypeCapability; 13] = [
+const ALL_CAPABILITIES: [TypeCapability; 8] = [
     TypeCapability::RecordFields,
     TypeCapability::AccessorMethods,
     TypeCapability::Methods,
     TypeCapability::StructuralEmbedding,
     TypeCapability::NominalSubtyping,
     TypeCapability::InterfaceImplementation,
-    TypeCapability::ParametricPolymorphism,
-    TypeCapability::BoundedPolymorphism,
-    TypeCapability::HigherKindedPolymorphism,
     TypeCapability::PrimaryConstructorParameters,
     TypeCapability::Variants,
-    TypeCapability::ClosedSum,
-    TypeCapability::Attributes,
+];
+const ALL_DECLARATION_CAPABILITIES: [TypeDeclarationCapability; 4] = [
+    TypeDeclarationCapability::ParametricPolymorphism,
+    TypeDeclarationCapability::BoundedPolymorphism,
+    TypeDeclarationCapability::HigherKindedPolymorphism,
+    TypeDeclarationCapability::Attributes,
 ];
 
-fn assert_matrix(lang: &dyn CodeLang, expected: &[(TypeKind, &[TypeCapability])]) {
+fn assert_matrix(
+    lang: &dyn CodeLang,
+    expected: &[(TypeKind, &[TypeDeclarationCapability], &[TypeCapability])],
+) {
     let actual = lang.capabilities();
     for kind in ALL_KINDS {
-        let expected_supported = expected.iter().any(|(candidate, _)| *candidate == kind);
+        let expected_supported = expected.iter().any(|(candidate, _, _)| *candidate == kind);
         assert_eq!(
             actual.supports_type_kind(kind),
             expected_supported,
@@ -49,9 +54,23 @@ fn assert_matrix(lang: &dyn CodeLang, expected: &[(TypeKind, &[TypeCapability])]
         );
         let expected_caps = expected
             .iter()
-            .find(|(candidate, _)| *candidate == kind)
-            .map(|(_, caps)| *caps)
+            .find(|(candidate, _, _)| *candidate == kind)
+            .map(|(_, _, caps)| *caps)
             .unwrap_or(&[]);
+        let expected_declaration = expected
+            .iter()
+            .find(|(candidate, _, _)| *candidate == kind)
+            .map(|(_, caps, _)| *caps)
+            .unwrap_or(&[]);
+        for capability in ALL_DECLARATION_CAPABILITIES {
+            assert_eq!(
+                actual.supports_type_declaration_capability(kind, capability),
+                expected_declaration.contains(&capability),
+                "{}.{} {capability:?}",
+                lang.file_extension(),
+                kind_name(kind)
+            );
+        }
         for capability in ALL_CAPABILITIES {
             assert_eq!(
                 actual.supports_type_capability(kind, capability),
@@ -82,8 +101,13 @@ fn capability_profile_builders_preserve_semantic_policy() {
     // inputs opaque so this test also exercises their runtime API contract.
     let type_kind = std::hint::black_box(TypeKind::Class);
     let type_capabilities = std::hint::black_box(&[TypeCapability::Methods][..]);
-    let type_profile = TypeCapabilityProfile::new(type_kind, type_capabilities);
+    let type_profile = TypeKindCapabilityProfile::new(
+        type_kind,
+        std::hint::black_box(&[TypeDeclarationCapability::Attributes][..]),
+        type_capabilities,
+    );
     assert_eq!(type_profile.kind(), TypeKind::Class);
+    assert!(type_profile.supports_declaration_capability(TypeDeclarationCapability::Attributes));
     assert!(type_profile.supports(TypeCapability::Methods));
 
     let context = std::hint::black_box(FunctionContext::Member);
@@ -138,43 +162,50 @@ fn empty_matrices_for_shell_and_lua() {
 
 #[test]
 fn c_matrix() {
-    let record = &[TypeCapability::RecordFields, TypeCapability::Attributes];
-    let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
+    let record_declaration = &[TypeDeclarationCapability::Attributes];
+    let record = &[TypeCapability::RecordFields];
+    let enum_caps_declaration = &[TypeDeclarationCapability::Attributes];
+    let enum_caps = &[TypeCapability::Variants];
     assert_matrix(
         adapter_for("c").as_ref(),
         &[
-            (TypeKind::Struct, record),
-            (TypeKind::Class, record),
-            (TypeKind::Interface, record),
-            (TypeKind::Trait, record),
-            (TypeKind::Enum, enum_caps),
-            (TypeKind::TypeAlias, &[]),
+            (TypeKind::Struct, record_declaration, record),
+            (TypeKind::Class, record_declaration, record),
+            (TypeKind::Interface, record_declaration, record),
+            (TypeKind::Trait, record_declaration, record),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
+            (TypeKind::TypeAlias, &[], &[]),
         ],
     );
 }
 
 #[test]
 fn cpp_matrix() {
+    let class_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::Attributes,
+    ];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::Attributes,
     ];
-    let record_caps = &[TypeCapability::RecordFields, TypeCapability::Attributes];
-    let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
+    let record_caps_declaration = &[TypeDeclarationCapability::Attributes];
+    let record_caps = &[TypeCapability::RecordFields];
+    let enum_caps_declaration = &[TypeDeclarationCapability::Attributes];
+    let enum_caps = &[TypeCapability::Variants];
     assert_matrix(
         adapter_for("cpp").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, record_caps),
-            (TypeKind::Interface, class_caps),
-            (TypeKind::Trait, class_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, record_caps_declaration, record_caps),
+            (TypeKind::Interface, class_caps_declaration, class_caps),
+            (TypeKind::Trait, class_caps_declaration, class_caps),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
             (
                 TypeKind::TypeAlias,
-                &[TypeCapability::ParametricPolymorphism],
+                &[TypeDeclarationCapability::ParametricPolymorphism],
+                &[],
             ),
         ],
     );
@@ -182,79 +213,93 @@ fn cpp_matrix() {
 
 #[test]
 fn csharp_matrix() {
+    let class_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
+    ];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    ];
+    let struct_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
     let struct_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::Methods,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::Attributes,
     ];
-    let contract_caps = &[
-        TypeCapability::Methods,
-        TypeCapability::NominalSubtyping,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    let contract_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
-    let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
+    let contract_caps = &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+    let enum_caps_declaration = &[TypeDeclarationCapability::Attributes];
+    let enum_caps = &[TypeCapability::Variants];
     assert_matrix(
         adapter_for("csharp").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, struct_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, struct_caps_declaration, struct_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
         ],
     );
 }
 
 #[test]
 fn dart_matrix() {
+    let class_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
+    ];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    ];
+    let contract_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
     let contract_caps = &[
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
     ];
     assert_matrix(
         adapter_for("dart").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, class_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Trait, contract_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, class_caps_declaration, class_caps),
             (
-                TypeKind::Enum,
-                &[TypeCapability::Variants, TypeCapability::ClosedSum],
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
             ),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (TypeKind::Enum, &[], &[TypeCapability::Variants]),
             (
                 TypeKind::TypeAlias,
                 &[
-                    TypeCapability::ParametricPolymorphism,
-                    TypeCapability::BoundedPolymorphism,
+                    TypeDeclarationCapability::ParametricPolymorphism,
+                    TypeDeclarationCapability::BoundedPolymorphism,
                 ],
+                &[],
             ),
         ],
     );
@@ -262,27 +307,35 @@ fn dart_matrix() {
 
 #[test]
 fn go_matrix() {
+    let struct_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+    ];
     let struct_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::StructuralEmbedding,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
     ];
+    let contract_caps_declaration = &[];
     let contract_caps = &[TypeCapability::Methods, TypeCapability::StructuralEmbedding];
     assert_matrix(
         adapter_for("go").as_ref(),
         &[
-            (TypeKind::Struct, struct_caps),
-            (TypeKind::Class, struct_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::TypeAlias, &[]),
+            (TypeKind::Struct, struct_caps_declaration, struct_caps),
+            (TypeKind::Class, struct_caps_declaration, struct_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (TypeKind::TypeAlias, &[], &[]),
             (
                 TypeKind::Newtype,
                 &[
-                    TypeCapability::ParametricPolymorphism,
-                    TypeCapability::BoundedPolymorphism,
+                    TypeDeclarationCapability::ParametricPolymorphism,
+                    TypeDeclarationCapability::BoundedPolymorphism,
                 ],
+                &[],
             ),
         ],
     );
@@ -290,101 +343,114 @@ fn go_matrix() {
 
 #[test]
 fn haskell_matrix() {
+    let data_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+    ];
     let data_caps = &[
         TypeCapability::RecordFields,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
         TypeCapability::Variants,
         TypeCapability::InterfaceImplementation,
     ];
-    let contract_caps = &[
-        TypeCapability::Methods,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
+    let contract_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+    ];
+    let contract_caps = &[TypeCapability::Methods];
+    let enum_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
     ];
     let enum_caps = &[
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
         TypeCapability::Variants,
-        TypeCapability::ClosedSum,
         TypeCapability::InterfaceImplementation,
     ];
-    let newtype_caps = &[
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::InterfaceImplementation,
+    let newtype_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
     ];
+    let newtype_caps = &[TypeCapability::InterfaceImplementation];
     assert_matrix(
         adapter_for("haskell").as_ref(),
         &[
-            (TypeKind::Struct, data_caps),
-            (TypeKind::Class, data_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Struct, data_caps_declaration, data_caps),
+            (TypeKind::Class, data_caps_declaration, data_caps),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
             (
                 TypeKind::TypeAlias,
-                &[TypeCapability::ParametricPolymorphism],
+                &[TypeDeclarationCapability::ParametricPolymorphism],
+                &[],
             ),
-            (TypeKind::Newtype, newtype_caps),
+            (TypeKind::Newtype, newtype_caps_declaration, newtype_caps),
         ],
     );
 }
 
 #[test]
 fn java_matrix() {
+    let class_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
+    ];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
     ];
-    let contract_caps = &[
-        TypeCapability::Methods,
-        TypeCapability::NominalSubtyping,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    let contract_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
+    let contract_caps = &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+    let enum_caps_declaration = &[TypeDeclarationCapability::Attributes];
     let enum_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::Methods,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::Attributes,
         TypeCapability::Variants,
-        TypeCapability::ClosedSum,
     ];
     assert_matrix(
         adapter_for("java").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, class_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, class_caps_declaration, class_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
         ],
     );
 }
 
 #[test]
 fn javascript_matrix() {
+    let class_caps_declaration = &[TypeDeclarationCapability::Attributes];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
-        TypeCapability::Attributes,
     ];
+    let contract_caps_declaration = &[TypeDeclarationCapability::Attributes];
     let contract_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
-        TypeCapability::Attributes,
     ];
+    let enum_caps_declaration = &[];
     let enum_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
@@ -394,88 +460,97 @@ fn javascript_matrix() {
     assert_matrix(
         adapter_for("javascript").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, class_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, class_caps_declaration, class_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
         ],
     );
 }
 
 #[test]
 fn kotlin_matrix() {
+    let class_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
+    ];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
         TypeCapability::PrimaryConstructorParameters,
-        TypeCapability::Attributes,
+    ];
+    let contract_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
     let contract_caps = &[
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
     ];
+    let enum_caps_declaration = &[TypeDeclarationCapability::Attributes];
     let enum_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::InterfaceImplementation,
         TypeCapability::PrimaryConstructorParameters,
-        TypeCapability::Attributes,
         TypeCapability::Variants,
-        TypeCapability::ClosedSum,
     ];
-    let newtype_caps = &[
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    let newtype_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
+    let newtype_caps = &[];
     assert_matrix(
         adapter_for("kotlin").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, class_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, class_caps_declaration, class_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
             (
                 TypeKind::TypeAlias,
-                &[TypeCapability::ParametricPolymorphism],
+                &[TypeDeclarationCapability::ParametricPolymorphism],
+                &[],
             ),
-            (TypeKind::Newtype, newtype_caps),
+            (TypeKind::Newtype, newtype_caps_declaration, newtype_caps),
         ],
     );
 }
 
 #[test]
 fn ocaml_matrix() {
-    let record_caps = &[
-        TypeCapability::RecordFields,
-        TypeCapability::ParametricPolymorphism,
-    ];
-    let variant_caps = &[
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::Variants,
-        TypeCapability::ClosedSum,
-    ];
+    let record_caps_declaration = &[TypeDeclarationCapability::ParametricPolymorphism];
+    let record_caps = &[TypeCapability::RecordFields];
+    let variant_caps_declaration = &[TypeDeclarationCapability::ParametricPolymorphism];
+    let variant_caps = &[TypeCapability::Variants];
     assert_matrix(
         adapter_for("ocaml").as_ref(),
         &[
-            (TypeKind::Struct, record_caps),
-            (TypeKind::Class, record_caps),
-            (TypeKind::Enum, variant_caps),
+            (TypeKind::Struct, record_caps_declaration, record_caps),
+            (TypeKind::Class, record_caps_declaration, record_caps),
+            (TypeKind::Enum, variant_caps_declaration, variant_caps),
             (
                 TypeKind::TypeAlias,
-                &[TypeCapability::ParametricPolymorphism],
+                &[TypeDeclarationCapability::ParametricPolymorphism],
+                &[],
             ),
         ],
     );
@@ -483,53 +558,59 @@ fn ocaml_matrix() {
 
 #[test]
 fn php_matrix() {
+    let class_caps_declaration = &[TypeDeclarationCapability::Attributes];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::Attributes,
     ];
-    let interface_caps = &[
-        TypeCapability::Methods,
-        TypeCapability::NominalSubtyping,
-        TypeCapability::Attributes,
-    ];
+    let interface_caps_declaration = &[TypeDeclarationCapability::Attributes];
+    let interface_caps = &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+    let trait_caps_declaration = &[TypeDeclarationCapability::Attributes];
     let trait_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
-        TypeCapability::Attributes,
     ];
+    let enum_caps_declaration = &[TypeDeclarationCapability::Attributes];
     let enum_caps = &[
         TypeCapability::Methods,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::Attributes,
         TypeCapability::Variants,
     ];
     assert_matrix(
         adapter_for("php").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, class_caps),
-            (TypeKind::Interface, interface_caps),
-            (TypeKind::Trait, trait_caps),
-            (TypeKind::Enum, enum_caps),
-            (TypeKind::Newtype, &[TypeCapability::Attributes]),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, class_caps_declaration, class_caps),
+            (
+                TypeKind::Interface,
+                interface_caps_declaration,
+                interface_caps,
+            ),
+            (TypeKind::Trait, trait_caps_declaration, trait_caps),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
+            (
+                TypeKind::Newtype,
+                &[TypeDeclarationCapability::Attributes],
+                &[],
+            ),
         ],
     );
 }
 
 #[test]
 fn python_matrix() {
+    let class_caps_declaration = &[TypeDeclarationCapability::Attributes];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::Attributes,
     ];
+    let enum_caps_declaration = &[];
     let enum_caps = &[
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
@@ -538,223 +619,253 @@ fn python_matrix() {
     assert_matrix(
         adapter_for("python").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, class_caps),
-            (TypeKind::Interface, class_caps),
-            (TypeKind::Trait, class_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, class_caps_declaration, class_caps),
+            (TypeKind::Interface, class_caps_declaration, class_caps),
+            (TypeKind::Trait, class_caps_declaration, class_caps),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
             (
                 TypeKind::TypeAlias,
-                &[TypeCapability::ParametricPolymorphism],
+                &[TypeDeclarationCapability::ParametricPolymorphism],
+                &[],
             ),
-            (TypeKind::Newtype, &[]),
+            (TypeKind::Newtype, &[], &[]),
         ],
     );
 }
 
 #[test]
 fn ruby_matrix() {
-    let class_caps = &[
-        TypeCapability::Methods,
-        TypeCapability::NominalSubtyping,
-        TypeCapability::Attributes,
-    ];
-    let contract_caps = &[TypeCapability::Methods, TypeCapability::Attributes];
-    let enum_caps = &[TypeCapability::Variants, TypeCapability::Attributes];
+    let class_caps_declaration = &[TypeDeclarationCapability::Attributes];
+    let class_caps = &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+    let contract_caps_declaration = &[TypeDeclarationCapability::Attributes];
+    let contract_caps = &[TypeCapability::Methods];
+    let enum_caps_declaration = &[TypeDeclarationCapability::Attributes];
+    let enum_caps = &[TypeCapability::Variants];
     assert_matrix(
         adapter_for("ruby").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, class_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, class_caps_declaration, class_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
         ],
     );
 }
 
 #[test]
 fn rust_matrix() {
-    let record_caps = &[
-        TypeCapability::RecordFields,
-        TypeCapability::Methods,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    let record_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
-    let contract_caps = &[
-        TypeCapability::Methods,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    let record_caps = &[TypeCapability::RecordFields, TypeCapability::Methods];
+    let contract_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
-    let enum_caps = &[
-        TypeCapability::Methods,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
-        TypeCapability::Variants,
-        TypeCapability::ClosedSum,
+    let contract_caps = &[TypeCapability::Methods];
+    let enum_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
-    let alias_caps = &[TypeCapability::ParametricPolymorphism];
-    let newtype_caps = &[
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    let enum_caps = &[TypeCapability::Methods, TypeCapability::Variants];
+    let alias_caps_declaration = &[TypeDeclarationCapability::ParametricPolymorphism];
+    let alias_caps = &[];
+    let newtype_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
+    let newtype_caps = &[];
     assert_matrix(
         adapter_for("rust").as_ref(),
         &[
-            (TypeKind::Struct, record_caps),
-            (TypeKind::Class, record_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Enum, enum_caps),
-            (TypeKind::TypeAlias, alias_caps),
-            (TypeKind::Newtype, newtype_caps),
+            (TypeKind::Struct, record_caps_declaration, record_caps),
+            (TypeKind::Class, record_caps_declaration, record_caps),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
+            (TypeKind::TypeAlias, alias_caps_declaration, alias_caps),
+            (TypeKind::Newtype, newtype_caps_declaration, newtype_caps),
         ],
     );
 }
 
 #[test]
 fn scala_matrix() {
+    let class_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::HigherKindedPolymorphism,
+        TypeDeclarationCapability::Attributes,
+    ];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::HigherKindedPolymorphism,
         TypeCapability::PrimaryConstructorParameters,
-        TypeCapability::Attributes,
     ];
-    let contract_caps = &[
-        TypeCapability::Methods,
-        TypeCapability::NominalSubtyping,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::HigherKindedPolymorphism,
-        TypeCapability::Attributes,
+    let contract_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::HigherKindedPolymorphism,
+        TypeDeclarationCapability::Attributes,
+    ];
+    let contract_caps = &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+    let enum_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::HigherKindedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
     let enum_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::HigherKindedPolymorphism,
-        TypeCapability::Attributes,
         TypeCapability::Variants,
-        TypeCapability::ClosedSum,
     ];
-    let newtype_caps = &[
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::HigherKindedPolymorphism,
-        TypeCapability::Attributes,
+    let newtype_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::HigherKindedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
+    let newtype_caps = &[];
     assert_matrix(
         adapter_for("scala").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, class_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, class_caps_declaration, class_caps),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
             (
                 TypeKind::TypeAlias,
                 &[
-                    TypeCapability::ParametricPolymorphism,
-                    TypeCapability::BoundedPolymorphism,
-                    TypeCapability::HigherKindedPolymorphism,
+                    TypeDeclarationCapability::ParametricPolymorphism,
+                    TypeDeclarationCapability::BoundedPolymorphism,
+                    TypeDeclarationCapability::HigherKindedPolymorphism,
                 ],
+                &[],
             ),
-            (TypeKind::Newtype, newtype_caps),
+            (TypeKind::Newtype, newtype_caps_declaration, newtype_caps),
         ],
     );
 }
 
 #[test]
 fn swift_matrix() {
+    let class_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
+    ];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    ];
+    let struct_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
     let struct_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
     ];
-    let contract_caps = &[
-        TypeCapability::Methods,
-        TypeCapability::NominalSubtyping,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    let contract_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
     ];
+    let contract_caps = &[TypeCapability::Methods, TypeCapability::NominalSubtyping];
+    let enum_caps_declaration = &[TypeDeclarationCapability::Attributes];
     let enum_caps = &[
         TypeCapability::Methods,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::Attributes,
         TypeCapability::Variants,
-        TypeCapability::ClosedSum,
     ];
     assert_matrix(
         adapter_for("swift").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, struct_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, enum_caps),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, struct_caps_declaration, struct_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (TypeKind::Enum, enum_caps_declaration, enum_caps),
         ],
     );
 }
 
 #[test]
 fn typescript_matrix() {
+    let class_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
+        TypeDeclarationCapability::Attributes,
+    ];
     let class_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::AccessorMethods,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
-        TypeCapability::Attributes,
+    ];
+    let contract_caps_declaration = &[
+        TypeDeclarationCapability::ParametricPolymorphism,
+        TypeDeclarationCapability::BoundedPolymorphism,
     ];
     let contract_caps = &[
         TypeCapability::RecordFields,
         TypeCapability::Methods,
         TypeCapability::NominalSubtyping,
-        TypeCapability::ParametricPolymorphism,
-        TypeCapability::BoundedPolymorphism,
     ];
     assert_matrix(
         adapter_for("typescript").as_ref(),
         &[
-            (TypeKind::Class, class_caps),
-            (TypeKind::Struct, class_caps),
-            (TypeKind::Interface, contract_caps),
-            (TypeKind::Trait, contract_caps),
-            (TypeKind::Enum, &[TypeCapability::Variants]),
+            (TypeKind::Class, class_caps_declaration, class_caps),
+            (TypeKind::Struct, class_caps_declaration, class_caps),
+            (
+                TypeKind::Interface,
+                contract_caps_declaration,
+                contract_caps,
+            ),
+            (TypeKind::Trait, contract_caps_declaration, contract_caps),
+            (TypeKind::Enum, &[], &[TypeCapability::Variants]),
             (
                 TypeKind::TypeAlias,
                 &[
-                    TypeCapability::ParametricPolymorphism,
-                    TypeCapability::BoundedPolymorphism,
+                    TypeDeclarationCapability::ParametricPolymorphism,
+                    TypeDeclarationCapability::BoundedPolymorphism,
                 ],
+                &[],
             ),
         ],
     );

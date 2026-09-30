@@ -101,7 +101,7 @@ pub struct ValidatedFields<'a> {
 }
 
 impl<'a> ValidatedFields<'a> {
-    fn new(intent: FieldSequenceIntent<'a>) -> Self {
+    pub(crate) fn new(intent: FieldSequenceIntent<'a>) -> Self {
         Self { intent }
     }
 }
@@ -270,7 +270,7 @@ impl FieldSpec {
         }
     }
 
-    fn collect_sequence_target_validation_errors(
+    pub(crate) fn collect_sequence_target_validation_errors(
         intent: FieldSequenceIntent<'_>,
         lang: &dyn CodeLang,
         errors: &mut Vec<SigilStitchError>,
@@ -381,7 +381,7 @@ impl FieldSpec {
         lang.lower_fields(fields)
     }
 
-    fn requested_capabilities(&self) -> Vec<FieldCapability> {
+    pub(crate) fn requested_capabilities(&self) -> Vec<FieldCapability> {
         let mut capabilities = Vec::new();
         if !self.field_type.is_empty() {
             capabilities.push(FieldCapability::ExplicitType);
