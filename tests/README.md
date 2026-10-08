@@ -42,6 +42,13 @@ The integration suites are grouped by the contract they protect:
   empty-application rules, and modern Rust lifetime constraints for every owner.
   Adapter unit tests separately exercise native generic-domain validation and
   recursive kind/parameter/import walkers without widening capability profiles.
+- `tests/quote_structured_types.rs` checks modern types through existing macro
+  entry points and complete file rendering: nested callable/application imports,
+  compound `$T_join` alias conflicts, C++ complete expansion patterns, Haskell
+  operator qualification, fail-closed unsupported types, `$C`/`$L` structured
+  splices, and emitted generic closed sums. Wide/narrow output is checked against
+  the builder path where applicable. These are Rust integration tests, not target-compiler
+  acceptance tests; no new macro syntax is introduced.
 - `tests/renderer_parity_tests.rs` covers all built-in languages on the direct
   and pretty renderer paths, the exact five-operation renderer-event matrix, a
   fully migrated external adapter that does not use legacy block config,
@@ -124,6 +131,7 @@ cargo test --test closed_sum_validation_tests
 cargo test --test closed_sum_lowering_tests
 cargo test --test renderer_parity_tests
 cargo test --test declaration_generic_lowering_tests
+cargo test --test quote_structured_types
 cargo test --test typescript shared::golden::tests
 ```
 
