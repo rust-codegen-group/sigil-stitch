@@ -15,6 +15,10 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::TypeKind;
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -267,6 +271,10 @@ impl RendererLang for PipelineLang {
         rewrite_pipeline_nodes(nodes);
     }
 
+    #[allow(
+        deprecated,
+        reason = "exercise released generic and callable compatibility inputs"
+    )]
     fn lower_type_name(&self, type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
         self.events
             .borrow_mut()
@@ -874,6 +882,10 @@ fn source_block_owners_are_rewritten_and_lowered_in_dispatch_order() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn raw_import_metadata_matrix_lowers_without_rewriting_opaque_content() {
     let content = "INSERT_IMPORT __source_header__\r\n";
     let compound = TypeName::generic(
@@ -943,6 +955,10 @@ fn invalid_raw_import_metadata_fails_before_lowering_or_rewriting() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn repeated_structural_types_are_lowered_once_per_original_root() {
     let events = Rc::new(RefCell::new(Vec::new()));
     let repeated = TypeName::generic(
@@ -1336,6 +1352,10 @@ impl RendererLang for FailingHookLang {
 }
 
 impl CodeLang for FailingHookLang {
+    #[allow(
+        deprecated,
+        reason = "exercise released generic and callable compatibility inputs"
+    )]
     fn emit_newtype_decl(
         &self,
         _visibility: &str,
@@ -1349,6 +1369,10 @@ impl CodeLang for FailingHookLang {
         CodeBlock::of(&format!("struct {name}(%T);"), inner.clone())
     }
 
+    #[allow(
+        deprecated,
+        reason = "exercise released generic and callable compatibility inputs"
+    )]
     fn emit_type_context(
         &self,
         _type_params: &[TypeParamSpec],
@@ -1386,6 +1410,10 @@ impl CodeLang for FailingHookLang {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_structured_hook_errors_propagate_from_file_render() {
     let newtype = TypeSpec::builder("Wrapped", TypeKind::Newtype)
         .extends(TypeName::primitive("String"))

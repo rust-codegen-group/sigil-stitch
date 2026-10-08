@@ -15,6 +15,7 @@ fn terminal_type(type_name: &TypeName) -> Option<CodeBlock> {
             qualified: true,
             ..
         } => Some(qualified(module, ".", imported_name)),
+        TypeName::Parameter(value) => Some(literal(value.clone())),
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             Some(terminal(type_name))
         }
@@ -63,10 +64,14 @@ fn parenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     Ok(surround("(", lower(type_name)?, ")"))
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn optional_inner(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     if matches!(
         type_name,
-        TypeName::Intersection(_) | TypeName::Function { .. }
+        TypeName::Intersection(_) | TypeName::Function { .. } | TypeName::Callable { .. }
     ) {
         parenthesized(type_name)
     } else {
@@ -74,14 +79,25 @@ fn optional_inner(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn intersection_member(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
-    if matches!(type_name, TypeName::Function { .. }) {
+    if matches!(
+        type_name,
+        TypeName::Function { .. } | TypeName::Callable { .. }
+    ) {
         parenthesized(type_name)
     } else {
         lower(type_name)
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     if let Some(terminal) = terminal_type(type_name) {
         return Ok(terminal);
@@ -92,9 +108,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::ReadonlyArray(_) => Err(unsupported(
             "Swift has no readonly-array type distinct from Array",
         ))?,
-        TypeName::Generic { base, params } => generic_delimited(
+        TypeName::Generic { base, .. } | TypeName::Application { base, .. } => generic_delimited(
             lower(base)?,
-            params.iter().map(lower).collect::<Result<_, _>>()?,
+            lower_application_arguments(type_name)?,
             "<",
             ">",
         ),
@@ -126,19 +142,13 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::Reference { .. } => Err(unsupported(
             "Swift has no reference modifier that preserves shared, mutable, and lifetime intent",
         ))?,
-        TypeName::Function {
-            params,
-            return_type,
-        } => concat([
-            delimited(
-                "(",
-                params.iter().map(lower).collect::<Result<_, _>>()?,
-                ", ",
-                ")",
-            ),
-            literal(" -> "),
-            lower(return_type)?,
-        ]),
+        TypeName::Function { return_type, .. } | TypeName::Callable { return_type, .. } => {
+            concat([
+                delimited("(", lower_callable_parameters(type_name)?, ", ", ")"),
+                literal(" -> "),
+                lower(return_type)?,
+            ])
+        }
         TypeName::AssociatedType {
             base,
             qualifier: None,
@@ -159,6 +169,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::StringLiteral(_) => {
             Err(unsupported("Swift has no string singleton type expression"))?
         }
+        TypeName::Parameter(_) => Err(unsupported(
+            "Swift modern type expressions are not supported in this position",
+        ))?,
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             unreachable!("terminal variants returned above")
         }
@@ -167,3 +180,45 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
 
 #[cfg(test)]
 assert_string_literal_rejection!("swift", "Swift has no string singleton type expression");
+
+#[expect(
+    deprecated,
+    reason = "borrow released and modern application inputs without conversion"
+)]
+fn lower_application_arguments(type_name: &TypeName) -> Result<Vec<CodeBlock>, SigilStitchError> {
+    let values = match type_name {
+        TypeName::Generic { params, .. } => {
+            params.iter().map(lower).collect::<Result<Vec<_>, _>>()?
+        }
+        TypeName::Application { arguments, .. } => arguments
+            .iter()
+            .map(|argument| match argument {
+                crate::spec::where_spec::TypeArgument::Single(value) => lower(value),
+                crate::spec::where_spec::TypeArgument::Expansion { .. } => Err(unsupported(
+                    "argument-pack expansion is not supported in this type application",
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        _ => unreachable!("application helper receives only application inputs"),
+    };
+    if values.is_empty() {
+        return Err(unsupported("this target has no empty type-argument syntax"));
+    }
+    Ok(values)
+}
+
+#[expect(
+    deprecated,
+    reason = "borrow released and modern callable inputs without conversion"
+)]
+fn lower_callable_parameters(type_name: &TypeName) -> Result<Vec<CodeBlock>, SigilStitchError> {
+    let values = match type_name {
+        TypeName::Function { params, .. } => params.iter().map(lower).collect::<Result<Vec<_>, _>>()?,
+        TypeName::Callable { parameters, .. } => parameters.iter().map(|parameter| match parameter {
+            crate::spec::where_spec::CallableParam::Single { name: None, type_name, presence: crate::spec::where_spec::CallableParamPresence::Required } => lower(type_name),
+            _ => Err(unsupported("this callable type cannot preserve labelled, optional, repeated, or expanded slots")),
+        }).collect::<Result<Vec<_>, _>>()?,
+        _ => unreachable!("callable helper receives only callable inputs"),
+    };
+    Ok(values)
+}

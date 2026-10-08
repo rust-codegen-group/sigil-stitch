@@ -189,7 +189,10 @@ fn lower_split<L: CodeLang + ?Sized>(
         let mut format = String::from("impl");
         let mut arguments = Vec::new();
         format.push_str(&render_type_params_for(
-            type_.type_params(),
+            &type_
+                .generic_params()
+                .map(|parameter| parameter.compatibility_input(lang.file_extension()))
+                .collect::<Result<Vec<_>, _>>()?,
             lang,
             &mut arguments,
         ));
@@ -286,7 +289,14 @@ fn lower_alias<L: CodeLang + ?Sized>(
     let visibility =
         lang.render_visibility(type_.modifiers().visibility, DeclarationContext::TopLevel);
     let keyword = lang.type_keyword(type_.kind());
-    let parameters = render_type_params_for(type_.type_params(), lang, &mut arguments);
+    let parameters = render_type_params_for(
+        &type_
+            .generic_params()
+            .map(|parameter| parameter.compatibility_input(lang.file_extension()))
+            .collect::<Result<Vec<_>, _>>()?,
+        lang,
+        &mut arguments,
+    );
     let target = type_
         .target_type()
         .cloned()
@@ -339,12 +349,17 @@ fn lower_newtype<L: CodeLang + ?Sized>(
         .target_type()
         .cloned()
         .unwrap_or_else(|| TypeName::primitive(""));
-    block.add_code(lang.emit_newtype_decl(
-        visibility,
-        type_.name(),
-        type_.type_params(),
-        &target,
-    )?);
+    block.add_code(
+        lang.emit_newtype_decl(
+            visibility,
+            type_.name(),
+            &type_
+                .generic_params()
+                .map(|parameter| parameter.compatibility_input(lang.file_extension()))
+                .collect::<Result<Vec<_>, _>>()?,
+            &target,
+        )?,
+    );
     block.add_line();
     if let Some(suffix) = lang.emit_type_close_suffix(type_.kind(), type_.implemented_types())? {
         block.add("%>", ());
@@ -408,7 +423,10 @@ fn emit_header<L: CodeLang + ?Sized>(
     format.push(' ');
     format.push_str(type_.name());
     format.push_str(&render_type_params_for(
-        type_.type_params(),
+        &type_
+            .generic_params()
+            .map(|parameter| parameter.compatibility_input(lang.file_extension()))
+            .collect::<Result<Vec<_>, _>>()?,
         lang,
         &mut arguments,
     ));

@@ -58,7 +58,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec, TypeSpec) {
 
     // --- Interface: TaskRepository<T> ---
     let repo = TypeSpec::builder("TaskRepository", TypeKind::Interface)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
                 .returns(TypeName::primitive("T?"))
@@ -166,9 +166,9 @@ fn builder_approach() -> String {
 
     let fetch_task = FunSpec::builder("fetchTask")
         .is_async()
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("Future"),
-            vec![TypeName::primitive("Task")],
+            vec![TypeArgument::Single(TypeName::primitive("Task"))],
         ))
         .body(fetch_body.build().unwrap())
         .build()
@@ -179,8 +179,8 @@ fn builder_approach() -> String {
     transform_body.add("return mapper(input)", ());
 
     let transform = FunSpec::builder("transform")
-        .add_type_param(TypeParamSpec::new("T"))
-        .add_type_param(TypeParamSpec::new("R"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
+        .add_generic_param(GenericParamSpec::single("R").unwrap())
         .returns(TypeName::primitive("R"))
         .add_param(ParameterSpec::new("input", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("mapper", TypeName::primitive("R Function(T)")).unwrap())
@@ -300,9 +300,9 @@ fn macro_approach() -> String {
 
     let fetch_task = FunSpec::builder("fetchTask")
         .is_async()
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("Future"),
-            vec![TypeName::primitive("Task")],
+            vec![TypeArgument::Single(TypeName::primitive("Task"))],
         ))
         .body(fetch_body)
         .build()
@@ -315,8 +315,8 @@ fn macro_approach() -> String {
     .unwrap();
 
     let transform = FunSpec::builder("transform")
-        .add_type_param(TypeParamSpec::new("T"))
-        .add_type_param(TypeParamSpec::new("R"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
+        .add_generic_param(GenericParamSpec::single("R").unwrap())
         .returns(TypeName::primitive("R"))
         .add_param(ParameterSpec::new("input", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("mapper", TypeName::primitive("R Function(T)")).unwrap())

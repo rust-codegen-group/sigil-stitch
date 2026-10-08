@@ -55,7 +55,7 @@ public class UserService {
 # fn main() {
 let type_spec = TypeSpec::builder("Repository", TypeKind::Interface)
     .visibility(Visibility::Public)
-    .add_type_param(TypeParamSpec::new("T"))
+    .add_generic_param(GenericParamSpec::single("T").unwrap())
     .doc("Generic data repository.")
     .add_method(
         FunSpec::builder("findById")

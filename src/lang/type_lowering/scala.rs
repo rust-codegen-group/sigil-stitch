@@ -9,12 +9,18 @@ use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+use crate::spec::where_spec::{GenericParamView, WhereConstraint};
 use crate::type_name::TypeName;
 
 use super::common;
 
 pub(crate) fn validate(lang: &Scala, type_: TypeIntent<'_>) -> Result<(), SigilStitchError> {
+    for parameter in type_.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        crate::lang::scala::validate_generic_domain(&parameter)?;
+    }
     common::validate_declaration(
         type_,
         lang.file_extension(),
@@ -38,7 +44,7 @@ pub(crate) fn validate(lang: &Scala, type_: TypeIntent<'_>) -> Result<(), SigilS
         is_identifier,
         lang.reserved_words(),
     )?;
-    if let Some(parameter) = crate::lang::scala::invalid_raw_type_parameter(type_.type_params()) {
+    if let Some(parameter) = crate::lang::scala::invalid_raw_type_parameter(&type_.type_params()) {
         return Err(SigilStitchError::InvalidTypeParameter {
             type_name: type_.name().to_string(),
             parameter_name: parameter.name().to_string(),
@@ -111,7 +117,7 @@ pub(crate) fn lower(
         let mut block = CodeBlock::builder();
         preamble(&mut block, lang, &type_)?;
         let mut arguments = Vec::new();
-        let params = type_parameters(&type_, &mut arguments);
+        let params = type_parameters(&type_, &mut arguments)?;
         arguments.push(Arg::TypeName(
             type_.target_type().expect("validated target").clone(),
         ));
@@ -130,7 +136,7 @@ pub(crate) fn lower(
         let mut block = CodeBlock::builder();
         preamble(&mut block, lang, &type_)?;
         let mut arguments = Vec::new();
-        let params = type_parameters(&type_, &mut arguments);
+        let params = type_parameters(&type_, &mut arguments)?;
         arguments.push(Arg::TypeName(
             type_.target_type().expect("validated target").clone(),
         ));
@@ -163,7 +169,7 @@ pub(crate) fn lower(
     });
     format.push_str(type_.name());
     let mut arguments = Vec::new();
-    format.push_str(&type_parameters(&type_, &mut arguments));
+    format.push_str(&type_parameters(&type_, &mut arguments)?);
     if !type_.primary_constructor_parameters().is_empty() {
         format.push_str("(%L)");
         arguments.push(Arg::Code(primary_constructor(
@@ -204,9 +210,12 @@ pub(crate) fn lower(
     Ok(vec![block.build()?])
 }
 
-fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> String {
+fn type_parameters(
+    type_: &ValidatedType<'_>,
+    arguments: &mut Vec<Arg>,
+) -> Result<String, SigilStitchError> {
     if type_.type_params().is_empty() {
-        return String::new();
+        return Ok(String::new());
     }
     let mut format = String::from("[");
     for (index, parameter) in type_.type_params().iter().enumerate() {
@@ -216,6 +225,11 @@ fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> Strin
         format.push_str(parameter.name());
         if let Some(kind) = parameter.kind() {
             format.push_str(&scala_kind(kind));
+        }
+        if let crate::spec::where_spec::GenericParamDomain::Single { kind: Some(kind) } =
+            parameter.domain().as_ref()
+        {
+            format.push_str(&crate::lang::scala::generic_kind_suffix(kind)?);
         }
         let bounds = parameter_bounds(parameter, type_.where_constraints());
         if !bounds.is_empty() {
@@ -234,11 +248,11 @@ fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> Strin
         }
     }
     format.push(']');
-    format
+    Ok(format)
 }
 
 fn parameter_bounds<'a>(
-    parameter: &'a TypeParamSpec,
+    parameter: &'a GenericParamView<'_>,
     constraints: &'a [WhereConstraint],
 ) -> Vec<&'a TypeName> {
     let mut bounds = parameter.bounds().iter().collect::<Vec<_>>();
@@ -254,6 +268,10 @@ fn parameter_bounds<'a>(
     bounds
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn scala_kind(kind: &crate::spec::where_spec::TypeParamKind) -> String {
     match kind {
         crate::spec::where_spec::TypeParamKind::Constructor1 => "[_]".to_string(),

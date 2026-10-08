@@ -94,7 +94,7 @@ public enum NetworkResult {
 # use sigil_stitch::prelude::*;
 # fn main() {
 let type_spec = TypeSpec::builder("Repository", TypeKind::Interface)
-    .add_type_param(TypeParamSpec::new("T"))
+    .add_generic_param(GenericParamSpec::single("T").unwrap())
     .doc("Generic data repository.")
     .add_method(
         FunSpec::builder("findById")

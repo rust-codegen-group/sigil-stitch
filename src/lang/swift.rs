@@ -480,6 +480,12 @@ const SWIFT_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Swift {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::swift_function_lowering::validate_generic_parameters(self, function)
+    }
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,
@@ -614,7 +620,7 @@ impl CodeLang for Swift {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         if let Some(parameter) = type_params.iter().find(|parameter| {
@@ -834,50 +840,46 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let sw = Swift::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "Foundation".into(),
-                name: "URL".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "Foundation".into(),
+            name: "URL".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(sw.render_imports(&imports), "import Foundation");
     }
 
     #[test]
     fn test_render_imports_grouped() {
         let sw = Swift::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "MyModule".into(),
-                    name: "MyType".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "Foundation".into(),
-                    name: "URL".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "UIKit".into(),
-                    name: "UIViewController".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "MyModule".into(),
+                name: "MyType".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "Foundation".into(),
+                name: "URL".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "UIKit".into(),
+                name: "UIViewController".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = sw.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import Foundation");
@@ -889,34 +891,32 @@ mod tests {
     #[test]
     fn test_render_imports_module_dedup() {
         let sw = Swift::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "Foundation".into(),
-                    name: "URL".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "Foundation".into(),
-                    name: "Data".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "Foundation".into(),
-                    name: "JSONDecoder".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "Foundation".into(),
+                name: "URL".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "Foundation".into(),
+                name: "Data".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "Foundation".into(),
+                name: "JSONDecoder".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(sw.render_imports(&imports), "import Foundation");
     }
 

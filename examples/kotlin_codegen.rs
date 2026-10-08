@@ -103,7 +103,7 @@ fn builder_approach() -> String {
 
     // --- Interface with variance ---
     let repo = TypeSpec::builder("Repository", TypeKind::Interface)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
                 .returns(TypeName::optional(TypeName::primitive("T")))
@@ -122,9 +122,11 @@ fn builder_approach() -> String {
                 .add_param(
                     ParameterSpec::new(
                         "items",
-                        TypeName::generic(
+                        TypeName::application(
                             TypeName::primitive("List"),
-                            vec![TypeName::wildcard_extends(TypeName::primitive("T"))],
+                            vec![TypeArgument::Single(TypeName::wildcard_extends(
+                                TypeName::primitive("T"),
+                            ))],
                         ),
                     )
                     .unwrap(),
@@ -167,9 +169,9 @@ fn builder_approach() -> String {
 
     let fetch_fn = FunSpec::builder("fetchTasks")
         .is_async()
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("List"),
-            vec![TypeName::primitive("Task")],
+            vec![TypeArgument::Single(TypeName::primitive("Task"))],
         ))
         .body(fetch_body.build().unwrap())
         .build()
@@ -196,7 +198,7 @@ fn macro_approach() -> String {
     let (status, task) = build_shared_types();
 
     let repo = TypeSpec::builder("Repository", TypeKind::Interface)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
                 .returns(TypeName::optional(TypeName::primitive("T")))
@@ -215,9 +217,11 @@ fn macro_approach() -> String {
                 .add_param(
                     ParameterSpec::new(
                         "items",
-                        TypeName::generic(
+                        TypeName::application(
                             TypeName::primitive("List"),
-                            vec![TypeName::wildcard_extends(TypeName::primitive("T"))],
+                            vec![TypeArgument::Single(TypeName::wildcard_extends(
+                                TypeName::primitive("T"),
+                            ))],
                         ),
                     )
                     .unwrap(),
@@ -255,9 +259,9 @@ fn macro_approach() -> String {
 
     let fetch_fn = FunSpec::builder("fetchTasks")
         .is_async()
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("List"),
-            vec![TypeName::primitive("Task")],
+            vec![TypeArgument::Single(TypeName::primitive("Task"))],
         ))
         .body(fetch_body)
         .build()

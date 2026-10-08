@@ -157,11 +157,8 @@ pub trait Summary {
 # fn main() {
 let type_spec = TypeSpec::builder("Result", TypeKind::TypeAlias)
     .visibility(Visibility::Public)
-    .add_type_param(TypeParamSpec::new("T"))
-    .extends(TypeName::generic(
-        TypeName::primitive("std::result::Result"),
-        vec![TypeName::primitive("T"), TypeName::primitive("MyError")],
-    ))
+    .add_generic_param(GenericParamSpec::single("T").unwrap())
+    .extends(TypeName::application(TypeName::primitive("std::result::Result"), vec![TypeArgument::Single(TypeName::primitive("T")), TypeArgument::Single(TypeName::primitive("MyError"))]))
     .build()
     .unwrap();
 # }
@@ -185,13 +182,7 @@ let field = FieldSpec::builder("data", TypeName::qualified("serde_json", "Value"
     .unwrap();
 
 // In a generic:
-let map_type = TypeName::generic(
-    TypeName::qualified("std::collections", "HashMap"),
-    vec![
-        TypeName::primitive("String"),
-        TypeName::qualified("serde_json", "Value"),
-    ],
-);
+let map_type = TypeName::application(TypeName::qualified("std::collections", "HashMap"), vec![TypeArgument::Single(TypeName::primitive("String")), TypeArgument::Single(TypeName::qualified("serde_json", "Value"))]);
 # }
 ```
 

@@ -18,6 +18,7 @@ fn terminal_type(type_name: &TypeName, qualified_separator: Option<&str>) -> Opt
             Some(separator) => qualified(module, separator, imported_name),
             None => name(imported_name.clone()),
         }),
+        TypeName::Parameter(value) => Some(literal(value.clone())),
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             Some(terminal(type_name))
         }
@@ -25,9 +26,16 @@ fn terminal_type(type_name: &TypeName, qualified_separator: Option<&str>) -> Opt
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn application_parameter(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     let lowered = lower(type_name)?;
-    if matches!(type_name, TypeName::Tuple(_) | TypeName::Function { .. }) {
+    if matches!(
+        type_name,
+        TypeName::Tuple(_) | TypeName::Function { .. } | TypeName::Callable { .. }
+    ) {
         Ok(surround("(", lowered, ")"))
     } else {
         Ok(lowered)
@@ -72,15 +80,26 @@ fn postfix_type(type_name: &TypeName, suffix: &str) -> Result<CodeBlock, SigilSt
     Ok(postfix(inner, suffix))
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn function_parameter(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     let lowered = lower(type_name)?;
-    if matches!(type_name, TypeName::Function { .. }) {
+    if matches!(
+        type_name,
+        TypeName::Function { .. } | TypeName::Callable { .. }
+    ) {
         Ok(surround("(", lowered, ")"))
     } else {
         Ok(lowered)
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     if let Some(terminal) = terminal_type(type_name, Some(".")) {
         return Ok(terminal);
@@ -88,13 +107,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
     Ok(match type_name {
         TypeName::Array(inner) => postfix_type(inner, " array")?,
         TypeName::ReadonlyArray(inner) => postfix_type(inner, " list")?,
-        TypeName::Generic { base, params } => generic_postfix(
-            lower(base)?,
-            params
-                .iter()
-                .map(application_parameter)
-                .collect::<Result<_, _>>()?,
-        ),
+        TypeName::Generic { base, .. } | TypeName::Application { base, .. } => {
+            generic_postfix(lower(base)?, lower_application_arguments(type_name)?)
+        }
         TypeName::Union(_) => Err(unsupported("OCaml has no union type expression"))?,
         TypeName::Intersection(_) => Err(unsupported("OCaml has no intersection type expression"))?,
         TypeName::Pointer(_) => Err(unsupported(
@@ -129,14 +144,8 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         } if params.is_empty() => Err(unsupported(
             "OCaml has no nullary function type distinct from its result type",
         ))?,
-        TypeName::Function {
-            params,
-            return_type,
-        } => curried(
-            params
-                .iter()
-                .map(function_parameter)
-                .collect::<Result<_, _>>()?,
+        TypeName::Function { return_type, .. } | TypeName::Callable { return_type, .. } => curried(
+            lower_callable_parameters(type_name)?,
             lower(return_type)?,
             " -> ",
         ),
@@ -151,6 +160,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::StringLiteral(_) => {
             Err(unsupported("OCaml has no string singleton type expression"))?
         }
+        TypeName::Parameter(_) => Err(unsupported(
+            "OCaml modern type expressions are not supported in this position",
+        ))?,
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             unreachable!("terminal variants returned above")
         }
@@ -159,3 +171,53 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
 
 #[cfg(test)]
 assert_string_literal_rejection!("ml", "OCaml has no string singleton type expression");
+
+#[expect(
+    deprecated,
+    reason = "borrow released and modern application inputs without conversion"
+)]
+fn lower_application_arguments(type_name: &TypeName) -> Result<Vec<CodeBlock>, SigilStitchError> {
+    let values = match type_name {
+        TypeName::Generic { params, .. } => params
+            .iter()
+            .map(application_parameter)
+            .collect::<Result<Vec<_>, _>>()?,
+        TypeName::Application { arguments, .. } => arguments
+            .iter()
+            .map(|argument| match argument {
+                crate::spec::where_spec::TypeArgument::Single(value) => {
+                    application_parameter(value)
+                }
+                crate::spec::where_spec::TypeArgument::Expansion { .. } => Err(unsupported(
+                    "argument-pack expansion is not supported in this type application",
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        _ => unreachable!("application helper receives only application inputs"),
+    };
+    if values.is_empty() {
+        return Err(unsupported("this target has no empty type-argument syntax"));
+    }
+    Ok(values)
+}
+
+#[expect(
+    deprecated,
+    reason = "borrow released and modern callable inputs without conversion"
+)]
+fn lower_callable_parameters(type_name: &TypeName) -> Result<Vec<CodeBlock>, SigilStitchError> {
+    let values = match type_name {
+        TypeName::Function { params, .. } => params.iter().map(function_parameter).collect::<Result<Vec<_>, _>>()?,
+        TypeName::Callable { parameters, .. } => parameters.iter().map(|parameter| match parameter {
+            crate::spec::where_spec::CallableParam::Single { name: None, type_name, presence: crate::spec::where_spec::CallableParamPresence::Required } => function_parameter(type_name),
+            _ => Err(unsupported("this callable type cannot preserve labelled, optional, repeated, or expanded slots")),
+        }).collect::<Result<Vec<_>, _>>()?,
+        _ => unreachable!("callable helper receives only callable inputs"),
+    };
+    if values.is_empty() {
+        return Err(unsupported(
+            "OCaml has no nullary function type distinct from its result type",
+        ));
+    }
+    Ok(values)
+}

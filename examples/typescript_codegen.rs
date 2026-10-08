@@ -54,15 +54,15 @@ fn builder_approach() -> String {
     // --- Interface with generic type param ---
     let repo_iface = TypeSpec::builder("Repository", TypeKind::Interface)
         .visibility(Visibility::Public)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("Promise"),
-                    vec![TypeName::union(vec![
+                    vec![TypeArgument::Single(TypeName::union(vec![
                         TypeName::primitive("T"),
                         TypeName::primitive("null"),
-                    ])],
+                    ]))],
                 ))
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
                 .build()
@@ -70,9 +70,9 @@ fn builder_approach() -> String {
         )
         .add_method(
             FunSpec::builder("save")
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("Promise"),
-                    vec![TypeName::primitive("void")],
+                    vec![TypeArgument::Single(TypeName::primitive("void"))],
                 ))
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
                 .build()
@@ -80,9 +80,11 @@ fn builder_approach() -> String {
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("Promise"),
-                    vec![TypeName::array(TypeName::primitive("T"))],
+                    vec![TypeArgument::Single(TypeName::array(TypeName::primitive(
+                        "T",
+                    )))],
                 ))
                 .add_param(
                     ParameterSpec::builder("limit", TypeName::primitive("number"))
@@ -116,8 +118,19 @@ fn builder_approach() -> String {
         .add_field(
             FieldSpec::builder(
                 "onChange",
-                TypeName::function(
-                    vec![TypeName::primitive("User"), TypeName::primitive("string")],
+                TypeName::callable(
+                    vec![
+                        CallableParam::Single {
+                            name: None,
+                            type_name: TypeName::primitive("User"),
+                            presence: CallableParamPresence::Required,
+                        },
+                        CallableParam::Single {
+                            name: None,
+                            type_name: TypeName::primitive("string"),
+                            presence: CallableParamPresence::Required,
+                        },
+                    ],
                     TypeName::primitive("void"),
                 ),
             )
@@ -153,9 +166,9 @@ fn builder_approach() -> String {
     let get_user = FunSpec::builder("getUser")
         .is_async()
         .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("Promise"),
-            vec![user_type],
+            vec![TypeArgument::Single(user_type)],
         ))
         .body(body.build().unwrap())
         .build()
@@ -244,15 +257,15 @@ fn macro_approach() -> String {
     // --- Interface with generic type param ---
     let repo_iface = TypeSpec::builder("Repository", TypeKind::Interface)
         .visibility(Visibility::Public)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("Promise"),
-                    vec![TypeName::union(vec![
+                    vec![TypeArgument::Single(TypeName::union(vec![
                         TypeName::primitive("T"),
                         TypeName::primitive("null"),
-                    ])],
+                    ]))],
                 ))
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
                 .build()
@@ -260,9 +273,9 @@ fn macro_approach() -> String {
         )
         .add_method(
             FunSpec::builder("save")
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("Promise"),
-                    vec![TypeName::primitive("void")],
+                    vec![TypeArgument::Single(TypeName::primitive("void"))],
                 ))
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
                 .build()
@@ -270,9 +283,11 @@ fn macro_approach() -> String {
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("Promise"),
-                    vec![TypeName::array(TypeName::primitive("T"))],
+                    vec![TypeArgument::Single(TypeName::array(TypeName::primitive(
+                        "T",
+                    )))],
                 ))
                 .add_param(
                     ParameterSpec::builder("limit", TypeName::primitive("number"))
@@ -302,9 +317,9 @@ fn macro_approach() -> String {
     let get_user = FunSpec::builder("getUser")
         .is_async()
         .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("Promise"),
-            vec![user_type],
+            vec![TypeArgument::Single(user_type)],
         ))
         .body(body)
         .build()
@@ -370,8 +385,19 @@ fn macro_approach() -> String {
         .add_field(
             FieldSpec::builder(
                 "onChange",
-                TypeName::function(
-                    vec![TypeName::primitive("User"), TypeName::primitive("string")],
+                TypeName::callable(
+                    vec![
+                        CallableParam::Single {
+                            name: None,
+                            type_name: TypeName::primitive("User"),
+                            presence: CallableParamPresence::Required,
+                        },
+                        CallableParam::Single {
+                            name: None,
+                            type_name: TypeName::primitive("string"),
+                            presence: CallableParamPresence::Required,
+                        },
+                    ],
                     TypeName::primitive("void"),
                 ),
             )

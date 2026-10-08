@@ -8,7 +8,7 @@ use crate::lang::java::Java;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+use crate::spec::where_spec::{GenericParamView, WhereConstraint};
 use crate::type_name::TypeName;
 
 use super::common;
@@ -46,6 +46,23 @@ pub(crate) fn is_identifier(name: &str) -> bool {
 }
 
 pub(crate) fn validate(lang: &Java, type_: TypeIntent<'_>) -> Result<(), SigilStitchError> {
+    for parameter in type_.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        if !matches!(
+            parameter.domain().as_ref(),
+            crate::spec::where_spec::GenericParamDomain::Single {
+                kind: None | Some(crate::spec::where_spec::KindExpr::Type)
+            }
+        ) {
+            return Err(SigilStitchError::InvalidTypeParameter {
+                type_name: type_.name().into(),
+                parameter_name: parameter.name().into(),
+                reason: "this binding domain has no representation in this type declaration".into(),
+            });
+        }
+    }
     common::validate_declaration(
         type_,
         lang.file_extension(),
@@ -81,7 +98,7 @@ pub(crate) fn validate(lang: &Java, type_: TypeIntent<'_>) -> Result<(), SigilSt
     }
     common::validate_constraint_subjects(type_, lang.file_extension(), type_.where_constraints())?;
     if let Some((parameter_name, first, second)) = crate::lang::java::conflicting_bound_erasures(
-        type_.type_params(),
+        &type_.type_params(),
         type_.where_constraints(),
     ) {
         return Err(SigilStitchError::InvalidTypeParameter {
@@ -198,7 +215,7 @@ fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> Strin
 }
 
 fn parameter_bounds<'a>(
-    parameter: &'a TypeParamSpec,
+    parameter: &'a GenericParamView<'_>,
     constraints: &'a [WhereConstraint],
 ) -> Vec<&'a TypeName> {
     let explicit_bounds = constraints

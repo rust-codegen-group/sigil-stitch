@@ -11,6 +11,31 @@ use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::where_spec::WhereConstraint;
 
+pub(crate) fn validate_generic_parameters(
+    lang: &Rust,
+    function: crate::lang::FunctionIntent<'_>,
+) -> Result<(), SigilStitchError> {
+    for parameter in function.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        if !matches!(
+            parameter.domain().as_ref(),
+            crate::spec::where_spec::GenericParamDomain::Single {
+                kind: None | Some(crate::spec::where_spec::KindExpr::Type)
+            } | crate::spec::where_spec::GenericParamDomain::Lifetime
+        ) {
+            return Err(SigilStitchError::UnsupportedTypeName {
+                language: lang.file_extension().into(),
+                context: format!("generic_param.{}", parameter.name()),
+                reason: "this binding domain has no representation in this function declaration"
+                    .into(),
+            });
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn lower(
     lang: &Rust,
     function: ValidatedFunction<'_>,
@@ -28,7 +53,7 @@ pub(crate) fn lower(
     }
     signature.push_literal("fn ");
     signature.push_literal(function.name());
-    append_type_parameters(&mut signature, function.type_params());
+    append_type_parameters(&mut signature, &function.type_params());
     signature.push_literal("(");
     signature.push_code(tupled_parameter_list(
         function.parameters(),
@@ -66,7 +91,7 @@ pub(crate) fn lower(
 
 fn append_type_parameters(
     signature: &mut SignatureBuilder,
-    type_params: &[crate::spec::where_spec::TypeParamSpec],
+    type_params: &[crate::spec::where_spec::GenericParamView<'_>],
 ) {
     if type_params.is_empty() {
         return;
@@ -164,13 +189,13 @@ mod tests {
     use crate::lang::rust::Rust;
     use crate::spec::fun_spec::FunSpec;
     use crate::spec::modifiers::DeclarationContext;
-    use crate::spec::where_spec::TypeParamSpec;
+    use crate::spec::where_spec::GenericParamSpec;
     use crate::type_name::TypeName;
 
     #[test]
     fn where_continuations_use_structural_indentation() {
         let function = FunSpec::builder("work")
-            .add_type_param(TypeParamSpec::new("T"))
+            .add_generic_param(GenericParamSpec::single("T").unwrap())
             .add_where_constraint(TypeName::primitive("T"), vec![TypeName::primitive("Clone")])
             .body(CodeBlock::of("todo!()", ()).unwrap())
             .build()

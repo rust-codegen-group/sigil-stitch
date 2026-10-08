@@ -180,6 +180,9 @@ are unaffected.
 | `Primitive` | `string`, `i32` | No |
 | `Importable` | `User` from `./models` | Yes |
 | `Generic` | `Promise<User>` | Recursively |
+| `Parameter` | A supplied binder reference such as `n` | No |
+| `Application` | A supplied constructor/operator with scalar or expanded arguments | Base and complete argument patterns tracked |
+| `Callable` | Required/optional slots and repeated or expanded segments | Every contained type tracked |
 | `Array` | `User[]`, `Vec<User>` | Inner type tracked |
 | `ReadonlyArray` | `readonly User[]` | Inner type tracked |
 | `Optional` | `User?`, `Option<User>` | Inner type tracked |
@@ -197,6 +200,15 @@ Every variant that contains other types remains structured until the selected
 adapter lowers the complete root. The lowering result retains importable leaf
 references in its `CodeBlock`, so ordinary nested imports and target-derived
 imports are collected together before alias resolution.
+
+Declarations store generic bindings in one private ordered list and expose
+one borrowed `GenericParamView` sequence. Modern domains and kinds remain
+complete through native validation, constraint merging, and lowering. Legacy
+kind metadata remains separate from modern `KindExpr`; frozen compatibility
+lowerers reject domains they cannot represent. Application and callable
+expressions do not introduce inference, pack evaluation, or a shared target
+grammar. Each language preserves the concrete request or returns
+`SigilStitchError`.
 
 #### Type-Name Lowering
 

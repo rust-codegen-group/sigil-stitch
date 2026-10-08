@@ -15,6 +15,7 @@ fn terminal_type(type_name: &TypeName) -> Option<CodeBlock> {
             qualified: true,
             ..
         } => Some(qualified(module, ".", imported_name)),
+        TypeName::Parameter(value) => Some(literal(value.clone())),
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             Some(terminal(type_name))
         }
@@ -59,28 +60,50 @@ fn parenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     Ok(surround("(", lower(type_name)?, ")"))
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn union_member(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
-    if matches!(type_name, TypeName::Function { .. }) {
+    if matches!(
+        type_name,
+        TypeName::Function { .. } | TypeName::Callable { .. }
+    ) {
         parenthesized(type_name)
     } else {
         lower(type_name)
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn intersection_member(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
-    if matches!(type_name, TypeName::Union(_) | TypeName::Function { .. }) {
+    if matches!(
+        type_name,
+        TypeName::Union(_) | TypeName::Function { .. } | TypeName::Callable { .. }
+    ) {
         parenthesized(type_name)
     } else {
         lower(type_name)
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     if let Some(terminal) = terminal_type(type_name) {
         return Ok(terminal);
     }
 
     Ok(match type_name {
+        TypeName::Generic { params, .. } if params.is_empty() =>
+            return Err(unsupported("Scala type argument lists must not be empty")),
+        TypeName::Application { arguments, .. } if arguments.is_empty() =>
+            return Err(unsupported("Scala type argument lists must not be empty")),
         TypeName::Array(inner) => generic_wrap("Array", vec![lower(inner)?]),
         TypeName::ReadonlyArray(inner) => generic_wrap("IArray", vec![lower(inner)?]),
         TypeName::Generic { base, params } => generic_delimited(
@@ -89,6 +112,21 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             "[",
             "]",
         ),
+        TypeName::Application { base, arguments } => generic_delimited(
+            lower(base)?,
+            arguments.iter().map(|argument| match argument {
+                crate::spec::where_spec::TypeArgument::Single(value) => lower(value),
+                crate::spec::where_spec::TypeArgument::Expansion { .. } => Err(unsupported("Scala type applications do not express argument-pack expansion")),
+            }).collect::<Result<_, _>>()?,
+            "[", "]",
+        ),
+        TypeName::Callable { parameters, return_type } => concat([
+            delimited("(", parameters.iter().map(|parameter| match parameter {
+                crate::spec::where_spec::CallableParam::Single { name: None, type_name, presence: crate::spec::where_spec::CallableParamPresence::Required } => lower(type_name),
+                _ => Err(unsupported("Scala function types cannot preserve this labelled, optional, repeated, or expanded parameter")),
+            }).collect::<Result<_, _>>()?, ", ", ")"),
+            literal(" => "), lower(return_type)?,
+        ]),
         TypeName::Union(members) => infix(
             members.iter().map(union_member).collect::<Result<_, _>>()?,
             " | ",
@@ -158,6 +196,7 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::StringLiteral(_) => {
             Err(unsupported("Scala has no string singleton type expression"))?
         }
+        TypeName::Parameter(_) => unreachable!("parameter leaves returned above"),
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             unreachable!("terminal variants returned above")
         }

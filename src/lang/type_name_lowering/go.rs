@@ -18,6 +18,7 @@ fn terminal_type(type_name: &TypeName, qualified_separator: Option<&str>) -> Opt
             Some(separator) => qualified(module, separator, imported_name),
             None => name(imported_name.clone()),
         }),
+        TypeName::Parameter(value) => Some(literal(value.clone())),
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             Some(terminal(type_name))
         }
@@ -50,6 +51,10 @@ fn unsupported(reason: &str) -> SigilStitchError {
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     if let Some(terminal) = terminal_type(type_name, Some(".")) {
         return Ok(terminal);
@@ -57,9 +62,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
     Ok(match type_name {
         TypeName::Array(inner) => prefix("[]", lower(inner)?),
         TypeName::ReadonlyArray(_) => Err(unsupported("Go has no readonly slice type expression"))?,
-        TypeName::Generic { base, params } => generic_delimited(
+        TypeName::Generic { base, .. } | TypeName::Application { base, .. } => generic_delimited(
             lower(base)?,
-            params.iter().map(lower).collect::<Result<_, _>>()?,
+            lower_application_arguments(type_name)?,
             "[",
             "]",
         ),
@@ -80,20 +85,14 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::Reference { .. } => Err(unsupported(
             "Go pointers do not preserve reference mutability semantics",
         ))?,
-        TypeName::Function {
-            params,
-            return_type,
-        } => concat([
-            literal("func"),
-            delimited(
-                "(",
-                params.iter().map(lower).collect::<Result<_, _>>()?,
-                ", ",
-                ")",
-            ),
-            literal(" "),
-            lower(return_type)?,
-        ]),
+        TypeName::Function { return_type, .. } | TypeName::Callable { return_type, .. } => {
+            concat([
+                literal("func"),
+                delimited("(", lower_callable_parameters(type_name)?, ", ", ")"),
+                literal(" "),
+                lower(return_type)?,
+            ])
+        }
         TypeName::AssociatedType { .. } => {
             Err(unsupported("Go has no associated-type expression"))?
         }
@@ -109,6 +108,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::StringLiteral(_) => {
             Err(unsupported("Go has no string singleton type expression"))?
         }
+        TypeName::Parameter(_) => Err(unsupported(
+            "Go modern type expressions are not supported in this position",
+        ))?,
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             unreachable!("terminal variants returned above")
         }
@@ -117,3 +119,45 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
 
 #[cfg(test)]
 assert_string_literal_rejection!("go", "Go has no string singleton type expression");
+
+#[expect(
+    deprecated,
+    reason = "borrow released and modern application inputs without conversion"
+)]
+fn lower_application_arguments(type_name: &TypeName) -> Result<Vec<CodeBlock>, SigilStitchError> {
+    let values = match type_name {
+        TypeName::Generic { params, .. } => {
+            params.iter().map(lower).collect::<Result<Vec<_>, _>>()?
+        }
+        TypeName::Application { arguments, .. } => arguments
+            .iter()
+            .map(|argument| match argument {
+                crate::spec::where_spec::TypeArgument::Single(value) => lower(value),
+                crate::spec::where_spec::TypeArgument::Expansion { .. } => Err(unsupported(
+                    "argument-pack expansion is not supported in this type application",
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        _ => unreachable!("application helper receives only application inputs"),
+    };
+    if values.is_empty() {
+        return Err(unsupported("this target has no empty type-argument syntax"));
+    }
+    Ok(values)
+}
+
+#[expect(
+    deprecated,
+    reason = "borrow released and modern callable inputs without conversion"
+)]
+fn lower_callable_parameters(type_name: &TypeName) -> Result<Vec<CodeBlock>, SigilStitchError> {
+    let values = match type_name {
+        TypeName::Function { params, .. } => params.iter().map(lower).collect::<Result<Vec<_>, _>>()?,
+        TypeName::Callable { parameters, .. } => parameters.iter().map(|parameter| match parameter {
+            crate::spec::where_spec::CallableParam::Single { name: None, type_name, presence: crate::spec::where_spec::CallableParamPresence::Required } => lower(type_name),
+            _ => Err(unsupported("this callable type cannot preserve labelled, optional, repeated, or expanded slots")),
+        }).collect::<Result<Vec<_>, _>>()?,
+        _ => unreachable!("callable helper receives only callable inputs"),
+    };
+    Ok(values)
+}

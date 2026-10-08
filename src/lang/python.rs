@@ -17,6 +17,10 @@ use crate::lang::config::{
 use crate::lang::{CodeLang, FunctionIntent, RendererLang};
 use crate::spec::annotation_spec::AnnotationNameRef;
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
 use crate::spec::where_spec::TypeParamSpec;
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::type_name::{AssociatedTypeStyle, FunctionPresentation, TypeName, TypePresentation};
@@ -760,6 +764,10 @@ impl CodeLang for Python {
         format!("{name} = NewType(\"{name}\", {inner})")
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_newtype_decl(
         &self,
         _visibility: &str,
@@ -855,42 +863,38 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let py = Python::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "json".into(),
-                name: "dumps".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "json".into(),
+            name: "dumps".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(py.render_imports(&imports), "from json import dumps");
     }
 
     #[test]
     fn test_render_imports_same_module_merged() {
         let py = Python::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "typing".into(),
-                    name: "Optional".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "typing".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "typing".into(),
+                name: "Optional".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "typing".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(
             py.render_imports(&imports),
             "from typing import List, Optional"
@@ -900,26 +904,24 @@ mod tests {
     #[test]
     fn test_render_imports_grouped() {
         let py = Python::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "json".into(),
-                    name: "dumps".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "flask".into(),
-                    name: "Flask".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "json".into(),
+                name: "dumps".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "flask".into(),
+                name: "Flask".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = py.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "from json import dumps");

@@ -7,13 +7,19 @@ use crate::type_name_lowering::structure::{
     concat, join, literal, name, qualified, surround, terminal,
 };
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn is_compound(type_name: &TypeName) -> bool {
     matches!(
         type_name,
         TypeName::Generic { .. }
+            | TypeName::Application { .. }
             | TypeName::Union(_)
             | TypeName::Intersection(_)
             | TypeName::Function { .. }
+            | TypeName::Callable { .. }
             | TypeName::Tuple(_)
             | TypeName::Optional(_)
             | TypeName::Map { .. }
@@ -51,6 +57,15 @@ fn generic_prefix(base: CodeBlock, params: Vec<(CodeBlock, bool)>) -> CodeBlock 
     concat(parts)
 }
 
+fn application_base(base: &TypeName) -> Result<CodeBlock, SigilStitchError> {
+    let lowered = lower(base)?;
+    if is_compound(base) {
+        Ok(surround("(", lowered, ")"))
+    } else {
+        Ok(lowered)
+    }
+}
+
 fn delimited(open: &str, items: Vec<CodeBlock>, separator: &str, close: &str) -> CodeBlock {
     surround(open, join(items, separator), close)
 }
@@ -72,30 +87,67 @@ fn data_map() -> CodeBlock {
     terminal(&TypeName::importable("Data.Map", "Map"))
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn function_parameter(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     let lowered = lower(type_name)?;
-    if matches!(type_name, TypeName::Function { .. }) {
+    if matches!(
+        type_name,
+        TypeName::Function { .. } | TypeName::Callable { .. }
+    ) {
         Ok(surround("(", lowered, ")"))
     } else {
         Ok(lowered)
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     if let Some(terminal) = terminal_type(type_name, Some(".")) {
-        return Ok(terminal);
+        return Ok(
+            if type_name
+                .simple_name()
+                .is_some_and(crate::lang::haskell::is_symbolic_name)
+            {
+                surround("(", terminal, ")")
+            } else {
+                terminal
+            },
+        );
     }
     Ok(match type_name {
         TypeName::Array(inner) | TypeName::ReadonlyArray(inner) => {
             delimited("[", vec![lower(inner)?], "", "]")
         }
         TypeName::Generic { base, params } => generic_prefix(
-            lower(base)?,
+            application_base(base)?,
             params
                 .iter()
                 .map(|parameter| Ok((lower(parameter)?, is_compound(parameter))))
                 .collect::<Result<_, SigilStitchError>>()?,
         ),
+        TypeName::Application { base, arguments } => {
+            let mut params = Vec::with_capacity(arguments.len());
+            for argument in arguments {
+                match argument {
+                    crate::spec::where_spec::TypeArgument::Single(value) => {
+                        params.push((lower(value)?, is_compound(value)));
+                    }
+                    crate::spec::where_spec::TypeArgument::Expansion { .. } => {
+                        return Err(unsupported(
+                            "Haskell does not support C++-style type argument expansion",
+                        ));
+                    }
+                }
+            }
+            generic_prefix(application_base(base)?, params)
+        }
+        TypeName::Parameter(name) => literal(name.clone()),
         TypeName::Union(_) => Err(unsupported("Haskell has no union type expression"))?,
         TypeName::Intersection(_) => {
             Err(unsupported("Haskell has no intersection type expression"))?
@@ -141,6 +193,36 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             lower(return_type)?,
             " -> ",
         ),
+        TypeName::Callable {
+            parameters,
+            return_type,
+        } => {
+            let mut lowered = Vec::with_capacity(parameters.len());
+            for parameter in parameters {
+                match parameter {
+                    crate::spec::where_spec::CallableParam::Single { name: Some(_), .. }
+                    | crate::spec::where_spec::CallableParam::Single {
+                        presence: crate::spec::where_spec::CallableParamPresence::Optional,
+                        ..
+                    }
+                    | crate::spec::where_spec::CallableParam::Repeated { .. }
+                    | crate::spec::where_spec::CallableParam::Expansion { .. } => {
+                        return Err(unsupported(
+                            "Haskell callable types cannot preserve labelled or variadic segments",
+                        ));
+                    }
+                    crate::spec::where_spec::CallableParam::Single {
+                        name: None,
+                        type_name,
+                        ..
+                    } => lowered.push(function_parameter(type_name)?),
+                }
+            }
+            if lowered.is_empty() {
+                return Err(unsupported("Haskell has no nullary callable type"));
+            }
+            curried(lowered, lower(return_type)?, " -> ")
+        }
         TypeName::AssociatedType { .. } => Err(unsupported(
             "Haskell has no associated-type projection expression",
         ))?,

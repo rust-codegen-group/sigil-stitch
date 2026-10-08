@@ -59,9 +59,13 @@ enum Precedence {
     Primary,
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn precedence(type_name: &TypeName) -> Precedence {
     match type_name {
-        TypeName::Function { .. } => Precedence::Function,
+        TypeName::Function { .. } | TypeName::Callable { .. } => Precedence::Function,
         TypeName::Union(_) | TypeName::Optional(_) => Precedence::Union,
         TypeName::Intersection(_) => Precedence::Intersection,
         TypeName::StringLiteral(_) => Precedence::Literal,
@@ -90,14 +94,14 @@ fn supports_generic_application(type_name: &TypeName) -> bool {
         TypeName::Importable { .. }
             | TypeName::Primitive(_)
             | TypeName::Raw(_)
-            | TypeName::Generic { .. }
-            | TypeName::AssociatedType {
-                qualifier: None,
-                ..
-            }
+            | TypeName::Parameter(_)
     )
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn lower_unparenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     if matches!(
         type_name,
@@ -115,6 +119,16 @@ fn lower_unparenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchE
     }
 
     Ok(match type_name {
+        TypeName::Generic { params, .. } if params.is_empty() => {
+            return Err(unsupported(
+                "TypeScript type argument lists must not be empty",
+            ));
+        }
+        TypeName::Application { arguments, .. } if arguments.is_empty() => {
+            return Err(unsupported(
+                "TypeScript type argument lists must not be empty",
+            ));
+        }
         TypeName::Array(inner) => postfix(lower_at(inner, Precedence::Postfix)?, "[]"),
         TypeName::ReadonlyArray(inner) => prefix(
             "readonly ",
@@ -132,8 +146,28 @@ fn lower_unparenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchE
             )
         }
         TypeName::Generic { .. } => Err(unsupported(
-            "TypeScript generic application requires a named or projected generic base",
+            "TypeScript generic application requires a named generic base",
         ))?,
+        TypeName::Application { base, arguments } if supports_generic_application(base) => {
+            let mut rendered = Vec::with_capacity(arguments.len());
+            for argument in arguments {
+                rendered.push(match argument {
+                    crate::spec::where_spec::TypeArgument::Single(value) => {
+                        lower_at(value, Precedence::Function)?
+                    }
+                    crate::spec::where_spec::TypeArgument::Expansion { .. } => {
+                        return Err(unsupported(
+                            "TypeScript has no expansion syntax in a generic argument list",
+                        ));
+                    }
+                });
+            }
+            generic_delimited(lower_at(base, Precedence::Postfix)?, rendered, "<", ">")
+        }
+        TypeName::Application { .. } => {
+            Err(unsupported("TypeScript application requires a named base"))?
+        }
+        TypeName::Parameter(name) => literal(name.clone()),
         TypeName::Union(members) => infix(
             members
                 .iter()
@@ -195,6 +229,112 @@ fn lower_unparenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchE
                     ]))
                 })
                 .collect::<Result<_, SigilStitchError>>()?;
+            concat([
+                delimited_soft("(", params, ",", ")"),
+                literal(" => "),
+                lower_at(return_type, Precedence::Function)?,
+            ])
+        }
+        TypeName::Callable {
+            parameters,
+            return_type,
+        } => {
+            use crate::spec::where_spec::{CallableParam, CallableParamPresence};
+            let mut labels = std::collections::HashSet::new();
+            for parameter in parameters {
+                let label = match parameter {
+                    CallableParam::Single { name, .. }
+                    | CallableParam::Repeated { name, .. }
+                    | CallableParam::Expansion { name, .. } => name,
+                };
+                if let Some(label) = label
+                    && (!crate::lang::type_lowering::typescript::is_identifier(label)
+                        || crate::lang::typescript::TS_RESERVED.contains(&label.as_str())
+                        || !labels.insert(label.clone()))
+                {
+                    return Err(unsupported(
+                        "TypeScript callable labels must be distinct identifiers",
+                    ));
+                }
+            }
+            let mut optional_seen = false;
+            let mut rest_seen = false;
+            for (index, parameter) in parameters.iter().enumerate() {
+                match parameter {
+                    CallableParam::Single { presence, .. } => {
+                        if rest_seen
+                            || (optional_seen && *presence == CallableParamPresence::Required)
+                        {
+                            return Err(unsupported(
+                                "TypeScript callable parameter order is not representable",
+                            ));
+                        }
+                        optional_seen |= *presence == CallableParamPresence::Optional;
+                    }
+                    CallableParam::Repeated { .. } | CallableParam::Expansion { .. } => {
+                        if rest_seen || index + 1 != parameters.len() {
+                            return Err(unsupported(
+                                "TypeScript callable rest parameters must be final",
+                            ));
+                        }
+                        rest_seen = true;
+                    }
+                }
+            }
+            let params = parameters
+                .iter()
+                .enumerate()
+                .map(|(index, parameter)| {
+                    let mut generated = format!("arg{index}");
+                    while labels.contains(&generated) {
+                        generated.push('_');
+                    }
+                    labels.insert(generated.clone());
+                    match parameter {
+                        crate::spec::where_spec::CallableParam::Single {
+                            name: label,
+                            type_name,
+                            presence,
+                        } => {
+                            let label = label.clone().unwrap_or_else(|| generated.clone());
+                            let optional = matches!(
+                                presence,
+                                crate::spec::where_spec::CallableParamPresence::Optional
+                            );
+                            Ok(concat([
+                                name(label),
+                                literal(if optional { "?: " } else { ": " }),
+                                lower_at(type_name, Precedence::Function)?,
+                            ]))
+                        }
+                        crate::spec::where_spec::CallableParam::Repeated {
+                            name: label,
+                            element_type,
+                        } => {
+                            let label = label.clone().unwrap_or_else(|| generated.clone());
+                            Ok(concat([
+                                literal("..."),
+                                name(label),
+                                literal(": "),
+                                lower_at(element_type, Precedence::Postfix)?,
+                                literal("[]"),
+                            ]))
+                        }
+                        crate::spec::where_spec::CallableParam::Expansion {
+                            name: label,
+                            pattern,
+                        } => {
+                            let label = label.clone().unwrap_or_else(|| generated.clone());
+                            Ok(concat([
+                                literal("..."),
+                                name(label),
+                                literal(": "),
+                                lower_at(pattern, Precedence::Function)?,
+                            ]))
+                        }
+                    }
+                })
+                .collect::<Result<Vec<_>, SigilStitchError>>()?;
             concat([
                 delimited_soft("(", params, ",", ")"),
                 literal(" => "),

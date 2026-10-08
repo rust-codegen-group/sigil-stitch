@@ -13,8 +13,33 @@ use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::modifiers::Visibility;
 use crate::spec::parameter_spec::ParameterSpec;
-use crate::spec::where_spec::TypeParamSpec;
+use crate::spec::where_spec::GenericParamView;
 use crate::type_name::TypeName;
+
+pub(crate) fn validate_generic_parameters(
+    lang: &Kotlin,
+    function: crate::lang::FunctionIntent<'_>,
+) -> Result<(), SigilStitchError> {
+    for parameter in function.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        if !matches!(
+            parameter.domain().as_ref(),
+            crate::spec::where_spec::GenericParamDomain::Single {
+                kind: None | Some(crate::spec::where_spec::KindExpr::Type)
+            }
+        ) {
+            return Err(SigilStitchError::UnsupportedTypeName {
+                language: lang.file_extension().into(),
+                context: format!("generic_param.{}", parameter.name()),
+                reason: "this binding domain has no representation in this function declaration"
+                    .into(),
+            });
+        }
+    }
+    Ok(())
+}
 
 pub(crate) fn lower(
     lang: &Kotlin,
@@ -71,7 +96,10 @@ pub(crate) fn lower(
     block.build()
 }
 
-fn append_type_parameters(signature: &mut SignatureBuilder, type_params: &[TypeParamSpec]) -> bool {
+fn append_type_parameters(
+    signature: &mut SignatureBuilder,
+    type_params: &[GenericParamView<'_>],
+) -> bool {
     if type_params.is_empty() {
         return false;
     }
@@ -141,9 +169,9 @@ fn append_suffixes(signature: &mut SignatureBuilder, function: ValidatedFunction
     }
 }
 
-fn split_kotlin_bounds(
-    type_params: &[TypeParamSpec],
-) -> (Vec<TypeParamSpec>, Vec<(String, TypeName)>) {
+fn split_kotlin_bounds<'a>(
+    type_params: &[GenericParamView<'a>],
+) -> (Vec<GenericParamView<'a>>, Vec<(String, TypeName)>) {
     let mut declaration_type_params = type_params.to_vec();
     let mut where_bounds = Vec::new();
 
@@ -155,7 +183,8 @@ fn split_kotlin_bounds(
         }
         where_bounds.extend(
             bounds
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(|bound| (type_param.name().to_string(), bound)),
         );
     }

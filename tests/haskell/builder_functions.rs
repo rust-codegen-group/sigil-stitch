@@ -51,6 +51,10 @@ fn test_function_with_import() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_split_signature_preserves_compound_param_and_return_types() {
     let text = TypeName::importable("Data.Text", "Text");
     let user = TypeName::importable("Domain.User", "User");
@@ -162,6 +166,10 @@ fn test_split_signature_qualifies_conflicting_import_names() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_split_signature_preserves_imported_context_bounds() {
     let fun = FunSpec::builder("forceDisplay")
         .add_type_param(
@@ -199,6 +207,10 @@ fn test_split_signature_preserves_imported_context_bounds() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_function_with_context() {
     let body = CodeBlock::of("show x", ()).unwrap();
     let fun = FunSpec::builder("display")
@@ -265,6 +277,10 @@ fn test_function_with_doc() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_multi_constraint_context() {
     let body = CodeBlock::of("show x", ()).unwrap();
     let fun = FunSpec::builder("display")

@@ -100,13 +100,7 @@ Qualified types work anywhere a `TypeName` is accepted, including inside generic
 # use sigil_stitch::prelude::*;
 # fn main() {
 // Rust: std::collections::HashMap<String, serde_json::Value>
-let map = TypeName::generic(
-    TypeName::qualified("std::collections", "HashMap"),
-    vec![
-        TypeName::primitive("String"),
-        TypeName::qualified("serde_json", "Value"),
-    ],
-);
+let map = TypeName::application(TypeName::qualified("std::collections", "HashMap"), vec![TypeArgument::Single(TypeName::primitive("String")), TypeArgument::Single(TypeName::qualified("serde_json", "Value"))]);
 # }
 ```
 
@@ -187,6 +181,26 @@ let s = TypeName::slice(TypeName::primitive("User"));
 
 ## Generics
 
+For structured applications, use `TypeName::application`. A declaration's
+bindings are separate `GenericParamSpec` values; a use refers to one by
+`TypeName::parameter`. Expansions preserve a complete pattern, not just a
+special final argument:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+let tuple = TypeName::application(
+    TypeName::primitive("std::tuple"),
+    vec![TypeArgument::Expansion { pattern: TypeName::parameter("Ts") }],
+);
+// C++: std::tuple<Ts...>
+```
+
+An empty application argument sequence is valid shared data. A language may
+express it, as C++ does with `Bundle<>`, or reject it. The library performs no
+arity inference or pack evaluation. The older `Generic` representation remains
+a compatibility input with its existing fields.
+
 Wrap a base type with type parameters:
 
 ```rust
@@ -194,22 +208,10 @@ Wrap a base type with type parameters:
 # use sigil_stitch::prelude::*;
 # fn main() {
 // TypeScript: Promise<User>
-let promise = TypeName::generic(
-    TypeName::primitive("Promise"),
-    vec![TypeName::importable("./models", "User")],
-);
+let promise = TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(TypeName::importable("./models", "User"))]);
 
 // Rust: HashMap<String, Vec<User>>
-let map = TypeName::generic(
-    TypeName::primitive("HashMap"),
-    vec![
-        TypeName::primitive("String"),
-        TypeName::generic(
-            TypeName::primitive("Vec"),
-            vec![TypeName::primitive("User")],
-        ),
-    ],
-);
+let map = TypeName::application(TypeName::primitive("HashMap"), vec![TypeArgument::Single(TypeName::primitive("String")), TypeArgument::Single(TypeName::application(TypeName::primitive("Vec"), vec![TypeArgument::Single(TypeName::primitive("User"))]))]);
 # }
 ```
 
@@ -284,6 +286,29 @@ Reference rendering is language-aware:
 
 ## Function types
 
+`TypeName::callable` carries an ordered sequence whose scalar slots can be
+required or optional. Repetition supplies an element type; expansion supplies
+a complete pattern. Labels and ordering rules belong to the target adapter:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+let callback = TypeName::callable(
+    vec![CallableParam::Single {
+        name: Some("value".into()),
+        type_name: TypeName::primitive("string"),
+        presence: CallableParamPresence::Optional,
+    }],
+    TypeName::primitive("void"),
+);
+// TypeScript: (value?: string) => void
+```
+
+Optional presence differs from `TypeName::Optional`, which describes the
+value in a supplied slot. A target must preserve all supplied labels and
+segment intent or reject the complete expression; it cannot silently drop
+them. The older `Function` representation remains a compatibility input.
+
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
@@ -293,10 +318,7 @@ Reference rendering is language-aware:
 // Python:     Callable[[str, int], bool]
 // C++:        std::function<bool(string, int)>
 // Dart:       bool Function(String, int)
-let f = TypeName::function(
-    vec![TypeName::primitive("string"), TypeName::primitive("number")],
-    TypeName::primitive("boolean"),
-);
+let f = TypeName::callable(vec![CallableParam::Single { name: None, type_name: TypeName::primitive("string"), presence: CallableParamPresence::Required }, CallableParam::Single { name: None, type_name: TypeName::primitive("number"), presence: CallableParamPresence::Required }], TypeName::primitive("boolean"));
 # }
 ```
 

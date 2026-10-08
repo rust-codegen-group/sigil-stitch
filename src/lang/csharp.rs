@@ -431,7 +431,7 @@ impl CodeLang for CSharp {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         if let Some(parameter) = type_params.iter().find(|parameter| {
@@ -471,10 +471,11 @@ impl CodeLang for CSharp {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::csharp_function_lowering::validate_generic_parameters(self, function)?;
         for parameter in function.type_params() {
             if let Err(reason) =
                 crate::lang::csharp_constraints::validate_function_constraint_context(
-                    parameter,
+                    &parameter,
                     function.where_constraints(),
                     function.modifiers().is_override,
                 )
@@ -728,16 +729,14 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let cs = CSharp::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "System.Collections.Generic".into(),
-                name: "List".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "System.Collections.Generic".into(),
+            name: "List".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(
             cs.render_imports(&imports),
             "using System.Collections.Generic;"
@@ -747,34 +746,32 @@ mod tests {
     #[test]
     fn test_render_imports_grouped() {
         let cs = CSharp::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "MyApp.Models".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "System.Collections.Generic".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "Microsoft.Extensions.Logging".into(),
-                    name: "ILogger".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "MyApp.Models".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "System.Collections.Generic".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "Microsoft.Extensions.Logging".into(),
+                name: "ILogger".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = cs.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "using System.Collections.Generic;");
@@ -787,34 +784,32 @@ mod tests {
     #[test]
     fn test_render_imports_sorted_within_group() {
         let cs = CSharp::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "System.Threading.Tasks".into(),
-                    name: "Task".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "System.Collections.Generic".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "System.Linq".into(),
-                    name: "Enumerable".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "System.Threading.Tasks".into(),
+                name: "Task".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "System.Collections.Generic".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "System.Linq".into(),
+                name: "Enumerable".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = cs.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "using System.Collections.Generic;");
@@ -825,26 +820,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let cs = CSharp::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "System.Linq".into(),
-                    name: "Enumerable".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "System.Linq".into(),
-                    name: "Queryable".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "System.Linq".into(),
+                name: "Enumerable".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "System.Linq".into(),
+                name: "Queryable".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(cs.render_imports(&imports), "using System.Linq;");
     }
 

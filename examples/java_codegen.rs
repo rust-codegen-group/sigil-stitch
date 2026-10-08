@@ -66,10 +66,13 @@ fn build_interface() -> TypeSpec {
 
     TypeSpec::builder("Repository", TypeKind::Interface)
         .visibility(Visibility::Public)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::generic(optional, vec![TypeName::primitive("T")]))
+                .returns(TypeName::application(
+                    optional,
+                    vec![TypeArgument::Single(TypeName::primitive("T"))],
+                ))
                 .add_param(ParameterSpec::new("id", TypeName::primitive("long")).unwrap())
                 .build()
                 .unwrap(),
@@ -83,7 +86,10 @@ fn build_interface() -> TypeSpec {
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(TypeName::generic(list, vec![TypeName::primitive("T")]))
+                .returns(TypeName::application(
+                    list,
+                    vec![TypeArgument::Single(TypeName::primitive("T"))],
+                ))
                 .build()
                 .unwrap(),
         )
@@ -93,9 +99,11 @@ fn build_interface() -> TypeSpec {
                 .add_param(
                     ParameterSpec::new(
                         "items",
-                        TypeName::generic(
+                        TypeName::application(
                             TypeName::importable("java.util", "Collection"),
-                            vec![TypeName::wildcard_extends(TypeName::primitive("T"))],
+                            vec![TypeArgument::Single(TypeName::wildcard_extends(
+                                TypeName::primitive("T"),
+                            ))],
                         ),
                     )
                     .unwrap(),
@@ -244,20 +252,25 @@ fn builder_approach() -> String {
     let sort_fn = FunSpec::builder("sortList")
         .visibility(Visibility::Public)
         .is_static()
-        .add_type_param(TypeParamSpec::new("T").with_bound(comparable))
+        .add_generic_param(
+            GenericParamSpec::single("T")
+                .unwrap()
+                .with_bound(comparable)
+                .unwrap(),
+        )
         .add_param(
             ParameterSpec::new(
                 "list",
-                TypeName::generic(
+                TypeName::application(
                     TypeName::importable("java.util", "List"),
-                    vec![TypeName::primitive("T")],
+                    vec![TypeArgument::Single(TypeName::primitive("T"))],
                 ),
             )
             .unwrap(),
         )
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::importable("java.util", "List"),
-            vec![TypeName::primitive("T")],
+            vec![TypeArgument::Single(TypeName::primitive("T"))],
         ))
         .body(sort_body.build().unwrap())
         .build()
@@ -412,20 +425,25 @@ fn macro_approach() -> String {
     let sort_fn = FunSpec::builder("sortList")
         .visibility(Visibility::Public)
         .is_static()
-        .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("Comparable")))
+        .add_generic_param(
+            GenericParamSpec::single("T")
+                .unwrap()
+                .with_bound(TypeName::primitive("Comparable"))
+                .unwrap(),
+        )
         .add_param(
             ParameterSpec::new(
                 "list",
-                TypeName::generic(
+                TypeName::application(
                     TypeName::importable("java.util", "List"),
-                    vec![TypeName::primitive("T")],
+                    vec![TypeArgument::Single(TypeName::primitive("T"))],
                 ),
             )
             .unwrap(),
         )
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::importable("java.util", "List"),
-            vec![TypeName::primitive("T")],
+            vec![TypeArgument::Single(TypeName::primitive("T"))],
         ))
         .body(sort_body)
         .build()

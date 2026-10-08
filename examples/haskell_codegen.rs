@@ -68,9 +68,12 @@ fn builder_approach() -> String {
 
     // --- Type alias ---
     let user_map = TypeSpec::builder("UserMap", TypeKind::TypeAlias)
-        .extends(TypeName::generic(
+        .extends(TypeName::application(
             map,
-            vec![TypeName::primitive("UserId"), TypeName::primitive("Person")],
+            vec![
+                TypeArgument::Single(TypeName::primitive("UserId")),
+                TypeArgument::Single(TypeName::primitive("Person")),
+            ],
         ))
         .build()
         .unwrap();
@@ -98,7 +101,12 @@ fn builder_approach() -> String {
     show_body.add("putStrLn (show x)", ());
 
     let print_fn = FunSpec::builder("printItem")
-        .add_type_param(TypeParamSpec::new("a").with_bound(TypeName::primitive("Show")))
+        .add_generic_param(
+            GenericParamSpec::single("a")
+                .unwrap()
+                .with_bound(TypeName::primitive("Show"))
+                .unwrap(),
+        )
         .add_param(ParameterSpec::new("x", TypeName::primitive("a")).unwrap())
         .returns(TypeName::primitive("IO ()"))
         .body(show_body.build().unwrap())
@@ -126,9 +134,12 @@ fn macro_approach() -> String {
     let v_interp = "World";
 
     let user_map = TypeSpec::builder("UserMap", TypeKind::TypeAlias)
-        .extends(TypeName::generic(
+        .extends(TypeName::application(
             map,
-            vec![TypeName::primitive("UserId"), TypeName::primitive("Person")],
+            vec![
+                TypeArgument::Single(TypeName::primitive("UserId")),
+                TypeArgument::Single(TypeName::primitive("Person")),
+            ],
         ))
         .build()
         .unwrap();
@@ -152,7 +163,12 @@ fn macro_approach() -> String {
     .unwrap();
 
     let print_fn = FunSpec::builder("printItem")
-        .add_type_param(TypeParamSpec::new("a").with_bound(TypeName::primitive("Show")))
+        .add_generic_param(
+            GenericParamSpec::single("a")
+                .unwrap()
+                .with_bound(TypeName::primitive("Show"))
+                .unwrap(),
+        )
         .add_param(ParameterSpec::new("x", TypeName::primitive("a")).unwrap())
         .returns(TypeName::primitive("IO ()"))
         .body(print_body)

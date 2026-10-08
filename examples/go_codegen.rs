@@ -144,7 +144,12 @@ fn builder_approach() -> String {
     sort_body.add_statement("return items", ());
 
     let sort_fn = FunSpec::builder("SortSlice")
-        .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("~int | ~string")))
+        .add_generic_param(
+            GenericParamSpec::single("T")
+                .unwrap()
+                .with_bound(TypeName::primitive("~int | ~string"))
+                .unwrap(),
+        )
         .add_param(ParameterSpec::new("items", TypeName::slice(TypeName::primitive("T"))).unwrap())
         .returns(TypeName::slice(TypeName::primitive("T")))
         .body(sort_body.build().unwrap())
@@ -253,7 +258,12 @@ fn macro_approach() -> String {
     .unwrap();
 
     let sort_fn = FunSpec::builder("SortSlice")
-        .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("~int | ~string")))
+        .add_generic_param(
+            GenericParamSpec::single("T")
+                .unwrap()
+                .with_bound(TypeName::primitive("~int | ~string"))
+                .unwrap(),
+        )
         .add_param(ParameterSpec::new("items", TypeName::slice(TypeName::primitive("T"))).unwrap())
         .returns(TypeName::slice(TypeName::primitive("T")))
         .body(sort_body)

@@ -750,16 +750,14 @@ mod tests {
     #[test]
     fn test_render_imports_basic() {
         let js = JavaScript::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "./utils".into(),
-                name: "formatDate".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "./utils".into(),
+            name: "formatDate".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(
             js.render_imports(&imports),
             "import { formatDate } from './utils';"
@@ -769,26 +767,24 @@ mod tests {
     #[test]
     fn test_render_imports_no_import_type() {
         let js = JavaScript::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "./models".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: true, // Should be ignored in JS.
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "./models".into(),
-                    name: "createUser".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "./models".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: true, // Should be ignored in JS.
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "./models".into(),
+                name: "createUser".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = js.render_imports(&imports);
         // Both should be in a single import statement, no `import type`.
         assert_eq!(output, "import { User, createUser } from './models';");
@@ -798,16 +794,14 @@ mod tests {
     #[test]
     fn test_render_imports_with_alias() {
         let js = JavaScript::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "./other".into(),
-                name: "User".into(),
-                alias: Some("OtherUser".into()),
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "./other".into(),
+            name: "User".into(),
+            alias: Some("OtherUser".into()),
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(
             js.render_imports(&imports),
             "import { User as OtherUser } from './other';"
@@ -817,16 +811,14 @@ mod tests {
     #[test]
     fn import_paths_use_language_owned_string_escaping() {
         let js = JavaScript::new().with_double_quotes();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "./path\\segment\t\u{2028}".into(),
-                name: "value".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "./path\\segment\t\u{2028}".into(),
+            name: "value".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(
             js.render_imports(&imports),
             "import { value } from \"./path\\\\segment\\t\\u2028\";"
@@ -836,26 +828,24 @@ mod tests {
     #[test]
     fn test_render_imports_multiple_modules() {
         let js = JavaScript::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "./models".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "./utils".into(),
-                    name: "format".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "./models".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "./utils".into(),
+                name: "format".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = js.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines.len(), 2);
@@ -869,16 +859,14 @@ mod tests {
             semicolons: false,
             ..Default::default()
         };
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "./utils".into(),
-                name: "format".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "./utils".into(),
+            name: "format".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(
             js.render_imports(&imports),
             "import { format } from './utils'"

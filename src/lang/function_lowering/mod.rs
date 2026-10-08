@@ -7,13 +7,11 @@
 
 mod compatibility;
 
-use std::borrow::Cow;
-
 use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::parameter_spec::ParameterSpec;
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+use crate::spec::where_spec::{GenericParamView, WhereConstraint};
 use crate::type_name::TypeName;
 
 pub(crate) use compatibility::lower as lower_compatibility;
@@ -91,7 +89,7 @@ pub(crate) fn curried_parameter_list(
 pub(crate) fn validate_constraints_target_declared_type_params(
     language: &str,
     function_name: &str,
-    type_params: &[TypeParamSpec],
+    type_params: &[GenericParamView<'_>],
     constraints: &[WhereConstraint],
 ) -> Result<(), SigilStitchError> {
     for constraint in constraints {
@@ -120,9 +118,9 @@ pub(crate) fn validate_constraints_target_declared_type_params(
 pub(crate) fn type_params_with_inline_constraints<'a>(
     function: ValidatedFunction<'a>,
     language: &str,
-) -> Result<Cow<'a, [TypeParamSpec]>, SigilStitchError> {
+) -> Result<Vec<GenericParamView<'a>>, SigilStitchError> {
     if function.where_constraints().is_empty() {
-        return Ok(Cow::Borrowed(function.type_params()));
+        return Ok(function.type_params());
     }
 
     let mut type_params = function.type_params().to_vec();
@@ -143,10 +141,10 @@ pub(crate) fn type_params_with_inline_constraints<'a>(
         };
         for bound in constraint.bounds() {
             if !type_param.bounds.contains(bound) {
-                type_param.bounds.push(bound.clone());
+                type_param.bounds.to_mut().push(bound.clone());
             }
         }
     }
 
-    Ok(Cow::Owned(type_params))
+    Ok(type_params)
 }

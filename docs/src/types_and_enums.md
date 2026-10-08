@@ -236,11 +236,8 @@ Type aliases support type parameters:
 // Rust: pub type Result<T> = std::result::Result<T, MyError>;
 let type_spec = TypeSpec::builder("Result", TypeKind::TypeAlias)
     .visibility(Visibility::Public)
-    .add_type_param(TypeParamSpec::new("T"))
-    .extends(TypeName::generic(
-        TypeName::primitive("std::result::Result"),
-        vec![TypeName::primitive("T"), TypeName::primitive("MyError")],
-    ))
+    .add_generic_param(GenericParamSpec::single("T").unwrap())
+    .extends(TypeName::application(TypeName::primitive("std::result::Result"), vec![TypeArgument::Single(TypeName::primitive("T")), TypeArgument::Single(TypeName::primitive("MyError"))]))
     .build()
     .unwrap();
 # }

@@ -16,6 +16,10 @@ use crate::lang::config::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
 use crate::spec::where_spec::{TypeParamSpec, render_type_params_for};
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::type_name::{FunctionPresentation, TypeName, TypePresentation, WildcardPresentation};
@@ -581,7 +585,7 @@ impl CodeLang for Go {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         if let Some(parameter) = type_params.iter().find(|parameter| {
@@ -632,6 +636,7 @@ impl CodeLang for Go {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::go_function_lowering::validate_generic_parameters(self, function)?;
         let exported = function
             .name()
             .chars()
@@ -784,6 +789,10 @@ impl CodeLang for Go {
         format!("type {name} {inner}")
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_newtype_decl(
         &self,
         _visibility: &str,
@@ -857,50 +866,46 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let go = Go::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "fmt".into(),
-                name: "Println".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "fmt".into(),
+            name: "Println".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(go.render_imports(&imports), "import \"fmt\"");
     }
 
     #[test]
     fn test_render_imports_multiple_grouped() {
         let go = Go::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "fmt".into(),
-                    name: "Println".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "net/http".into(),
-                    name: "Server".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "github.com/gin-gonic/gin".into(),
-                    name: "Context".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "fmt".into(),
+                name: "Println".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "net/http".into(),
+                name: "Server".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "github.com/gin-gonic/gin".into(),
+                name: "Context".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = go.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import (");
@@ -915,26 +920,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup_same_package() {
         let go = Go::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "net/http".into(),
-                    name: "Server".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "net/http".into(),
-                    name: "Handler".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "net/http".into(),
+                name: "Server".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "net/http".into(),
+                name: "Handler".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = go.render_imports(&imports);
         // Should emit only one import for the package.
         assert_eq!(output, "import \"net/http\"");

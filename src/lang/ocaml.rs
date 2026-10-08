@@ -641,26 +641,24 @@ mod tests {
     #[test]
     fn test_render_imports() {
         let ml = OCaml::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "List".into(),
-                    name: "t".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "Hashtbl".into(),
-                    name: "t".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "List".into(),
+                name: "t".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "Hashtbl".into(),
+                name: "t".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = ml.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "open Hashtbl");
@@ -670,26 +668,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let ml = OCaml::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "List".into(),
-                    name: "t".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "List".into(),
-                    name: "map".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "List".into(),
+                name: "t".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "List".into(),
+                name: "map".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(ml.render_imports(&imports), "open List");
     }
 

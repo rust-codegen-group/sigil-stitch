@@ -13,6 +13,10 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::{TypeParamKind, TypeParamSpec};
 use sigil_stitch::type_name::TypeName;
 use std::fmt::Write;
@@ -57,7 +61,8 @@ const TYPE_CLASS_LANGUAGES: [&str; 17] = [
     "typescript",
 ];
 
-const FUNCTION_GENERIC_LANGUAGES: [&str; 10] = [
+const FUNCTION_GENERIC_LANGUAGES: [&str; 11] = [
+    "cpp",
     "csharp",
     "dart",
     "go",
@@ -97,6 +102,10 @@ fn type_name(language: &str) -> &'static str {
     if language == "ocaml" { "box" } else { "Box" }
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn generic_type(language: &str, parameter_count: usize, bound: bool) -> TypeSpec {
     let field_type = if parameter_count == 0 {
         TypeName::primitive("Value")
@@ -117,6 +126,10 @@ fn generic_type(language: &str, parameter_count: usize, bound: bool) -> TypeSpec
     builder.build().unwrap()
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn type_with_where_constraint(language: &str) -> TypeSpec {
     let name = parameter_name(language, 0);
     TypeSpec::builder(type_name(language), TypeKind::Class)
@@ -134,6 +147,10 @@ fn type_with_where_constraint(language: &str) -> TypeSpec {
         .unwrap()
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn type_with_type_parameter(language: &str, parameter: TypeParamSpec) -> TypeSpec {
     let field_type = if parameter.is_lifetime() {
         TypeName::primitive("Value")
@@ -162,6 +179,10 @@ fn imported_constraint_bounds(language: &str) -> (TypeName, TypeName) {
     )
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn type_with_imported_constraints(language: &str) -> TypeSpec {
     let first_name = parameter_name(language, 0);
     let second_name = parameter_name(language, 1);
@@ -180,6 +201,10 @@ fn type_with_imported_constraints(language: &str) -> TypeSpec {
         .unwrap()
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn function_with_imported_constraints(language: &str) -> FunSpec {
     let first_name = parameter_name(language, 0);
     let second_name = parameter_name(language, 1);
@@ -213,6 +238,10 @@ fn function_context(language: &str) -> DeclarationContext {
     }
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn generic_function(language: &str, parameter_count: usize, bound: bool) -> FunSpec {
     let mut builder = FunSpec::builder("work").body(CodeBlock::of("body", ()).unwrap());
     if parameter_count == 0 {
@@ -241,6 +270,10 @@ fn generic_function(language: &str, parameter_count: usize, bound: bool) -> FunS
         .unwrap()
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn function_with_type_parameter(parameter: TypeParamSpec) -> FunSpec {
     FunSpec::builder("work")
         .add_type_param(parameter)
@@ -251,6 +284,10 @@ fn function_with_type_parameter(parameter: TypeParamSpec) -> FunSpec {
         .unwrap()
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn function_with_where_constraint(language: &str) -> FunSpec {
     let name = parameter_name(language, 0);
     FunSpec::builder("work")
@@ -328,6 +365,8 @@ fn type_fragment(language: &str, count: usize) -> &'static str {
 
 fn function_fragment(language: &str, count: usize) -> &'static str {
     match (language, count) {
+        ("cpp", 1) => "template<class T>\nT work",
+        ("cpp", 2) => "template<class T, class U>\nT work",
         ("csharp", 1) => "T work<T>",
         ("csharp", 2) => "T work<T, U>",
         ("dart", 1) => "T work<T>",
@@ -474,6 +513,10 @@ fn append_matrix_result(
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn declaration_generic_matrix_matches_exact_wide_and_narrow_results() {
     let mut report = String::new();
     for language in languages_registry::BUILT_IN_LANGUAGES {
@@ -651,6 +694,10 @@ fn assert_invalid_function_type_parameter(
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn function_type_parameter_semantics_are_lowered_or_rejected() {
     for language in FUNCTION_GENERIC_LANGUAGES {
         let parameter = parameter_name(language, 0);
@@ -659,6 +706,9 @@ fn function_type_parameter_semantics_are_lowered_or_rejected() {
         );
         let context_result = render_function(language, &context_bound, 100);
         match language {
+            "cpp" => assert!(
+                matches!(context_result, Err(SigilStitchError::UnsupportedFunctionCapabilities { capabilities, .. }) if capabilities == vec![sigil_stitch::lang::capability::FunctionCapability::BoundedPolymorphism])
+            ),
             "csharp" => assert_eq!(
                 context_result.unwrap(),
                 "Value work<T>(Value @value)\n    where T : Context\n{\n    body\n}\n"
@@ -833,6 +883,10 @@ fn function_type_parameter_semantics_are_lowered_or_rejected() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn haskell_function_type_parameters_must_occur_in_the_signature() {
     let unused = function_with_type_parameter(TypeParamSpec::new("a"));
     assert_invalid_function_type_parameter("haskell", render_function("haskell", &unused, 100));
@@ -854,6 +908,10 @@ fn haskell_function_type_parameters_must_occur_in_the_signature() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn java_declaration_constraints_deduplicate_exact_direct_bounds() {
     let parameter = || {
         TypeParamSpec::new("T")
@@ -888,6 +946,10 @@ fn java_declaration_constraints_deduplicate_exact_direct_bounds() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn java_declaration_constraints_reject_duplicate_bound_erasures() {
     let container = |element| {
         TypeName::generic(
@@ -928,6 +990,10 @@ fn java_declaration_constraints_reject_duplicate_bound_erasures() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_type_constraints_deduplicate_exact_bounds() {
     let type_ = TypeSpec::builder("Box", TypeKind::Class)
         .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("Bound")))
@@ -947,6 +1013,10 @@ fn csharp_type_constraints_deduplicate_exact_bounds() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_type_constraints_deduplicate_semantic_imports() {
     let bound = TypeName::importable("constraints", "Bound");
     let type_ = TypeSpec::builder("Box", TypeKind::Class)
@@ -970,6 +1040,10 @@ fn csharp_type_constraints_deduplicate_semantic_imports() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_function_constraints_deduplicate_semantic_imports() {
     let bound = TypeName::importable("constraints", "Bound");
     let method = FunSpec::builder("Work")
@@ -1001,6 +1075,10 @@ fn csharp_function_constraints_deduplicate_semantic_imports() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_constraint_deduplication_preserves_qualified_references() {
     let type_ = TypeSpec::builder("Box", TypeKind::Class)
         .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::generic(
@@ -1031,6 +1109,10 @@ fn csharp_constraint_deduplication_preserves_qualified_references() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_constraints_deduplicate_equivalent_terminal_spellings() {
     let type_ = TypeSpec::builder("Box", TypeKind::Class)
         .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::raw("IDisposable")))
@@ -1048,6 +1130,10 @@ fn csharp_constraints_deduplicate_equivalent_terminal_spellings() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_constraint_sources_share_target_order() {
     let parameter = || {
         TypeParamSpec::new("T")
@@ -1078,6 +1164,10 @@ fn csharp_constraint_sources_share_target_order() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_conflicting_special_constraints_fail_closed() {
     let conflicting_bounds = [
         vec![TypeName::primitive("class"), TypeName::primitive("struct")],
@@ -1126,6 +1216,10 @@ fn csharp_conflicting_special_constraints_fail_closed() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_default_constraint_requires_an_override_and_stands_alone() {
     let type_ = TypeSpec::builder("Box", TypeKind::Class)
         .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("default")))
@@ -1175,6 +1269,10 @@ fn csharp_default_constraint_requires_an_override_and_stands_alone() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_override_constraints_follow_target_rules() {
     for bound in [
         TypeName::primitive("class?"),
@@ -1215,6 +1313,10 @@ fn csharp_override_constraints_follow_target_rules() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_constraints_reject_invalid_type_shapes() {
     for bound in [
         TypeName::primitive("int"),
@@ -1246,6 +1348,10 @@ fn csharp_constraints_reject_invalid_type_shapes() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_nullable_and_non_nullable_constraints_cannot_repeat() {
     for nullable in [
         TypeName::optional(TypeName::primitive("IDisposable")),
@@ -1279,6 +1385,10 @@ fn csharp_nullable_and_non_nullable_constraints_cannot_repeat() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn rust_lifetime_constraints_reject_compound_subjects() {
     let compound_lifetime =
         || TypeName::generic(TypeName::primitive("'a"), vec![TypeName::primitive("T")]);
@@ -1306,6 +1416,10 @@ fn rust_lifetime_constraints_reject_compound_subjects() {
     ));
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn structured_constraint_subjects(parameter: &str) -> [TypeName; 3] {
     [
         TypeName::generic(
@@ -1318,6 +1432,10 @@ fn structured_constraint_subjects(parameter: &str) -> [TypeName; 3] {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn inline_type_constraints_require_primitive_declared_parameter_subjects() {
     for language in BOUNDED_TYPE_LANGUAGES
         .into_iter()
@@ -1345,10 +1463,14 @@ fn inline_type_constraints_require_primitive_declared_parameter_subjects() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn inline_function_constraints_require_primitive_declared_parameter_subjects() {
     for language in FUNCTION_GENERIC_LANGUAGES
         .into_iter()
-        .filter(|language| *language != "rust")
+        .filter(|language| !matches!(*language, "rust" | "cpp"))
     {
         let parameter = parameter_name(language, 0);
         for subject in structured_constraint_subjects(parameter) {
@@ -1373,6 +1495,10 @@ fn inline_function_constraints_require_primitive_declared_parameter_subjects() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn duplicate_function_type_parameters_are_intrinsically_invalid() {
     let function = FunSpec::builder("work")
         .add_type_param(TypeParamSpec::new("T"))
@@ -1399,6 +1525,10 @@ fn duplicate_function_type_parameters_are_intrinsically_invalid() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn strict_function_constraints_reject_empty_subjects_and_bounds() {
     for function in [
         FunSpec::builder("work")
@@ -1490,6 +1620,10 @@ fn bounded_function_parameters_use_language_owned_grammar() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn lifetimes_kinds_context_bounds_and_where_constraints_remain_target_local() {
     let rust = TypeSpec::builder("Borrowed", TypeKind::Class)
         .add_type_param(TypeParamSpec::new("T"))
@@ -1585,6 +1719,10 @@ fn lifetimes_kinds_context_bounds_and_where_constraints_remain_target_local() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn imported_bound_aliases_survive_type_and_function_lowering() {
     let first = TypeName::importable("./alpha", "Constraint");
     let second = TypeName::importable("./beta", "Constraint").with_alias("SecondConstraint");

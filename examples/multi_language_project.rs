@@ -117,9 +117,9 @@ fn build_typescript_client(schema: &[SchemaField]) -> FileSpec {
             FunSpec::builder("getUser")
                 .is_async()
                 .add_param(ParameterSpec::new("id", TypeName::primitive("number")).unwrap())
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("Promise"),
-                    vec![TypeName::primitive("User")],
+                    vec![TypeArgument::Single(TypeName::primitive("User"))],
                 ))
                 .body(get_body)
                 .build()
@@ -131,9 +131,9 @@ fn build_typescript_client(schema: &[SchemaField]) -> FileSpec {
                 .add_param(
                     ParameterSpec::new("data", TypeName::primitive("Omit<User, 'id'>")).unwrap(),
                 )
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("Promise"),
-                    vec![TypeName::primitive("User")],
+                    vec![TypeArgument::Single(TypeName::primitive("User"))],
                 ))
                 .body(create_body)
                 .build()

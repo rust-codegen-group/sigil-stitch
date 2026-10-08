@@ -36,11 +36,41 @@ impl ImportEntry {
 #[derive(Debug, Clone, Default)]
 pub struct ImportGroup {
     pub(crate) entries: Vec<ImportEntry>,
+    request_summaries: HashMap<(String, String), ImportRequestSummary>,
+}
+
+/// Retained request forms for one original semantic import identity.
+///
+/// Ordinary requests do not establish that the symbol is value-exclusive.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ImportRequestSummary {
+    type_only: bool,
+    ordinary: bool,
+}
+
+impl ImportRequestSummary {
+    /// Whether at least one request explicitly selected type-only import syntax.
+    pub fn has_type_only_request(self) -> bool {
+        self.type_only
+    }
+
+    /// Whether at least one request did not select type-only import syntax.
+    pub fn has_ordinary_request(self) -> bool {
+        self.ordinary
+    }
+
+    fn record(&mut self, is_type_only: bool) {
+        self.type_only |= is_type_only;
+        self.ordinary |= !is_type_only;
+    }
 }
 
 impl From<Vec<ImportEntry>> for ImportGroup {
     fn from(entries: Vec<ImportEntry>) -> Self {
-        Self { entries }
+        Self {
+            entries,
+            ..Self::default()
+        }
     }
 }
 
@@ -272,6 +302,24 @@ impl ImportGroup {
         resolve_fallible(refs, explicit, resolver, false)
     }
 
+    pub(crate) fn try_resolve_with_default(
+        refs: &[ImportRef],
+        explicit: Vec<ImportEntry>,
+        resolver: &dyn ImportAliasConflictResolver,
+    ) -> Result<Self, SigilStitchError> {
+        resolve_fallible(refs, explicit, resolver, true)
+    }
+
+    /// Request evidence for the original `(module, name)` identity, not its alias.
+    ///
+    /// `None` means evidence was not retained, including on frozen compatibility
+    /// resolution and direct entry construction paths.
+    pub fn request_summary(&self, module: &str, name: &str) -> Option<ImportRequestSummary> {
+        self.request_summaries
+            .get(&(module.to_string(), name.to_string()))
+            .copied()
+    }
+
     /// Read-only access to the resolved import entries.
     pub fn entries(&self) -> &[ImportEntry] {
         &self.entries
@@ -292,7 +340,10 @@ impl ImportGroup {
             resolve_ref(import_ref, &mut claimed, &mut seen, &mut entries);
         }
 
-        Self { entries }
+        Self {
+            entries,
+            ..Self::default()
+        }
     }
 
     /// Resolve import references, merging with explicit (user-specified) entries.
@@ -333,7 +384,10 @@ impl ImportGroup {
             resolve_ref(import_ref, &mut claimed, &mut seen, &mut entries);
         }
 
-        Self { entries }
+        Self {
+            entries,
+            ..Self::default()
+        }
     }
 
     /// Look up the resolved name for a given (module, name) pair.
@@ -365,6 +419,7 @@ fn resolve_fallible(
     let mut passthrough_identities = HashSet::new();
     let mut pending_by_identity: HashMap<(String, String), usize> = HashMap::new();
     let mut order = 0;
+    let mut request_summaries: HashMap<(String, String), ImportRequestSummary> = HashMap::new();
 
     for entry in explicit {
         validate_module_path(&entry.module)?;
@@ -393,6 +448,10 @@ fn resolve_fallible(
         }
         validate_import_text(&entry.name, "explicit import name")?;
         let identity = (entry.module.clone(), entry.name.clone());
+        request_summaries
+            .entry(identity.clone())
+            .or_default()
+            .record(entry.is_type_only);
         let requested_name = entry.resolved_name().to_string();
         validate_import_text(&requested_name, "explicit local binding")?;
         if let Some(existing_index) = pending_by_identity.get(&identity).copied() {
@@ -425,6 +484,10 @@ fn resolve_fallible(
         validate_module_path(&import_ref.module)?;
         validate_import_text(&import_ref.name, "imported name")?;
         let identity = (import_ref.module.clone(), import_ref.name.clone());
+        request_summaries
+            .entry(identity.clone())
+            .or_default()
+            .record(import_ref.is_type_only);
         if let Some(existing_index) = pending_by_identity.get(&identity).copied() {
             pending[existing_index].entry.is_type_only &= import_ref.is_type_only;
             continue;
@@ -608,6 +671,7 @@ fn resolve_fallible(
     ordered.sort_by_key(|(order, _)| *order);
     Ok(ImportGroup {
         entries: ordered.into_iter().map(|(_, entry)| entry).collect(),
+        request_summaries,
     })
 }
 
@@ -1298,5 +1362,56 @@ mod tests {
             Err(SigilStitchError::ImportAliasResolverRejected { reason })
                 if reason == "project mapping is incomplete"
         ));
+    }
+
+    #[test]
+    fn request_summary_retains_both_forms_independent_of_encounter_order() {
+        let mut ordinary = import_ref("GHC.TypeNats", "+", None);
+        ordinary.is_type_only = false;
+        let mut type_only = ordinary.clone();
+        type_only.is_type_only = true;
+        for refs in [
+            [ordinary.clone(), type_only.clone()],
+            [type_only.clone(), ordinary.clone()],
+        ] {
+            let group = ImportGroup::try_resolve(&refs, vec![]).unwrap();
+            let summary = group.request_summary("GHC.TypeNats", "+").unwrap();
+            assert!(summary.has_type_only_request());
+            assert!(summary.has_ordinary_request());
+            assert!(!group.entries()[0].is_type_only);
+        }
+        let mut entry = explicit("GHC.TypeNats", "+", None);
+        entry.is_type_only = true;
+        let group = ImportGroup::try_resolve(&[ordinary], vec![entry]).unwrap();
+        let summary = group.request_summary("GHC.TypeNats", "+").unwrap();
+        assert!(summary.has_type_only_request() && summary.has_ordinary_request());
+    }
+
+    #[test]
+    fn request_summary_uses_original_identity_and_does_not_reconstruct_legacy_evidence() {
+        let refs = conflicting_refs();
+        let group = ImportGroup::try_resolve(&refs, vec![]).unwrap();
+        for import in group.entries() {
+            assert!(
+                group
+                    .request_summary(&import.module, &import.name)
+                    .is_some()
+            );
+            if let Some(alias) = &import.alias {
+                assert!(group.request_summary(&import.module, alias).is_none());
+            }
+        }
+        let direct = ImportGroup::from(group.entries().to_vec());
+        assert!(
+            direct
+                .request_summary(&refs[0].module, &refs[0].name)
+                .is_none()
+        );
+        let legacy = ImportGroup::resolve(&refs);
+        assert!(
+            legacy
+                .request_summary(&refs[0].module, &refs[0].name)
+                .is_none()
+        );
     }
 }

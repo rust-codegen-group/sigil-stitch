@@ -176,36 +176,49 @@ class Box {
     T value;
 };
 ===== cpp function one width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+template<class T>
+T work(T first) {
+    body
+}
 ===== cpp type one width=12 =====
 template <typename T>
 class Box {
     T value;
 };
 ===== cpp function one width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+template<class T>
+T work(T first) {
+    body
+}
 ===== cpp type many width=100 =====
 template <typename T, typename U>
 class Box {
     T value;
 };
 ===== cpp function many width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+template<class T, class U>
+T work(T first, U second) {
+    body
+}
 ===== cpp type many width=12 =====
 template <typename T, typename U>
 class Box {
     T value;
 };
 ===== cpp function many width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+template<class T, class U>
+T work(T first,
+    U second) {
+    body
+}
 ===== cpp type bounded width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }
 ===== cpp function bounded width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [BoundedPolymorphism] }
 ===== cpp type bounded width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }
 ===== cpp function bounded width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [BoundedPolymorphism] }
 ===== cpp type explicit-constraint width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }
 ===== cpp type explicit-constraint width=12 =====
@@ -223,29 +236,29 @@ ERROR: UnsupportedTypeDeclarationCapabilities { language: "cpp", type_name: "Box
 ===== cpp type higher-kinded width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "cpp", type_name: "Box", capabilities: [HigherKindedPolymorphism] }
 ===== cpp function context-bound width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [BoundedPolymorphism] }
 ===== cpp function context-bound width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [BoundedPolymorphism] }
 ===== cpp function lifetime width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+ERROR: InvalidFunctionTypeParameter { language: "cpp", function_name: "work", parameter_name: "'a", reason: "C++ function templates require identifier-named type or type-pack binders without kind or bound annotations" }
 ===== cpp function lifetime width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism] }
+ERROR: InvalidFunctionTypeParameter { language: "cpp", function_name: "work", parameter_name: "'a", reason: "C++ function templates require identifier-named type or type-pack binders without kind or bound annotations" }
 ===== cpp function higher-kinded width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
 ===== cpp function higher-kinded width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [HigherKindedPolymorphism] }
 ===== cpp function explicit-constraint width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [BoundedPolymorphism] }
 ===== cpp function explicit-constraint width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
+ERROR: UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [BoundedPolymorphism] }
 ===== cpp type imported-constraints width=100 =====
 ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedTypeDeclarationCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }] }
 ===== cpp function imported-constraints width=100 =====
-ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [BoundedPolymorphism] }] }
 ===== cpp type imported-constraints width=12 =====
 ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedTypeDeclarationCapabilities { language: "cpp", type_name: "Box", capabilities: [BoundedPolymorphism] }] }
 ===== cpp function imported-constraints width=12 =====
-ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism] }] }
+ERROR: FileSpecValidation { filename: "bounds.cpp", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "cpp", function_name: "work", context: TopLevel, form: Function, capabilities: [BoundedPolymorphism] }] }
 ===== csharp type zero width=100 =====
 internal class Box {
     Value @value;

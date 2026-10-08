@@ -11,6 +11,10 @@ use crate::lang::capability::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
 use crate::spec::where_spec::{TypeParamKind, TypeParamSpec, render_type_params_for};
 use crate::type_name::TypeName;
 
@@ -127,10 +131,54 @@ fn is_valid_raw_type_parameter_kind(raw: &str) -> bool {
     depth == 0
 }
 
-pub(crate) fn invalid_raw_type_parameter(type_params: &[TypeParamSpec]) -> Option<&TypeParamSpec> {
+#[expect(
+    deprecated,
+    reason = "retain released compatibility metadata and hooks"
+)]
+pub(crate) fn invalid_raw_type_parameter<'view, 'data>(
+    type_params: &'view [crate::spec::where_spec::GenericParamView<'data>],
+) -> Option<&'view crate::spec::where_spec::GenericParamView<'data>> {
     type_params.iter().find(|parameter| {
         matches!(parameter.kind(), Some(TypeParamKind::Raw(raw)) if !is_valid_raw_type_parameter_kind(raw))
     })
+}
+
+pub(crate) fn generic_kind_suffix(
+    kind: &crate::spec::where_spec::KindExpr,
+) -> Result<String, SigilStitchError> {
+    use crate::spec::where_spec::KindExpr;
+    match kind {
+        KindExpr::Type => Ok(String::new()),
+        KindExpr::Constructor { parameters, result }
+            if !parameters.is_empty() && matches!(result.as_ref(), KindExpr::Type) =>
+        {
+            let parameters = parameters
+                .iter()
+                .map(|parameter| generic_kind_suffix(parameter).map(|suffix| format!("_{suffix}")))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(format!("[{}]", parameters.join(", ")))
+        }
+        _ => Err(SigilStitchError::UnsupportedTypeName {
+            language: "scala".into(),
+            context: "generic_param.kind".into(),
+            reason: "Scala constructor kinds require nonempty parameters and a Type result".into(),
+        }),
+    }
+}
+
+pub(crate) fn validate_generic_domain(
+    parameter: &crate::spec::where_spec::GenericParamView<'_>,
+) -> Result<(), SigilStitchError> {
+    use crate::spec::where_spec::GenericParamDomain;
+    match parameter.domain().as_ref() {
+        GenericParamDomain::Single { kind: None } => Ok(()),
+        GenericParamDomain::Single { kind: Some(kind) } => generic_kind_suffix(kind).map(|_| ()),
+        _ => Err(SigilStitchError::UnsupportedTypeName {
+            language: "scala".into(),
+            context: format!("generic_param.{}", parameter.name()),
+            reason: "Scala type binders do not express lifetime or pack domains".into(),
+        }),
+    }
 }
 
 #[rustfmt::skip]
@@ -429,6 +477,15 @@ const SCALA_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Scala {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        for parameter in function.generic_params() {
+            validate_generic_domain(&parameter)?;
+        }
+        Ok(())
+    }
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,
@@ -570,7 +627,7 @@ impl CodeLang for Scala {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         if let Some(parameter) = type_params.iter().find(|parameter| {
@@ -737,6 +794,10 @@ impl CodeLang for Scala {
         }
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn render_type_param_kind(&self, kind: &crate::spec::where_spec::TypeParamKind) -> String {
         match kind {
             crate::spec::where_spec::TypeParamKind::Constructor1 => "[_]".to_string(),
@@ -749,6 +810,10 @@ impl CodeLang for Scala {
         format!("{visibility}class {name}(val value: {inner})")
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_newtype_decl(
         &self,
         visibility: &str,
@@ -822,16 +887,14 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let sc = Scala::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "scala.collection.mutable".into(),
-                name: "ListBuffer".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "scala.collection.mutable".into(),
+            name: "ListBuffer".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(
             sc.render_imports(&imports),
             "import scala.collection.mutable.ListBuffer"
@@ -841,34 +904,32 @@ mod tests {
     #[test]
     fn test_render_imports_grouped() {
         let sc = Scala::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "com.example.model".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "scala.collection.immutable".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "java.util".into(),
-                    name: "UUID".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "com.example.model".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "scala.collection.immutable".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "java.util".into(),
+                name: "UUID".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = sc.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import scala.collection.immutable.List");
@@ -881,34 +942,32 @@ mod tests {
     #[test]
     fn test_render_imports_sorted_within_group() {
         let sc = Scala::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "scala.collection.immutable".into(),
-                    name: "Set".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "scala.collection.immutable".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "scala.collection.immutable".into(),
-                    name: "Map".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "scala.collection.immutable".into(),
+                name: "Set".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "scala.collection.immutable".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "scala.collection.immutable".into(),
+                name: "Map".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = sc.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import scala.collection.immutable.List");
@@ -919,26 +978,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let sc = Scala::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "scala.collection.immutable".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "scala.collection.immutable".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "scala.collection.immutable".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "scala.collection.immutable".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(
             sc.render_imports(&imports),
             "import scala.collection.immutable.List"

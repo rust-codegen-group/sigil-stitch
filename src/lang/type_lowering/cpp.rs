@@ -12,6 +12,30 @@ use crate::spec::type_spec::{TypeIntent, ValidatedType};
 use super::common;
 
 pub(crate) fn validate(lang: &Cpp, type_: TypeIntent<'_>) -> Result<(), SigilStitchError> {
+    let parameters = type_.generic_params().collect::<Vec<_>>();
+    for (index, parameter) in parameters.iter().enumerate() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        use crate::spec::where_spec::{GenericParamDomain, KindExpr};
+        if !matches!(
+            parameter.domain().as_ref(),
+            GenericParamDomain::Single {
+                kind: None | Some(KindExpr::Type)
+            } | GenericParamDomain::Pack {
+                element_kind: None | Some(KindExpr::Type)
+            }
+        ) || (matches!(parameter.domain().as_ref(), GenericParamDomain::Pack { .. })
+            && index + 1 != parameters.len())
+        {
+            return Err(SigilStitchError::InvalidTypeParameter {
+                type_name: type_.name().into(),
+                parameter_name: parameter.name().into(),
+                reason: "C++ type templates require type binders and at most one final type pack"
+                    .into(),
+            });
+        }
+    }
     common::validate_declaration(
         type_,
         lang.file_extension(),
@@ -100,7 +124,17 @@ fn emit_template_declaration(block: &mut CodeBlockBuilder, type_: &ValidatedType
         if index > 0 {
             block.add(", ", ());
         }
-        block.add("typename %L", parameter.name());
+        block.add(
+            if matches!(
+                parameter.domain().as_ref(),
+                crate::spec::where_spec::GenericParamDomain::Pack { .. }
+            ) {
+                "typename... %L"
+            } else {
+                "typename %L"
+            },
+            parameter.name(),
+        );
     }
     block.add(">", ());
     block.add_line();

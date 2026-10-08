@@ -11,12 +11,9 @@ Practical, copy-paste-ready recipes for C++ code generation. For the full API of
 let body = CodeBlock::of("data_.push_back(value)", ()).unwrap();
 
 let type_spec = TypeSpec::builder("Stack", TypeKind::Class)
-    .add_type_param(TypeParamSpec::new("T"))
+    .add_generic_param(GenericParamSpec::single("T").unwrap())
     .add_field(
-        FieldSpec::builder("data_", TypeName::generic(
-            TypeName::primitive("std::vector"),
-            vec![TypeName::primitive("T")],
-        ))
+        FieldSpec::builder("data_", TypeName::application(TypeName::primitive("std::vector"), vec![TypeArgument::Single(TypeName::primitive("T"))]))
             .visibility(Visibility::Private)
             .build()
             .unwrap(),
@@ -54,10 +51,7 @@ public:
 # use sigil_stitch::prelude::*;
 # fn main() {
 let type_spec = TypeSpec::builder("StringVec", TypeKind::TypeAlias)
-    .extends(TypeName::generic(
-        TypeName::primitive("std::vector"),
-        vec![TypeName::primitive("std::string")],
-    ))
+    .extends(TypeName::application(TypeName::primitive("std::vector"), vec![TypeArgument::Single(TypeName::primitive("std::string"))]))
     .build()
     .unwrap();
 # }

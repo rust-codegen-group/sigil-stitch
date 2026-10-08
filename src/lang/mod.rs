@@ -12,6 +12,8 @@ pub mod cpp;
 pub mod csharp;
 /// Dart language support.
 pub mod dart;
+#[cfg(test)]
+mod generic_binding_tests;
 /// Go language support.
 pub mod go;
 /// Haskell language support.
@@ -96,6 +98,10 @@ use crate::spec::parameter_spec::ParameterSpec;
 pub use crate::spec::property_spec::{PropertyIntent, ValidatedProperty};
 pub use crate::spec::type_members_intent::TypeMembersIntent;
 pub use crate::spec::type_spec::{TypeIntent, ValidatedType};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
 use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
 use crate::type_name::TypeName;
 use compatibility_markers::LegacyTypeMarkers;
@@ -465,6 +471,13 @@ pub trait RendererLang: std::fmt::Debug + 'static {
 /// # Ok::<(), SigilStitchError>(())
 /// ```
 pub trait CodeLang: RendererLang {
+    /// Default alias-conflict policy selected by this language.
+    ///
+    /// An explicit caller resolver takes precedence over this borrowed policy.
+    fn default_import_alias_resolver(&self) -> &dyn crate::import::ImportAliasConflictResolver {
+        &crate::import::ModulePrefixImportAliasResolver
+    }
+
     // ── Capability contract ───────────────────────────────────────────
 
     /// Declare which spec constructs this language supports.
@@ -737,7 +750,7 @@ pub trait CodeLang: RendererLang {
     fn validate_function_type_constraints(
         &self,
         _function_name: &str,
-        _type_params: &[TypeParamSpec],
+        _type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         _constraints: &[WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         Ok(())
@@ -1040,6 +1053,10 @@ pub trait CodeLang: RendererLang {
     ///
     /// Default: Rust tuple-struct `{visibility}struct {name}<T>({inner});`.
     #[deprecated(note = "legacy 0.6.8 type grammar; implement CodeLang::lower_type instead")]
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_newtype_decl(
         &self,
         visibility: &str,
@@ -1129,6 +1146,10 @@ pub trait CodeLang: RendererLang {
     /// This exact 0.6.8 string hook is retained for compatibility. Current
     /// lowering uses [`CodeLang::emit_type_context`].
     #[deprecated(note = "legacy 0.6.8 generic grammar; implement CodeLang::lower_function instead")]
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn render_type_context(&self, _type_params: &[TypeParamSpec]) -> String {
         String::new()
     }
@@ -1136,6 +1157,10 @@ pub trait CodeLang: RendererLang {
     /// Emit a type context / constraint prefix for split function signatures.
     ///
     /// Default: no context.
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_type_context(
         &self,
         type_params: &[TypeParamSpec],
@@ -1212,6 +1237,10 @@ pub trait CodeLang: RendererLang {
     /// Default: empty string.
     #[deprecated(
         note = "legacy 0.6.8 generic grammar; implement complete language-owned lowering instead"
+    )]
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
     )]
     fn render_type_param_kind(&self, _kind: &crate::spec::where_spec::TypeParamKind) -> String {
         String::new()

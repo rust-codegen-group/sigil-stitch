@@ -86,6 +86,10 @@ pub(crate) fn lower(
     Ok(vec![block.build()?])
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn lower_alias(lang: &C, type_: &ValidatedType<'_>) -> Result<CodeBlock, SigilStitchError> {
     let mut block = CodeBlock::builder();
     common::emit_doc(&mut block, lang, type_);

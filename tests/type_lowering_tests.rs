@@ -11,6 +11,10 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::{TypeParamKind, TypeParamSpec};
 use sigil_stitch::type_name::TypeName;
 
@@ -127,6 +131,10 @@ fn alias_and_newtype_inputs_that_have_no_grammar_fail_instead_of_disappearing() 
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn target_local_type_identifiers_preserve_dollar_names() {
     let generic = || {
         TypeSpec::builder("$Widget", TypeKind::Class)
@@ -179,6 +187,10 @@ fn target_local_type_identifiers_preserve_dollar_names() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn scala_validates_raw_higher_kinded_type_parameters() {
     for raw in [" ", "not-a-kind", "[_"] {
         let error = TypeSpec::builder("Container", TypeKind::Class)
@@ -223,6 +235,10 @@ fn c_alias_preserves_documentation() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_merges_direct_context_and_explicit_constraints() {
     let type_ = TypeSpec::builder("Box", TypeKind::Class)
         .add_type_param(
@@ -244,6 +260,10 @@ fn csharp_merges_direct_context_and_explicit_constraints() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn kotlin_emits_additional_and_explicit_bounds_on_constrained_newtypes() {
     let type_ = TypeSpec::builder("Wrapper", TypeKind::Newtype)
         .add_type_param(
@@ -280,6 +300,10 @@ fn javascript_emits_structured_type_annotations() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn c_and_cpp_place_structured_type_attributes_in_valid_grammar_positions() {
     let c = TypeSpec::builder("Packed", TypeKind::Struct)
         .annotate(AnnotationSpec::new("packed"))
@@ -428,6 +452,10 @@ fn kotlin_and_scala_aliases_preserve_docs_and_visibility() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn typescript_type_aliases_preserve_direct_bounds() {
     let alias = TypeSpec::builder("Box", TypeKind::TypeAlias)
         .visibility(Visibility::Public)
@@ -444,6 +472,10 @@ fn typescript_type_aliases_preserve_direct_bounds() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn non_context_bound_languages_reject_context_bound_intent() {
     for lang in [
         &sigil_stitch::lang::dart::Dart::new() as &dyn CodeLang,
@@ -470,6 +502,10 @@ fn non_context_bound_languages_reject_context_bound_intent() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn inline_constraint_languages_lower_explicit_type_constraints() {
     for (lang, expected) in [
         (
@@ -508,6 +544,10 @@ fn inline_constraint_languages_lower_explicit_type_constraints() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn inline_constraint_languages_deduplicate_direct_and_explicit_bounds() {
     for lang in [
         &sigil_stitch::lang::dart::Dart::new() as &dyn CodeLang,
@@ -532,6 +572,10 @@ fn inline_constraint_languages_deduplicate_direct_and_explicit_bounds() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn inline_constraint_languages_preserve_direct_then_explicit_bound_order() {
     for (lang, expected) in [
         (
@@ -569,6 +613,10 @@ fn inline_constraint_languages_preserve_direct_then_explicit_bound_order() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn attached_constraint_languages_reject_unknown_subjects() {
     for lang in [
         &sigil_stitch::lang::csharp::CSharp::new() as &dyn CodeLang,
@@ -825,6 +873,10 @@ fn every_builtin_type_lowerer_rejects_reserved_declaration_names() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn shared_type_validation_rejects_invalid_identifiers_and_parameter_subjects() {
     let invalid_name = minimal_type("not-valid", TypeKind::Class, "ts")
         .emit(&sigil_stitch::lang::typescript::TypeScript::new())
@@ -868,6 +920,10 @@ fn shared_type_validation_rejects_invalid_identifiers_and_parameter_subjects() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn rust_type_lifetime_bounds_target_declared_lifetimes() {
     let static_bound = render_type(
         sigil_stitch::lang::rust::Rust::new(),
@@ -934,6 +990,10 @@ fn rust_type_lifetime_bounds_target_declared_lifetimes() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn target_specific_type_validation_rejects_grammar_invalid_shapes() {
     fn assert_invalid(type_: TypeSpec, lang: &dyn CodeLang, expected: &str) {
         let error = type_.emit(lang).unwrap_err();

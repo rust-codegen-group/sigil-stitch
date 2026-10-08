@@ -492,50 +492,46 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let bash = Bash::new();
-        let imports = ImportGroup {
-            entries: vec![crate::import::ImportEntry {
-                module: "./lib/utils.sh".into(),
-                name: "log_info".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![crate::import::ImportEntry {
+            module: "./lib/utils.sh".into(),
+            name: "log_info".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(bash.render_imports(&imports), "source \"./lib/utils.sh\"");
     }
 
     #[test]
     fn test_render_imports_dedup() {
         let bash = Bash::new();
-        let imports = ImportGroup {
-            entries: vec![
-                crate::import::ImportEntry {
-                    module: "./lib/utils.sh".into(),
-                    name: "log_info".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                crate::import::ImportEntry {
-                    module: "./lib/utils.sh".into(),
-                    name: "log_error".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                crate::import::ImportEntry {
-                    module: "./lib/config.sh".into(),
-                    name: "load_config".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            crate::import::ImportEntry {
+                module: "./lib/utils.sh".into(),
+                name: "log_info".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            crate::import::ImportEntry {
+                module: "./lib/utils.sh".into(),
+                name: "log_error".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            crate::import::ImportEntry {
+                module: "./lib/config.sh".into(),
+                name: "load_config".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = bash.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines.len(), 2);

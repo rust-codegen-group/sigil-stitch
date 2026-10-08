@@ -12,8 +12,72 @@ use crate::lang::capability::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
 use crate::spec::where_spec::TypeParamSpec;
 use crate::type_name::TypeName;
+
+pub(crate) fn validate_generic_domain(
+    parameter: &crate::spec::where_spec::GenericParamView<'_>,
+) -> Result<(), SigilStitchError> {
+    if matches!(
+        parameter.domain().as_ref(),
+        crate::spec::where_spec::GenericParamDomain::Single { .. }
+    ) {
+        Ok(())
+    } else {
+        Err(SigilStitchError::UnsupportedTypeName {
+            language: "haskell".into(),
+            context: format!("generic_param.{}", parameter.name()),
+            reason: "Haskell binders do not express lifetime or argument-pack domains".into(),
+        })
+    }
+}
+
+pub(crate) fn lower_kind(
+    kind: &crate::spec::where_spec::KindExpr,
+) -> Result<CodeBlock, SigilStitchError> {
+    use crate::spec::where_spec::KindExpr;
+    let mut block = CodeBlock::builder();
+    match kind {
+        KindExpr::Type => {
+            block.add("%T", TypeName::importable("Data.Kind", "Type"));
+        }
+        KindExpr::Named(name) => {
+            block.add("%T", name.clone());
+        }
+        KindExpr::Constructor { parameters, result } => {
+            for parameter in parameters {
+                if matches!(parameter, KindExpr::Constructor { .. }) {
+                    block.add("(%L) -> ", lower_kind(parameter)?);
+                } else {
+                    block.add("%L -> ", lower_kind(parameter)?);
+                }
+            }
+            block.add("%L", lower_kind(result)?);
+        }
+    }
+    block.build()
+}
+
+pub(crate) fn emit_generic_binding(
+    block: &mut crate::code_block::CodeBlockBuilder,
+    parameter: &crate::spec::where_spec::GenericParamView<'_>,
+) -> Result<(), SigilStitchError> {
+    use crate::spec::where_spec::GenericParamDomain;
+    match parameter.domain().as_ref() {
+        GenericParamDomain::Single { kind: Some(kind) } => {
+            block.add("(%L :: %L)", (parameter.name(), lower_kind(kind)?));
+        }
+        GenericParamDomain::Single { kind: None } => {
+            block.add("%L", parameter.name());
+        }
+        _ => validate_generic_domain(parameter)?,
+    }
+    Ok(())
+}
 
 fn haskell_block_open_for_intent(intent: BlockIntent) -> Option<&'static str> {
     match intent {
@@ -176,6 +240,63 @@ fn is_valid_import_alias(alias: &str) -> bool {
             character == '_' || character == '\'' || unicode_ident::is_xid_continue(character)
         })
         && !HASKELL_RESERVED.contains(&alias)
+}
+
+pub(crate) fn is_symbolic_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|character| "!#$%&*+./<=>?@\\^|-~:".contains(character))
+}
+
+#[derive(Debug)]
+struct HaskellImportAliasResolver;
+
+impl crate::import::ImportAliasConflictResolver for HaskellImportAliasResolver {
+    fn resolve(
+        &self,
+        conflicts: &crate::import::ImportAliasConflicts<'_>,
+    ) -> Result<Vec<crate::import::ImportAliasAssignment>, crate::import::ImportAliasRejection>
+    {
+        use crate::import::{ImportAliasRequestKind, ModulePrefixImportAliasResolver};
+        let mut assignments = ModulePrefixImportAliasResolver.resolve(conflicts)?;
+        let claims: std::collections::HashMap<_, _> = conflicts
+            .conflicts()
+            .iter()
+            .flat_map(|conflict| conflict.claims())
+            .map(|claim| (claim.id(), claim))
+            .collect();
+        let mut reserved: std::collections::HashSet<String> = conflicts
+            .reserved_names()
+            .iter()
+            .cloned()
+            .chain(
+                assignments
+                    .iter()
+                    .map(|assignment| assignment.local_name.clone()),
+            )
+            .collect();
+        for (index, assignment) in assignments.iter_mut().enumerate() {
+            let claim = claims.get(&assignment.claim_id).ok_or_else(|| {
+                crate::import::ImportAliasRejection::new(
+                    "default resolver returned an unknown import claim",
+                )
+            })?;
+            if claim.request_kind() == ImportAliasRequestKind::Exact
+                || assignment.local_name == claim.name()
+                || is_valid_import_alias(&assignment.local_name)
+            {
+                continue;
+            }
+            let mut alias = format!("ImportedSymbol{index}");
+            while reserved.contains(&alias) {
+                alias.push('_');
+            }
+            reserved.insert(alias.clone());
+            assignment.local_name = alias;
+        }
+        Ok(assignments)
+    }
 }
 
 /// Classify an import module for ordering.
@@ -473,6 +594,9 @@ const HASKELL_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Haskell {
+    fn default_import_alias_resolver(&self) -> &dyn crate::import::ImportAliasConflictResolver {
+        &HaskellImportAliasResolver
+    }
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,
@@ -578,7 +702,7 @@ impl CodeLang for Haskell {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         if let Some(parameter) = type_params.iter().find(|parameter| {
@@ -608,6 +732,12 @@ impl CodeLang for Haskell {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        for parameter in function.generic_params() {
+            if !parameter.has_kind_or_pack_domain() {
+                continue;
+            }
+            validate_generic_domain(&parameter)?;
+        }
         if let Some(parameter) = function.type_params().iter().find(|parameter| {
             !function
                 .parameters()
@@ -659,18 +789,38 @@ impl CodeLang for Haskell {
             let lines = if has_wildcard {
                 vec![format!("import {module}")]
             } else {
-                let mut unqualified: Vec<&str> = entries
+                let import_names = |entry: &&ImportEntry| -> Vec<String> {
+                    if !is_symbolic_name(&entry.name) {
+                        return vec![entry.name.clone()];
+                    }
+                    let summary = imports.request_summary(&entry.module, &entry.name);
+                    let type_only = summary.map_or(entry.is_type_only, |summary| {
+                        summary.has_type_only_request()
+                    });
+                    let ordinary = summary.map_or(!entry.is_type_only, |summary| {
+                        summary.has_ordinary_request()
+                    });
+                    let mut names = Vec::new();
+                    if type_only {
+                        names.push(format!("type ({})", entry.name));
+                    }
+                    if ordinary {
+                        names.push(format!("({})", entry.name));
+                    }
+                    names
+                };
+                let mut unqualified: Vec<String> = entries
                     .iter()
                     .filter(|e| e.alias.is_none())
-                    .map(|e| e.name.as_str())
+                    .flat_map(import_names)
                     .collect();
                 unqualified.sort();
                 unqualified.dedup();
 
-                let mut qualified: Vec<&str> = entries
+                let mut qualified: Vec<String> = entries
                     .iter()
                     .filter(|e| e.alias.is_some())
-                    .map(|e| e.name.as_str())
+                    .flat_map(import_names)
                     .collect();
                 qualified.sort();
                 qualified.dedup();
@@ -795,6 +945,10 @@ impl CodeLang for Haskell {
         format!("  deriving ({})", impl_types.join(", "))
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_newtype_decl(
         &self,
         _visibility: &str,
@@ -819,6 +973,10 @@ impl CodeLang for Haskell {
         cb.build()
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_type_context(
         &self,
         type_params: &[TypeParamSpec],
@@ -918,6 +1076,10 @@ impl CodeLang for Haskell {
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "retain released compatibility metadata and hooks"
+)]
 fn type_name_contains_parameter(type_name: &TypeName, parameter_name: &str) -> bool {
     match type_name {
         TypeName::Primitive(name) | TypeName::Raw(name) => name == parameter_name,
@@ -933,6 +1095,16 @@ fn type_name_contains_parameter(type_name: &TypeName, parameter_name: &str) -> b
                     .iter()
                     .any(|parameter| type_name_contains_parameter(parameter, parameter_name))
         }
+        TypeName::Application { base, arguments } => {
+            type_name_contains_parameter(base, parameter_name)
+                || arguments.iter().any(|argument| match argument {
+                    crate::spec::where_spec::TypeArgument::Single(value)
+                    | crate::spec::where_spec::TypeArgument::Expansion { pattern: value } => {
+                        type_name_contains_parameter(value, parameter_name)
+                    }
+                })
+        }
+        TypeName::Parameter(name) => name == parameter_name,
         TypeName::Union(types)
         | TypeName::Intersection(types)
         | TypeName::Tuple(types)
@@ -952,6 +1124,22 @@ fn type_name_contains_parameter(type_name: &TypeName, parameter_name: &str) -> b
                 .iter()
                 .any(|parameter| type_name_contains_parameter(parameter, parameter_name))
                 || type_name_contains_parameter(return_type, parameter_name)
+        }
+        TypeName::Callable {
+            parameters,
+            return_type,
+        } => {
+            parameters.iter().any(|parameter| match parameter {
+                crate::spec::where_spec::CallableParam::Single { type_name, .. } => {
+                    type_name_contains_parameter(type_name, parameter_name)
+                }
+                crate::spec::where_spec::CallableParam::Repeated { element_type, .. } => {
+                    type_name_contains_parameter(element_type, parameter_name)
+                }
+                crate::spec::where_spec::CallableParam::Expansion { pattern, .. } => {
+                    type_name_contains_parameter(pattern, parameter_name)
+                }
+            }) || type_name_contains_parameter(return_type, parameter_name)
         }
         TypeName::AssociatedType {
             base, qualifier, ..
@@ -1044,50 +1232,46 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let hs = Haskell::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "Data.Map".into(),
-                name: "Map".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "Data.Map".into(),
+            name: "Map".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(hs.render_imports(&imports), "import Data.Map (Map)");
     }
 
     #[test]
     fn test_render_imports_grouped() {
         let hs = Haskell::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "Data.Map".into(),
-                    name: "Map".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "Data.Map".into(),
-                    name: "fromList".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "MyApp.Types".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "Data.Map".into(),
+                name: "Map".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "Data.Map".into(),
+                name: "fromList".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "MyApp.Types".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = hs.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import Data.Map (Map, fromList)");
@@ -1098,26 +1282,24 @@ mod tests {
     #[test]
     fn test_render_imports_uses_qualified_form_for_resolved_aliases() {
         let hs = Haskell::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "Domain.Input".into(),
-                    name: "Value".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "Domain.Output".into(),
-                    name: "Value".into(),
-                    alias: Some("OutputValue".into()),
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "Domain.Input".into(),
+                name: "Value".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "Domain.Output".into(),
+                name: "Value".into(),
+                alias: Some("OutputValue".into()),
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
 
         assert_eq!(
             hs.render_imports(&imports),
@@ -1128,16 +1310,14 @@ mod tests {
     #[test]
     fn test_render_imports_wildcard() {
         let hs = Haskell::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "Data.List".into(),
-                name: "".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: true,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "Data.List".into(),
+            name: "".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: true,
+        }]);
         assert_eq!(hs.render_imports(&imports), "import Data.List");
     }
 
@@ -1383,5 +1563,66 @@ mod tests {
             matches!(&nodes[1], CodeNode::Literal(s) if s == "name = \"cost: $value\""),
             "dollar signs inside string literals must not be rewritten"
         );
+    }
+
+    #[test]
+    fn modern_occurrence_walker_checks_all_slots_and_application_patterns() {
+        use crate::spec::where_spec::{CallableParam, CallableParamPresence, TypeArgument};
+        for parameter in [
+            CallableParam::Single {
+                name: None,
+                type_name: TypeName::parameter("a"),
+                presence: CallableParamPresence::Required,
+            },
+            CallableParam::Repeated {
+                name: None,
+                element_type: TypeName::parameter("a"),
+            },
+            CallableParam::Expansion {
+                name: None,
+                pattern: TypeName::parameter("a"),
+            },
+        ] {
+            let ty = TypeName::application(
+                TypeName::parameter("f"),
+                vec![TypeArgument::Single(TypeName::callable(
+                    vec![parameter],
+                    TypeName::parameter("r"),
+                ))],
+            );
+            for name in ["a", "f", "r"] {
+                assert!(type_name_contains_parameter(&ty, name));
+            }
+            assert!(!type_name_contains_parameter(&ty, "missing"));
+        }
+        let expansion = TypeName::application(
+            TypeName::parameter("f"),
+            vec![TypeArgument::Expansion {
+                pattern: TypeName::parameter("a"),
+            }],
+        );
+        assert!(type_name_contains_parameter(&expansion, "a"));
+    }
+
+    #[test]
+    fn structural_constructor_kinds_keep_nested_parentheses_and_type_imports() {
+        use crate::spec::where_spec::KindExpr;
+        let unary = KindExpr::Constructor {
+            parameters: vec![KindExpr::Type],
+            result: Box::new(KindExpr::Type),
+        };
+        let kind = KindExpr::Constructor {
+            parameters: vec![unary],
+            result: Box::new(KindExpr::Named(TypeName::importable("GHC.TypeNats", "Nat"))),
+        };
+        let output = crate::spec::file_spec::FileSpec::builder("Kinds.hs")
+            .add_code(lower_kind(&kind).unwrap())
+            .build()
+            .unwrap()
+            .render(80)
+            .unwrap();
+        assert!(output.contains("(Type -> Type) -> Nat"), "{output}");
+        assert!(output.contains("import Data.Kind (Type)"), "{output}");
+        assert!(output.contains("import GHC.TypeNats (Nat)"), "{output}");
     }
 }

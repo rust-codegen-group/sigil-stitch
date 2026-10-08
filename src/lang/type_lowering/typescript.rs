@@ -8,7 +8,7 @@ use crate::lang::RendererLang;
 use crate::lang::typescript::TypeScript;
 use crate::spec::modifiers::{TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+use crate::spec::where_spec::{GenericParamView, WhereConstraint};
 use crate::type_name::TypeName;
 
 use super::common;
@@ -27,6 +27,23 @@ pub(crate) fn is_identifier(name: &str) -> bool {
 }
 
 pub(crate) fn validate(lang: &TypeScript, type_: TypeIntent<'_>) -> Result<(), SigilStitchError> {
+    for parameter in type_.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        if !matches!(
+            parameter.domain().as_ref(),
+            crate::spec::where_spec::GenericParamDomain::Single {
+                kind: None | Some(crate::spec::where_spec::KindExpr::Type)
+            }
+        ) {
+            return Err(SigilStitchError::InvalidTypeParameter {
+                type_name: type_.name().into(),
+                parameter_name: parameter.name().into(),
+                reason: "this binding domain has no representation in this type declaration".into(),
+            });
+        }
+    }
     common::validate_declaration(
         type_,
         lang.file_extension(),
@@ -178,7 +195,7 @@ fn type_parameters(type_: &ValidatedType<'_>, arguments: &mut Vec<Arg>) -> Strin
 }
 
 fn parameter_bounds<'a>(
-    parameter: &'a TypeParamSpec,
+    parameter: &'a GenericParamView<'_>,
     constraints: &'a [WhereConstraint],
 ) -> Vec<&'a TypeName> {
     let mut bounds = parameter.bounds().iter().collect::<Vec<_>>();

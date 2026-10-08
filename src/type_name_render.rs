@@ -106,18 +106,28 @@ fn render_function_presentation(
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 pub(crate) fn is_compound_type(t: &TypeName) -> bool {
     matches!(
         t,
         TypeName::Generic { .. }
+            | TypeName::Application { .. }
             | TypeName::Union(_)
             | TypeName::Intersection(_)
             | TypeName::Function { .. }
+            | TypeName::Callable { .. }
             | TypeName::Tuple(_)
             | TypeName::Optional(_)
     )
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 pub(crate) fn to_canonical_doc<F>(tn: &TypeName, resolve: &F) -> BoxDoc<'static, ()>
 where
     F: Fn(&str, &str) -> String,
@@ -128,6 +138,7 @@ where
             BoxDoc::text(display)
         }
         TypeName::Primitive(name) => BoxDoc::text(name.clone()),
+        TypeName::Parameter(name) => BoxDoc::text(name.clone()),
         TypeName::Raw(s) => BoxDoc::text(s.clone()),
         TypeName::StringLiteral(_) => BoxDoc::fail(),
         TypeName::Array(inner) => to_canonical_doc(inner, resolve).append(BoxDoc::text("[]")),
@@ -147,6 +158,7 @@ where
                 .append(params_doc.nest(2).group())
                 .append(BoxDoc::text(">"))
         }
+        TypeName::Application { .. } | TypeName::Callable { .. } => BoxDoc::fail(),
         TypeName::Union(members) => {
             let docs: Vec<_> = members
                 .iter()

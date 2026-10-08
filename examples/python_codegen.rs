@@ -136,9 +136,9 @@ fn builder_approach() -> String {
         .add_field(
             FieldSpec::builder(
                 "tags",
-                TypeName::generic(
+                TypeName::application(
                     TypeName::primitive("list"),
-                    vec![TypeName::primitive("str")],
+                    vec![TypeArgument::Single(TypeName::primitive("str"))],
                 ),
             )
             .initializer(
@@ -267,9 +267,9 @@ fn macro_approach() -> String {
         .add_field(
             FieldSpec::builder(
                 "tags",
-                TypeName::generic(
+                TypeName::application(
                     TypeName::primitive("list"),
-                    vec![TypeName::primitive("str")],
+                    vec![TypeArgument::Single(TypeName::primitive("str"))],
                 ),
             )
             .initializer(

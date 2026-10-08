@@ -8,7 +8,13 @@ use crate::spec::annotation_spec::{AnnotationNameRef, AnnotationSpec};
 use crate::spec::closed_sum_case_spec::ClosedSumCaseSpec;
 use crate::spec::field_spec::ValidatedFields;
 use crate::spec::modifiers::{Modifiers, Visibility};
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
+use crate::spec::where_spec::{
+    GenericParamEntry, GenericParamIter, GenericParamSpec, TypeParamSpec, WhereConstraint,
+};
 use crate::type_name::TypeName;
 
 /// Read-only semantic intent for a complete ClosedSum declaration.
@@ -35,8 +41,14 @@ impl<'a> ClosedSumIntent<'a> {
         &self.spec.doc
     }
     /// Type parameters.
-    pub fn type_params(self) -> &'a [TypeParamSpec] {
-        &self.spec.type_params
+    pub(crate) fn type_params(self) -> Vec<crate::spec::where_spec::GenericParamView<'a>> {
+        self.generic_params().collect()
+    }
+    /// Ordered modern and compatibility generic-parameter view.
+    pub fn generic_params(
+        self,
+    ) -> impl Iterator<Item = crate::spec::where_spec::GenericParamView<'a>> {
+        GenericParamIter::new(&self.spec.generic_entries)
     }
     /// Explicit declaration constraints.
     pub fn where_constraints(self) -> &'a [WhereConstraint] {
@@ -166,8 +178,14 @@ impl<'a> ValidatedClosedSum<'a> {
         self.intent.doc()
     }
     /// Type parameters.
-    pub fn type_params(&self) -> &'a [TypeParamSpec] {
+    pub(crate) fn type_params(&self) -> Vec<crate::spec::where_spec::GenericParamView<'a>> {
         self.intent.type_params()
+    }
+    /// Ordered modern and compatibility generic-parameter view.
+    pub fn generic_params(
+        &self,
+    ) -> impl Iterator<Item = crate::spec::where_spec::GenericParamView<'a>> {
+        self.intent.generic_params()
     }
     /// Explicit declaration constraints.
     pub fn where_constraints(&self) -> &'a [WhereConstraint] {
@@ -193,7 +211,8 @@ pub struct ClosedSumSpec {
     pub(crate) name: String,
     pub(crate) modifiers: Modifiers,
     pub(crate) doc: Vec<String>,
-    pub(crate) type_params: Vec<TypeParamSpec>,
+    #[serde(default)]
+    pub(crate) generic_entries: Vec<GenericParamEntry>,
     pub(crate) where_constraints: Vec<WhereConstraint>,
     pub(crate) annotations: Vec<CodeBlock>,
     pub(crate) annotation_specs: Vec<AnnotationSpec>,
@@ -201,13 +220,18 @@ pub struct ClosedSumSpec {
 }
 
 impl ClosedSumSpec {
+    pub(crate) fn generic_params(
+        &self,
+    ) -> impl Iterator<Item = crate::spec::where_spec::GenericParamView<'_>> {
+        GenericParamIter::new(&self.generic_entries)
+    }
     /// Start building a ClosedSum declaration.
     pub fn builder(name: &str) -> ClosedSumSpecBuilder {
         ClosedSumSpecBuilder {
             name: name.to_string(),
             modifiers: Modifiers::default(),
             doc: Vec::new(),
-            type_params: Vec::new(),
+            generic_entries: Vec::new(),
             where_constraints: Vec::new(),
             annotations: Vec::new(),
             annotation_specs: Vec::new(),
@@ -229,6 +253,13 @@ impl ClosedSumSpec {
     }
 
     fn collect_intrinsic_validation_errors(&self, errors: &mut Vec<SigilStitchError>) {
+        for entry in &self.generic_entries {
+            if let GenericParamEntry::Modern(parameter) = entry
+                && let Err(error) = parameter.validate()
+            {
+                errors.push(error);
+            }
+        }
         if self.name.is_empty() {
             errors.push(SigilStitchError::EmptyName {
                 builder: "ClosedSumSpec",
@@ -281,7 +312,7 @@ impl ClosedSumSpec {
         }
         let mut seen_type_params = std::collections::HashSet::new();
         let mut reported_type_params = std::collections::HashSet::new();
-        for parameter in &self.type_params {
+        for parameter in self.generic_params() {
             if parameter.name().is_empty() {
                 errors.push(SigilStitchError::InvalidTypeParameter {
                     type_name: self.name.clone(),
@@ -354,7 +385,7 @@ impl ClosedSumSpec {
         };
 
         let missing: Vec<_> = super::type_declaration::requested_capabilities(
-            &self.type_params,
+            &self.generic_params().collect::<Vec<_>>(),
             &self.where_constraints,
             !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
         )
@@ -485,7 +516,7 @@ pub struct ClosedSumSpecBuilder {
     name: String,
     modifiers: Modifiers,
     doc: Vec<String>,
-    type_params: Vec<TypeParamSpec>,
+    generic_entries: Vec<GenericParamEntry>,
     where_constraints: Vec<WhereConstraint>,
     annotations: Vec<CodeBlock>,
     annotation_specs: Vec<AnnotationSpec>,
@@ -504,8 +535,19 @@ impl ClosedSumSpecBuilder {
         self
     }
     /// Add a type parameter.
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     pub fn add_type_param(mut self, parameter: TypeParamSpec) -> Self {
-        self.type_params.push(parameter);
+        self.generic_entries
+            .push(GenericParamEntry::Legacy(parameter));
+        self
+    }
+    /// Add a modern semantic generic parameter.
+    pub fn add_generic_param(mut self, parameter: GenericParamSpec) -> Self {
+        self.generic_entries
+            .push(GenericParamEntry::Modern(parameter));
         self
     }
     /// Add a where constraint.
@@ -544,7 +586,7 @@ impl ClosedSumSpecBuilder {
             name: self.name,
             modifiers: self.modifiers,
             doc: self.doc,
-            type_params: self.type_params,
+            generic_entries: self.generic_entries,
             where_constraints: self.where_constraints,
             annotations: self.annotations,
             annotation_specs: self.annotation_specs,

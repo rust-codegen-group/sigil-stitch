@@ -14,7 +14,13 @@ use crate::spec::modifiers::{Modifiers, TypeKind, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::property_spec::{PropertyIntent, PropertySpec, ValidatedProperty};
 use crate::spec::type_members_intent::TypeMembersIntent;
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
+use crate::spec::where_spec::{
+    GenericParamEntry, GenericParamIter, GenericParamSpec, TypeParamSpec, WhereConstraint,
+};
 use crate::type_name::TypeName;
 
 /// A type declaration (struct, class, interface, trait, enum).
@@ -60,7 +66,8 @@ pub struct TypeSpec {
     pub(crate) fields: Vec<FieldSpec>,
     pub(crate) properties: Vec<PropertySpec>,
     pub(crate) methods: Vec<FunSpec>,
-    pub(crate) type_params: Vec<TypeParamSpec>,
+    #[serde(default)]
+    pub(crate) generic_entries: Vec<GenericParamEntry>,
     pub(crate) super_types: Vec<TypeName>,
     pub(crate) impl_types: Vec<TypeName>,
     pub(crate) annotations: Vec<CodeBlock>,
@@ -113,6 +120,13 @@ impl<'a> TypeIntent<'a> {
         &self.spec.embedded_types
     }
 
+    /// Ordered modern and compatibility generic-parameter view.
+    pub fn generic_params(
+        self,
+    ) -> impl Iterator<Item = crate::spec::where_spec::GenericParamView<'a>> {
+        GenericParamIter::new(&self.spec.generic_entries)
+    }
+
     /// Declared fields.
     pub fn fields(self) -> &'a [FieldSpec] {
         &self.spec.fields
@@ -129,8 +143,8 @@ impl<'a> TypeIntent<'a> {
     }
 
     /// Declared type parameters.
-    pub fn type_params(self) -> &'a [TypeParamSpec] {
-        &self.spec.type_params
+    pub(crate) fn type_params(self) -> Vec<crate::spec::where_spec::GenericParamView<'a>> {
+        self.generic_params().collect()
     }
 
     /// Alias or newtype target, when this declaration has one.
@@ -257,8 +271,15 @@ impl<'a> ValidatedType<'a> {
     }
 
     /// Declared type parameters.
-    pub fn type_params(&self) -> &'a [TypeParamSpec] {
+    pub(crate) fn type_params(&self) -> Vec<crate::spec::where_spec::GenericParamView<'a>> {
         self.intent.type_params()
+    }
+
+    /// Ordered modern and compatibility generic-parameter view.
+    pub fn generic_params(
+        &self,
+    ) -> impl Iterator<Item = crate::spec::where_spec::GenericParamView<'a>> {
+        self.intent.generic_params()
     }
 
     /// Alias or newtype target, when present.
@@ -308,6 +329,11 @@ impl<'a> ValidatedType<'a> {
 }
 
 impl TypeSpec {
+    pub(crate) fn generic_params(
+        &self,
+    ) -> impl Iterator<Item = crate::spec::where_spec::GenericParamView<'_>> {
+        GenericParamIter::new(&self.generic_entries)
+    }
     /// Create a new builder for a type declaration with the given name and kind.
     pub fn builder(name: &str, kind: TypeKind) -> TypeSpecBuilder {
         TypeSpecBuilder {
@@ -319,7 +345,7 @@ impl TypeSpec {
             fields: Vec::new(),
             properties: Vec::new(),
             methods: Vec::new(),
-            type_params: Vec::new(),
+            generic_entries: Vec::new(),
             super_types: Vec::new(),
             impl_types: Vec::new(),
             annotations: Vec::new(),
@@ -539,6 +565,13 @@ impl TypeSpec {
     }
 
     fn collect_intrinsic_type_validation_errors(&self, errors: &mut Vec<SigilStitchError>) {
+        for entry in &self.generic_entries {
+            if let GenericParamEntry::Modern(parameter) = entry
+                && let Err(error) = parameter.validate()
+            {
+                errors.push(error);
+            }
+        }
         if self.name.is_empty() {
             errors.push(SigilStitchError::EmptyName {
                 builder: "TypeSpec",
@@ -599,7 +632,7 @@ impl TypeSpec {
 
         let mut seen_type_params = std::collections::HashSet::new();
         let mut reported_type_params = std::collections::HashSet::new();
-        for parameter in &self.type_params {
+        for parameter in self.generic_params() {
             if parameter.name().is_empty() {
                 errors.push(SigilStitchError::InvalidTypeParameter {
                     type_name: self.name.clone(),
@@ -734,7 +767,7 @@ impl TypeSpec {
         }
 
         let declaration_missing: Vec<_> = super::type_declaration::requested_capabilities(
-            &self.type_params,
+            &self.generic_params().collect::<Vec<_>>(),
             &self.where_constraints,
             !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
         )
@@ -836,7 +869,7 @@ pub struct TypeSpecBuilder {
     fields: Vec<FieldSpec>,
     properties: Vec<PropertySpec>,
     methods: Vec<FunSpec>,
-    type_params: Vec<TypeParamSpec>,
+    generic_entries: Vec<GenericParamEntry>,
     super_types: Vec<TypeName>,
     impl_types: Vec<TypeName>,
     annotations: Vec<CodeBlock>,
@@ -899,8 +932,20 @@ impl TypeSpecBuilder {
     }
 
     /// Add a type parameter (generic).
+    #[deprecated(note = "legacy declaration binding; use add_generic_param(GenericParamSpec)")]
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     pub fn add_type_param(mut self, tp: TypeParamSpec) -> Self {
-        self.type_params.push(tp);
+        self.generic_entries.push(GenericParamEntry::Legacy(tp));
+        self
+    }
+
+    /// Add a modern semantic generic parameter.
+    pub fn add_generic_param(mut self, parameter: GenericParamSpec) -> Self {
+        self.generic_entries
+            .push(GenericParamEntry::Modern(parameter));
         self
     }
 
@@ -1049,7 +1094,7 @@ impl TypeSpecBuilder {
             fields: self.fields,
             properties: self.properties,
             methods: self.methods,
-            type_params: self.type_params,
+            generic_entries: self.generic_entries,
             super_types: self.super_types,
             impl_types: self.impl_types,
             annotations: self.annotations,

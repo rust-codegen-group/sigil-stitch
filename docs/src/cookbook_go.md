@@ -108,7 +108,7 @@ type Repository interface {
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
 # fn main() {
-let tp = TypeParamSpec::new("T").with_bound(TypeName::primitive("comparable"));
+let tp = GenericParamSpec::single("T").unwrap().with_bound(TypeName::primitive("comparable")).unwrap();
 
 let mut body_b = CodeBlock::builder();
 body_b.begin_control_flow("if a > b", ());
@@ -118,7 +118,7 @@ body_b.add_statement("return b", ());
 let body = body_b.build().unwrap();
 
 let fun = FunSpec::builder("Max")
-    .add_type_param(tp)
+    .add_generic_param(tp)
     .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())
     .add_param(ParameterSpec::new("b", TypeName::primitive("T")).unwrap())
     .returns(TypeName::primitive("T"))

@@ -167,7 +167,7 @@ pub struct WildcardPresentation<'a> {
 /// # Examples
 ///
 /// ```
-/// use sigil_stitch::type_name::TypeName;
+/// use sigil_stitch::prelude::{TypeName, TypeArgument};
 /// use sigil_stitch::lang::typescript::TypeScript;
 ///
 /// // Importable type (generates `import { User } from './models'`):
@@ -177,9 +177,9 @@ pub struct WildcardPresentation<'a> {
 /// let num = TypeName::primitive("number");
 ///
 /// // Generic: Promise<User>
-/// let promise = TypeName::generic(
+/// let promise = TypeName::application(
 ///     TypeName::primitive("Promise"),
-///     vec![user],
+///     vec![TypeArgument::Single(user)],
 /// );
 ///
 /// // Optional: string | null
@@ -213,11 +213,23 @@ pub enum TypeName {
     /// their `Array` rendering since they lack a direct readonly-array form.
     ReadonlyArray(Box<TypeName>),
     /// Generic type. e.g., `Promise<User>`, `HashMap<String, User>`.
+    #[deprecated(
+        note = "legacy type application; use TypeName::Application or TypeName::application"
+    )]
     Generic {
         /// The base type (e.g., `Promise`, `HashMap`).
         base: Box<TypeName>,
         /// The type parameters.
         params: Vec<TypeName>,
+    },
+    /// A named type-level parameter reference.
+    Parameter(String),
+    /// A structured type application whose arguments may include expansions.
+    Application {
+        /// The applied type-level constructor or symbol.
+        base: Box<TypeName>,
+        /// Ordered scalar and expansion arguments.
+        arguments: Vec<crate::spec::where_spec::TypeArgument>,
     },
     /// Union type. TS: `A | B | C`.
     Union(Vec<TypeName>),
@@ -275,10 +287,18 @@ pub enum TypeName {
         lower_bound: Option<Box<TypeName>>,
     },
     /// Function type. TS: `(a: A, b: B) => R`.
+    #[deprecated(note = "legacy callable type; use TypeName::Callable or TypeName::callable")]
     Function {
         /// The parameter types.
         params: Vec<TypeName>,
         /// The return type.
+        return_type: Box<TypeName>,
+    },
+    /// A callable type with labelled, optional, repeated, and expanded segments.
+    Callable {
+        /// Ordered callable parameter segments.
+        parameters: Vec<crate::spec::where_spec::CallableParam>,
+        /// Callable result type.
         return_type: Box<TypeName>,
     },
     /// Raw string escape hatch. No import tracking.
@@ -398,10 +418,33 @@ impl TypeName {
     }
 
     /// Create a generic type (e.g., `Promise<User>`).
+    #[deprecated(
+        note = "legacy type application; use TypeName::application with TypeArgument values"
+    )]
+    #[expect(
+        deprecated,
+        reason = "one semantic path also accepts released compatibility inputs"
+    )]
     pub fn generic(base: TypeName, params: Vec<TypeName>) -> Self {
         TypeName::Generic {
             base: Box::new(base),
             params,
+        }
+    }
+
+    /// Create a named type-level parameter reference.
+    pub fn parameter(name: impl Into<String>) -> Self {
+        TypeName::Parameter(name.into())
+    }
+
+    /// Create a structured type application.
+    pub fn application(
+        base: TypeName,
+        arguments: Vec<crate::spec::where_spec::TypeArgument>,
+    ) -> Self {
+        TypeName::Application {
+            base: Box::new(base),
+            arguments,
         }
     }
 
@@ -485,9 +528,25 @@ impl TypeName {
     }
 
     /// Create a function type.
+    #[deprecated(note = "legacy callable type; use TypeName::callable with CallableParam values")]
+    #[expect(
+        deprecated,
+        reason = "one semantic path also accepts released compatibility inputs"
+    )]
     pub fn function(params: Vec<TypeName>, return_type: TypeName) -> Self {
         TypeName::Function {
             params,
+            return_type: Box::new(return_type),
+        }
+    }
+
+    /// Create a structured callable type.
+    pub fn callable(
+        parameters: Vec<crate::spec::where_spec::CallableParam>,
+        return_type: TypeName,
+    ) -> Self {
+        TypeName::Callable {
+            parameters,
             return_type: Box::new(return_type),
         }
     }
@@ -559,11 +618,17 @@ impl TypeName {
     }
 
     /// Get the simple name of this type (for import resolution lookups).
+    #[expect(
+        deprecated,
+        reason = "one semantic path also accepts released compatibility inputs"
+    )]
     pub fn simple_name(&self) -> Option<&str> {
         match self {
             TypeName::Importable { name, .. } => Some(name),
             TypeName::Primitive(name) => Some(name),
             TypeName::Generic { base, .. } => base.simple_name(),
+            TypeName::Application { base, .. } => base.simple_name(),
+            TypeName::Parameter(name) => Some(name),
             TypeName::Raw(s) => Some(s),
             TypeName::StringLiteral(_) => None,
             _ => None,
@@ -1617,5 +1682,45 @@ mod tests {
         let mut buf = Vec::new();
         doc.render(80, &mut buf).unwrap();
         assert_eq!(String::from_utf8(buf).unwrap(), "Value");
+    }
+
+    #[test]
+    fn structured_application_collects_nested_imports_and_round_trips() {
+        use crate::spec::where_spec::TypeArgument;
+
+        let application = TypeName::application(
+            TypeName::importable("crate::types", "Array"),
+            vec![
+                TypeArgument::Single(TypeName::importable("crate::types", "Element")),
+                TypeArgument::Expansion {
+                    pattern: TypeName::importable("crate::types", "Tail"),
+                },
+            ],
+        );
+        let mut imports = Vec::new();
+        application.collect_imports(&mut imports);
+        assert_eq!(imports.len(), 3);
+
+        let encoded = serde_json::to_string(&application).unwrap();
+        let decoded: TypeName = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, application);
+    }
+
+    #[test]
+    fn callable_labels_remain_target_owned_data() {
+        use crate::spec::where_spec::{CallableParam, CallableParamPresence};
+        let callable = TypeName::callable(
+            vec![CallableParam::Single {
+                name: Some("   ".to_string()),
+                type_name: TypeName::primitive("number"),
+                presence: CallableParamPresence::Required,
+            }],
+            TypeName::primitive("string"),
+        );
+        crate::type_name_lowering::validation::validate_type_name(
+            &callable,
+            &crate::type_name_lowering::DiagnosticPath::root("callable"),
+        )
+        .unwrap();
     }
 }

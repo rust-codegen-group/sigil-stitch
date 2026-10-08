@@ -6,12 +6,20 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
 use super::golden;
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_class_with_fields_and_methods() {
     let body = CodeBlock::of("return this.userRepo.findById(id)", ()).unwrap();
     let tb = TypeSpec::builder("UserService", TypeKind::Class)
@@ -54,6 +62,10 @@ fn test_class_with_fields_and_methods() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_interface_generic() {
     let tp = TypeParamSpec::new("T");
     let tb = TypeSpec::builder("Repository", TypeKind::Interface)

@@ -92,6 +92,32 @@ selected target. Its Rust type is language-agnostic so declaration lowerers,
 rewrite, import collection, and rendering can compose it, but its literal
 content and structure are not a portable cross-language program.
 
+### Generic binding and kind expression
+
+A declaration-owned name with a single, pack, or lifetime domain, optional
+kind intent, and supplied bounds. `GenericParamSpec` records the binding;
+`GenericParamView` borrows the owner's complete ordered sequence. Uses refer
+to names without a shared scope resolver. The target compiler owns inference
+and instantiation.
+
+`KindExpr` records Type, a named kind, or a constructor's parameter and result
+kinds. Declaration lowering owns representation or rejection. Named kinds are
+not inferred; legacy raw binder suffixes are not modern kind expressions.
+
+### Type application and expansion pattern
+
+Application of a supplied type-level base to ordered arguments. An expansion
+retains its complete pattern, including every referenced pack. The library
+does not evaluate the pattern, solve its arity, or reinterpret a tuple as an
+argument list.
+
+### Callable parameter sequence
+
+Ordered scalar slots, repeated-element segments, and complete expansion
+patterns. Optional presence belongs to a scalar slot and differs from an
+optional value. Labels and ordering restrictions belong to the selected
+language, not to a shared rest-parameter grammar.
+
 ### String literal type
 
 A type inhabited by exactly one decoded string value.

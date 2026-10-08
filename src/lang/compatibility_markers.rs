@@ -6,6 +6,10 @@ use crate::code_block::CodeBlock;
 use crate::code_node::CodeNode;
 use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
 use crate::spec::where_spec::{TypeParamSpec, render_type_params_for};
 use crate::type_name::TypeName;
 
@@ -42,6 +46,10 @@ impl LegacyTypeMarkers {
         token
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     pub(crate) fn mark_type_params(&mut self, params: &[TypeParamSpec]) -> Vec<TypeParamSpec> {
         params
             .iter()
@@ -63,6 +71,10 @@ impl LegacyTypeMarkers {
             .collect()
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     pub(crate) fn render_marked_type_params<L: CodeLang + ?Sized>(
         &mut self,
         params: &[TypeParamSpec],

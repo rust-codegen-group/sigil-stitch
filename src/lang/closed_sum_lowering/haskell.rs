@@ -12,6 +12,12 @@ use crate::spec::modifiers::Visibility;
 use super::{emit_case_doc, emit_doc};
 
 pub(crate) fn validate(lang: &Haskell, sum: ClosedSumIntent<'_>) -> Result<(), SigilStitchError> {
+    for parameter in sum.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        crate::lang::haskell::validate_generic_domain(&parameter)?;
+    }
     if sum.visibility() != Visibility::Inherited {
         return Err(SigilStitchError::InvalidTypeDeclaration {
             type_name: sum.name().to_string(),
@@ -113,7 +119,8 @@ pub(crate) fn lower(
     emit_context(&mut block, &sum);
     block.add("%L", sum.name());
     for parameter in sum.type_params() {
-        block.add(" %L", parameter.name());
+        block.add(" ", ());
+        crate::lang::haskell::emit_generic_binding(&mut block, &parameter)?;
     }
     block.add(" =", ());
     block.add_line();
