@@ -108,6 +108,44 @@ let block = sigil_quote!(TypeScript {
 # }
 ```
 
+`$T` accepts a complete `TypeName`, including `Parameter`, `Application`, and
+`Callable`. It preserves the value as a structured type reference; it does not
+render it to a string inside the macro. The selected language lowers that value
+before import collection, so nested and language-derived imports remain visible.
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), SigilStitchError> {
+let input = TypeName::application(
+    TypeName::importable_type("./models", "Box"),
+    vec![TypeArgument::Single(TypeName::parameter("T"))],
+);
+let handler = TypeName::callable(
+    vec![CallableParam::Single {
+        name: Some("value".into()),
+        type_name: input,
+        presence: CallableParamPresence::Optional,
+    }],
+    TypeName::importable_type("./results", "Result"),
+);
+let block = sigil_quote!(TypeScript {
+    type Handler<T> = $T(handler);
+})?;
+let output = FileSpec::builder("handler.ts").add_code(block).build()?.render(80)?;
+assert!(output.contains("type Handler<T> = (value?: Box<T>) => Result;"));
+assert!(output.contains("import type { Box } from './models'"));
+assert!(output.contains("import type { Result } from './results'"));
+# Ok(())
+# }
+```
+
+The same entry point accepts complete C++ application expansion patterns and
+Haskell indexed applications. Their spelling and representability belong to
+the selected language, not the macro. A successful `sigil_quote!` call builds a
+source block; unsupported type intent still returns `SigilStitchError` when
+that block is prepared for rendering. See [TypeName](type_name.md).
+
 ### Names (`$N`)
 
 ```rust
@@ -797,6 +835,34 @@ These map to the `%>` and `%<` format specifiers in `CodeBlockBuilder`.
 `$C_each(expr)` iterates over a collection of `CodeBlock` values and splices each
 one into the builder sequentially. It must appear at the start of a line.
 
+Declaration specs continue to own generic bindings, kinds, and complete
+declaration intent. Emit a spec with the same language used for the surrounding
+source, propagate its error, then splice its structured output. For example,
+a closed sum may lower to several blocks, so use `$C_each` rather than assuming
+one declaration:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+use sigil_stitch::lang::haskell::Haskell;
+# fn main() -> Result<(), SigilStitchError> {
+let outcome = ClosedSumSpec::builder("Outcome")
+    .add_generic_param(GenericParamSpec::single("a")?)
+    .add_case(ClosedSumCaseSpec::positional("Value", vec![TypeName::parameter("a")])?)
+    .build()?;
+let blocks = outcome.emit(&Haskell::new())?;
+let block = sigil_quote!(Haskell { $C_each(blocks) })?;
+let output = FileSpec::builder("outcome.hs").add_code(block).build()?.render(80)?;
+assert!(output.contains("data Outcome a ="));
+assert!(output.contains("Value a"));
+# Ok(())
+# }
+```
+
+For one emitted block, `$C` or `$L` also preserves its type references. Do not
+render a spec to a string before splicing it: that would lose structured
+references needed for later import collection and alias resolution.
+
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
@@ -1321,6 +1387,12 @@ sigil_quote!(TypeScript {
 `$T_join(sep, iter)` joins `TypeName` items with a separator, tracking imports for
 each item. Unlike `$join` (which calls `.to_string()` on each element), `$T_join`
 uses `%T` slots so every type in the join contributes its import to the file.
+
+Items may be complete applications or callables, not just simple names. Nested
+types retain their imports and participate in the file's ordinary alias
+resolution. The separator is caller-supplied target syntax: `$T_join` does not
+turn its items into generic bindings, callable slots, or expansion segments.
+Represent those semantics inside a complete `TypeName` instead.
 
 ```rust
 # extern crate sigil_stitch;
