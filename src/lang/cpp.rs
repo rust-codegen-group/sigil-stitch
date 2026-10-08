@@ -357,6 +357,7 @@ const CPP_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::ne
 )];
 
 const CPP_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::ParametricPolymorphism,
     // Attributes = [[...]]
     FunctionCapability::Attributes,
     // DefaultParameters = default parameter values
@@ -369,6 +370,7 @@ const CPP_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::StaticFunction,
 ];
 const CPP_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::ParametricPolymorphism,
     // VirtualMethod = virtual dispatch; pure virtual remains an explicit suffix
     FunctionCapability::VirtualMethod,
     // Attributes = [[...]]
@@ -385,12 +387,14 @@ const CPP_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::StaticMethod,
 ];
 const CPP_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::ParametricPolymorphism,
     FunctionCapability::Attributes,
     FunctionCapability::ConstructorDelegation,
     FunctionCapability::DefaultParameters,
     FunctionCapability::TypedParameters,
 ];
 const CPP_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
+    FunctionCapability::ParametricPolymorphism,
     FunctionCapability::VirtualMethod,
     FunctionCapability::Attributes,
     FunctionCapability::DefaultParameters,
@@ -466,6 +470,51 @@ const CPP_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Cpp {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        use crate::spec::where_spec::{GenericParamDomain, KindExpr};
+        for parameter in function.generic_params() {
+            if !matches!(
+                parameter.domain().as_ref(),
+                GenericParamDomain::Single {
+                    kind: None | Some(KindExpr::Type)
+                } | GenericParamDomain::Pack {
+                    element_kind: None | Some(KindExpr::Type)
+                }
+            ) || parameter.kind().is_some()
+                || !parameter.bounds().is_empty()
+                || !parameter.context_bounds().is_empty()
+                || !crate::lang::type_lowering::is_identifier(parameter.name())
+                || self.reserved_words().contains(&parameter.name())
+            {
+                return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                    language: self.file_extension().into(), function_name: function.name().into(),
+                    parameter_name: parameter.name().into(),
+                    reason: "C++ function templates require identifier-named type or type-pack binders without kind or bound annotations".into(),
+                });
+            }
+        }
+        if let Some(parameter) = function.generic_params().next()
+            && (function.modifiers().is_abstract || function.modifiers().is_override)
+        {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language: self.file_extension().into(),
+                function_name: function.name().into(),
+                parameter_name: parameter.name().into(),
+                reason: "C++ member function templates cannot be virtual or overriding".into(),
+            });
+        }
+        if !function.where_constraints().is_empty() {
+            return Err(SigilStitchError::InvalidFunctionConstraintSubject {
+                language: self.file_extension().into(),
+                function_name: function.name().into(),
+                subject: "C++ function template constraints require target-specific source".into(),
+            });
+        }
+        Ok(())
+    }
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,
@@ -746,66 +795,60 @@ mod tests {
     #[test]
     fn test_render_imports_system() {
         let cpp = Cpp::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "iostream".into(),
-                name: "std::cout".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "iostream".into(),
+            name: "std::cout".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(cpp.render_imports(&imports), "#include <iostream>");
     }
 
     #[test]
     fn test_render_imports_local() {
         let cpp = Cpp::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "./myclass.hpp".into(),
-                name: "MyClass".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "./myclass.hpp".into(),
+            name: "MyClass".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(cpp.render_imports(&imports), "#include \"myclass.hpp\"");
     }
 
     #[test]
     fn test_render_imports_grouped() {
         let cpp = Cpp::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "iostream".into(),
-                    name: "std::cout".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "vector".into(),
-                    name: "std::vector".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "./myclass.hpp".into(),
-                    name: "MyClass".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "iostream".into(),
+                name: "std::cout".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "vector".into(),
+                name: "std::vector".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "./myclass.hpp".into(),
+                name: "MyClass".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = cpp.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "#include <iostream>");
@@ -817,26 +860,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let cpp = Cpp::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "vector".into(),
-                    name: "std::vector".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "vector".into(),
-                    name: "std::vector".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "vector".into(),
+                name: "std::vector".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "vector".into(),
+                name: "std::vector".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(cpp.render_imports(&imports), "#include <vector>");
     }
 

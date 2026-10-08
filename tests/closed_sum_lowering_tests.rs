@@ -9,6 +9,10 @@ use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -180,6 +184,10 @@ fn closed_sum_record_fields_require_implicit_component_metadata() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn generic_closed_sums_are_preserved_only_for_proven_combinations() {
     let rust = ClosedSumSpec::builder("Maybe")
         .add_type_param(TypeParamSpec::new("T"))
@@ -286,6 +294,10 @@ fn generic_closed_sums_are_preserved_only_for_proven_combinations() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn rust_closed_sum_parameter_occurrence_traverses_nested_type_names() {
     let parameter = || TypeName::primitive("T");
     let payloads = vec![
@@ -699,6 +711,10 @@ fn dart_record_case_constructors_use_the_validated_emitted_field_name() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn closed_sum_payloads_exercise_wide_and_narrow_renderer_paths() {
     let type_ = |name: &str| {
         ClosedSumSpec::builder(name)

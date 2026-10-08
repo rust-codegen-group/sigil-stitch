@@ -15,6 +15,10 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::{TypeParamKind, TypeParamSpec};
 use sigil_stitch::type_name::TypeName;
 
@@ -128,6 +132,10 @@ impl RendererLang for SemanticViewLang {
 }
 
 impl CodeLang for SemanticViewLang {
+    #[expect(
+        deprecated,
+        reason = "assert the compatibility metadata exposed by the borrowed view"
+    )]
     fn lower_function(
         &self,
         function: ValidatedFunction<'_>,
@@ -167,17 +175,23 @@ impl CodeLang for SemanticViewLang {
         assert!(function.modifiers().is_override);
         assert_eq!(function.doc(), &["Semantic view".to_string()]);
 
-        let type_params = function.type_params();
+        let type_params = function.generic_params().collect::<Vec<_>>();
         assert_eq!(type_params.len(), 2);
         assert_eq!(type_params[0].name(), "'a");
-        assert!(type_params[0].is_lifetime());
+        assert!(matches!(
+            type_params[0].domain().as_ref(),
+            sigil_stitch::spec::where_spec::GenericParamDomain::Lifetime
+        ));
         assert_eq!(type_params[1].name(), "T");
         assert_eq!(type_params[1].bounds(), &[TypeName::primitive("Cloneable")]);
         assert!(matches!(
-            type_params[1].kind(),
+            type_params[1].legacy_kind(),
             Some(TypeParamKind::Constructor1)
         ));
-        assert!(!type_params[1].is_lifetime());
+        assert!(matches!(
+            type_params[1].domain().as_ref(),
+            sigil_stitch::spec::where_spec::GenericParamDomain::Single { kind: None }
+        ));
         assert_eq!(
             type_params[1].context_bounds(),
             &[TypeName::primitive("Ordered")]
@@ -259,6 +273,10 @@ fn validation_prevents_invalid_intent_from_reaching_the_lowerer() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn default_constraint_validation_is_syntax_independent() {
     let lang = NovelLang::strict();
     let function = FunSpec::builder("copy")
@@ -276,6 +294,10 @@ fn default_constraint_validation_is_syntax_independent() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn validated_function_exposes_complete_read_only_semantic_intent() {
     let function = FunSpec::builder("inspect")
         .receiver(ParameterSpec::of("self", TypeName::primitive("Receiver")))
@@ -330,6 +352,10 @@ fn validated_function_exposes_complete_read_only_semantic_intent() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn scala_rejects_empty_raw_higher_kinded_function_parameters() {
     let function = FunSpec::builder("transform")
         .add_type_param(TypeParamSpec::new("F").with_kind(TypeParamKind::Raw("".to_string())))

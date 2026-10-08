@@ -3,12 +3,20 @@ use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::Visibility;
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
 use super::golden;
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_top_level_function() {
     let tp = TypeParamSpec::new("T").with_bound(TypeName::primitive("Serializable"));
 

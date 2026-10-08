@@ -116,6 +116,9 @@ corresponding compatibility surface can be removed in a future major version.
 | Functions | `function_keyword()`, `fun_block_open()`, `function_syntax()`, `FunctionSyntaxConfig`, `ParamListStyle`, `FunctionSignatureStyle`, `ConstructorDelegationStyle`, and `WhereClauseStyle` | The provided `lower_function()` interprets them for external adapters | `validate_function()` and complete `lower_function()` |
 | Types | `type_keyword()`, `methods_inside_type_body()`, `type_kind_suffix()`, `emit_newtype_decl()`, `type_header_block_open()`, `type_body_prefix()` / `type_body_suffix()`, `emit_type_close_suffix()`, `abstract_type_modifier_is_valid()`, `type_decl_syntax()`, and type-emitter reads of `function_syntax()` / `enum_and_annotation()` | The provided `lower_type()` interprets them only for permissive external adapters and does not infer later closed-sum intent | `validate_type()`, complete `lower_type()`, and the dedicated closed-sum builder |
 | Type parameters | `generic_syntax()`, `render_type_params()`, `render_type_param_kind()`, and `ParameterSpec::emit_into()` | The provided permissive declaration lowerers and direct facades preserve frozen 0.6.8 grammar | Complete language-owned type and function lowering; strict adapters without a complete function lowerer fail with `MissingFunctionLowerer` |
+| Type application inputs | `TypeName::Generic`, `TypeName::generic()` | Explicitly deprecated; old storage and checked JSON fixtures remain supported | `TypeName::Application` / `application()` with ordered `TypeArgument` values |
+| Callable type inputs | `TypeName::Function`, `TypeName::function()` | Explicitly deprecated; existing scalar-slot meaning remains supported | `TypeName::Callable` / `callable()` with `CallableParam` values |
+| Declaration binding inputs | `TypeParamSpec`, `TypeParamKind`, and `FunSpecBuilder::add_type_param()` / `TypeSpecBuilder::add_type_param()` | Explicitly deprecated; released bounds, context bounds, lifetime intent, and raw Scala suffix metadata remain compatibility inputs | Fallible `GenericParamSpec`, `GenericParamDomain`, `KindExpr`, and `add_generic_param()` |
 | Variable spelling | `variable_prefix()` | Frozen function, field, property, and type compatibility lowerers interpret the adapter's prefix | Complete language-owned declaration lowering |
 | Preambles | `doc_before_annotations()`, `doc_comment_inside_body()` | Frozen compatibility lowerers may read them | Emit documentation and attributes in each complete lowerer |
 | Fields | `optional_field_style()`, `OptionalFieldStyle` | The provided `lower_fields()` freezes the old field emitter | `FieldCapability`, `FieldContext`, `TypeName::Optional`, and complete `lower_fields()` |
@@ -128,6 +131,27 @@ Direct `FieldSpec::emit()` and `PropertySpec::emit()` remain public facades. The
 `DeclarationContext` input is retained only as a compatibility payload. Prefer
 adding members to `TypeSpec` whenever the owning `TypeKind` or other members can
 affect validity.
+
+### Structured Parametric Inputs
+
+New bindings are constructed fallibly; existing released constructors keep
+their signatures. Owners retain one ordered binding sequence, including mixed
+old and new inputs, and expose it through borrowed `generic_params()` views.
+Modern kind annotations are never reconstructed from legacy raw suffixes.
+`GenericParamView::legacy_kind()` is explicitly deprecated and exists only
+for that retained compatibility metadata.
+
+Ordinary legacy application arguments migrate to `TypeArgument::Single`.
+Ordinary legacy callable slots migrate to unnamed required
+`CallableParam::Single` values. Expansion patterns, optional presence, and
+repeated-element segments are new explicit intent; no old vector is
+reinterpreted as a pack. A frozen compatibility adapter rejects modern
+application/callable values or binding domains it cannot preserve.
+
+The new expression enums and binding domains are non-exhaustive for downstream
+matching. This adds no unknown-node or cross-version serialization contract.
+Unreleased owner-view APIs and the unreleased closed-sum builder are not
+classified as released legacy surfaces.
 
 ## Frozen Grammar Configuration
 

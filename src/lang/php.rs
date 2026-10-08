@@ -57,6 +57,10 @@ use crate::lang::config::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
 use crate::spec::where_spec::TypeParamSpec;
 use crate::type_name::TypeName;
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
@@ -687,6 +691,10 @@ impl CodeLang for Php {
         )
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_newtype_decl(
         &self,
         visibility: &str,
@@ -790,42 +798,38 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let php = Php::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "App\\Models".into(),
-                name: "User".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "App\\Models".into(),
+            name: "User".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(php.render_imports(&imports), "use App\\Models\\User;");
     }
 
     #[test]
     fn test_render_imports_sorted() {
         let php = Php::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "App\\Models".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "App\\Http".into(),
-                    name: "Controller".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "App\\Models".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "App\\Http".into(),
+                name: "Controller".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = php.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "use App\\Http\\Controller;");
@@ -835,42 +839,38 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let php = Php::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "App\\Models".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "App\\Models".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "App\\Models".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "App\\Models".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(php.render_imports(&imports), "use App\\Models\\User;");
     }
 
     #[test]
     fn test_render_imports_with_alias() {
         let php = Php::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "App\\Models".into(),
-                name: "User".into(),
-                alias: Some("UserModel".into()),
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "App\\Models".into(),
+            name: "User".into(),
+            alias: Some("UserModel".into()),
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(
             php.render_imports(&imports),
             "use App\\Models\\User as UserModel;"

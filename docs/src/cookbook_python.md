@@ -15,10 +15,7 @@ let body = CodeBlock::of("return await db.query(User).filter(active=True)", ()).
 let fun = FunSpec::builder("get_active_users")
     .is_async()
     .add_param(ParameterSpec::new("db", TypeName::primitive("Database")).unwrap())
-    .returns(TypeName::generic(
-        TypeName::primitive("list"),
-        vec![user_type],
-    ))
+    .returns(TypeName::application(TypeName::primitive("list"), vec![TypeArgument::Single(user_type)]))
     .body(body)
     .build()
     .unwrap();

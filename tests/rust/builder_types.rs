@@ -7,12 +7,20 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
 use super::golden;
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_struct_with_impl() {
     let derive = CodeBlock::of(
         "#[derive(%T, %T)]",
@@ -72,6 +80,10 @@ fn test_struct_with_impl() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_generic_struct() {
     let tp = TypeParamSpec::new("T")
         .with_bound(TypeName::primitive("Clone"))
@@ -131,6 +143,10 @@ fn test_enum() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_enum_tuple_variants() {
     let derive = CodeBlock::of("#[derive(Debug, Clone)]", ()).unwrap();
     let tb = TypeSpec::builder("Expr", TypeKind::Enum)

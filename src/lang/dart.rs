@@ -402,6 +402,12 @@ const DART_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Dart {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::dart_function_lowering::validate_generic_parameters(self, function)
+    }
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,
@@ -496,7 +502,7 @@ impl CodeLang for Dart {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         if let Some(parameter) = type_params.iter().find(|parameter| {
@@ -742,50 +748,46 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let d = Dart::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "dart:async".into(),
-                name: "Future".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "dart:async".into(),
+            name: "Future".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(d.render_imports(&imports), "import 'dart:async';");
     }
 
     #[test]
     fn test_render_imports_grouped() {
         let d = Dart::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "package:http/http.dart".into(),
-                    name: "Client".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "dart:async".into(),
-                    name: "Future".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "../models/user.dart".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "package:http/http.dart".into(),
+                name: "Client".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "dart:async".into(),
+                name: "Future".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "../models/user.dart".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = d.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import 'dart:async';");
@@ -798,34 +800,32 @@ mod tests {
     #[test]
     fn test_render_imports_sorted_within_group() {
         let d = Dart::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "dart:io".into(),
-                    name: "File".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "dart:async".into(),
-                    name: "Future".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "dart:convert".into(),
-                    name: "json".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "dart:io".into(),
+                name: "File".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "dart:async".into(),
+                name: "Future".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "dart:convert".into(),
+                name: "json".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = d.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import 'dart:async';");
@@ -836,26 +836,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let d = Dart::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "dart:async".into(),
-                    name: "Future".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "dart:async".into(),
-                    name: "Stream".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "dart:async".into(),
+                name: "Future".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "dart:async".into(),
+                name: "Stream".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(d.render_imports(&imports), "import 'dart:async';");
     }
 

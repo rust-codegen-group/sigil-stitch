@@ -182,16 +182,14 @@ fn legacy_block_nodes_render_through_external_hooks_and_keyword_delimiters() {
 #[test]
 fn test_type_rendering() {
     let user = TypeName::importable("./models", "User");
-    let imports = ImportGroup {
-        entries: vec![crate::import::ImportEntry {
-            module: "./models".to_string(),
-            name: "User".to_string(),
-            alias: None,
-            is_type_only: true,
-            is_side_effect: false,
-            is_wildcard: false,
-        }],
-    };
+    let imports = ImportGroup::from(vec![crate::import::ImportEntry {
+        module: "./models".to_string(),
+        name: "User".to_string(),
+        alias: None,
+        is_type_only: true,
+        is_side_effect: false,
+        is_wildcard: false,
+    }]);
     let block = CodeBlock::of("const u: %T = getUser()", (user,)).unwrap();
     let ts = TypeScript::new();
     let mut renderer = CodeRenderer::new(&ts, &imports, 80);

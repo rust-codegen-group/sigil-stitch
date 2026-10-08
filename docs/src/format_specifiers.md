@@ -53,10 +53,7 @@ Generic types track imports recursively. Every `TypeName` nested inside the gene
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
 # fn main() {
-let promise = TypeName::generic(
-    TypeName::primitive("Promise"),
-    vec![TypeName::importable("./models", "User")],
-);
+let promise = TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(TypeName::importable("./models", "User"))]);
 let block = CodeBlock::of("function load(): %T", (promise,)).unwrap();
 // Promise<User> -- the User import is still tracked
 # }
@@ -142,7 +139,7 @@ cb.add("local config=%V", (VerbatimStrArg("\"${XDG_CONFIG_HOME:-$HOME/.config}\"
 cb.add_line();
 cb.add("local version=%V", (VerbatimStrArg("\"$(git describe --tags 2>/dev/null || echo dev)\"".to_string()),));
 cb.add_line();
-cb.add("echo %V", (VerbatimStrArg("Deploying ${APP_NAME} v${version} (PID=$$)".to_string()),));
+cb.add("echo %V", (VerbatimStrArg("Deploying ${APP_NAME} v${version} (PID=$)".to_string()),));
 let block = cb.build().unwrap();
 let file = FileSpec::builder_with("test.bash", Bash::new())
     .add_code(block)
@@ -151,11 +148,11 @@ let file = FileSpec::builder_with("test.bash", Bash::new())
 let output = file.render(80).unwrap();
 assert!(output.contains(r#""${XDG_CONFIG_HOME:-$HOME/.config}""#));
 assert!(output.contains(r#""$(git describe --tags 2>/dev/null || echo dev)""#));
-assert!(output.contains("Deploying ${APP_NAME} v${version} (PID=$$)"));
+assert!(output.contains("Deploying ${APP_NAME} v${version} (PID=$)"));
 // Output (Bash $V is pure passthrough — users include their own quotes):
 //   local config="${XDG_CONFIG_HOME:-$HOME/.config}"
 //   local version="$(git describe --tags 2>/dev/null || echo dev)"
-//   echo Deploying ${APP_NAME} v${version} (PID=$$)
+//   echo Deploying ${APP_NAME} v${version} (PID=$)
 # }
 ```
 

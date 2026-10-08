@@ -62,6 +62,10 @@ fn test_enum() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_typedef_function_pointer() {
     let callback = TypeSpec::builder("Callback", TypeKind::TypeAlias)
         .extends(TypeName::function(

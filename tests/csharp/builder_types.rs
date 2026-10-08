@@ -7,6 +7,10 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -67,6 +71,10 @@ fn test_class_with_methods() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_interface() {
     let tp = TypeParamSpec::new("T");
 
@@ -128,6 +136,10 @@ fn test_class_extends_implements() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_generic_class() {
     let tp = TypeParamSpec::new("T");
 
@@ -258,6 +270,10 @@ fn test_annotation_bracket_syntax() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_where_clause_multiple() {
     let ts = TypeSpec::builder("Mapper", TypeKind::Class)
         .visibility(Visibility::Public)

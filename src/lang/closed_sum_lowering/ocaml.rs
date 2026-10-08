@@ -12,6 +12,23 @@ use crate::spec::modifiers::Visibility;
 use super::emit_doc;
 
 pub(crate) fn validate(lang: &OCaml, sum: ClosedSumIntent<'_>) -> Result<(), SigilStitchError> {
+    for parameter in sum.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        if !matches!(
+            parameter.domain().as_ref(),
+            crate::spec::where_spec::GenericParamDomain::Single {
+                kind: None | Some(crate::spec::where_spec::KindExpr::Type)
+            }
+        ) {
+            return Err(SigilStitchError::InvalidTypeParameter {
+                type_name: sum.name().into(),
+                parameter_name: parameter.name().into(),
+                reason: "this binding domain has no representation in this declaration".into(),
+            });
+        }
+    }
     if sum.visibility() != Visibility::Inherited {
         return Err(SigilStitchError::InvalidTypeDeclaration {
             type_name: sum.name().to_string(),
@@ -84,7 +101,7 @@ pub(crate) fn lower(
     let mut block = CodeBlock::builder();
     emit_doc(&mut block, lang, sum.intent());
     block.add("type ", ());
-    match sum.type_params() {
+    match sum.type_params().as_slice() {
         [] => {}
         [parameter] => {
             block.add("%L ", ocaml_parameter(parameter.name()));

@@ -33,6 +33,15 @@ The integration suites are grouped by the contract they protect:
   higher-kinded, context-bound, and explicit-constraint cases. It also checks
   imported bound aliases, wide/narrow rendering, and strict missing-lowerer
   failure.
+- `tests/parametric_callable_tests.rs` covers the structured parametric type
+  surface: ordered application arguments, expansion imports, labelled and
+  optional callable slots, repeated segments, C++ independent function-template
+  packs, Haskell kinds and indexed signatures, and Scala constructor kinds.
+  It also checks borrowed binding views, mixed-origin duplicate names,
+  same-version owner revalidation, frozen compatibility rejection, target-local
+  empty-application rules, and modern Rust lifetime constraints for every owner.
+  Adapter unit tests separately exercise native generic-domain validation and
+  recursive kind/parameter/import walkers without widening capability profiles.
 - `tests/renderer_parity_tests.rs` covers all built-in languages on the direct
   and pretty renderer paths, the exact five-operation renderer-event matrix, a
   fully migrated external adapter that does not use legacy block config,
@@ -86,6 +95,14 @@ The integration suites are grouped by the contract they protect:
 - `tests/compatibility_semver_script.rs` exercises the pinned semver report
   parser against zero, expected, duplicate, malformed, missing, unexpected,
   and aborted-run fixtures.
+- `tests/ui/parametric/` checks downstream deprecation diagnostics for old
+  variants, constructors, and both released binding builders, plus warning-free
+  modern construction and non-exhaustive matching.
+- `tests/generated-source/` documents the local generated-source compiler
+  acceptance command, its paired positive/negative use-sites, required tools,
+  and diagnostic protocol. It is not part of ordinary Rust CI.
+  The Rust runner in `examples/source_acceptance.rs` has synthetic diagnostic
+  protocol tests included in ordinary Rust checks; these do not invoke compilers.
 
 Run only the compatibility gates with:
 
@@ -127,7 +144,12 @@ When changing a 0.6.8 bridge or approving a semver break, update the exact
 compatibility fixture, manifest or allowlist, and its README in the same change.
 
 The non-gating TypeName materialization benchmark reports throughput for
-wide and moderately nested trees at three input sizes:
+wide and moderately nested trees at three input sizes. Matched legacy/modern
+application and callable cases also measure direct rendering and complete
+`FileSpec` rendering with repeated imports, mixed request evidence, and name
+conflicts. Inputs are constructed outside timed iterations, and matched files
+must render identical source. Benchmark smoke checks run with
+`cargo bench --bench type_name_lowering -- --test`; they are not timing evidence:
 
 ```text
 just bench-type-name-lowering

@@ -11,6 +11,10 @@ use crate::lang::capability::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
 use crate::spec::where_spec::{TypeParamSpec, render_type_params_for};
 use crate::type_name::TypeName;
 
@@ -468,6 +472,12 @@ const KOTLIN_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Kotlin {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::kotlin_function_lowering::validate_generic_parameters(self, function)
+    }
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,
@@ -602,7 +612,7 @@ impl CodeLang for Kotlin {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         if let Some(parameter) = type_params.iter().find(|parameter| {
@@ -810,6 +820,10 @@ impl CodeLang for Kotlin {
         format!("{visibility}value class {name}(val value: {inner})")
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_newtype_decl(
         &self,
         visibility: &str,
@@ -889,16 +903,14 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let kt = Kotlin::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "kotlin.collections".into(),
-                name: "List".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "kotlin.collections".into(),
+            name: "List".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(
             kt.render_imports(&imports),
             "import kotlin.collections.List"
@@ -908,34 +920,32 @@ mod tests {
     #[test]
     fn test_render_imports_grouped() {
         let kt = Kotlin::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "com.example.model".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "kotlin.collections".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "java.util".into(),
-                    name: "UUID".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "com.example.model".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "kotlin.collections".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "java.util".into(),
+                name: "UUID".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = kt.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import kotlin.collections.List");
@@ -948,34 +958,32 @@ mod tests {
     #[test]
     fn test_render_imports_sorted_within_group() {
         let kt = Kotlin::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "kotlin.collections".into(),
-                    name: "Set".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "kotlin.collections".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "kotlin.collections".into(),
-                    name: "Map".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "kotlin.collections".into(),
+                name: "Set".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "kotlin.collections".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "kotlin.collections".into(),
+                name: "Map".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = kt.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import kotlin.collections.List");
@@ -986,26 +994,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let kt = Kotlin::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "kotlin.collections".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "kotlin.collections".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "kotlin.collections".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "kotlin.collections".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(
             kt.render_imports(&imports),
             "import kotlin.collections.List"

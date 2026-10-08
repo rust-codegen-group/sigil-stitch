@@ -19,6 +19,21 @@ pub(crate) fn lower(
     if let Some(return_type) = function.return_type() {
         let type_params = type_params_with_inline_constraints(function, lang.file_extension())?;
         block.add("%L :: ", function.name());
+        if type_params.iter().any(|parameter| {
+            matches!(
+                parameter.domain().as_ref(),
+                crate::spec::where_spec::GenericParamDomain::Single { kind: Some(_) }
+            )
+        }) {
+            block.add("forall ", ());
+            for (index, parameter) in type_params.iter().enumerate() {
+                if index > 0 {
+                    block.add(" ", ());
+                }
+                crate::lang::haskell::emit_generic_binding(&mut block, parameter)?;
+            }
+            block.add(". ", ());
+        }
         emit_type_context(&mut block, type_params.as_ref());
         for parameter in function.parameters() {
             block.add("%T -> ", parameter.param_type().clone());
@@ -50,7 +65,7 @@ pub(crate) fn lower(
 
 fn emit_type_context(
     block: &mut CodeBlockBuilder,
-    type_params: &[crate::spec::where_spec::TypeParamSpec],
+    type_params: &[crate::spec::where_spec::GenericParamView<'_>],
 ) {
     let constraint_count = type_params
         .iter()

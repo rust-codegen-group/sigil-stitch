@@ -626,6 +626,7 @@ fn c_matrix() {
 #[test]
 fn cpp_matrix() {
     let member = &[
+        FunctionCapability::ParametricPolymorphism,
         FunctionCapability::Attributes,
         FunctionCapability::DefaultParameters,
         FunctionCapability::ExplicitReturnType,
@@ -641,6 +642,7 @@ fn cpp_matrix() {
                 FunctionContext::TopLevel,
                 FunctionForm::Function,
                 &[
+                    FunctionCapability::ParametricPolymorphism,
                     FunctionCapability::Attributes,
                     FunctionCapability::DefaultParameters,
                     FunctionCapability::ExplicitReturnType,
@@ -653,6 +655,7 @@ fn cpp_matrix() {
                 FunctionContext::Member,
                 FunctionForm::Constructor,
                 &[
+                    FunctionCapability::ParametricPolymorphism,
                     FunctionCapability::Attributes,
                     FunctionCapability::ConstructorDelegation,
                     FunctionCapability::DefaultParameters,
@@ -668,6 +671,7 @@ fn cpp_matrix() {
                 FunctionContext::InterfaceMember,
                 FunctionForm::Constructor,
                 &[
+                    FunctionCapability::ParametricPolymorphism,
                     FunctionCapability::Attributes,
                     FunctionCapability::ConstructorDelegation,
                     FunctionCapability::DefaultParameters,

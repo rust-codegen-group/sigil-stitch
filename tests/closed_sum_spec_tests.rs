@@ -19,6 +19,10 @@ use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::modifiers::Visibility;
 use sigil_stitch::spec::project_spec::ProjectSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -336,6 +340,10 @@ fn empty_sum_support_matches_the_language_capability_matrix() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn swift_and_kotlin_reject_closed_sum_type_parameters() {
     let spec = ClosedSumSpec::builder("Outcome")
         .add_type_param(TypeParamSpec::new("T"))
@@ -355,6 +363,10 @@ fn swift_and_kotlin_reject_closed_sum_type_parameters() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn haskell_closed_sum_preserves_explicit_constraints() {
     let spec = ClosedSumSpec::builder("Maybe")
         .add_type_param(TypeParamSpec::new("a"))
@@ -450,6 +462,10 @@ fn scala_rejects_constraints_that_its_closed_sum_lowerer_cannot_preserve() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn rust_closed_sum_rejects_non_lifetime_bounds_on_lifetime_parameters() {
     let spec = ClosedSumSpec::builder("Outcome")
         .add_type_param(TypeParamSpec::lifetime("'a").with_bound(TypeName::raw("Clone")))
@@ -464,6 +480,10 @@ fn rust_closed_sum_rejects_non_lifetime_bounds_on_lifetime_parameters() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn ocaml_closed_sum_rejects_invalid_type_parameter_names() {
     let spec = ClosedSumSpec::builder("outcome")
         .add_type_param(TypeParamSpec::new("T"))

@@ -41,7 +41,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
 
     // --- Protocol ---
     let proto = TypeSpec::builder("Repository", TypeKind::Interface)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
                 .returns(TypeName::optional(TypeName::primitive("T")))

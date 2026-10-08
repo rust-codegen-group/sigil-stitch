@@ -42,9 +42,9 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
 
     // --- Type alias: type string_list = string list ---
     let string_list = TypeSpec::builder("string_list", TypeKind::TypeAlias)
-        .extends(TypeName::generic(
+        .extends(TypeName::application(
             TypeName::primitive("list"),
-            vec![TypeName::primitive("string")],
+            vec![TypeArgument::Single(TypeName::primitive("string"))],
         ))
         .build()
         .unwrap();
@@ -83,19 +83,26 @@ fn builder_approach() -> String {
     map_pair_body.add("%T f [x; x]", (list_map,));
 
     let map_pair_fn = FunSpec::builder("map_pair")
-        .add_type_param(TypeParamSpec::new("'a"))
-        .add_type_param(TypeParamSpec::new("'b"))
+        .add_generic_param(GenericParamSpec::single("'a").unwrap())
+        .add_generic_param(GenericParamSpec::single("'b").unwrap())
         .add_param(
             ParameterSpec::new(
                 "f",
-                TypeName::function(vec![TypeName::primitive("'a")], TypeName::primitive("'b")),
+                TypeName::callable(
+                    vec![CallableParam::Single {
+                        name: None,
+                        type_name: TypeName::primitive("'a"),
+                        presence: CallableParamPresence::Required,
+                    }],
+                    TypeName::primitive("'b"),
+                ),
             )
             .unwrap(),
         )
         .add_param(ParameterSpec::new("x", TypeName::primitive("'a")).unwrap())
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("list"),
-            vec![TypeName::primitive("'b")],
+            vec![TypeArgument::Single(TypeName::primitive("'b"))],
         ))
         .body(map_pair_body.build().unwrap())
         .build()
@@ -159,19 +166,26 @@ fn macro_approach() -> String {
     .unwrap();
 
     let map_pair_fn = FunSpec::builder("map_pair")
-        .add_type_param(TypeParamSpec::new("'a"))
-        .add_type_param(TypeParamSpec::new("'b"))
+        .add_generic_param(GenericParamSpec::single("'a").unwrap())
+        .add_generic_param(GenericParamSpec::single("'b").unwrap())
         .add_param(
             ParameterSpec::new(
                 "f",
-                TypeName::function(vec![TypeName::primitive("'a")], TypeName::primitive("'b")),
+                TypeName::callable(
+                    vec![CallableParam::Single {
+                        name: None,
+                        type_name: TypeName::primitive("'a"),
+                        presence: CallableParamPresence::Required,
+                    }],
+                    TypeName::primitive("'b"),
+                ),
             )
             .unwrap(),
         )
         .add_param(ParameterSpec::new("x", TypeName::primitive("'a")).unwrap())
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("list"),
-            vec![TypeName::primitive("'b")],
+            vec![TypeArgument::Single(TypeName::primitive("'b"))],
         ))
         .body(map_pair_body)
         .build()

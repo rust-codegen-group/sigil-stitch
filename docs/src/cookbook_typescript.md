@@ -26,7 +26,7 @@ let type_spec = TypeSpec::builder("UserService", TypeKind::Class)
         FunSpec::builder("getUser")
             .is_async()
             .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-            .returns(TypeName::generic(TypeName::primitive("Promise"), vec![user_type]))
+            .returns(TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(user_type)]))
             .body(body)
             .build()
             .unwrap(),
@@ -64,18 +64,18 @@ export class UserService {
 # fn main() {
 let type_spec = TypeSpec::builder("Repository", TypeKind::Interface)
     .visibility(Visibility::Public)
-    .add_type_param(TypeParamSpec::new("T"))
+    .add_generic_param(GenericParamSpec::single("T").unwrap())
     .add_method(
         FunSpec::builder("findById")
             .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-            .returns(TypeName::generic(TypeName::primitive("Promise"), vec![TypeName::primitive("T")]))
+            .returns(TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(TypeName::primitive("T"))]))
             .build()
             .unwrap(),
     )
     .add_method(
         FunSpec::builder("save")
             .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
-            .returns(TypeName::generic(TypeName::primitive("Promise"), vec![TypeName::primitive("void")]))
+            .returns(TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(TypeName::primitive("void"))]))
             .build()
             .unwrap(),
     )

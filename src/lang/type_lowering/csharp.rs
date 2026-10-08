@@ -13,6 +13,23 @@ use crate::spec::type_spec::{TypeIntent, ValidatedType};
 use super::common;
 
 pub(crate) fn validate(lang: &CSharp, type_: TypeIntent<'_>) -> Result<(), SigilStitchError> {
+    for parameter in type_.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        if !matches!(
+            parameter.domain().as_ref(),
+            crate::spec::where_spec::GenericParamDomain::Single {
+                kind: None | Some(crate::spec::where_spec::KindExpr::Type)
+            }
+        ) {
+            return Err(SigilStitchError::InvalidTypeParameter {
+                type_name: type_.name().into(),
+                parameter_name: parameter.name().into(),
+                reason: "this binding domain has no representation in this type declaration".into(),
+            });
+        }
+    }
     common::validate_declaration(
         type_,
         lang.file_extension(),
@@ -35,7 +52,7 @@ pub(crate) fn validate(lang: &CSharp, type_: TypeIntent<'_>) -> Result<(), Sigil
     common::validate_constraint_subjects(type_, lang.file_extension(), type_.where_constraints())?;
     for parameter in type_.type_params() {
         if let Err(reason) = csharp_constraints::validate_type_constraint_bounds(
-            parameter,
+            &parameter,
             type_.where_constraints(),
         ) {
             return Err(SigilStitchError::InvalidTypeParameter {
@@ -133,7 +150,7 @@ fn append_constraints(
     let mut emitted = false;
     for parameter in type_.type_params() {
         let bounds =
-            csharp_constraints::merged_constraint_bounds(parameter, type_.where_constraints());
+            csharp_constraints::merged_constraint_bounds(&parameter, type_.where_constraints());
         if bounds.is_empty() {
             continue;
         }

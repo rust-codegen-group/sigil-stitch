@@ -18,6 +18,7 @@ fn terminal_type(type_name: &TypeName, qualified_separator: Option<&str>) -> Opt
             Some(separator) => qualified(module, separator, imported_name),
             None => name(imported_name.clone()),
         }),
+        TypeName::Parameter(value) => Some(literal(value.clone())),
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             Some(terminal(type_name))
         }
@@ -58,6 +59,10 @@ fn collections_generic(name: &str) -> CodeBlock {
     terminal(&TypeName::importable("System.Collections.Generic", name))
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     if let Some(terminal) = terminal_type(type_name, Some(".")) {
         return Ok(terminal);
@@ -71,9 +76,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             collections_generic("IReadOnlyList"),
             delimited_soft("<", vec![lower(inner)?], ",", ">"),
         ]),
-        TypeName::Generic { base, params } => generic_delimited(
+        TypeName::Generic { base, .. } | TypeName::Application { base, .. } => generic_delimited(
             lower(base)?,
-            params.iter().map(lower).collect::<Result<_, _>>()?,
+            lower_application_arguments(type_name)?,
             "<",
             ">",
         ),
@@ -102,7 +107,7 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::Reference { .. } => Err(unsupported(
             "C# reference modifiers are declaration syntax, not type expressions",
         ))?,
-        TypeName::Function { .. } => Err(unsupported(
+        TypeName::Function { .. } | TypeName::Callable { .. } => Err(unsupported(
             "C# function types require a selected delegate type",
         ))?,
         TypeName::AssociatedType {
@@ -119,6 +124,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::StringLiteral(_) => {
             Err(unsupported("C# has no string singleton type expression"))?
         }
+        TypeName::Parameter(_) => Err(unsupported(
+            "C# modern type expressions are not supported in this position",
+        ))?,
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             unreachable!("terminal variants returned above")
         }
@@ -127,3 +135,29 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
 
 #[cfg(test)]
 assert_string_literal_rejection!("cs", "C# has no string singleton type expression");
+
+#[expect(
+    deprecated,
+    reason = "borrow released and modern application inputs without conversion"
+)]
+fn lower_application_arguments(type_name: &TypeName) -> Result<Vec<CodeBlock>, SigilStitchError> {
+    let values = match type_name {
+        TypeName::Generic { params, .. } => {
+            params.iter().map(lower).collect::<Result<Vec<_>, _>>()?
+        }
+        TypeName::Application { arguments, .. } => arguments
+            .iter()
+            .map(|argument| match argument {
+                crate::spec::where_spec::TypeArgument::Single(value) => lower(value),
+                crate::spec::where_spec::TypeArgument::Expansion { .. } => Err(unsupported(
+                    "argument-pack expansion is not supported in this type application",
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        _ => unreachable!("application helper receives only application inputs"),
+    };
+    if values.is_empty() {
+        return Err(unsupported("this target has no empty type-argument syntax"));
+    }
+    Ok(values)
+}

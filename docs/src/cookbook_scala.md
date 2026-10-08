@@ -39,7 +39,7 @@ case class User(name: String, age: Int, email: String) {
 # use sigil_stitch::prelude::*;
 # fn main() {
 let type_spec = TypeSpec::builder("Repository", TypeKind::Trait)
-    .add_type_param(TypeParamSpec::new("T"))
+    .add_generic_param(GenericParamSpec::single("T").unwrap())
     .doc("Generic data repository.")
     .add_method(
         FunSpec::builder("findById")
@@ -107,8 +107,8 @@ enum Color {
 let body = CodeBlock::of("if (a.compareTo(b) >= 0) a else b", ()).unwrap();
 
 let fun = FunSpec::builder("max")
-    .add_type_param(
-        TypeParamSpec::new("T").with_bound(TypeName::primitive("Comparable[T]")),
+    .add_generic_param(
+        GenericParamSpec::single("T").unwrap().with_bound(TypeName::primitive("Comparable[T]")).unwrap(),
     )
     .returns(TypeName::primitive("T"))
     .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())

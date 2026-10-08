@@ -71,7 +71,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec, TypeSpec) {
     let config = TypeSpec::builder("Config", TypeKind::Struct)
         .visibility(Visibility::Public)
         .annotate(AnnotationSpec::new("derive").args(["Debug", "Clone"]))
-        .add_type_param(TypeParamSpec::lifetime("'a"))
+        .add_generic_param(GenericParamSpec::lifetime("'a").unwrap())
         .add_field(
             FieldSpec::builder(
                 "name",
@@ -84,9 +84,12 @@ fn build_shared_types() -> (TypeSpec, TypeSpec, TypeSpec) {
         .add_field(
             FieldSpec::builder(
                 "values",
-                TypeName::generic(
+                TypeName::application(
                     hashmap,
-                    vec![TypeName::primitive("String"), TypeName::primitive("i64")],
+                    vec![
+                        TypeArgument::Single(TypeName::primitive("String")),
+                        TypeArgument::Single(TypeName::primitive("i64")),
+                    ],
                 ),
             )
             .visibility(Visibility::Public)
@@ -138,7 +141,7 @@ fn builder_approach() -> String {
 
     let print_fn = FunSpec::builder("print_item")
         .visibility(Visibility::Public)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_where_constraint(
             TypeName::primitive("T"),
             vec![display, TypeName::primitive("Clone")],
@@ -236,7 +239,7 @@ fn macro_approach() -> String {
 
     let print_fn = FunSpec::builder("print_item")
         .visibility(Visibility::Public)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_where_constraint(
             TypeName::primitive("T"),
             vec![display, TypeName::primitive("Clone")],

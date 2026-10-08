@@ -262,7 +262,7 @@ impl FileSpec {
         }
     }
 
-    /// Render the file with the built-in fallible import-alias policy.
+    /// Render the file with the selected language's default fallible alias policy.
     pub fn render(&self, width: usize) -> Result<String, SigilStitchError> {
         self.render_with_resolver(width, None)
     }
@@ -409,7 +409,11 @@ impl FileSpec {
             Some(resolver) => {
                 ImportGroup::try_resolve_with(&import_refs, explicit_entries, resolver)?
             }
-            None => ImportGroup::try_resolve(&import_refs, explicit_entries)?,
+            None => ImportGroup::try_resolve_with_default(
+                &import_refs,
+                explicit_entries,
+                lang.default_import_alias_resolver(),
+            )?,
         };
         lang.validate_resolved_imports(&imports)?;
 

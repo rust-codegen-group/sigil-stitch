@@ -1,0 +1,40 @@
+{
+  "cpp": {
+    "compiler": "clang++",
+    "version_flags": ["--version"],
+    "flags": ["-std=c++20", "-fsyntax-only", "-fno-color-diagnostics"],
+    "positive": "cpp_positive.cpp",
+    "negative": [
+      {"file": "cpp_mismatched.cpp", "diagnostic": "no matching function for call to 'pairs'|pack expansion contains parameter packs.*different lengths"}
+    ]
+  },
+  "haskell": {
+    "compiler": "ghc",
+    "version_flags": ["--numeric-version"],
+    "flags": ["-fno-code", "-fforce-recomp", "-fdiagnostics-color=never", "-XDataKinds", "-XKindSignatures", "-XExplicitForAll", "-XTypeOperators", "-XExplicitNamespaces"],
+    "positive": "haskell_positive.hs",
+    "negative": [
+      {"file": "haskell_wrong_index.hs", "diagnostic": "Couldn't match type.*(?:5.*6|6.*5)"}
+    ]
+  },
+  "typescript": {
+    "compiler": "vp",
+    "command_prefix": ["dlx", "--package", "typescript@7.0.2", "tsc"],
+    "version_flags": ["--version"],
+    "flags": ["--strict", "--noEmit", "--pretty", "false", "--target", "ES2020"],
+    "positive": "typescript_positive.ts",
+    "negative": [
+      {"file": "typescript_missing.ts", "diagnostic": "TS2554: Expected 1-2 arguments, but got 0"},
+      {"file": "typescript_wrong_type.ts", "diagnostic": "TS2345: Argument of type 'number' is not assignable to parameter of type 'string'"}
+    ]
+  },
+  "scala": {
+    "compiler": "scalac",
+    "version_flags": ["-version"],
+    "flags": ["-color:never"],
+    "positive": "scala_positive.scala",
+    "negative": [
+      {"file": "scala_wrong_kind.scala", "diagnostic": "Type argument Int does not conform to upper bound \\[_\\] =>> Any"}
+    ]
+  }
+}

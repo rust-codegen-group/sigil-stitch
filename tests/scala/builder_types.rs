@@ -6,6 +6,10 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::TypeKind;
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::{TypeParamKind, TypeParamSpec};
 use sigil_stitch::type_name::TypeName;
 
@@ -37,6 +41,10 @@ fn test_case_class() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_trait_with_type_param() {
     let tp = TypeParamSpec::new("T");
 
@@ -136,6 +144,10 @@ fn test_enum() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_hkt_type_param() {
     let tp_f = TypeParamSpec::new("F").with_kind(TypeParamKind::Constructor1);
     let tp_a = TypeParamSpec::new("A");
@@ -161,6 +173,10 @@ fn test_hkt_type_param() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_bounded_type_param() {
     let tp = TypeParamSpec::new("T").with_bound(TypeName::primitive("Comparable[T]"));
 
@@ -217,6 +233,10 @@ fn test_abstract_class() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_context_bound() {
     let body = CodeBlock::of("implicitly[Ordering[T]].compare(a, b)", ()).unwrap();
     let fun = FunSpec::builder("sortedPair")
@@ -257,6 +277,10 @@ fn test_newtype() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_multiple_context_bounds() {
     let body = CodeBlock::of("implicitly[Ordering[T]].compare(a, b)", ()).unwrap();
     let fun = FunSpec::builder("compare")

@@ -1,10 +1,10 @@
 //! Shared semantic capability derivation for concrete type declarations.
 
-use super::where_spec::{TypeParamSpec, WhereConstraint};
+use super::where_spec::{GenericParamView, WhereConstraint};
 use crate::lang::capability::TypeDeclarationCapability;
 
 pub(crate) fn requested_capabilities(
-    parameters: &[TypeParamSpec],
+    parameters: &[GenericParamView<'_>],
     constraints: &[WhereConstraint],
     has_annotations: bool,
 ) -> Vec<TypeDeclarationCapability> {
@@ -21,7 +21,7 @@ pub(crate) fn requested_capabilities(
     }
     if parameters
         .iter()
-        .any(|parameter| parameter.kind().is_some())
+        .any(|parameter| parameter.has_constructor_kind())
     {
         requested.push(TypeDeclarationCapability::HigherKindedPolymorphism);
     }

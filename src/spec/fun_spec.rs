@@ -9,7 +9,13 @@ use crate::lang::capability::{
 use crate::spec::annotation_spec::AnnotationSpec;
 use crate::spec::modifiers::{DeclarationContext, Modifiers, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
+use crate::spec::where_spec::{
+    GenericParamEntry, GenericParamIter, GenericParamSpec, TypeParamSpec, WhereConstraint,
+};
 use crate::type_name::TypeName;
 
 /// How function parameter lists are formatted.
@@ -68,7 +74,8 @@ pub struct FunSpec {
     pub(crate) body: Option<CodeBlock>,
     pub(crate) modifiers: Modifiers,
     pub(crate) doc: Vec<String>,
-    pub(crate) type_params: Vec<TypeParamSpec>,
+    #[serde(default)]
+    pub(crate) generic_entries: Vec<GenericParamEntry>,
     pub(crate) annotations: Vec<CodeBlock>,
     pub(crate) annotation_specs: Vec<AnnotationSpec>,
     /// Receiver parameter (e.g., Go: `func (s *Server) Handle()`).
@@ -150,8 +157,15 @@ impl<'a> FunctionIntent<'a> {
     }
 
     /// Declared type parameters.
-    pub fn type_params(self) -> &'a [TypeParamSpec] {
-        &self.spec.type_params
+    pub(crate) fn type_params(self) -> Vec<crate::spec::where_spec::GenericParamView<'a>> {
+        self.generic_params().collect()
+    }
+
+    /// Ordered modern and compatibility generic-parameter view.
+    pub fn generic_params(
+        self,
+    ) -> impl Iterator<Item = crate::spec::where_spec::GenericParamView<'a>> {
+        GenericParamIter::new(&self.spec.generic_entries)
     }
 
     /// Opaque annotation blocks supplied through the escape hatch.
@@ -238,7 +252,7 @@ impl FunSpec {
             body: None,
             modifiers: Modifiers::default(),
             doc: Vec::new(),
-            type_params: Vec::new(),
+            generic_entries: Vec::new(),
             annotations: Vec::new(),
             annotation_specs: Vec::new(),
             receiver: None,
@@ -251,6 +265,13 @@ impl FunSpec {
     /// Return the function name.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Ordered modern and compatibility generic-parameter view.
+    pub fn generic_params(
+        &self,
+    ) -> impl Iterator<Item = crate::spec::where_spec::GenericParamView<'_>> {
+        GenericParamIter::new(&self.generic_entries)
     }
 
     /// Validate this function against the language function-capability matrix.
@@ -366,6 +387,11 @@ impl FunSpec {
         lang: &L,
         intent: FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        for entry in &self.generic_entries {
+            if let GenericParamEntry::Modern(parameter) = entry {
+                parameter.validate()?;
+            }
+        }
         let capabilities = lang.capabilities();
         let permissive_validation = capabilities.function_validation_is_permissive();
         let context = intent.function_context();
@@ -397,7 +423,7 @@ impl FunSpec {
         }
         let language = lang.file_extension().to_string();
         let mut type_parameter_names = std::collections::HashSet::new();
-        for parameter in &self.type_params {
+        for parameter in self.generic_params() {
             if !type_parameter_names.insert(parameter.name()) {
                 return Err(SigilStitchError::DuplicateFunctionTypeParameterName {
                     function_name: self.name.clone(),
@@ -625,19 +651,19 @@ impl FunSpec {
 
         request(
             FunctionCapability::ParametricPolymorphism,
-            !self.type_params.is_empty(),
+            !self.generic_entries.is_empty(),
         );
         request(
             FunctionCapability::BoundedPolymorphism,
             !self.where_constraints.is_empty()
                 || self
-                    .type_params
-                    .iter()
-                    .any(|param| !param.bounds.is_empty() || !param.context_bounds.is_empty()),
+                    .generic_params()
+                    .any(|param| !param.bounds().is_empty() || !param.context_bounds().is_empty()),
         );
         request(
             FunctionCapability::HigherKindedPolymorphism,
-            self.type_params.iter().any(|param| param.kind().is_some()),
+            self.generic_params()
+                .any(|param| param.has_constructor_kind()),
         );
         request(
             FunctionCapability::Attributes,
@@ -740,7 +766,7 @@ impl FunSpec {
                 .params
                 .iter()
                 .any(|parameter| !parameter.param_type.is_empty())
-                || !self.type_params.is_empty()
+                || !self.generic_entries.is_empty()
                 || !self.where_constraints.is_empty();
 
             if self.return_type.is_none() && has_signature_metadata {
@@ -780,7 +806,7 @@ impl FunSpec {
         if !permissive_validation {
             lang.validate_function_type_constraints(
                 &self.name,
-                &self.type_params,
+                &self.generic_params().collect::<Vec<_>>(),
                 &self.where_constraints,
             )?;
             match lang.function_body_policy(context, form, self.modifiers.is_static) {
@@ -884,7 +910,7 @@ pub struct FunSpecBuilder {
     body: Option<CodeBlock>,
     modifiers: Modifiers,
     doc: Vec<String>,
-    type_params: Vec<TypeParamSpec>,
+    generic_entries: Vec<GenericParamEntry>,
     annotations: Vec<CodeBlock>,
     annotation_specs: Vec<AnnotationSpec>,
     receiver: Option<ParameterSpec>,
@@ -955,8 +981,20 @@ impl FunSpecBuilder {
     }
 
     /// Add a generic type parameter.
+    #[deprecated(note = "legacy declaration binding; use add_generic_param(GenericParamSpec)")]
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     pub fn add_type_param(mut self, tp: TypeParamSpec) -> Self {
-        self.type_params.push(tp);
+        self.generic_entries.push(GenericParamEntry::Legacy(tp));
+        self
+    }
+
+    /// Add a modern semantic generic parameter.
+    pub fn add_generic_param(mut self, parameter: GenericParamSpec) -> Self {
+        self.generic_entries
+            .push(GenericParamEntry::Modern(parameter));
         self
     }
 
@@ -1039,7 +1077,7 @@ impl FunSpecBuilder {
             body: self.body,
             modifiers: self.modifiers,
             doc: self.doc,
-            type_params: self.type_params,
+            generic_entries: self.generic_entries,
             annotations: self.annotations,
             annotation_specs: self.annotation_specs,
             receiver: self.receiver,

@@ -60,6 +60,10 @@ coverage-nextest:
 bench-type-name-lowering:
     cargo bench --bench type_name_lowering
 
+# Local generated-source compiler acceptance; all selected compilers are required
+generated-source-acceptance *args:
+    cargo run --quiet --example source_acceptance -- {{args}}
+
 # Update golden test files
 bless:
     BLESS=1 cargo test --workspace

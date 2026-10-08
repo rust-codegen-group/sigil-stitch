@@ -107,7 +107,7 @@ impl TypeScript {
     }
 }
 
-const TS_RESERVED: &[&str] = &[
+pub(crate) const TS_RESERVED: &[&str] = &[
     // ECMAScript reserved words
     "break",
     "case",
@@ -551,6 +551,12 @@ const TS_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for TypeScript {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::typescript_function_lowering::validate_generic_parameters(self, function)
+    }
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,
@@ -650,7 +656,7 @@ impl CodeLang for TypeScript {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         if let Some(parameter) = type_params.iter().find(|parameter| {
@@ -1035,16 +1041,14 @@ mod tests {
         assert_eq!(ts.file_extension(), "tsx");
         assert_eq!(ts.block_syntax().indent_unit, "    ");
 
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "./models".to_string(),
-                name: "User".to_string(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "./models".to_string(),
+            name: "User".to_string(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         let output = ts.render_imports(&imports);
         assert!(output.contains("import { User } from './models'"));
         assert!(!output.contains(";"));
@@ -1070,26 +1074,24 @@ mod tests {
     #[test]
     fn test_render_imports() {
         let ts = TypeScript::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "./models".to_string(),
-                    name: "User".to_string(),
-                    alias: None,
-                    is_type_only: true,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "./models".to_string(),
-                    name: "UserFromJSON".to_string(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "./models".to_string(),
+                name: "User".to_string(),
+                alias: None,
+                is_type_only: true,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "./models".to_string(),
+                name: "UserFromJSON".to_string(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = ts.render_imports(&imports);
         assert!(output.contains("import type { User } from './models'"));
         assert!(output.contains("import { UserFromJSON } from './models'"));
@@ -1098,26 +1100,24 @@ mod tests {
     #[test]
     fn test_render_imports_with_alias() {
         let ts = TypeScript::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "./models".to_string(),
-                    name: "User".to_string(),
-                    alias: None,
-                    is_type_only: true,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "./other".to_string(),
-                    name: "User".to_string(),
-                    alias: Some("OtherUser".to_string()),
-                    is_type_only: true,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "./models".to_string(),
+                name: "User".to_string(),
+                alias: None,
+                is_type_only: true,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "./other".to_string(),
+                name: "User".to_string(),
+                alias: Some("OtherUser".to_string()),
+                is_type_only: true,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = ts.render_imports(&imports);
         assert!(output.contains("import type { User } from './models'"));
         assert!(output.contains("import type { User as OtherUser } from './other'"));
@@ -1126,16 +1126,14 @@ mod tests {
     #[test]
     fn import_paths_use_language_owned_string_escaping() {
         let ts = TypeScript::new().with_double_quotes();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "./path\\segment\t\u{2028}".into(),
-                name: "Value".into(),
-                alias: None,
-                is_type_only: true,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "./path\\segment\t\u{2028}".into(),
+            name: "Value".into(),
+            alias: None,
+            is_type_only: true,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(
             ts.render_imports(&imports),
             "import type { Value } from \"./path\\\\segment\\t\\u2028\";"

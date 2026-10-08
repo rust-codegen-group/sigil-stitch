@@ -16,6 +16,10 @@ fn render(block: &CodeBlock) -> String {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_imports() {
     let vector = TypeName::generic(
         TypeName::importable("vector", "std::vector"),

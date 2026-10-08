@@ -1,7 +1,7 @@
 # TypeName Validation and Lowering
 
 Status: implemented for every current `TypeName` variant, including string
-literal types.
+literal types, parameter references, applications, and callable sequences.
 
 `TypeName` records semantic type-reference structure. It does not describe a
 shared target grammar. One selected language adapter must either lower the
@@ -34,6 +34,19 @@ The selected language adapter owns:
 No `TypeExpressionCapability`, presentation matrix, or universal syntax
 configuration sits between those responsibilities. Detailed type grammar
 varies together and remains local to one adapter.
+
+Legacy `Generic` / `Function` and modern `Application` / `Callable` inputs
+share semantic validation and traversal; they do not create a second
+preparation pipeline. Every adapter must preserve the supplied structure or
+return `SigilStitchError`. An unsupported expansion, kind, label, or presence
+rule is not silently erased, and the library performs no type-level
+evaluation, argument inference, or pack-length solving.
+
+Generic declaration lowerers consume borrowed `GenericParamView` values from
+the owner's single ordered binding store. Kind expressions remain structural
+until that declaration's language-owned lowering. Haskell callers supply
+required extensions themselves through file headers or compiler flags;
+sigil-stitch does not infer pragmas from type expressions.
 
 ## One Fallible Interface
 

@@ -12,6 +12,23 @@ use crate::spec::modifiers::{DeclarationContext, Visibility};
 use super::{emit_annotations, emit_case_annotations, emit_case_doc, emit_doc};
 
 pub(crate) fn validate(lang: &Rust, sum: ClosedSumIntent<'_>) -> Result<(), SigilStitchError> {
+    for parameter in sum.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        if !matches!(
+            parameter.domain().as_ref(),
+            crate::spec::where_spec::GenericParamDomain::Single {
+                kind: None | Some(crate::spec::where_spec::KindExpr::Type)
+            } | crate::spec::where_spec::GenericParamDomain::Lifetime
+        ) {
+            return Err(SigilStitchError::InvalidTypeParameter {
+                type_name: sum.name().into(),
+                parameter_name: parameter.name().into(),
+                reason: "this binding domain has no representation in this declaration".into(),
+            });
+        }
+    }
     if !matches!(
         sum.visibility(),
         Visibility::Inherited
@@ -47,11 +64,9 @@ pub(crate) fn validate(lang: &Rust, sum: ClosedSumIntent<'_>) -> Result<(), Sigi
                         .to_string(),
                 });
             }
-            if parameter
-                .bounds()
-                .iter()
-                .any(|bound| !crate::lang::rust::is_valid_lifetime_bound(bound, sum.type_params()))
-            {
+            if parameter.bounds().iter().any(|bound| {
+                !crate::lang::rust::is_valid_generic_lifetime_bound(bound, &sum.type_params())
+            }) {
                 return Err(SigilStitchError::InvalidTypeParameter {
                     type_name: sum.name().to_string(),
                     parameter_name: parameter.name().to_string(),
@@ -106,11 +121,9 @@ pub(crate) fn validate(lang: &Rust, sum: ClosedSumIntent<'_>) -> Result<(), Sigi
                 reason: "Rust lifetime constraints must target a declared lifetime".to_string(),
             });
         }
-        if constraint
-            .bounds()
-            .iter()
-            .any(|bound| !crate::lang::rust::is_valid_lifetime_bound(bound, sum.type_params()))
-        {
+        if constraint.bounds().iter().any(|bound| {
+            !crate::lang::rust::is_valid_generic_lifetime_bound(bound, &sum.type_params())
+        }) {
             return Err(SigilStitchError::InvalidTypeParameter {
                 type_name: sum.name().to_string(),
                 parameter_name: subject.to_string(),
@@ -150,6 +163,10 @@ pub(crate) fn validate(lang: &Rust, sum: ClosedSumIntent<'_>) -> Result<(), Sigi
     Ok(())
 }
 
+#[expect(
+    deprecated,
+    reason = "walk released compatibility variants alongside modern type expressions"
+)]
 fn contains_parameter(ty: &crate::type_name::TypeName, name: &str) -> bool {
     use crate::type_name::TypeName;
     match ty {
@@ -166,6 +183,16 @@ fn contains_parameter(ty: &crate::type_name::TypeName, name: &str) -> bool {
             contains_parameter(base, name)
                 || params.iter().any(|param| contains_parameter(param, name))
         }
+        TypeName::Application { base, arguments } => {
+            contains_parameter(base, name)
+                || arguments.iter().any(|argument| match argument {
+                    crate::spec::where_spec::TypeArgument::Single(value)
+                    | crate::spec::where_spec::TypeArgument::Expansion { pattern: value } => {
+                        contains_parameter(value, name)
+                    }
+                })
+        }
+        TypeName::Parameter(value) => value == name,
         TypeName::Union(values)
         | TypeName::Intersection(values)
         | TypeName::Tuple(values)
@@ -182,6 +209,22 @@ fn contains_parameter(ty: &crate::type_name::TypeName, name: &str) -> bool {
         } => {
             params.iter().any(|param| contains_parameter(param, name))
                 || contains_parameter(return_type, name)
+        }
+        TypeName::Callable {
+            parameters,
+            return_type,
+        } => {
+            parameters.iter().any(|parameter| match parameter {
+                crate::spec::where_spec::CallableParam::Single { type_name, .. } => {
+                    contains_parameter(type_name, name)
+                }
+                crate::spec::where_spec::CallableParam::Repeated { element_type, .. } => {
+                    contains_parameter(element_type, name)
+                }
+                crate::spec::where_spec::CallableParam::Expansion { pattern, .. } => {
+                    contains_parameter(pattern, name)
+                }
+            }) || contains_parameter(return_type, name)
         }
         TypeName::AssociatedType {
             base, qualifier, ..
@@ -309,4 +352,49 @@ fn emit_case(
     block.add(",", ());
     block.add_line();
     Ok(())
+}
+
+#[cfg(test)]
+mod occurrence_tests {
+    use super::*;
+    use crate::spec::where_spec::{CallableParam, CallableParamPresence, TypeArgument};
+    use crate::type_name::TypeName;
+
+    #[test]
+    fn modern_occurrences_include_all_callable_segments_and_application_patterns() {
+        for parameter in [
+            CallableParam::Single {
+                name: None,
+                type_name: TypeName::parameter("T"),
+                presence: CallableParamPresence::Required,
+            },
+            CallableParam::Repeated {
+                name: None,
+                element_type: TypeName::parameter("T"),
+            },
+            CallableParam::Expansion {
+                name: None,
+                pattern: TypeName::parameter("T"),
+            },
+        ] {
+            let ty = TypeName::application(
+                TypeName::parameter("F"),
+                vec![TypeArgument::Single(TypeName::callable(
+                    vec![parameter],
+                    TypeName::parameter("R"),
+                ))],
+            );
+            for name in ["T", "F", "R"] {
+                assert!(contains_parameter(&ty, name));
+            }
+            assert!(!contains_parameter(&ty, "Missing"));
+        }
+        let ty = TypeName::application(
+            TypeName::parameter("F"),
+            vec![TypeArgument::Expansion {
+                pattern: TypeName::parameter("T"),
+            }],
+        );
+        assert!(contains_parameter(&ty, "T"));
+    }
 }

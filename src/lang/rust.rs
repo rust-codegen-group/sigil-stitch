@@ -77,12 +77,14 @@ pub(crate) fn is_valid_lifetime_parameter_name(name: &str) -> bool {
         && !RUST_RESERVED.contains(&identifier)
 }
 
-pub(crate) fn is_valid_lifetime_bound(
+pub(crate) fn is_valid_generic_lifetime_bound(
     bound: &crate::type_name::TypeName,
-    type_params: &[crate::spec::where_spec::TypeParamSpec],
+    type_params: &[crate::spec::where_spec::GenericParamView<'_>],
 ) -> bool {
     let name = match bound {
-        crate::type_name::TypeName::Primitive(name) | crate::type_name::TypeName::Raw(name) => name,
+        crate::type_name::TypeName::Primitive(name)
+        | crate::type_name::TypeName::Raw(name)
+        | crate::type_name::TypeName::Parameter(name) => name,
         _ => return false,
     };
     name == "'static"
@@ -99,22 +101,35 @@ pub(crate) fn lifetime_constraint_subject_name(
     use crate::type_name::TypeName;
 
     match subject {
-        TypeName::Primitive(name) | TypeName::Raw(name) if name.starts_with('\'') => Ok(Some(name)),
+        TypeName::Primitive(name) | TypeName::Raw(name) | TypeName::Parameter(name)
+            if name.starts_with('\'') =>
+        {
+            Ok(Some(name))
+        }
         _ if lifetime_head_name(subject).is_some() => Err(()),
         _ => Ok(None),
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "classify released compatibility applications alongside modern values"
+)]
 fn lifetime_head_name(type_name: &crate::type_name::TypeName) -> Option<&str> {
     use crate::type_name::TypeName;
 
     match type_name {
-        TypeName::Primitive(name) | TypeName::Raw(name) | TypeName::Importable { name, .. }
+        TypeName::Primitive(name)
+        | TypeName::Raw(name)
+        | TypeName::Parameter(name)
+        | TypeName::Importable { name, .. }
             if name.starts_with('\'') =>
         {
             Some(name)
         }
-        TypeName::Generic { base, .. } => lifetime_head_name(base),
+        TypeName::Generic { base, .. } | TypeName::Application { base, .. } => {
+            lifetime_head_name(base)
+        }
         _ => None,
     }
 }
@@ -405,6 +420,12 @@ const RUST_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Rust {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::rust_function_lowering::validate_generic_parameters(self, function)
+    }
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,
@@ -459,7 +480,7 @@ impl CodeLang for Rust {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         for parameter in type_params {
@@ -477,7 +498,7 @@ impl CodeLang for Rust {
                 if parameter
                     .bounds()
                     .iter()
-                    .any(|bound| !is_valid_lifetime_bound(bound, type_params))
+                    .any(|bound| !is_valid_generic_lifetime_bound(bound, type_params))
                 {
                     return Err(SigilStitchError::InvalidFunctionTypeParameter {
                         language: self.file_extension().to_string(),
@@ -536,7 +557,7 @@ impl CodeLang for Rust {
             if constraint
                 .bounds()
                 .iter()
-                .any(|bound| !is_valid_lifetime_bound(bound, type_params))
+                .any(|bound| !is_valid_generic_lifetime_bound(bound, type_params))
             {
                 return Err(SigilStitchError::InvalidFunctionTypeParameter {
                     language: self.file_extension().to_string(),
@@ -818,42 +839,40 @@ mod tests {
     #[test]
     fn test_render_imports_grouped() {
         let rs = Rust::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "std::collections".into(),
-                    name: "HashMap".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "std::collections".into(),
-                    name: "BTreeMap".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "serde".into(),
-                    name: "Serialize".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "crate::models".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "std::collections".into(),
+                name: "HashMap".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "std::collections".into(),
+                name: "BTreeMap".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "serde".into(),
+                name: "Serialize".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "crate::models".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = rs.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         // std group first
@@ -871,16 +890,14 @@ mod tests {
     #[test]
     fn test_render_imports_with_alias() {
         let rs = Rust::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "models".into(),
-                name: "User".into(),
-                alias: Some("ModelsUser".into()),
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "models".into(),
+            name: "User".into(),
+            alias: Some("ModelsUser".into()),
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         let output = rs.render_imports(&imports);
         assert_eq!(output, "use models::User as ModelsUser;");
     }

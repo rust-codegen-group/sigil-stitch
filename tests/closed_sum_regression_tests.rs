@@ -2,6 +2,10 @@
 
 use sigil_stitch::lang::{dart::Dart, java::Java, ocaml::OCaml, swift::Swift};
 use sigil_stitch::prelude::*;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 
 #[test]
@@ -34,6 +38,10 @@ fn java_record_cases_reject_forbidden_component_names() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn ocaml_rejects_type_parameters_with_the_same_lowered_name() {
     let sum = ClosedSumSpec::builder("outcome")
         .add_type_param(TypeParamSpec::new("a"))
@@ -47,6 +55,10 @@ fn ocaml_rejects_type_parameters_with_the_same_lowered_name() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn ordinary_declaration_capabilities_precede_type_specific_capabilities() {
     let spec = TypeSpec::builder("Outcome", TypeKind::Enum)
         .add_type_param(TypeParamSpec::new("T"))
@@ -170,6 +182,10 @@ impl CodeLang for NoFeatures {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn declaration_capability_diagnostics_preserve_feature_order_and_empty_groups() {
     use sigil_stitch::spec::where_spec::TypeParamKind;
     let declaration = TypeSpec::builder("Container", TypeKind::Class)

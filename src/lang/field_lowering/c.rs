@@ -62,6 +62,10 @@ fn is_valid_identifier(name: &str) -> bool {
         && chars.all(unicode_ident::is_xid_continue)
 }
 
+#[expect(
+    deprecated,
+    reason = "classify released compatibility declarators alongside modern values"
+)]
 fn requires_interleaved_declarator(field_type: &crate::type_name::TypeName) -> bool {
     use crate::type_name::TypeName;
 
@@ -74,6 +78,16 @@ fn requires_interleaved_declarator(field_type: &crate::type_name::TypeName) -> b
             requires_interleaved_declarator(base)
                 || params.iter().any(requires_interleaved_declarator)
         }
+        TypeName::Application { base, arguments } => {
+            requires_interleaved_declarator(base)
+                || arguments.iter().any(|argument| match argument {
+                    crate::spec::where_spec::TypeArgument::Single(value)
+                    | crate::spec::where_spec::TypeArgument::Expansion { pattern: value } => {
+                        requires_interleaved_declarator(value)
+                    }
+                })
+        }
+        TypeName::Parameter(_) => false,
         TypeName::Union(types)
         | TypeName::Intersection(types)
         | TypeName::Tuple(types)
@@ -85,6 +99,7 @@ fn requires_interleaved_declarator(field_type: &crate::type_name::TypeName) -> b
         TypeName::Map { key, value } => {
             requires_interleaved_declarator(key) || requires_interleaved_declarator(value)
         }
+        TypeName::Callable { .. } => true,
         TypeName::AssociatedType {
             base, qualifier, ..
         } => {

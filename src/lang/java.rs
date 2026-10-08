@@ -11,7 +11,7 @@ use crate::lang::capability::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+use crate::spec::where_spec::WhereConstraint;
 use crate::type_name::TypeName;
 
 /// Java language implementation.
@@ -93,6 +93,10 @@ enum JavaErasureIdentity {
     Associated { base: Box<Self>, member: String },
 }
 
+#[expect(
+    deprecated,
+    reason = "retain released compatibility metadata and hooks"
+)]
 fn java_erasure_identity(type_name: &TypeName) -> Option<JavaErasureIdentity> {
     Some(match type_name {
         TypeName::Importable { module, name, .. } => JavaErasureIdentity::Imported {
@@ -100,11 +104,14 @@ fn java_erasure_identity(type_name: &TypeName) -> Option<JavaErasureIdentity> {
             name: name.clone(),
         },
         TypeName::Primitive(name) | TypeName::Raw(name) => JavaErasureIdentity::Named(name.clone()),
+        TypeName::Parameter(name) => JavaErasureIdentity::Named(name.clone()),
         TypeName::Array(_) => JavaErasureIdentity::Imported {
             module: "java.util".to_string(),
             name: "List".to_string(),
         },
-        TypeName::Generic { base, .. } => java_erasure_identity(base)?,
+        TypeName::Generic { base, .. } | TypeName::Application { base, .. } => {
+            java_erasure_identity(base)?
+        }
         TypeName::Map { .. } => JavaErasureIdentity::Imported {
             module: "java.util".to_string(),
             name: "Map".to_string(),
@@ -136,6 +143,7 @@ fn java_erasure_identity(type_name: &TypeName) -> Option<JavaErasureIdentity> {
         | TypeName::DynTrait { .. }
         | TypeName::Wildcard { .. }
         | TypeName::StringLiteral(_) => return None,
+        TypeName::Callable { .. } => return None,
     })
 }
 
@@ -152,7 +160,7 @@ pub(crate) fn deduplicated_bounds<'a>(
 }
 
 pub(crate) fn conflicting_bound_erasures<'a>(
-    type_params: &'a [TypeParamSpec],
+    type_params: &'a [crate::spec::where_spec::GenericParamView<'_>],
     constraints: &'a [WhereConstraint],
 ) -> Option<(&'a str, &'a TypeName, &'a TypeName)> {
     for parameter in type_params {
@@ -444,6 +452,12 @@ const JAVA_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Java {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::java_function_lowering::validate_generic_parameters(self, function)
+    }
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,
@@ -545,7 +559,7 @@ impl CodeLang for Java {
     fn validate_function_type_constraints(
         &self,
         function_name: &str,
-        type_params: &[crate::spec::where_spec::TypeParamSpec],
+        type_params: &[crate::spec::where_spec::GenericParamView<'_>],
         constraints: &[crate::spec::where_spec::WhereConstraint],
     ) -> Result<(), SigilStitchError> {
         if let Some(parameter) = type_params.iter().find(|parameter| {
@@ -869,50 +883,46 @@ mod tests {
     #[test]
     fn test_render_imports_single() {
         let java = Java::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "java.util".into(),
-                name: "List".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "java.util".into(),
+            name: "List".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(java.render_imports(&imports), "import java.util.List;");
     }
 
     #[test]
     fn test_render_imports_grouped() {
         let java = Java::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "com.example.model".into(),
-                    name: "User".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "java.util".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "javax.persistence".into(),
-                    name: "Entity".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "com.example.model".into(),
+                name: "User".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "java.util".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "javax.persistence".into(),
+                name: "Entity".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = java.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import java.util.List;");
@@ -925,34 +935,32 @@ mod tests {
     #[test]
     fn test_render_imports_sorted_within_group() {
         let java = Java::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "java.util".into(),
-                    name: "Map".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "java.io".into(),
-                    name: "File".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "java.util".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "java.util".into(),
+                name: "Map".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "java.io".into(),
+                name: "File".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "java.util".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = java.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "import java.io.File;");
@@ -963,26 +971,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let java = Java::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "java.util".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "java.util".into(),
-                    name: "List".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "java.util".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "java.util".into(),
+                name: "List".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(java.render_imports(&imports), "import java.util.List;");
     }
 

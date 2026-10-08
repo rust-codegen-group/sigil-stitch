@@ -690,9 +690,11 @@ enum TypeNameExampleKind {
     Importable,
     QualifiedImportable,
     Primitive,
+    Parameter,
     Array,
     ReadonlyArray,
     Generic,
+    Application,
     Union,
     Intersection,
     Pointer,
@@ -712,6 +714,7 @@ enum TypeNameExampleKind {
     UpperWildcard,
     LowerWildcard,
     Function,
+    Callable,
     Raw,
     StringLiteral,
 }
@@ -809,6 +812,28 @@ fn expected_type_name(language: &str, kind: TypeNameExampleKind) -> ExpectedType
                 ("typescript", "readonly Value[]"),
             ],
         ),
+        Application => expected_type_name(language, Generic),
+        Parameter => output_for(
+            language,
+            &[
+                ("c", "Value"),
+                ("cpp", "Value"),
+                ("csharp", "Value"),
+                ("dart", "Value"),
+                ("go", "Value"),
+                ("haskell", "Value"),
+                ("java", "Value"),
+                ("kotlin", "Value"),
+                ("ocaml", "Value"),
+                ("php", "Value"),
+                ("python", "Value"),
+                ("rust", "Value"),
+                ("scala", "Value"),
+                ("swift", "Value"),
+                ("typescript", "Value"),
+            ],
+        ),
+        Callable => expected_type_name(language, Function),
         Generic => output_for(
             language,
             &[
@@ -1019,6 +1044,10 @@ fn expected_type_name(language: &str, kind: TypeNameExampleKind) -> ExpectedType
     }
 }
 
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn every_existing_type_name_variant() -> Vec<TypeNameExample> {
     use TypeNameExampleKind::*;
 
@@ -1038,6 +1067,36 @@ fn every_existing_type_name_variant() -> Vec<TypeNameExample> {
             kind: Primitive,
             label: "primitive",
             value: value(),
+        },
+        TypeNameExample {
+            kind: Parameter,
+            label: "parameter reference",
+            value: TypeName::parameter("Value"),
+        },
+        TypeNameExample {
+            kind: Application,
+            label: "type application",
+            value: TypeName::application(
+                value(),
+                vec![sigil_stitch::prelude::TypeArgument::Single(
+                    TypeName::primitive("Item"),
+                )],
+            ),
+        },
+        TypeNameExample {
+            kind: Callable,
+            label: "callable sequence",
+            value: TypeName::callable(
+                vec![value(), TypeName::primitive("Other")]
+                    .into_iter()
+                    .map(|type_name| sigil_stitch::prelude::CallableParam::Single {
+                        name: None,
+                        type_name,
+                        presence: sigil_stitch::prelude::CallableParamPresence::Required,
+                    })
+                    .collect(),
+                TypeName::primitive("Result"),
+            ),
         },
         TypeNameExample {
             kind: Array,

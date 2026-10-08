@@ -10,6 +10,10 @@ use crate::lang::capability::{
 };
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
+#[expect(
+    deprecated,
+    reason = "re-export or import released compatibility inputs"
+)]
 use crate::spec::where_spec::TypeParamSpec;
 use crate::type_name::TypeName;
 
@@ -470,6 +474,10 @@ impl CodeLang for C {
         format!("typedef {inner} {name};")
     }
 
+    #[expect(
+        deprecated,
+        reason = "retain released compatibility metadata and hooks"
+    )]
     fn emit_newtype_decl(
         &self,
         _visibility: &str,
@@ -541,66 +549,60 @@ mod tests {
     #[test]
     fn test_render_imports_system() {
         let c = C::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "stdio.h".into(),
-                name: "printf".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "stdio.h".into(),
+            name: "printf".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(c.render_imports(&imports), "#include <stdio.h>");
     }
 
     #[test]
     fn test_render_imports_local() {
         let c = C::new();
-        let imports = ImportGroup {
-            entries: vec![ImportEntry {
-                module: "./config.h".into(),
-                name: "Config".into(),
-                alias: None,
-                is_type_only: false,
-                is_side_effect: false,
-                is_wildcard: false,
-            }],
-        };
+        let imports = ImportGroup::from(vec![ImportEntry {
+            module: "./config.h".into(),
+            name: "Config".into(),
+            alias: None,
+            is_type_only: false,
+            is_side_effect: false,
+            is_wildcard: false,
+        }]);
         assert_eq!(c.render_imports(&imports), "#include \"config.h\"");
     }
 
     #[test]
     fn test_render_imports_grouped() {
         let c = C::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "stdio.h".into(),
-                    name: "printf".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "stdlib.h".into(),
-                    name: "malloc".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "./config.h".into(),
-                    name: "Config".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "stdio.h".into(),
+                name: "printf".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "stdlib.h".into(),
+                name: "malloc".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "./config.h".into(),
+                name: "Config".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         let output = c.render_imports(&imports);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines[0], "#include <stdio.h>");
@@ -612,26 +614,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let c = C::new();
-        let imports = ImportGroup {
-            entries: vec![
-                ImportEntry {
-                    module: "stdio.h".into(),
-                    name: "printf".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                ImportEntry {
-                    module: "stdio.h".into(),
-                    name: "fprintf".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            ImportEntry {
+                module: "stdio.h".into(),
+                name: "printf".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            ImportEntry {
+                module: "stdio.h".into(),
+                name: "fprintf".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(c.render_imports(&imports), "#include <stdio.h>");
     }
 

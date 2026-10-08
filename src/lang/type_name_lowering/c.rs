@@ -16,6 +16,7 @@ fn terminal_type(type_name: &TypeName, qualified_separator: Option<&str>) -> Opt
             Some(separator) => qualified(module, separator, imported_name),
             None => name(imported_name.clone()),
         }),
+        TypeName::Parameter(value) => Some(literal(value.clone())),
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             Some(terminal(type_name))
         }
@@ -38,6 +39,10 @@ fn unsupported(reason: &str) -> SigilStitchError {
         reason: reason.to_string(),
     }
 }
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     if matches!(
         type_name,
@@ -87,6 +92,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::StringLiteral(_) => {
             Err(unsupported("C has no string singleton type expression"))?
         }
+        TypeName::Parameter(_) | TypeName::Application { .. } | TypeName::Callable { .. } => Err(
+            unsupported("C does not support the modern structured type expression"),
+        )?,
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             unreachable!("terminal variants returned above")
         }

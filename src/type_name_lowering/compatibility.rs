@@ -66,6 +66,15 @@ pub(crate) fn lower<L: RendererLang + ?Sized>(
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             terminal(type_name)
         }
+        TypeName::Parameter(name) => literal(name.clone()),
+        TypeName::Application { .. } | TypeName::Callable { .. } => {
+            return Err(SigilStitchError::UnsupportedTypeName {
+                language: lang.file_extension().to_string(),
+                context: "root".to_string(),
+                reason: "the 0.6.8 compatibility lowerer does not support modern type expressions"
+                    .to_string(),
+            });
+        }
         TypeName::StringLiteral(_) => {
             return Err(SigilStitchError::UnsupportedTypeName {
                 language: lang.file_extension().to_string(),
@@ -290,6 +299,10 @@ pub(crate) fn lower<L: RendererLang + ?Sized>(
     Ok(lowered)
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn params_type(type_name: &TypeName) -> &[TypeName] {
     match type_name {
         TypeName::Generic { params, .. } => params,

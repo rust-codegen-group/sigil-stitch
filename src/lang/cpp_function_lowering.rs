@@ -16,6 +16,24 @@ pub(crate) fn lower(
 ) -> Result<CodeBlock, SigilStitchError> {
     let mut block = CodeBlock::builder();
     emit_preamble(&mut block, lang, function)?;
+    if function.generic_params().next().is_some() {
+        block.add("template<", ());
+        for (index, parameter) in function.generic_params().enumerate() {
+            if index > 0 {
+                block.add(", ", ());
+            }
+            let pack = matches!(
+                parameter.domain().as_ref(),
+                crate::spec::where_spec::GenericParamDomain::Pack { .. }
+            );
+            block.add(
+                if pack { "class... %L" } else { "class %L" },
+                parameter.name(),
+            );
+        }
+        block.add(">", ());
+        block.add_line();
+    }
 
     let mut signature = SignatureBuilder::new();
     if function.modifiers().is_abstract {

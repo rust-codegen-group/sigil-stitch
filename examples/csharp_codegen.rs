@@ -32,13 +32,15 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
     // --- Interface ---
     let iface = TypeSpec::builder("IRepository", TypeKind::Interface)
         .visibility(Visibility::Public)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("FindByIdAsync")
                 .is_async()
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("Task"),
-                    vec![TypeName::optional(TypeName::primitive("T"))],
+                    vec![TypeArgument::Single(TypeName::optional(
+                        TypeName::primitive("T"),
+                    ))],
                 ))
                 .add_param(ParameterSpec::new("id", TypeName::primitive("int")).unwrap())
                 .build()

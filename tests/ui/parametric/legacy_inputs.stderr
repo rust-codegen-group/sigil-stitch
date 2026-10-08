@@ -1,0 +1,65 @@
+error: use of deprecated variant `sigil_stitch::type_name::TypeName::Generic`: legacy type application; use TypeName::Application or TypeName::application
+ --> tests/ui/parametric/legacy_inputs.rs:8:23
+  |
+8 |     let _ = TypeName::Generic {
+  |                       ^^^^^^^
+  |
+note: the lint level is defined here
+ --> tests/ui/parametric/legacy_inputs.rs:1:9
+  |
+1 | #![deny(deprecated)]
+  |         ^^^^^^^^^^
+
+error: use of deprecated variant `sigil_stitch::type_name::TypeName::Function`: legacy callable type; use TypeName::Callable or TypeName::callable
+  --> tests/ui/parametric/legacy_inputs.rs:13:23
+   |
+13 |     let _ = TypeName::Function {
+   |                       ^^^^^^^^
+
+error: use of deprecated struct `sigil_stitch::prelude::TypeParamSpec`: legacy declaration binding; use GenericParamSpec
+  --> tests/ui/parametric/legacy_inputs.rs:17:13
+   |
+17 |     let _ = TypeParamSpec::new("T");
+   |             ^^^^^^^^^^^^^
+
+error: use of deprecated unit variant `sigil_stitch::prelude::TypeParamKind::Constructor1`: legacy kind metadata; use GenericParamDomain and KindExpr
+  --> tests/ui/parametric/legacy_inputs.rs:18:28
+   |
+18 |     let _ = TypeParamKind::Constructor1;
+   |                            ^^^^^^^^^^^^
+
+error: use of deprecated struct `sigil_stitch::prelude::TypeParamSpec`: legacy declaration binding; use GenericParamSpec
+  --> tests/ui/parametric/legacy_inputs.rs:19:53
+   |
+19 |     let _ = FunSpec::builder("work").add_type_param(TypeParamSpec::new("T"));
+   |                                                     ^^^^^^^^^^^^^
+
+error: use of deprecated struct `sigil_stitch::prelude::TypeParamSpec`: legacy declaration binding; use GenericParamSpec
+  --> tests/ui/parametric/legacy_inputs.rs:21:25
+   |
+21 |         .add_type_param(TypeParamSpec::new("T"));
+   |                         ^^^^^^^^^^^^^
+
+error: use of deprecated associated function `sigil_stitch::type_name::TypeName::generic`: legacy type application; use TypeName::application with TypeArgument values
+ --> tests/ui/parametric/legacy_inputs.rs:7:23
+  |
+7 |     let _ = TypeName::generic(value.clone(), vec![value.clone()]);
+  |                       ^^^^^^^
+
+error: use of deprecated associated function `sigil_stitch::type_name::TypeName::function`: legacy callable type; use TypeName::callable with CallableParam values
+  --> tests/ui/parametric/legacy_inputs.rs:12:23
+   |
+12 |     let _ = TypeName::function(vec![value.clone()], value.clone());
+   |                       ^^^^^^^^
+
+error: use of deprecated method `sigil_stitch::spec::fun_spec::FunSpecBuilder::add_type_param`: legacy declaration binding; use add_generic_param(GenericParamSpec)
+  --> tests/ui/parametric/legacy_inputs.rs:19:38
+   |
+19 |     let _ = FunSpec::builder("work").add_type_param(TypeParamSpec::new("T"));
+   |                                      ^^^^^^^^^^^^^^
+
+error: use of deprecated method `sigil_stitch::spec::type_spec::TypeSpecBuilder::add_type_param`: legacy declaration binding; use add_generic_param(GenericParamSpec)
+  --> tests/ui/parametric/legacy_inputs.rs:21:10
+   |
+21 |         .add_type_param(TypeParamSpec::new("T"));
+   |          ^^^^^^^^^^^^^^

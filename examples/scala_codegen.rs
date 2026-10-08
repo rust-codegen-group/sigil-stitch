@@ -21,7 +21,7 @@ fn main() {
 fn build_shared_types() -> (TypeSpec, TypeSpec) {
     // --- Trait with bounded type param ---
     let repo = TypeSpec::builder("Repository", TypeKind::Interface)
-        .add_type_param(TypeParamSpec::new("T"))
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
                 .returns(TypeName::optional(TypeName::primitive("T")))
@@ -74,17 +74,25 @@ fn builder_approach() -> String {
     sort_body.add_statement("items.sorted %R", (CommentArg(comment_note.to_string()),));
 
     let sort_fn = FunSpec::builder("sortItems")
-        .add_type_param(TypeParamSpec::new("T").with_context_bound(TypeName::primitive("Ordering")))
+        .add_generic_param(
+            GenericParamSpec::single("T")
+                .unwrap()
+                .with_context_bound(TypeName::primitive("Ordering"))
+                .unwrap(),
+        )
         .add_param(
             ParameterSpec::new(
                 "items",
-                TypeName::generic(TypeName::primitive("List"), vec![TypeName::primitive("T")]),
+                TypeName::application(
+                    TypeName::primitive("List"),
+                    vec![TypeArgument::Single(TypeName::primitive("T"))],
+                ),
             )
             .unwrap(),
         )
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("List"),
-            vec![TypeName::primitive("T")],
+            vec![TypeArgument::Single(TypeName::primitive("T"))],
         ))
         .body(sort_body.build().unwrap())
         .build()
@@ -100,9 +108,9 @@ fn builder_approach() -> String {
 
     let collect_fn = FunSpec::builder("collectNames")
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("List"),
-            vec![TypeName::primitive("String")],
+            vec![TypeArgument::Single(TypeName::primitive("String"))],
         ))
         .body(collect_body.build().unwrap())
         .build()
@@ -110,31 +118,49 @@ fn builder_approach() -> String {
 
     // --- Higher-kinded type param ---
     let functor = TypeSpec::builder("Functor", TypeKind::Interface)
-        .add_type_param(TypeParamSpec::new("F").with_kind(TypeParamKind::Constructor1))
+        .add_generic_param(
+            GenericParamSpec::new(
+                "F",
+                GenericParamDomain::Single {
+                    kind: Some(KindExpr::Constructor {
+                        parameters: vec![KindExpr::Type],
+                        result: Box::new(KindExpr::Type),
+                    }),
+                },
+            )
+            .unwrap(),
+        )
         .add_method(
             FunSpec::builder("map")
-                .add_type_param(TypeParamSpec::new("A"))
-                .add_type_param(TypeParamSpec::new("B"))
+                .add_generic_param(GenericParamSpec::single("A").unwrap())
+                .add_generic_param(GenericParamSpec::single("B").unwrap())
                 .add_param(
                     ParameterSpec::new(
                         "fa",
-                        TypeName::generic(TypeName::primitive("F"), vec![TypeName::primitive("A")]),
+                        TypeName::application(
+                            TypeName::primitive("F"),
+                            vec![TypeArgument::Single(TypeName::primitive("A"))],
+                        ),
                     )
                     .unwrap(),
                 )
                 .add_param(
                     ParameterSpec::new(
                         "f",
-                        TypeName::function(
-                            vec![TypeName::primitive("A")],
+                        TypeName::callable(
+                            vec![CallableParam::Single {
+                                name: None,
+                                type_name: TypeName::primitive("A"),
+                                presence: CallableParamPresence::Required,
+                            }],
                             TypeName::primitive("B"),
                         ),
                     )
                     .unwrap(),
                 )
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("F"),
-                    vec![TypeName::primitive("B")],
+                    vec![TypeArgument::Single(TypeName::primitive("B"))],
                 ))
                 .build()
                 .unwrap(),
@@ -171,17 +197,25 @@ fn macro_approach() -> String {
     .unwrap();
 
     let sort_fn = FunSpec::builder("sortItems")
-        .add_type_param(TypeParamSpec::new("T").with_context_bound(TypeName::primitive("Ordering")))
+        .add_generic_param(
+            GenericParamSpec::single("T")
+                .unwrap()
+                .with_context_bound(TypeName::primitive("Ordering"))
+                .unwrap(),
+        )
         .add_param(
             ParameterSpec::new(
                 "items",
-                TypeName::generic(TypeName::primitive("List"), vec![TypeName::primitive("T")]),
+                TypeName::application(
+                    TypeName::primitive("List"),
+                    vec![TypeArgument::Single(TypeName::primitive("T"))],
+                ),
             )
             .unwrap(),
         )
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("List"),
-            vec![TypeName::primitive("T")],
+            vec![TypeArgument::Single(TypeName::primitive("T"))],
         ))
         .body(sort_body)
         .build()
@@ -196,40 +230,58 @@ fn macro_approach() -> String {
 
     let collect_fn = FunSpec::builder("collectNames")
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
-        .returns(TypeName::generic(
+        .returns(TypeName::application(
             TypeName::primitive("List"),
-            vec![TypeName::primitive("String")],
+            vec![TypeArgument::Single(TypeName::primitive("String"))],
         ))
         .body(collect_body)
         .build()
         .unwrap();
 
     let functor = TypeSpec::builder("Functor", TypeKind::Interface)
-        .add_type_param(TypeParamSpec::new("F").with_kind(TypeParamKind::Constructor1))
+        .add_generic_param(
+            GenericParamSpec::new(
+                "F",
+                GenericParamDomain::Single {
+                    kind: Some(KindExpr::Constructor {
+                        parameters: vec![KindExpr::Type],
+                        result: Box::new(KindExpr::Type),
+                    }),
+                },
+            )
+            .unwrap(),
+        )
         .add_method(
             FunSpec::builder("map")
-                .add_type_param(TypeParamSpec::new("A"))
-                .add_type_param(TypeParamSpec::new("B"))
+                .add_generic_param(GenericParamSpec::single("A").unwrap())
+                .add_generic_param(GenericParamSpec::single("B").unwrap())
                 .add_param(
                     ParameterSpec::new(
                         "fa",
-                        TypeName::generic(TypeName::primitive("F"), vec![TypeName::primitive("A")]),
+                        TypeName::application(
+                            TypeName::primitive("F"),
+                            vec![TypeArgument::Single(TypeName::primitive("A"))],
+                        ),
                     )
                     .unwrap(),
                 )
                 .add_param(
                     ParameterSpec::new(
                         "f",
-                        TypeName::function(
-                            vec![TypeName::primitive("A")],
+                        TypeName::callable(
+                            vec![CallableParam::Single {
+                                name: None,
+                                type_name: TypeName::primitive("A"),
+                                presence: CallableParamPresence::Required,
+                            }],
                             TypeName::primitive("B"),
                         ),
                     )
                     .unwrap(),
                 )
-                .returns(TypeName::generic(
+                .returns(TypeName::application(
                     TypeName::primitive("F"),
-                    vec![TypeName::primitive("B")],
+                    vec![TypeArgument::Single(TypeName::primitive("B"))],
                 ))
                 .build()
                 .unwrap(),

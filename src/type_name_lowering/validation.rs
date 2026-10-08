@@ -7,6 +7,10 @@ use crate::import::validate_module_path;
 use crate::type_name::TypeName;
 use crate::type_name_lowering::DiagnosticPath;
 
+#[expect(
+    deprecated,
+    reason = "validate released compatibility variants in the same semantic walker"
+)]
 pub(crate) fn validate_type_name(
     type_name: &TypeName,
     path: &DiagnosticPath,
@@ -105,12 +109,25 @@ pub(crate) fn validate_type_name(
             }
         }
         TypeName::Generic { base, params } => {
-            if params.is_empty() {
-                return Err(invalid(path, "generic parameters must not be empty"));
-            }
             validate_type_name(base, &path.child("generic.base"))?;
             for (index, parameter) in params.iter().enumerate() {
                 validate_type_name(parameter, &path.indexed("generic.params", index))?;
+            }
+        }
+        TypeName::Parameter(name) => {
+            non_blank(name, path, "type parameter reference")?;
+            no_controls(name, path, "type parameter reference")?;
+        }
+        TypeName::Application { base, arguments } => {
+            validate_type_name(base, &path.child("application.base"))?;
+            for (index, argument) in arguments.iter().enumerate() {
+                let argument_path = path.indexed("application.arguments", index);
+                match argument {
+                    crate::spec::where_spec::TypeArgument::Single(value)
+                    | crate::spec::where_spec::TypeArgument::Expansion { pattern: value } => {
+                        validate_type_name(value, &argument_path)?
+                    }
+                }
             }
         }
         TypeName::Union(members) => {
@@ -136,6 +153,26 @@ pub(crate) fn validate_type_name(
                 validate_type_name(parameter, &path.indexed("function.params", index))?;
             }
             validate_type_name(return_type, &path.child("function.return"))?;
+        }
+        TypeName::Callable {
+            parameters,
+            return_type,
+        } => {
+            for (index, parameter) in parameters.iter().enumerate() {
+                let parameter_path = path.indexed("callable.parameters", index);
+                match parameter {
+                    crate::spec::where_spec::CallableParam::Single { type_name, .. } => {
+                        validate_type_name(type_name, &parameter_path.child("type"))?;
+                    }
+                    crate::spec::where_spec::CallableParam::Repeated { element_type, .. } => {
+                        validate_type_name(element_type, &parameter_path.child("element"))?;
+                    }
+                    crate::spec::where_spec::CallableParam::Expansion { pattern, .. } => {
+                        validate_type_name(pattern, &parameter_path.child("pattern"))?;
+                    }
+                }
+            }
+            validate_type_name(return_type, &path.child("callable.return"))?;
         }
         TypeName::AssociatedType {
             base,

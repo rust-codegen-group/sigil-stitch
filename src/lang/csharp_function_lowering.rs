@@ -13,6 +13,31 @@ use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::modifiers::{DeclarationContext, Visibility};
 use crate::spec::parameter_spec::ParameterSpec;
 
+pub(crate) fn validate_generic_parameters(
+    lang: &CSharp,
+    function: crate::lang::FunctionIntent<'_>,
+) -> Result<(), SigilStitchError> {
+    for parameter in function.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        if !matches!(
+            parameter.domain().as_ref(),
+            crate::spec::where_spec::GenericParamDomain::Single {
+                kind: None | Some(crate::spec::where_spec::KindExpr::Type)
+            }
+        ) {
+            return Err(SigilStitchError::UnsupportedTypeName {
+                language: lang.file_extension().into(),
+                context: format!("generic_param.{}", parameter.name()),
+                reason: "this binding domain has no representation in this function declaration"
+                    .into(),
+            });
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn lower(
     lang: &CSharp,
     function: ValidatedFunction<'_>,
@@ -50,7 +75,7 @@ pub(crate) fn lower(
     }
 
     signature.push_literal(function.name());
-    append_type_parameters(&mut signature, function.type_params());
+    append_type_parameters(&mut signature, &function.type_params());
     signature.push_literal("(");
     signature.push_code(tupled_parameter_list(
         function.parameters(),
@@ -61,7 +86,7 @@ pub(crate) fn lower(
     let has_where_constraints = append_where_constraints(
         &mut signature,
         lang,
-        function.type_params(),
+        &function.type_params(),
         function.where_constraints(),
     );
 
@@ -71,7 +96,7 @@ pub(crate) fn lower(
 
 fn append_type_parameters(
     signature: &mut SignatureBuilder,
-    type_params: &[crate::spec::where_spec::TypeParamSpec],
+    type_params: &[crate::spec::where_spec::GenericParamView<'_>],
 ) {
     if type_params.is_empty() {
         return;
@@ -135,7 +160,7 @@ fn append_suffixes(signature: &mut SignatureBuilder, function: ValidatedFunction
 fn append_where_constraints(
     signature: &mut SignatureBuilder,
     lang: &CSharp,
-    type_params: &[crate::spec::where_spec::TypeParamSpec],
+    type_params: &[crate::spec::where_spec::GenericParamView<'_>],
     constraints: &[crate::spec::where_spec::WhereConstraint],
 ) -> bool {
     let mut emitted = false;

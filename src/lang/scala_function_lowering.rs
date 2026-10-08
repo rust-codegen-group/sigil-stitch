@@ -30,7 +30,7 @@ pub(crate) fn lower(
     signature.push_literal("def ");
     signature.push_literal(function.name());
     let type_params = type_params_with_inline_constraints(function, lang.file_extension())?;
-    append_type_parameters(&mut signature, type_params.as_ref());
+    append_type_parameters(&mut signature, type_params.as_ref())?;
     signature.push_literal("(");
     signature.push_code(tupled_parameter_list(
         function.parameters(),
@@ -63,10 +63,10 @@ pub(crate) fn lower(
 
 fn append_type_parameters(
     signature: &mut SignatureBuilder,
-    type_params: &[crate::spec::where_spec::TypeParamSpec],
-) {
+    type_params: &[crate::spec::where_spec::GenericParamView<'_>],
+) -> Result<(), SigilStitchError> {
     if type_params.is_empty() {
-        return;
+        return Ok(());
     }
     signature.push_literal("[");
     for (index, parameter) in type_params.iter().enumerate() {
@@ -76,6 +76,11 @@ fn append_type_parameters(
         signature.push_literal(parameter.name());
         if let Some(kind) = parameter.kind() {
             signature.push_literal(&scala_kind(kind));
+        }
+        if let crate::spec::where_spec::GenericParamDomain::Single { kind: Some(kind) } =
+            parameter.domain().as_ref()
+        {
+            signature.push_literal(&crate::lang::scala::generic_kind_suffix(kind)?);
         }
         if !parameter.bounds().is_empty() {
             signature.push_literal(" <: ");
@@ -92,8 +97,13 @@ fn append_type_parameters(
         }
     }
     signature.push_literal("]");
+    Ok(())
 }
 
+#[expect(
+    deprecated,
+    reason = "one semantic path also accepts released compatibility inputs"
+)]
 fn scala_kind(kind: &crate::spec::where_spec::TypeParamKind) -> String {
     match kind {
         crate::spec::where_spec::TypeParamKind::Constructor1 => "[_]".to_string(),

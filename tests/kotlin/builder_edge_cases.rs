@@ -11,6 +11,10 @@ use sigil_stitch::type_name::TypeName;
 use super::golden;
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_full_module() {
     let user = TypeName::primitive("User");
     let list = TypeName::generic(

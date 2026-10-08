@@ -2,8 +2,6 @@
 
 #![allow(deprecated)]
 
-use std::borrow::Cow;
-
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
@@ -350,15 +348,19 @@ pub(crate) fn lower<L: CodeLang + ?Sized>(
 fn type_params_for_rendering<'a, L: CodeLang + ?Sized>(
     lang: &L,
     function: ValidatedFunction<'a>,
-) -> Result<Cow<'a, [TypeParamSpec]>, SigilStitchError> {
-    if lang.capabilities().function_validation_is_permissive()
+) -> Result<Vec<TypeParamSpec>, SigilStitchError> {
+    let parameters = if lang.capabilities().function_validation_is_permissive()
         || function.where_constraints().is_empty()
         || lang.function_syntax().where_clause_style != WhereClauseStyle::Inline
     {
-        Ok(Cow::Borrowed(function.type_params()))
+        function.type_params()
     } else {
-        type_params_with_inline_constraints(function, lang.file_extension())
-    }
+        type_params_with_inline_constraints(function, lang.file_extension())?
+    };
+    parameters
+        .iter()
+        .map(|parameter| parameter.compatibility_input(lang.file_extension()))
+        .collect()
 }
 
 fn emit_parameter<L: CodeLang + ?Sized>(

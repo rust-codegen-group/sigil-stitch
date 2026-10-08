@@ -663,6 +663,20 @@ function profile without `lower_function()` fails closed with
 `MissingFunctionLowerer`, just as an incomplete strict type family fails with
 `MissingTypeLowerer`.
 
+Use the owner's `generic_params()` iterator and borrowed `GenericParamView`
+accessors for binding intent. Ordinary, named, and constructor kinds are not
+interchangeable: preserve the supplied domain and kind or reject them with
+`SigilStitchError`. Do not copy modern bindings into deprecated
+`TypeParamSpec` values to invoke a native lowerer. That conversion is reserved
+for the frozen compatibility boundary, which rejects unrepresentable modern
+domains instead of dropping metadata.
+
+Type applications and callable sequences likewise retain complete expansion
+patterns, labels, and presence intent until local type-name lowering. Targets
+own ordering, precedence, and representability; the library does not infer
+bindings or evaluate packs. For generated-source compiler examples, see the
+local fixtures in `tests/generated-source/README.md`.
+
 ## Reference Implementations
 
 Study these existing implementations for patterns similar to your target:

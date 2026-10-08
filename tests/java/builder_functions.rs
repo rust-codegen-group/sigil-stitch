@@ -5,6 +5,10 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -37,6 +41,10 @@ fn test_function_with_doc() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_generic_type_params_before_return_type() {
     use sigil_stitch::spec::where_spec::TypeParamSpec;
 
@@ -101,6 +109,10 @@ fn test_override_annotation() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_generic_params_before_return_golden() {
     let tp = TypeParamSpec::new("T").with_bound(TypeName::primitive("Comparable"));
     let body = CodeBlock::of("Collections.sort(list);\nreturn list;", ()).unwrap();

@@ -27,6 +27,10 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 use sigil_stitch::type_name::TypeName;
 
@@ -142,6 +146,10 @@ fn unsupported_function_context_has_its_own_error() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn go_distinguishes_generic_free_functions_from_receiver_methods() {
     let type_param = TypeParamSpec::new("T");
     let free = FunSpec::builder("Map")
@@ -776,6 +784,10 @@ fn permissive_legacy_adapter_preserves_pre_validation_function_shapes() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn inline_where_constraints_are_merged_into_type_parameters() {
     let fun = FunSpec::builder("copy")
         .add_type_param(TypeParamSpec::new("T"))
@@ -793,6 +805,10 @@ fn inline_where_constraints_are_merged_into_type_parameters() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn duplicate_inline_where_constraints_are_merged_once() {
     let cloneable = TypeName::primitive("Cloneable");
     let fun = FunSpec::builder("copy")
@@ -808,6 +824,10 @@ fn duplicate_inline_where_constraints_are_merged_once() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn unmatched_inline_where_constraint_fails_closed() {
     let fun = FunSpec::builder("copy")
         .add_type_param(TypeParamSpec::new("T"))
@@ -1230,6 +1250,10 @@ fn async_and_overriding_constructors_use_form_profiles() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn constructor_form_separates_generic_and_attribute_capabilities() {
     for (lang, name) in [
         (
@@ -2151,6 +2175,10 @@ fn rest_parameters_are_unique_and_last() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn kotlin_places_function_type_parameters_before_the_name() {
     let function = FunSpec::builder("identity")
         .add_type_param(TypeParamSpec::new("T"))
@@ -2400,6 +2428,10 @@ fn type_error_does_not_hide_contained_method_error() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_direct_type_parameter_bounds_use_where_clauses() {
     let function = FunSpec::builder("Convert")
         .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("IFoo")))
@@ -2415,6 +2447,10 @@ fn csharp_direct_type_parameter_bounds_use_where_clauses() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn csharp_rejects_constraints_on_non_parameter_subjects() {
     let function = FunSpec::builder("Convert")
         .add_type_param(TypeParamSpec::new("T"))
@@ -2434,6 +2470,10 @@ fn csharp_rejects_constraints_on_non_parameter_subjects() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn kotlin_multiple_type_parameter_bounds_use_a_where_clause() {
     let function = FunSpec::builder("convert")
         .add_type_param(

@@ -131,7 +131,9 @@ pub mod prelude {
     pub use crate::spec::type_spec::TypeSpec;
     #[allow(deprecated)]
     pub use crate::spec::where_spec::{
-        TypeParamKind, TypeParamSpec, WhereClauseStyle, WhereConstraint,
+        CallableParam, CallableParamPresence, GenericParamDomain, GenericParamSpec,
+        GenericParamSpecBuilder, GenericParamView, KindExpr, TypeArgument, TypeParamKind,
+        TypeParamSpec, WhereClauseStyle, WhereConstraint,
     };
     pub use crate::type_name::TypeName;
     pub use sigil_stitch_macros::sigil_quote;

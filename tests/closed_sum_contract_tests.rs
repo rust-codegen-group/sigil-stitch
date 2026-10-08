@@ -2,6 +2,10 @@
 
 use sigil_stitch::lang::{ClosedSumIntent, ValidatedClosedSum};
 use sigil_stitch::prelude::*;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::TypeParamSpec;
 
 fn unit(name: &str) -> ClosedSumSpec {
@@ -25,6 +29,10 @@ fn errors(sum: ClosedSumSpec) -> Vec<SigilStitchError> {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn deserialized_intrinsic_errors_remain_ordered_and_complete() {
     let mut value = serde_json::to_value(unit("Outcome")).unwrap();
     value["name"] = "".into();
@@ -260,7 +268,7 @@ impl CodeLang for InspectIntent {
         assert!(!intent.is_empty());
         assert_eq!(intent.modifiers().visibility, Visibility::Public);
         assert_eq!(intent.doc(), &["Root"]);
-        assert_eq!(intent.type_params()[0].name(), "T");
+        assert_eq!(intent.generic_params().next().unwrap().name(), "T");
         assert_eq!(intent.where_constraints().len(), 1);
         assert_eq!(intent.annotations().len(), 1);
         assert_eq!(intent.annotation_specs().len(), 1);
@@ -274,7 +282,7 @@ impl CodeLang for InspectIntent {
         assert_eq!(sum.modifiers().visibility, Visibility::Public);
         assert_eq!(sum.visibility(), Visibility::Public);
         assert_eq!(sum.doc(), &["Root"]);
-        assert_eq!(sum.type_params().len(), 1);
+        assert_eq!(sum.generic_params().count(), 1);
         assert_eq!(sum.where_constraints().len(), 1);
         assert_eq!(sum.annotations().len(), 1);
         assert_eq!(sum.annotation_specs().len(), 1);
@@ -289,6 +297,10 @@ impl CodeLang for InspectIntent {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn validated_views_preserve_complete_semantic_metadata() {
     let case = ClosedSumCaseSpec::builder("Value")
         .doc("Case")
@@ -334,6 +346,10 @@ fn validated_views_preserve_complete_semantic_metadata() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn rust_lifetime_constraints_reject_invalid_subjects_and_preserve_valid_bounds() {
     use sigil_stitch::lang::rust::Rust;
     for parameter in [
@@ -418,6 +434,10 @@ fn rust_lifetime_constraints_reject_invalid_subjects_and_preserve_valid_bounds()
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn algebraic_parameters_contexts_and_compound_payloads_keep_local_grammar() {
     use sigil_stitch::lang::{haskell::Haskell, ocaml::OCaml};
     for (extension, parameter) in [("hs", "A"), ("ml", "A")] {

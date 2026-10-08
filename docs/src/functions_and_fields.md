@@ -222,10 +222,7 @@ let fun = FunSpec::builder("fetchUser")
     .is_async()
     .visibility(Visibility::Public)
     .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-    .returns(TypeName::generic(
-        TypeName::primitive("Promise"),
-        vec![TypeName::primitive("User")],
-    ))
+    .returns(TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(TypeName::primitive("User"))]))
     .body(body)
     .build()
     .unwrap();
@@ -241,12 +238,12 @@ let fun = FunSpec::builder("fetchUser")
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;
 # fn main() {
-let tp = TypeParamSpec::new("T")
-    .with_bound(TypeName::primitive("Serializable"));
+let tp = GenericParamSpec::single("T").unwrap()
+    .with_bound(TypeName::primitive("Serializable")).unwrap();
 
 let body = CodeBlock::of("return JSON.stringify(value)", ()).unwrap();
 let fun = FunSpec::builder("serialize")
-    .add_type_param(tp)
+    .add_generic_param(tp)
     .add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap())
     .returns(TypeName::primitive("string"))
     .body(body)

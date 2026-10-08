@@ -2,7 +2,13 @@
 
 use std::borrow::Cow;
 
-use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
+#[cfg(test)]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
+use crate::spec::where_spec::TypeParamSpec;
+use crate::spec::where_spec::WhereConstraint;
 use crate::type_name::TypeName;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -14,7 +20,7 @@ enum ConstraintPlacement {
 }
 
 pub(crate) fn merged_constraint_bounds(
-    parameter: &TypeParamSpec,
+    parameter: &crate::spec::where_spec::GenericParamView<'_>,
     constraints: &[WhereConstraint],
 ) -> Vec<TypeName> {
     let explicit = constraints
@@ -42,7 +48,7 @@ pub(crate) fn merged_constraint_bounds(
 }
 
 pub(crate) fn validate_constraint_bounds(
-    parameter: &TypeParamSpec,
+    parameter: &crate::spec::where_spec::GenericParamView<'_>,
     constraints: &[WhereConstraint],
 ) -> Result<(), &'static str> {
     let bounds = merged_constraint_bounds(parameter, constraints);
@@ -50,7 +56,7 @@ pub(crate) fn validate_constraint_bounds(
 }
 
 pub(crate) fn validate_type_constraint_bounds(
-    parameter: &TypeParamSpec,
+    parameter: &crate::spec::where_spec::GenericParamView<'_>,
     constraints: &[WhereConstraint],
 ) -> Result<(), &'static str> {
     let bounds = merged_constraint_bounds(parameter, constraints);
@@ -62,7 +68,7 @@ pub(crate) fn validate_type_constraint_bounds(
 }
 
 pub(crate) fn validate_function_constraint_context(
-    parameter: &TypeParamSpec,
+    parameter: &crate::spec::where_spec::GenericParamView<'_>,
     constraints: &[WhereConstraint],
     is_override: bool,
 ) -> Result<(), &'static str> {
@@ -239,7 +245,7 @@ fn nullable_counterparts(left: &TypeName, right: &TypeName) -> bool {
 
 fn terminal_constraint_spelling(type_name: &TypeName) -> Option<Cow<'_, str>> {
     match type_name {
-        TypeName::Primitive(spelling) | TypeName::Raw(spelling) => {
+        TypeName::Primitive(spelling) | TypeName::Raw(spelling) | TypeName::Parameter(spelling) => {
             Some(Cow::Borrowed(spelling.as_str()))
         }
         TypeName::Optional(inner) => {
@@ -249,6 +255,10 @@ fn terminal_constraint_spelling(type_name: &TypeName) -> Option<Cow<'_, str>> {
     }
 }
 
+#[expect(
+    deprecated,
+    reason = "retain released compatibility metadata and hooks"
+)]
 fn merge_constraint_presentation(existing: &mut TypeName, duplicate: &TypeName) {
     match (existing, duplicate) {
         (
@@ -283,6 +293,65 @@ fn merge_constraint_presentation(existing: &mut TypeName, duplicate: &TypeName) 
         ) => {
             merge_constraint_presentation(existing_base, duplicate_base);
             merge_constraint_presentations(existing_params, duplicate_params);
+        }
+        (
+            TypeName::Application {
+                base: existing_base,
+                arguments: existing,
+            },
+            TypeName::Application {
+                base: duplicate_base,
+                arguments: duplicate,
+            },
+        ) => {
+            merge_constraint_presentation(existing_base, duplicate_base);
+            for (existing, duplicate) in existing.iter_mut().zip(duplicate) {
+                match (existing, duplicate) {
+                    (
+                        crate::spec::where_spec::TypeArgument::Single(existing),
+                        crate::spec::where_spec::TypeArgument::Single(duplicate),
+                    )
+                    | (
+                        crate::spec::where_spec::TypeArgument::Expansion { pattern: existing },
+                        crate::spec::where_spec::TypeArgument::Expansion { pattern: duplicate },
+                    ) => merge_constraint_presentation(existing, duplicate),
+                    _ => {}
+                }
+            }
+        }
+        (
+            TypeName::Generic {
+                base: existing_base,
+                params: existing,
+            },
+            TypeName::Application {
+                base: duplicate_base,
+                arguments: duplicate,
+            },
+        ) => {
+            merge_constraint_presentation(existing_base, duplicate_base);
+            for (existing, duplicate) in existing.iter_mut().zip(duplicate) {
+                if let crate::spec::where_spec::TypeArgument::Single(duplicate) = duplicate {
+                    merge_constraint_presentation(existing, duplicate);
+                }
+            }
+        }
+        (
+            TypeName::Application {
+                base: existing_base,
+                arguments: existing,
+            },
+            TypeName::Generic {
+                base: duplicate_base,
+                params: duplicate,
+            },
+        ) => {
+            merge_constraint_presentation(existing_base, duplicate_base);
+            for (existing, duplicate) in existing.iter_mut().zip(duplicate) {
+                if let crate::spec::where_spec::TypeArgument::Single(existing) = existing {
+                    merge_constraint_presentation(existing, duplicate);
+                }
+            }
         }
         (TypeName::Tuple(existing), TypeName::Tuple(duplicate)) => {
             merge_constraint_presentations(existing, duplicate);
@@ -319,6 +388,10 @@ fn same_terminal_constraint_spelling(left: &TypeName, right: &TypeName) -> bool 
     )
 }
 
+#[expect(
+    deprecated,
+    reason = "retain released compatibility metadata and hooks"
+)]
 fn same_constraint_type(left: &TypeName, right: &TypeName) -> bool {
     if same_terminal_constraint_spelling(left, right) {
         return true;
@@ -354,6 +427,31 @@ fn same_constraint_type(left: &TypeName, right: &TypeName) -> bool {
             same_constraint_type(left_base, right_base)
                 && same_constraint_types(left_params, right_params)
         }
+        (
+            TypeName::Application { base: left_base, arguments: left },
+            TypeName::Application { base: right_base, arguments: right },
+        ) => {
+            same_constraint_type(left_base, right_base)
+                && left.len() == right.len()
+                && left.iter().zip(right).all(|(left, right)| match (left, right) {
+                    (crate::spec::where_spec::TypeArgument::Single(left), crate::spec::where_spec::TypeArgument::Single(right))
+                    | (crate::spec::where_spec::TypeArgument::Expansion { pattern: left }, crate::spec::where_spec::TypeArgument::Expansion { pattern: right }) =>
+                        same_constraint_type(left, right),
+                    _ => false,
+                })
+        }
+        (
+            TypeName::Generic { base: left_base, params: left },
+            TypeName::Application { base: right_base, arguments: right },
+        ) | (
+            TypeName::Application { base: right_base, arguments: right },
+            TypeName::Generic { base: left_base, params: left },
+        ) => {
+            same_constraint_type(left_base, right_base)
+                && left.len() == right.len()
+                && left.iter().zip(right).all(|(left, right)|
+                    matches!(right, crate::spec::where_spec::TypeArgument::Single(right) if same_constraint_type(left, right)))
+        }
         (TypeName::Tuple(left), TypeName::Tuple(right)) => same_constraint_types(left, right),
         (
             TypeName::AssociatedType {
@@ -383,11 +481,18 @@ fn same_constraint_types(left: &[TypeName], right: &[TypeName]) -> bool {
 mod tests {
     use super::*;
 
+    #[allow(
+        deprecated,
+        reason = "exercise released generic and callable compatibility inputs"
+    )]
     fn merge_duplicate(first: TypeName, duplicate: TypeName) -> TypeName {
         let parameter = TypeParamSpec::new("T")
             .with_bound(first)
             .with_context_bound(duplicate);
-        let mut merged = merged_constraint_bounds(&parameter, &[]);
+        let mut merged = merged_constraint_bounds(
+            &crate::spec::where_spec::GenericParamView::from_legacy(&parameter),
+            &[],
+        );
         assert_eq!(merged.len(), 1);
         merged.pop().unwrap()
     }
@@ -439,6 +544,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        deprecated,
+        reason = "exercise released generic and callable compatibility inputs"
+    )]
     fn distinct_compound_constraints_remain_distinct() {
         let parameter = TypeParamSpec::new("T")
             .with_bound(TypeName::array(TypeName::importable("first", "Bound")))
@@ -454,6 +563,13 @@ mod tests {
                 "Second",
             ));
 
-        assert_eq!(merged_constraint_bounds(&parameter, &[]).len(), 6);
+        assert_eq!(
+            merged_constraint_bounds(
+                &crate::spec::where_spec::GenericParamView::from_legacy(&parameter),
+                &[]
+            )
+            .len(),
+            6
+        );
     }
 }

@@ -12,6 +12,12 @@ use crate::spec::type_spec::{TypeIntent, ValidatedType};
 use super::common;
 
 pub(crate) fn validate(lang: &Haskell, type_: TypeIntent<'_>) -> Result<(), SigilStitchError> {
+    for parameter in type_.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        crate::lang::haskell::validate_generic_domain(&parameter)?;
+    }
     common::validate_declaration(
         type_,
         lang.file_extension(),
@@ -92,7 +98,7 @@ fn lower_alias(lang: &Haskell, type_: &ValidatedType<'_>) -> Result<CodeBlock, S
     let mut block = CodeBlock::builder();
     common::emit_doc(&mut block, lang, type_);
     block.add("type ", ());
-    emit_name_and_parameters(&mut block, type_);
+    emit_name_and_parameters(&mut block, type_)?;
     block.add(
         " = %T",
         type_
@@ -109,7 +115,7 @@ fn lower_newtype(lang: &Haskell, type_: &ValidatedType<'_>) -> Result<CodeBlock,
     common::emit_doc(&mut block, lang, type_);
     block.add("newtype ", ());
     emit_context(&mut block, type_);
-    emit_name_and_parameters(&mut block, type_);
+    emit_name_and_parameters(&mut block, type_)?;
     block.add(&format!(" = {} ", type_.name()), ());
     let target = type_
         .target_type()
@@ -129,7 +135,7 @@ fn lower_class(lang: &Haskell, type_: &ValidatedType<'_>) -> Result<CodeBlock, S
     common::emit_doc(&mut block, lang, type_);
     block.add("class ", ());
     emit_context(&mut block, type_);
-    emit_name_and_parameters(&mut block, type_);
+    emit_name_and_parameters(&mut block, type_)?;
     block.add(" where", ());
     block.add_line();
     block.add("%>", ());
@@ -144,7 +150,7 @@ fn lower_data(lang: &Haskell, type_: &ValidatedType<'_>) -> Result<CodeBlock, Si
     common::emit_doc(&mut block, lang, type_);
     block.add("data ", ());
     emit_context(&mut block, type_);
-    emit_name_and_parameters(&mut block, type_);
+    emit_name_and_parameters(&mut block, type_)?;
 
     let has_rhs =
         type_.fields().is_some() || type_.variants().is_some() || !type_.extra_members().is_empty();
@@ -174,12 +180,16 @@ fn lower_data(lang: &Haskell, type_: &ValidatedType<'_>) -> Result<CodeBlock, Si
     block.build()
 }
 
-fn emit_name_and_parameters(block: &mut CodeBlockBuilder, type_: &ValidatedType<'_>) {
+fn emit_name_and_parameters(
+    block: &mut CodeBlockBuilder,
+    type_: &ValidatedType<'_>,
+) -> Result<(), SigilStitchError> {
     block.add("%L", type_.name());
     for parameter in type_.type_params() {
         block.add(" ", ());
-        block.add("%L", parameter.name());
+        crate::lang::haskell::emit_generic_binding(block, &parameter)?;
     }
+    Ok(())
 }
 
 fn emit_context(block: &mut CodeBlockBuilder, type_: &ValidatedType<'_>) {

@@ -13,6 +13,23 @@ use crate::spec::where_spec::WhereConstraint;
 use super::common;
 
 pub(crate) fn validate(lang: &Rust, type_: TypeIntent<'_>) -> Result<(), SigilStitchError> {
+    for parameter in type_.generic_params() {
+        if !parameter.has_kind_or_pack_domain() {
+            continue;
+        }
+        if !matches!(
+            parameter.domain().as_ref(),
+            crate::spec::where_spec::GenericParamDomain::Single {
+                kind: None | Some(crate::spec::where_spec::KindExpr::Type)
+            } | crate::spec::where_spec::GenericParamDomain::Lifetime
+        ) {
+            return Err(SigilStitchError::InvalidTypeParameter {
+                type_name: type_.name().into(),
+                parameter_name: parameter.name().into(),
+                reason: "this binding domain has no representation in this type declaration".into(),
+            });
+        }
+    }
     common::validate_declaration(
         type_,
         lang.file_extension(),
@@ -44,7 +61,7 @@ pub(crate) fn validate(lang: &Rust, type_: TypeIntent<'_>) -> Result<(), SigilSt
                 ));
             }
             if parameter.bounds().iter().any(|bound| {
-                !crate::lang::rust::is_valid_lifetime_bound(bound, type_.type_params())
+                !crate::lang::rust::is_valid_generic_lifetime_bound(bound, &type_.type_params())
             }) {
                 return Err(invalid_parameter(
                     type_,
@@ -94,11 +111,9 @@ pub(crate) fn validate(lang: &Rust, type_: TypeIntent<'_>) -> Result<(), SigilSt
                 "Rust lifetime constraints must target a declared lifetime",
             ));
         }
-        if constraint
-            .bounds()
-            .iter()
-            .any(|bound| !crate::lang::rust::is_valid_lifetime_bound(bound, type_.type_params()))
-        {
+        if constraint.bounds().iter().any(|bound| {
+            !crate::lang::rust::is_valid_generic_lifetime_bound(bound, &type_.type_params())
+        }) {
             return Err(invalid_parameter(
                 type_,
                 subject,

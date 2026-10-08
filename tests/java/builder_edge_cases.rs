@@ -78,6 +78,10 @@ fn test_annotated_method() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_full_module() {
     let list = TypeName::importable("java.util", "List");
     let list_user = TypeName::generic(list, vec![TypeName::primitive("User")]);

@@ -470,26 +470,24 @@ mod tests {
     #[test]
     fn test_render_imports_dedup() {
         let zsh = Zsh::new();
-        let imports = ImportGroup {
-            entries: vec![
-                crate::import::ImportEntry {
-                    module: "./lib/utils.zsh".into(),
-                    name: "log_info".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-                crate::import::ImportEntry {
-                    module: "./lib/utils.zsh".into(),
-                    name: "log_error".into(),
-                    alias: None,
-                    is_type_only: false,
-                    is_side_effect: false,
-                    is_wildcard: false,
-                },
-            ],
-        };
+        let imports = ImportGroup::from(vec![
+            crate::import::ImportEntry {
+                module: "./lib/utils.zsh".into(),
+                name: "log_info".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+            crate::import::ImportEntry {
+                module: "./lib/utils.zsh".into(),
+                name: "log_error".into(),
+                alias: None,
+                is_type_only: false,
+                is_side_effect: false,
+                is_wildcard: false,
+            },
+        ]);
         assert_eq!(zsh.render_imports(&imports), "source \"./lib/utils.zsh\"");
     }
 

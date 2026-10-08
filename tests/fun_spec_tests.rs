@@ -9,6 +9,10 @@ use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 use sigil_stitch::spec::where_spec::{TypeParamKind, TypeParamSpec};
 use sigil_stitch::type_name::TypeName;
 
@@ -44,6 +48,10 @@ fn test_ts_simple_function() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_ts_async_method() {
     let body = CodeBlock::of("return db.find(id)", ()).unwrap();
     let fun = FunSpec::builder("getUser")
@@ -89,6 +97,10 @@ fn test_rust_simple_function() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_fun_with_type_params() {
     let tp = TypeParamSpec::new("T").with_bound(TypeName::primitive("Serializable"));
     let body = CodeBlock::of("return JSON.stringify(value)", ()).unwrap();
@@ -116,6 +128,10 @@ fn test_build_empty_name_errors() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_where_clause_rust_function() {
     let fun = FunSpec::builder("process")
         .add_type_param(TypeParamSpec::new("T"))
@@ -146,6 +162,10 @@ fn test_where_clause_rust_function() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_where_clause_ts_merges_into_inline_type_parameter() {
     let fun = FunSpec::builder("process")
         .add_type_param(TypeParamSpec::new("T"))
@@ -168,6 +188,10 @@ fn test_where_clause_ts_merges_into_inline_type_parameter() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_where_bound_convenience() {
     let fun = FunSpec::builder("example")
         .add_type_param(TypeParamSpec::new("T"))
@@ -184,6 +208,10 @@ fn test_where_bound_convenience() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_type_param_kind_none_unchanged() {
     let fun = FunSpec::builder("foo")
         .add_type_param(TypeParamSpec::new("T"))
@@ -195,6 +223,10 @@ fn test_type_param_kind_none_unchanged() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn rust_rejects_unsupported_higher_kinded_type_parameters() {
     let fun = FunSpec::builder("apply")
         .add_type_param(TypeParamSpec::new("F").with_kind(TypeParamKind::Constructor1))
@@ -213,6 +245,10 @@ fn rust_rejects_unsupported_higher_kinded_type_parameters() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "exercise released generic and callable compatibility inputs"
+)]
 fn test_lifetime_params_before_type_params() {
     let fun = FunSpec::builder("longest")
         .add_type_param(TypeParamSpec::new("T"))
