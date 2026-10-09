@@ -81,7 +81,7 @@ CI runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo do
 - **Linting:** `cargo clippy -- -D warnings`. All warnings are errors in CI (`RUSTFLAGS=-Dwarnings`).
 - **No comments by default.** Only add a comment when the _why_ is non-obvious — a hidden constraint, a workaround, a surprising invariant. Don't explain what the code does; well-named identifiers do that.
 - **No unnecessary abstractions.** Three similar lines are better than a premature helper. Don't add features, refactoring, or error handling beyond what the task requires.
-- **Builder pattern:** Spec builders (`TypeSpec`, `FunSpec`, `FieldSpec`, `FileSpec`, etc.) take `mut self` and return `Self` for every setter -- chain them fluently: `FunSpec::builder("f").returns(t).body(b).build()`. `CodeBlockBuilder` takes `&mut self` -- use a `let mut` binding and call methods on it.
+- **Builder pattern:** Spec builders (`TypeSpec`, `FunSpec`, `FieldSpec`, `FileSpec`, etc.) take `mut self` and return `Self` for every setter -- chain them fluently: `FunSpec::builder("f").returns(vec![t]).body(b).build()`. `CodeBlockBuilder` takes `&mut self` -- use a `let mut` binding and call methods on it.
 - **Trait objects for language:** Public types no longer carry a language generic. The language enters at render time as `&dyn CodeLang`. `FileSpec` stores the language internally. `CodeBlock`, `TypeName`, and all specs have language-agnostic Rust types, but literal `CodeBlock` content is target-associated rather than automatically portable.
 - **`BoxDoc` never appears in a language hook:** Current complete declaration
   lowerers and the accepted type-name seam return structured `CodeBlock`

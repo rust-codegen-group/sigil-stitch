@@ -106,7 +106,7 @@ fn builder_approach() -> String {
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::optional(TypeName::primitive("T")))
+                .returns(vec![TypeName::optional(TypeName::primitive("T"))])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
@@ -152,7 +152,7 @@ fn builder_approach() -> String {
     );
 
     let create_fn = FunSpec::builder("createTask")
-        .returns(TypeName::primitive("Task"))
+        .returns(vec![TypeName::primitive("Task")])
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
         .body(create_body.build().unwrap())
         .build()
@@ -169,10 +169,10 @@ fn builder_approach() -> String {
 
     let fetch_fn = FunSpec::builder("fetchTasks")
         .is_async()
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("List"),
             vec![TypeArgument::Single(TypeName::primitive("Task"))],
-        ))
+        )])
         .body(fetch_body.build().unwrap())
         .build()
         .unwrap();
@@ -201,7 +201,7 @@ fn macro_approach() -> String {
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::optional(TypeName::primitive("T")))
+                .returns(vec![TypeName::optional(TypeName::primitive("T"))])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
@@ -245,7 +245,7 @@ fn macro_approach() -> String {
     .unwrap();
 
     let create_fn = FunSpec::builder("createTask")
-        .returns(TypeName::primitive("Task"))
+        .returns(vec![TypeName::primitive("Task")])
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
         .body(create_body)
         .build()
@@ -259,10 +259,10 @@ fn macro_approach() -> String {
 
     let fetch_fn = FunSpec::builder("fetchTasks")
         .is_async()
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("List"),
             vec![TypeArgument::Single(TypeName::primitive("Task"))],
-        ))
+        )])
         .body(fetch_body)
         .build()
         .unwrap();

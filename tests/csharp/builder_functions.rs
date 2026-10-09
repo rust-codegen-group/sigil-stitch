@@ -25,7 +25,7 @@ fn test_method_with_return() {
         .add_method(
             FunSpec::builder("Add")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("int"))
+                .returns(vec![TypeName::primitive("int")])
                 .add_param(ParameterSpec::new("a", TypeName::primitive("int")).unwrap())
                 .add_param(ParameterSpec::new("b", TypeName::primitive("int")).unwrap())
                 .body(body)
@@ -54,7 +54,7 @@ fn test_async_method() {
             FunSpec::builder("GetUserAsync")
                 .visibility(Visibility::Public)
                 .is_async()
-                .returns(TypeName::primitive("Task<User>"))
+                .returns(vec![TypeName::primitive("Task<User>")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
                 .body(body)
                 .build()
@@ -93,7 +93,7 @@ fn test_generic_method() {
                     TypeName::primitive("T"),
                     vec![TypeName::primitive("IComparable<T>")],
                 )
-                .returns(TypeName::primitive("T"))
+                .returns(vec![TypeName::primitive("T")])
                 .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())
                 .add_param(ParameterSpec::new("b", TypeName::primitive("T")).unwrap())
                 .body(body)
@@ -154,7 +154,7 @@ fn test_function_with_doc() {
                 .doc("</summary>")
                 .doc("<param name=\"name\">The name to greet.</param>")
                 .doc("<returns>A greeting string.</returns>")
-                .returns(TypeName::primitive("string"))
+                .returns(vec![TypeName::primitive("string")])
                 .add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap())
                 .body(body)
                 .build()
@@ -179,7 +179,7 @@ fn test_async_rejected_in_interface() {
         .add_method(
             FunSpec::builder("GetUserAsync")
                 .is_async()
-                .returns(TypeName::primitive("Task<User>"))
+                .returns(vec![TypeName::primitive("Task<User>")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
                 .build()
                 .unwrap(),
@@ -187,7 +187,7 @@ fn test_async_rejected_in_interface() {
         .add_method(
             FunSpec::builder("SaveUserAsync")
                 .is_async()
-                .returns(TypeName::primitive("Task"))
+                .returns(vec![TypeName::primitive("Task")])
                 .add_param(ParameterSpec::new("user", TypeName::primitive("User")).unwrap())
                 .build()
                 .unwrap(),

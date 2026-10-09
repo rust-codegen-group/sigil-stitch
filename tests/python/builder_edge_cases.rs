@@ -21,7 +21,7 @@ fn test_abstract_method() {
         .annotation(CodeBlock::of("@%T", (abstractmethod,)).unwrap())
         .add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap())
         .add_param(ParameterSpec::new("req", TypeName::primitive("Request")).unwrap())
-        .returns(TypeName::primitive("Response"));
+        .returns(vec![TypeName::primitive("Response")]);
     // No body — should emit `...`
 
     let tb = TypeSpec::builder("BaseController", TypeKind::Class)
@@ -30,7 +30,7 @@ fn test_abstract_method() {
         .add_method(
             FunSpec::builder("log")
                 .add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap())
-                .returns(TypeName::primitive("None"))
+                .returns(vec![TypeName::primitive("None")])
                 .body(CodeBlock::of("print('handled')", ()).unwrap())
                 .build()
                 .unwrap(),
@@ -51,7 +51,7 @@ fn test_decorated_function() {
         .add_function(
             FunSpec::builder("my_view")
                 .annotation(CodeBlock::of("@app.route('/hello')", ()).unwrap())
-                .returns(TypeName::primitive("str"))
+                .returns(vec![TypeName::primitive("str")])
                 .body(CodeBlock::of("return 'Hello, World!'", ()).unwrap())
                 .build()
                 .unwrap(),

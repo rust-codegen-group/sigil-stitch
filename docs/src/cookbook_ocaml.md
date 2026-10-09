@@ -45,7 +45,7 @@ let body = CodeBlock::of("List.map f xs", ()).unwrap();
 let fun = FunSpec::builder("transform")
     .add_param(ParameterSpec::new("f", TypeName::primitive("'a -> 'b")).unwrap())
     .add_param(ParameterSpec::new("xs", TypeName::primitive("'a list")).unwrap())
-    .returns(TypeName::primitive("'b list"))
+    .returns(vec![TypeName::primitive("'b list")])
     .body(body)
     .build()
     .unwrap();

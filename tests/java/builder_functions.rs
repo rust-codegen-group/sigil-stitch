@@ -21,7 +21,7 @@ fn test_function_with_doc() {
         .visibility(Visibility::Public)
         .doc("Greet the user by name.")
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(body)
         .build()
         .unwrap();
@@ -55,7 +55,7 @@ fn test_generic_type_params_before_return_type() {
         .is_static()
         .add_type_param(tp)
         .add_param(ParameterSpec::new("list", TypeName::primitive("List<T>")).unwrap())
-        .returns(TypeName::primitive("List<T>"))
+        .returns(vec![TypeName::primitive("List<T>")])
         .body(body)
         .build()
         .unwrap();
@@ -91,7 +91,7 @@ fn test_override_annotation() {
             FunSpec::builder("speak")
                 .visibility(Visibility::Public)
                 .is_override()
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -125,7 +125,7 @@ fn test_generic_params_before_return_golden() {
                 .is_static()
                 .add_type_param(tp)
                 .add_param(ParameterSpec::new("list", TypeName::primitive("List<T>")).unwrap())
-                .returns(TypeName::primitive("List<T>"))
+                .returns(vec![TypeName::primitive("List<T>")])
                 .body(body)
                 .build()
                 .unwrap(),

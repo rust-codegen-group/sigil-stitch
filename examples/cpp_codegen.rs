@@ -41,7 +41,7 @@ fn builder_approach() -> String {
             &FunSpec::builder("log")
                 .is_abstract()
                 .add_param(ParameterSpec::new("msg", TypeName::primitive("const char*")).unwrap())
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .suffix("= 0")
                 .build()
                 .unwrap(),
@@ -103,7 +103,7 @@ fn builder_approach() -> String {
         pub_section.add_code(emit_fun(
             &FunSpec::builder("log")
                 .add_param(ParameterSpec::new("msg", TypeName::primitive("const char*")).unwrap())
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .suffix("override")
                 .body(log_body)
                 .build()
@@ -119,7 +119,7 @@ fn builder_approach() -> String {
         pub_section.add_code(emit_fun(
             &FunSpec::builder("defaultLevel")
                 .is_static()
-                .returns(TypeName::primitive("LogLevel"))
+                .returns(vec![TypeName::primitive("LogLevel")])
                 .body(default_level_body)
                 .build()
                 .unwrap(),
@@ -182,7 +182,7 @@ fn builder_approach() -> String {
         .add_param(
             ParameterSpec::new("logger", TypeName::pointer(TypeName::primitive("Logger"))).unwrap(),
         )
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(log_all_body)
         .build()
         .unwrap();
@@ -197,7 +197,7 @@ fn builder_approach() -> String {
         .annotation(CodeBlock::of("template<typename T>", ()).unwrap())
         .add_param(ParameterSpec::new("first", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("second", TypeName::primitive("T")).unwrap())
-        .returns(TypeName::primitive("std::vector<T>"))
+        .returns(vec![TypeName::primitive("std::vector<T>")])
         .body(vec_body)
         .build()
         .unwrap();
@@ -234,7 +234,7 @@ fn macro_approach() -> String {
             &FunSpec::builder("log")
                 .is_abstract()
                 .add_param(ParameterSpec::new("msg", TypeName::primitive("const char*")).unwrap())
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .suffix("= 0")
                 .build()
                 .unwrap(),
@@ -294,7 +294,7 @@ fn macro_approach() -> String {
         pub_section.add_code(emit_fun(
             &FunSpec::builder("log")
                 .add_param(ParameterSpec::new("msg", TypeName::primitive("const char*")).unwrap())
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .suffix("override")
                 .body(log_body)
                 .build()
@@ -311,7 +311,7 @@ fn macro_approach() -> String {
         pub_section.add_code(emit_fun(
             &FunSpec::builder("defaultLevel")
                 .is_static()
-                .returns(TypeName::primitive("LogLevel"))
+                .returns(vec![TypeName::primitive("LogLevel")])
                 .body(default_level_body)
                 .build()
                 .unwrap(),
@@ -375,7 +375,7 @@ fn macro_approach() -> String {
         .add_param(
             ParameterSpec::new("logger", TypeName::pointer(TypeName::primitive("Logger"))).unwrap(),
         )
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(log_all_body)
         .build()
         .unwrap();
@@ -392,7 +392,7 @@ fn macro_approach() -> String {
         .annotation(CodeBlock::of("template<typename T>", ()).unwrap())
         .add_param(ParameterSpec::new("first", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("second", TypeName::primitive("T")).unwrap())
-        .returns(TypeName::primitive("std::vector<T>"))
+        .returns(vec![TypeName::primitive("std::vector<T>")])
         .body(vec_body)
         .build()
         .unwrap();

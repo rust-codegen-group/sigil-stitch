@@ -33,7 +33,7 @@ let type_spec = TypeSpec::builder("UserService", TypeKind::Class)
     )
     .add_method(
         FunSpec::builder("getName")
-            .returns(TypeName::primitive("string"))
+            .returns(vec![TypeName::primitive("string")])
             .body(body)
             .build()
             .unwrap(),
@@ -77,7 +77,7 @@ let type_spec = TypeSpec::builder("Config", TypeKind::Struct)
         FunSpec::builder("new")
             .visibility(Visibility::Public)
             .add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap())
-            .returns(TypeName::primitive("Self"))
+            .returns(vec![TypeName::primitive("Self")])
             .body(body)
             .build()
             .unwrap(),

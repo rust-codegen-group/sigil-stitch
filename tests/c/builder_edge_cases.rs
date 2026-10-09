@@ -71,7 +71,7 @@ fn test_struct_with_function() {
     let body = CodeBlock::of("return p.x + p.y;", ()).unwrap();
     let fun = FunSpec::builder("point_sum")
         .add_param(ParameterSpec::new("p", TypeName::primitive("struct Point")).unwrap())
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .body(body)
         .build()
         .unwrap();
@@ -119,7 +119,7 @@ fn test_top_level_with_includes() {
     .unwrap();
     let fun = FunSpec::builder("server_start")
         .add_param(ParameterSpec::new("srv", TypeName::primitive("struct Server")).unwrap())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(body)
         .build()
         .unwrap();

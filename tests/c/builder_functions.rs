@@ -14,7 +14,7 @@ fn test_function_with_params() {
     let fun = FunSpec::builder("add")
         .add_param(ParameterSpec::new("a", TypeName::primitive("int")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("int")).unwrap())
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .body(body)
         .build()
         .unwrap();
@@ -38,7 +38,7 @@ fn test_void_function() {
     .unwrap();
     let fun = FunSpec::builder("greet")
         .add_param(ParameterSpec::new("name", TypeName::primitive("const char*")).unwrap())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(body)
         .build()
         .unwrap();
@@ -59,7 +59,7 @@ fn test_static_function() {
         .visibility(Visibility::Private)
         .is_static()
         .add_param(ParameterSpec::new("x", TypeName::primitive("int")).unwrap())
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .body(body)
         .build()
         .unwrap();
@@ -79,7 +79,7 @@ fn test_function_declaration() {
     let fun = FunSpec::builder("process")
         .add_param(ParameterSpec::new("data", TypeName::primitive("const char*")).unwrap())
         .add_param(ParameterSpec::new("len", TypeName::primitive("size_t")).unwrap())
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .build()
         .unwrap();
 
@@ -99,7 +99,7 @@ fn test_function_with_doc() {
         .doc("Add two integers.")
         .add_param(ParameterSpec::new("a", TypeName::primitive("int")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("int")).unwrap())
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .body(body)
         .build()
         .unwrap();

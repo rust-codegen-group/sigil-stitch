@@ -61,7 +61,7 @@ fn test_ts_simple_annotation_on_fun() {
     let output = render_fun(
         &FunSpec::builder("handleRequest")
             .annotate(AnnotationSpec::new("deprecated"))
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("// todo", ()).unwrap())
             .build()
             .unwrap(),
@@ -210,7 +210,7 @@ fn test_cpp_nodiscard_annotation() {
     let output = render_fun(
         &FunSpec::builder("compute")
             .annotate(AnnotationSpec::new("nodiscard"))
-            .returns(TypeName::primitive("int"))
+            .returns(vec![TypeName::primitive("int")])
             .body(CodeBlock::of("return 42;", ()).unwrap())
             .build()
             .unwrap(),
@@ -226,7 +226,7 @@ fn test_cpp_deprecated_with_reason() {
     let output = render_fun(
         &FunSpec::builder("oldFunc")
             .annotate(AnnotationSpec::new("deprecated").arg("\"use newFunc instead\""))
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("// noop", ()).unwrap())
             .build()
             .unwrap(),
@@ -244,7 +244,7 @@ fn test_c_attribute_annotation() {
     let output = render_fun(
         &FunSpec::builder("init")
             .annotate(AnnotationSpec::new("constructor"))
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("// startup", ()).unwrap())
             .build()
             .unwrap(),
@@ -260,7 +260,7 @@ fn test_c_attribute_with_args() {
     let output = render_fun(
         &FunSpec::builder("alloc")
             .annotate(AnnotationSpec::new("malloc").arg("free, 1"))
-            .returns(TypeName::primitive("void*"))
+            .returns(vec![TypeName::primitive("void*")])
             .body(CodeBlock::of("return malloc(size);", ()).unwrap())
             .build()
             .unwrap(),
@@ -279,7 +279,7 @@ fn test_java_override_annotation() {
         &FunSpec::builder("toString")
             .annotate(AnnotationSpec::new("Override"))
             .visibility(Visibility::Public)
-            .returns(TypeName::primitive("String"))
+            .returns(vec![TypeName::primitive("String")])
             .body(CodeBlock::of("return \"\";", ()).unwrap())
             .build()
             .unwrap(),
@@ -296,7 +296,7 @@ fn test_java_suppress_warnings() {
     let output = render_fun(
         &FunSpec::builder("process")
             .annotate(AnnotationSpec::new("SuppressWarnings").arg("\"unchecked\""))
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("// raw types", ()).unwrap())
             .build()
             .unwrap(),
@@ -314,7 +314,7 @@ fn test_kotlin_jvm_static() {
     let output = render_fun(
         &FunSpec::builder("getInstance")
             .annotate(AnnotationSpec::new("JvmStatic"))
-            .returns(TypeName::primitive("Singleton"))
+            .returns(vec![TypeName::primitive("Singleton")])
             .body(CodeBlock::of("return INSTANCE", ()).unwrap())
             .build()
             .unwrap(),
@@ -412,7 +412,7 @@ fn test_importable_annotation_java() {
                 .add_method(
                     FunSpec::builder("getUser")
                         .annotate(AnnotationSpec::importable(nullable))
-                        .returns(TypeName::primitive("User"))
+                        .returns(vec![TypeName::primitive("User")])
                         .body(CodeBlock::of("return null;", ()).unwrap())
                         .build()
                         .unwrap(),

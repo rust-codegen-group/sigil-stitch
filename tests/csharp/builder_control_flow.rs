@@ -26,7 +26,7 @@ fn test_if_else() {
         .add_method(
             FunSpec::builder("GetSign")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("int"))
+                .returns(vec![TypeName::primitive("int")])
                 .add_param(ParameterSpec::new("x", TypeName::primitive("int")).unwrap())
                 .body(body)
                 .build()

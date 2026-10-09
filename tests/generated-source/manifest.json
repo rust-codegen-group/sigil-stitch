@@ -8,6 +8,15 @@
       {"file": "cpp_mismatched.cpp", "diagnostic": "no matching function for call to 'pairs'|pack expansion contains parameter packs.*different lengths"}
     ]
   },
+  "go": {
+    "compiler": "go",
+    "version_flags": ["version"],
+    "flags": ["build"],
+    "positive": "go_positive.go",
+    "negative": [
+      {"file": "go_single_value.go", "diagnostic": "multiple-value Pair\\(\\).*in single-value context"}
+    ]
+  },
   "haskell": {
     "compiler": "ghc",
     "version_flags": ["--numeric-version"],

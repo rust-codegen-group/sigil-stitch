@@ -69,6 +69,7 @@ fn run(fixture: &Fixture, arguments: &[String], directory: &Path) -> std::io::Re
 }
 
 fn intended_failure(
+    language: &str,
     filename: &str,
     source: &str,
     output: &str,
@@ -89,16 +90,35 @@ fn intended_failure(
     ))?;
     let error = Regex::new(r"(?i)\berror\b")?;
     let any_location = Regex::new(r":\d+:\d+|\(\d+,\d+\)")?;
+    // Go build reports diagnostics without an "error" keyword. Only its
+    // file:line:column headers qualify, never a note or warning at that line.
+    let go_header = Regex::new(r"^.+\.go:\d+:\d+: ")?;
+    let go_location = Regex::new(&format!(
+        r"^(?:.*[/\\])?{}:{line}:\d+: ",
+        regex::escape(filename)
+    ))?;
+    let go_note = Regex::new(r"^.+\.go:\d+:\d+: (?i:note|warning):")?;
     let expected = Regex::new(&format!("(?s:{diagnostic})"))?;
     let lines: Vec<_> = output.lines().collect();
     for (index, header) in lines.iter().enumerate() {
-        if !location.is_match(header) || !error.is_match(header) {
+        let matches_header = if language == "go" {
+            go_location.is_match(header) && !go_note.is_match(header)
+        } else {
+            location.is_match(header) && error.is_match(header)
+        };
+        if !matches_header {
             continue;
         }
         // An unrelated later error must not supply the expected diagnosis.
         let end = lines[index + 1..]
             .iter()
-            .position(|line| error.is_match(line) && any_location.is_match(line))
+            .position(|line| {
+                if language == "go" {
+                    go_header.is_match(line)
+                } else {
+                    error.is_match(line) && any_location.is_match(line)
+                }
+            })
             .map_or(lines.len(), |offset| index + 1 + offset);
         // Locations and fixture names are evidence of the use-site, not diagnosis.
         let diagnosis = lines[index..end].join("\n").replace(filename, "");
@@ -184,6 +204,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let result = run(fixture, &arguments, directory)?;
             if result.status.success()
                 || !intended_failure(
+                    &language,
                     &negative.file,
                     &source,
                     &output_text(&result),
@@ -209,6 +230,7 @@ mod tests {
 
     fn check(output: &str) -> bool {
         intended_failure(
+            "typescript",
             "negative.ts",
             "declare const f: (x: string) => void;\nf(1); // acceptance-failure\n",
             output,
@@ -255,6 +277,7 @@ mod tests {
         ] {
             assert!(
                 !intended_failure(
+                    "typescript",
                     "negative.ts",
                     source,
                     "negative.ts(2,3): error TS2345",
@@ -270,10 +293,18 @@ mod tests {
         let source = "val invalid = unknownName // acceptance-failure";
         let unrelated = "-- [E006] Not Found Error: scala_wrong_kind.scala:1:15\n1 |val invalid = unknownName\n  |Not found: unknownName";
         assert!(
-            !intended_failure("scala_wrong_kind.scala", source, unrelated, "(?i:kind)").unwrap()
+            !intended_failure(
+                "scala",
+                "scala_wrong_kind.scala",
+                source,
+                unrelated,
+                "(?i:kind)"
+            )
+            .unwrap()
         );
         assert!(
             !intended_failure(
+                "scala",
                 "scala_wrong_kind.scala",
                 source,
                 unrelated,
@@ -284,6 +315,7 @@ mod tests {
         let actual = "-- [E057] Type Mismatch Error: scala_wrong_kind.scala:1:15\n  |Type argument Int does not conform to upper bound [_] =>> Any";
         assert!(
             intended_failure(
+                "scala",
                 "scala_wrong_kind.scala",
                 source,
                 actual,
@@ -291,5 +323,42 @@ mod tests {
             )
             .unwrap()
         );
+    }
+
+    #[test]
+    fn go_diagnostics_require_the_exact_marked_use_site_and_own_diagnosis() {
+        let source = "package probe\nvar scalar int = Pair() // acceptance-failure\n";
+        let diagnostic = r"multiple-value Pair\(\).*in single-value context";
+        let check =
+            |output| intended_failure("go", "negative.go", source, output, diagnostic).unwrap();
+        assert!(check(
+            "negative.go:2:17: multiple-value Pair() (value of type (int, bool)) in single-value context"
+        ));
+        for output in [
+            "other.go:2:17: multiple-value Pair() in single-value context",
+            "not-negative.go:2:17: multiple-value Pair() in single-value context",
+            "negative.go:1:17: multiple-value Pair() in single-value context",
+            "negative.go:2:17: undefined: Pair",
+            "negative.go:2:17: note: multiple-value Pair() in single-value context",
+            "negative.go:2:17: undefined: Pair\nother.go:9:17: multiple-value Pair() in single-value context",
+            "negative.go:2:17: undefined: Pair\nnegative.go:9:17: multiple-value Pair() in single-value context",
+        ] {
+            assert!(!check(output), "{output}");
+        }
+        for source in [
+            "package probe",
+            "// acceptance-failure\n// acceptance-failure",
+        ] {
+            assert!(
+                !intended_failure(
+                    "go",
+                    "negative.go",
+                    source,
+                    "negative.go:2:17: multiple-value Pair() in single-value context",
+                    diagnostic
+                )
+                .unwrap()
+            );
+        }
     }
 }

@@ -49,7 +49,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec, TypeSpec) {
         .add_method(
             FunSpec::builder("validate")
                 .is_abstract()
-                .returns(TypeName::primitive("bool"))
+                .returns(vec![TypeName::primitive("bool")])
                 .build()
                 .unwrap(),
         )
@@ -61,7 +61,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec, TypeSpec) {
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::primitive("T?"))
+                .returns(vec![TypeName::primitive("T?")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
@@ -129,7 +129,7 @@ fn builder_approach() -> String {
         .add_method(
             FunSpec::builder("validate")
                 .is_override()
-                .returns(TypeName::primitive("bool"))
+                .returns(vec![TypeName::primitive("bool")])
                 .body({
                     let mut vb = CodeBlock::builder();
                     vb.add_attribute("override");
@@ -149,7 +149,7 @@ fn builder_approach() -> String {
     )
     .unwrap();
     let parse_task = FunSpec::builder("parseTask")
-        .returns(TypeName::primitive("Task"))
+        .returns(vec![TypeName::primitive("Task")])
         .add_param(ParameterSpec::new("json", TypeName::primitive("String")).unwrap())
         .body(parse_body)
         .build()
@@ -166,10 +166,10 @@ fn builder_approach() -> String {
 
     let fetch_task = FunSpec::builder("fetchTask")
         .is_async()
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("Future"),
             vec![TypeArgument::Single(TypeName::primitive("Task"))],
-        ))
+        )])
         .body(fetch_body.build().unwrap())
         .build()
         .unwrap();
@@ -181,7 +181,7 @@ fn builder_approach() -> String {
     let transform = FunSpec::builder("transform")
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_generic_param(GenericParamSpec::single("R").unwrap())
-        .returns(TypeName::primitive("R"))
+        .returns(vec![TypeName::primitive("R")])
         .add_param(ParameterSpec::new("input", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("mapper", TypeName::primitive("R Function(T)")).unwrap())
         .body(transform_body.build().unwrap())
@@ -270,7 +270,7 @@ fn macro_approach() -> String {
         .add_method(
             FunSpec::builder("validate")
                 .is_override()
-                .returns(TypeName::primitive("bool"))
+                .returns(vec![TypeName::primitive("bool")])
                 .body(validate_body)
                 .build()
                 .unwrap(),
@@ -285,7 +285,7 @@ fn macro_approach() -> String {
     })
     .unwrap();
     let parse_task = FunSpec::builder("parseTask")
-        .returns(TypeName::primitive("Task"))
+        .returns(vec![TypeName::primitive("Task")])
         .add_param(ParameterSpec::new("json", TypeName::primitive("String")).unwrap())
         .body(parse_body)
         .build()
@@ -300,10 +300,10 @@ fn macro_approach() -> String {
 
     let fetch_task = FunSpec::builder("fetchTask")
         .is_async()
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("Future"),
             vec![TypeArgument::Single(TypeName::primitive("Task"))],
-        ))
+        )])
         .body(fetch_body)
         .build()
         .unwrap();
@@ -317,7 +317,7 @@ fn macro_approach() -> String {
     let transform = FunSpec::builder("transform")
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_generic_param(GenericParamSpec::single("R").unwrap())
-        .returns(TypeName::primitive("R"))
+        .returns(vec![TypeName::primitive("R")])
         .add_param(ParameterSpec::new("input", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("mapper", TypeName::primitive("R Function(T)")).unwrap())
         .body(transform_body)

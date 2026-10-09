@@ -68,9 +68,22 @@ pub(crate) fn lower(
     )?);
     signature.push_literal(")");
     append_suffixes(&mut signature, function);
-    if let Some(return_type) = function.return_type() {
+    if let Some(returns) = function.returns()
+        && !returns.is_empty()
+    {
         signature.push_literal(" ");
-        signature.push_type(return_type);
+        if returns.len() > 1 {
+            signature.push_literal("(");
+        }
+        for (index, return_type) in returns.iter().enumerate() {
+            if index > 0 {
+                signature.push_literal(", ");
+            }
+            signature.push_type(return_type);
+        }
+        if returns.len() > 1 {
+            signature.push_literal(")");
+        }
     }
 
     if let Some(body) = function.body() {

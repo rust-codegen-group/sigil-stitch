@@ -1016,27 +1016,27 @@ function work() {
 ===== javascript type one width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
 ===== javascript function one width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript type one width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
 ===== javascript function one width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript type many width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
 ===== javascript function many width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript type many width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism] }
 ===== javascript function many width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript type bounded width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
 ===== javascript function bounded width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript type bounded width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
 ===== javascript function bounded width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript type explicit-constraint width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
 ===== javascript type explicit-constraint width=12 =====
@@ -1054,29 +1054,29 @@ ERROR: UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box"
 ===== javascript type higher-kinded width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
 ===== javascript function context-bound width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript function context-bound width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript function lifetime width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript function lifetime width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript function higher-kinded width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript function higher-kinded width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript function explicit-constraint width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript function explicit-constraint width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== javascript type imported-constraints width=100 =====
 ERROR: FileSpecValidation { filename: "bounds.js", error_count: 2, errors: [UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }, UnsupportedFieldCapabilities { language: "js", field_name: "value", context: TypeMember(Class), capabilities: [ExplicitType] }] }
 ===== javascript function imported-constraints width=100 =====
-ERROR: FileSpecValidation { filename: "bounds.js", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+ERROR: FileSpecValidation { filename: "bounds.js", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }] }
 ===== javascript type imported-constraints width=12 =====
 ERROR: FileSpecValidation { filename: "bounds.js", error_count: 2, errors: [UnsupportedTypeDeclarationCapabilities { language: "js", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }, UnsupportedFieldCapabilities { language: "js", field_name: "value", context: TypeMember(Class), capabilities: [ExplicitType] }] }
 ===== javascript function imported-constraints width=12 =====
-ERROR: FileSpecValidation { filename: "bounds.js", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+ERROR: FileSpecValidation { filename: "bounds.js", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "js", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }] }
 ===== kotlin type zero width=100 =====
 internal class Box {
     var value: Value
@@ -1225,27 +1225,27 @@ end
 ===== lua type one width=100 =====
 ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
 ===== lua function one width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua type one width=12 =====
 ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
 ===== lua function one width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua type many width=100 =====
 ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
 ===== lua function many width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua type many width=12 =====
 ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
 ===== lua function many width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua type bounded width=100 =====
 ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
 ===== lua function bounded width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua type bounded width=12 =====
 ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
 ===== lua function bounded width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua type explicit-constraint width=100 =====
 ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
 ===== lua type explicit-constraint width=12 =====
@@ -1263,29 +1263,29 @@ ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
 ===== lua type higher-kinded width=12 =====
 ERROR: UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }
 ===== lua function context-bound width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua function context-bound width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua function lifetime width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua function lifetime width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua function higher-kinded width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua function higher-kinded width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua function explicit-constraint width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua function explicit-constraint width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== lua type imported-constraints width=100 =====
 ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }] }
 ===== lua function imported-constraints width=100 =====
-ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }] }
 ===== lua type imported-constraints width=12 =====
 ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedTypeKind { language: "lua", kind: Class, type_name: "Box" }] }
 ===== lua function imported-constraints width=12 =====
-ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+ERROR: FileSpecValidation { filename: "bounds.lua", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "lua", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }] }
 ===== ocaml type zero width=100 =====
 type box =
   {
@@ -1549,27 +1549,27 @@ end
 ===== ruby type one width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism] }
 ===== ruby function one width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby type one width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism] }
 ===== ruby function one width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby type many width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism] }
 ===== ruby function many width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby type many width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism] }
 ===== ruby function many width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby type bounded width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
 ===== ruby function bounded width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby type bounded width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
 ===== ruby function bounded width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby type explicit-constraint width=100 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }
 ===== ruby type explicit-constraint width=12 =====
@@ -1587,29 +1587,29 @@ ERROR: UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box"
 ===== ruby type higher-kinded width=12 =====
 ERROR: UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism, HigherKindedPolymorphism] }
 ===== ruby function context-bound width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby function context-bound width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby function lifetime width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby function lifetime width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby function higher-kinded width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby function higher-kinded width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, HigherKindedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby function explicit-constraint width=100 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby function explicit-constraint width=12 =====
-ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }
+ERROR: UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }
 ===== ruby type imported-constraints width=100 =====
 ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 2, errors: [UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }, UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields] }] }
 ===== ruby function imported-constraints width=100 =====
-ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }] }
 ===== ruby type imported-constraints width=12 =====
 ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 2, errors: [UnsupportedTypeDeclarationCapabilities { language: "rb", type_name: "Box", capabilities: [ParametricPolymorphism, BoundedPolymorphism] }, UnsupportedTypeCapabilities { language: "rb", type_name: "Box", capabilities: [RecordFields] }] }
 ===== ruby function imported-constraints width=12 =====
-ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturnType, TypedParameters] }] }
+ERROR: FileSpecValidation { filename: "bounds.rb", error_count: 1, errors: [UnsupportedFunctionCapabilities { language: "rb", function_name: "work", context: TopLevel, form: Function, capabilities: [ParametricPolymorphism, BoundedPolymorphism, ExplicitReturns, TypedParameters] }] }
 ===== rust type zero width=100 =====
 struct Box {
     value: Value,

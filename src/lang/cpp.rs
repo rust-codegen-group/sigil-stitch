@@ -362,8 +362,8 @@ const CPP_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // DefaultParameters = default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = function result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = function result type
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = parameter declarations
     FunctionCapability::TypedParameters,
     // StaticFunction = internal-linkage function
@@ -377,8 +377,8 @@ const CPP_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // DefaultParameters = default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = method result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = method result type
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = parameter declarations
     FunctionCapability::TypedParameters,
     // Override = override
@@ -398,7 +398,7 @@ const CPP_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::VirtualMethod,
     FunctionCapability::Attributes,
     FunctionCapability::DefaultParameters,
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     FunctionCapability::Override,
     FunctionCapability::StaticMethod,
@@ -409,7 +409,7 @@ const CPP_DESTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::VirtualMethod,
 ];
 const CPP_REQUIRED_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
 ];
 const CPP_MEMBER_INCOMPATIBILITIES: &[(FunctionCapability, FunctionCapability)] = &[
@@ -474,6 +474,7 @@ impl CodeLang for Cpp {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::cpp_function_lowering::validate_returns(self, function)?;
         use crate::spec::where_spec::{GenericParamDomain, KindExpr};
         for parameter in function.generic_params() {
             if !matches!(

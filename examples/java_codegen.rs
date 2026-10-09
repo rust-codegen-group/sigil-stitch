@@ -69,33 +69,33 @@ fn build_interface() -> TypeSpec {
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     optional,
                     vec![TypeArgument::Single(TypeName::primitive("T"))],
-                ))
+                )])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("long")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("save")
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     list,
                     vec![TypeArgument::Single(TypeName::primitive("T"))],
-                ))
+                )])
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("addAll")
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(
                     ParameterSpec::new(
                         "items",
@@ -158,7 +158,7 @@ fn builder_approach() -> String {
         .add_method(
             FunSpec::builder("getName")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(get_name_body.build().unwrap())
                 .build()
                 .unwrap(),
@@ -167,7 +167,7 @@ fn builder_approach() -> String {
             FunSpec::builder("validate")
                 .visibility(Visibility::Public)
                 .is_abstract()
-                .returns(TypeName::primitive("boolean"))
+                .returns(vec![TypeName::primitive("boolean")])
                 .build()
                 .unwrap(),
         )
@@ -213,7 +213,7 @@ fn builder_approach() -> String {
             FunSpec::builder("validate")
                 .visibility(Visibility::Public)
                 .is_override()
-                .returns(TypeName::primitive("boolean"))
+                .returns(vec![TypeName::primitive("boolean")])
                 .body(validate_body.build().unwrap())
                 .build()
                 .unwrap(),
@@ -221,7 +221,7 @@ fn builder_approach() -> String {
         .add_method(
             FunSpec::builder("getEmail")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body({
                     let mut b = CodeBlock::builder();
                     b.add_statement("return this.email", ());
@@ -234,7 +234,7 @@ fn builder_approach() -> String {
             FunSpec::builder("toString")
                 .visibility(Visibility::Public)
                 .is_override()
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(to_string_body.build().unwrap())
                 .build()
                 .unwrap(),
@@ -268,10 +268,10 @@ fn builder_approach() -> String {
             )
             .unwrap(),
         )
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::importable("java.util", "List"),
             vec![TypeArgument::Single(TypeName::primitive("T"))],
-        ))
+        )])
         .body(sort_body.build().unwrap())
         .build()
         .unwrap();
@@ -337,7 +337,7 @@ fn macro_approach() -> String {
         .add_method(
             FunSpec::builder("getName")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(sigil_quote!(Java { $V("// @{v_interp} name"); return this.name; $comment(comment_note) }).unwrap())
                 .build()
                 .unwrap(),
@@ -346,7 +346,7 @@ fn macro_approach() -> String {
             FunSpec::builder("validate")
                 .visibility(Visibility::Public)
                 .is_abstract()
-                .returns(TypeName::primitive("boolean"))
+                .returns(vec![TypeName::primitive("boolean")])
                 .build()
                 .unwrap(),
         )
@@ -378,7 +378,7 @@ fn macro_approach() -> String {
             FunSpec::builder("validate")
                 .visibility(Visibility::Public)
                 .is_override()
-                .returns(TypeName::primitive("boolean"))
+                .returns(vec![TypeName::primitive("boolean")])
                 .body(
                     sigil_quote!(Java {
                         $attr("Override");
@@ -392,7 +392,7 @@ fn macro_approach() -> String {
         .add_method(
             FunSpec::builder("getEmail")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(sigil_quote!(Java { return this.email; }).unwrap())
                 .build()
                 .unwrap(),
@@ -401,7 +401,7 @@ fn macro_approach() -> String {
             FunSpec::builder("toString")
                 .visibility(Visibility::Public)
                 .is_override()
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(
                     sigil_quote!(Java {
                         return "User{name=" + this.name + ", email=" + this.email + "}";
@@ -441,10 +441,10 @@ fn macro_approach() -> String {
             )
             .unwrap(),
         )
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::importable("java.util", "List"),
             vec![TypeArgument::Single(TypeName::primitive("T"))],
-        ))
+        )])
         .body(sort_body)
         .build()
         .unwrap();

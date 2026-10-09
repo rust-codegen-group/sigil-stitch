@@ -782,26 +782,21 @@ pub trait CodeLang: RendererLang {
 
     /// Lower one fully validated function declaration into structured output.
     ///
-    /// The default preserves the pre-0.6.8 syntax-configuration contract only
-    /// for adapters whose function capabilities remain permissive. A strict
-    /// adapter that advertises a function profile must override this complete
-    /// seam or receives [`SigilStitchError::MissingFunctionLowerer`]. New
+    /// Every adapter must override this complete seam or receives
+    /// [`SigilStitchError::MissingFunctionLowerer`], including adapters with
+    /// permissive validation profiles. New
     /// language-specific grammar belongs here, not in another placement or
     /// keyword hook interpreted by `FunSpec`.
     fn lower_function(
         &self,
         function: ValidatedFunction<'_>,
     ) -> Result<CodeBlock, SigilStitchError> {
-        if self.capabilities().function_validation_is_permissive() {
-            function_lowering::lower_compatibility(self, function)
-        } else {
-            Err(SigilStitchError::MissingFunctionLowerer {
-                language: self.file_extension().to_string(),
-                function_name: function.name().to_string(),
-                context: function.function_context(),
-                form: function.form(),
-            })
-        }
+        Err(SigilStitchError::MissingFunctionLowerer {
+            language: self.file_extension().to_string(),
+            function_name: function.name().to_string(),
+            context: function.function_context(),
+            form: function.form(),
+        })
     }
 
     /// Apply additional target-specific validation to one complete field sequence.
@@ -987,16 +982,6 @@ pub trait CodeLang: RendererLang {
     )]
     fn function_keyword(&self, _ctx: crate::spec::modifiers::DeclarationContext) -> &str {
         ""
-    }
-
-    /// Whether a constructor may use this explicit return type.
-    ///
-    /// The capability profile decides whether constructor return annotations
-    /// exist at all. This hook handles languages such as Python that permit
-    /// only a particular annotated type. The permissive default preserves
-    /// behavior for adapters written before capability validation.
-    fn constructor_return_type_is_valid(&self, _return_type: &TypeName) -> bool {
-        true
     }
 
     /// The keyword for a type declaration (e.g., "struct", "class").

@@ -9,6 +9,252 @@ use sigil_stitch::prelude::*;
 mod languages_registry;
 
 #[test]
+fn callable_return_sequences_keep_native_empty_and_cardinality_rules() {
+    let parameter = CallableParam::Single {
+        name: None,
+        type_name: TypeName::primitive("Input"),
+        presence: CallableParamPresence::Required,
+    };
+    for descriptor in languages_registry::BUILT_IN_LANGUAGES {
+        let lang = descriptor.adapter();
+        let native = match descriptor.id {
+            "cpp" | "dart" | "typescript" => Some("void"),
+            "kotlin" | "scala" => Some("Unit"),
+            "swift" => Some("Void"),
+            "python" => Some("None"),
+            "haskell" | "rust" => Some("()"),
+            "ocaml" => Some("unit"),
+            "go" => Some(""),
+            _ => None,
+        };
+        let empty = TypeName::callable(vec![parameter.clone()], vec![]);
+        let multiple = TypeName::callable(
+            vec![parameter.clone()],
+            vec![TypeName::primitive("First"), TypeName::primitive("Second")],
+        );
+        if let Some(native) = native {
+            let empty_output = render_type(lang.as_ref(), &empty);
+            if descriptor.id == "go" {
+                assert_eq!(empty_output, "func(Input)");
+                assert_eq!(
+                    render_type(lang.as_ref(), &multiple),
+                    "func(Input) (First, Second)"
+                );
+            } else {
+                assert_eq!(
+                    empty_output,
+                    render_type(
+                        lang.as_ref(),
+                        &TypeName::callable(
+                            vec![parameter.clone()],
+                            vec![TypeName::primitive(native)]
+                        )
+                    ),
+                    "{}",
+                    descriptor.id
+                );
+                assert!(
+                    matches!(
+                        lang.lower_type_name(&multiple),
+                        Err(SigilStitchError::UnsupportedTypeName { .. })
+                    ),
+                    "{}",
+                    descriptor.id
+                );
+            }
+        } else {
+            for ty in [empty, multiple] {
+                assert!(
+                    matches!(
+                        lang.lower_type_name(&ty),
+                        Err(SigilStitchError::UnsupportedTypeName { .. })
+                    ),
+                    "{}",
+                    descriptor.id
+                );
+            }
+        }
+    }
+    for id in ["haskell", "ocaml"] {
+        assert!(
+            languages_registry::adapter_for(id)
+                .lower_type_name(&TypeName::callable(vec![], vec![]))
+                .unwrap_err()
+                .to_string()
+                .contains("nullary")
+        );
+    }
+}
+
+#[test]
+fn go_nested_callable_results_preserve_import_aliases_and_full_file_layout() {
+    let returns = vec![
+        TypeName::importable("alpha", "Value"),
+        TypeName::importable("beta", "Value"),
+    ];
+    let callable = TypeName::callable(vec![], returns.clone());
+    let decoded: TypeName =
+        serde_json::from_value(serde_json::to_value(&callable).unwrap()).unwrap();
+    assert_eq!(decoded, callable);
+    for width in [8, 120] {
+        let file = FileSpec::builder("results.go")
+            .add_function(
+                FunSpec::builder("fetch")
+                    .returns(returns.clone())
+                    .body(CodeBlock::of("body", ()).unwrap())
+                    .build()
+                    .unwrap(),
+            )
+            .add_code(CodeBlock::of("var callbacks %T", TypeName::slice(callable.clone())).unwrap())
+            .build()
+            .unwrap();
+        let output = file.render(width).unwrap();
+        assert!(
+            output.contains("\"alpha\"") && output.contains("\"beta\""),
+            "{output}"
+        );
+        let collapsed = output.split_whitespace().collect::<String>();
+        assert!(output.contains("BetaValue \"beta\""), "{output}");
+        assert!(
+            collapsed.contains("fetch()(alpha.Value,BetaValue.Value)"),
+            "{output}"
+        );
+        assert!(
+            collapsed.contains("[]func()(alpha.Value,BetaValue.Value)"),
+            "{output}"
+        );
+    }
+}
+
+#[test]
+fn later_callable_result_slots_are_validated_and_lowered() {
+    let lang = languages_registry::adapter_for("go");
+    let invalid = TypeName::callable(
+        vec![],
+        vec![TypeName::primitive("int"), TypeName::parameter("")],
+    );
+    let render = |ty| {
+        FileSpec::builder("invalid.go")
+            .add_code(CodeBlock::of("%T", ty).unwrap())
+            .build()
+            .unwrap()
+            .render(120)
+    };
+    assert!(
+        matches!(render(invalid.clone()), Err(SigilStitchError::InvalidTypeName { context, .. }) if context.contains("callable.returns[1]"))
+    );
+    let unsupported = TypeName::callable(
+        vec![],
+        vec![
+            TypeName::primitive("int"),
+            TypeName::tuple(vec![TypeName::primitive("bool")]),
+        ],
+    );
+    assert!(matches!(
+        lang.lower_type_name(&unsupported),
+        Err(SigilStitchError::UnsupportedTypeName { .. })
+    ));
+    let encoded = serde_json::to_value(&invalid).unwrap();
+    let decoded: TypeName = serde_json::from_value(encoded).unwrap();
+    assert!(render(decoded).is_err());
+}
+
+#[test]
+fn go_complete_files_lower_nested_return_sequences_at_both_widths() {
+    for returns in [
+        vec![],
+        vec![TypeName::primitive("int")],
+        vec![TypeName::primitive("int"), TypeName::primitive("bool")],
+    ] {
+        let callable = TypeName::callable(vec![], returns.clone());
+        let nested =
+            TypeName::callable(vec![], vec![callable.clone(), TypeName::primitive("error")]);
+        for width in [8, 120] {
+            for ty in [
+                callable.clone(),
+                TypeName::optional(callable.clone()),
+                TypeName::application(
+                    TypeName::primitive("Container"),
+                    vec![TypeArgument::Single(callable.clone())],
+                ),
+                nested.clone(),
+            ] {
+                let output = FileSpec::builder("nested.go")
+                    .add_code(CodeBlock::of("var callback %T", ty).unwrap())
+                    .build()
+                    .unwrap()
+                    .render(width)
+                    .unwrap();
+                let normalized = output.split_whitespace().collect::<String>();
+                let expected = match returns.len() {
+                    0 => "func()",
+                    1 => "func()int",
+                    _ => "func()(int,bool)",
+                };
+                assert!(normalized.contains(expected), "{output}");
+                assert_eq!(
+                    normalized.matches("bool").count(),
+                    usize::from(returns.len() > 1),
+                    "{output}"
+                );
+            }
+        }
+    }
+    let tuple = TypeName::callable(
+        vec![],
+        vec![TypeName::tuple(vec![
+            TypeName::primitive("i32"),
+            TypeName::primitive("bool"),
+        ])],
+    );
+    assert_eq!(
+        render_type(&sigil_stitch::lang::rust::Rust::new(), &tuple),
+        "fn() -> (i32, bool)"
+    );
+}
+
+#[test]
+fn later_callable_return_slots_count_as_declaration_binder_uses_before_lowering() {
+    let callable = |name| {
+        TypeName::callable(
+            vec![],
+            vec![TypeName::primitive("Int"), TypeName::parameter(name)],
+        )
+    };
+    let function = FunSpec::builder("work")
+        .add_generic_param(GenericParamSpec::single("a").unwrap())
+        .returns(vec![callable("a")])
+        .body(CodeBlock::of("undefined", ()).unwrap())
+        .build()
+        .unwrap();
+    assert!(
+        function
+            .validate(&Haskell::new(), DeclarationContext::TopLevel)
+            .is_ok()
+    );
+    assert!(
+        function
+            .emit(&Haskell::new(), DeclarationContext::TopLevel)
+            .is_ok()
+    );
+    let sum = ClosedSumSpec::builder("Choice")
+        .add_generic_param(GenericParamSpec::single("T").unwrap())
+        .add_case(ClosedSumCaseSpec::positional("Callback", vec![callable("T")]).unwrap())
+        .build()
+        .unwrap();
+    assert!(sum.validate(&sigil_stitch::lang::rust::Rust::new()).is_ok());
+    // Validation sees stored binders; complete type lowering still rejects multiple Rust slots.
+    assert!(
+        FileSpec::builder("choice.rs")
+            .add_closed_sum(sum)
+            .build()
+            .unwrap()
+            .render(120)
+            .is_err()
+    );
+}
+
+#[test]
 #[allow(
     deprecated,
     reason = "compare released and modern input meanings through complete native files"
@@ -23,7 +269,7 @@ fn ordinary_modern_type_inputs_preserve_nested_native_output_and_imports() {
             type_name: leaf(),
             presence: CallableParamPresence::Required,
         }],
-        result(),
+        vec![result()],
     );
     let old_application = TypeName::generic(
         TypeName::importable("Containers", "Container"),
@@ -145,7 +391,7 @@ fn native_type_lowerers_reject_unrepresentable_callable_slots_and_expansions() {
                 pattern: TypeName::parameter("Ts"),
             },
         ] {
-            let ty = TypeName::callable(vec![parameter], TypeName::parameter("R"));
+            let ty = TypeName::callable(vec![parameter], vec![TypeName::parameter("R")]);
             let error = lang.lower_type_name(&ty).unwrap_err();
             assert!(
                 matches!(error, SigilStitchError::UnsupportedTypeName { .. }),
@@ -173,7 +419,10 @@ fn native_type_lowerers_reject_unrepresentable_callable_slots_and_expansions() {
     let ocaml = languages_registry::adapter_for("ocaml");
     assert!(
         ocaml
-            .lower_type_name(&TypeName::callable(vec![], TypeName::primitive("int")))
+            .lower_type_name(&TypeName::callable(
+                vec![],
+                vec![TypeName::primitive("int")]
+            ))
             .unwrap_err()
             .to_string()
             .contains("nullary")
@@ -230,7 +479,7 @@ fn scala_rejects_nullary_constructor_kinds_for_supported_declaration_owners() {
             GenericParamSpec::new("F", GenericParamDomain::Single { kind: Some(kind) }).unwrap();
         let function = FunSpec::builder("wrap")
             .add_generic_param(binding.clone())
-            .returns(TypeName::primitive("Int"))
+            .returns(vec![TypeName::primitive("Int")])
             .body(CodeBlock::of("???", ()).unwrap())
             .build()
             .unwrap();
@@ -292,7 +541,7 @@ fn rust_modern_lifetime_constraints_are_checked_for_every_declaration_owner() {
             .add_generic_param(binding.clone())
             .add_where_constraint(subject.clone(), vec![bound.clone()])
             .add_param(ParameterSpec::new("value", payload.clone()).unwrap())
-            .returns(TypeName::primitive("()"))
+            .returns(vec![TypeName::primitive("()")])
             .body(CodeBlock::of("()", ()).unwrap())
             .build()
             .unwrap();
@@ -362,10 +611,10 @@ fn same_version_nested_parametric_values_roundtrip_and_revalidate() {
                 element_type: TypeName::importable_type("./items", "Item"),
             },
         ],
-        TypeName::application(
+        vec![TypeName::application(
             TypeName::primitive("Promise"),
             vec![TypeArgument::Single(TypeName::primitive("void"))],
-        ),
+        )],
     );
     let decoded: TypeName =
         serde_json::from_value(serde_json::to_value(&callable).unwrap()).unwrap();
@@ -375,7 +624,7 @@ fn same_version_nested_parametric_values_roundtrip_and_revalidate() {
         render_type(&TypeScript::new(), &callable)
     );
     let function = FunSpec::builder("handler")
-        .returns(callable)
+        .returns(vec![callable])
         .body(CodeBlock::of("throw new Error('fixture');", ()).unwrap())
         .build()
         .unwrap();
@@ -466,7 +715,7 @@ fn java_modern_application_bounds_preserve_erasure_rejection() {
     let function = FunSpec::builder("work")
         .add_generic_param(binding)
         .add_where_constraint(TypeName::parameter("T"), vec![bound("Integer")])
-        .returns(TypeName::parameter("T"))
+        .returns(vec![TypeName::parameter("T")])
         .body(CodeBlock::of("return null;", ()).unwrap())
         .build()
         .unwrap();
@@ -513,7 +762,7 @@ fn csharp_application_bounds_merge_across_representations_without_losing_qualifi
                     .unwrap(),
             )
             .add_where_constraint(TypeName::parameter("T"), vec![second])
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("return;", ()).unwrap())
             .build()
             .unwrap();
@@ -551,7 +800,7 @@ fn cpp_function_templates_preserve_multiple_independent_packs() {
         .add_generic_param(GenericParamSpec::pack("Bs").unwrap())
         .add_param(ParameterSpec::new("left", tuple("As")).unwrap())
         .add_param(ParameterSpec::new("right", tuple("Bs")).unwrap())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     let output = FileSpec::builder("combine.cpp")
@@ -611,7 +860,7 @@ fn haskell_indexed_function_preserves_kinds_and_operator_imports() {
         )
         .add_param(ParameterSpec::new("left", array(TypeName::parameter("n"))).unwrap())
         .add_param(ParameterSpec::new("right", array(TypeName::parameter("m"))).unwrap())
-        .returns(array(sum))
+        .returns(vec![array(sum)])
         .body(CodeBlock::of("undefined", ()).unwrap())
         .build()
         .unwrap();
@@ -656,7 +905,7 @@ fn scala_modern_constructor_kinds_do_not_use_legacy_suffix_storage() {
             )
             .unwrap(),
         )
-        .returns(TypeName::parameter("A"))
+        .returns(vec![TypeName::parameter("A")])
         .body(CodeBlock::of("???", ()).unwrap())
         .build()
         .unwrap();
@@ -706,7 +955,7 @@ fn named_kind_annotations_fail_closed_on_non_kind_declaration_consumers() {
     let function = FunSpec::builder("identity")
         .add_generic_param(binding())
         .add_param(ParameterSpec::new("value", TypeName::parameter("T")).unwrap())
-        .returns(TypeName::parameter("T"))
+        .returns(vec![TypeName::parameter("T")])
         .body(CodeBlock::of("return value;", ()).unwrap())
         .build()
         .unwrap();
@@ -833,7 +1082,7 @@ fn deserialized_modern_kinds_are_revalidated_by_type_and_closed_sum_owners() {
 }
 
 #[test]
-fn frozen_function_compatibility_lowering_rejects_rich_modern_bindings() {
+fn external_function_adapter_needs_complete_lowering_for_modern_bindings() {
     #[derive(Debug)]
     struct CompatibilityAdapter;
     impl sigil_stitch::lang::RendererLang for CompatibilityAdapter {
@@ -853,9 +1102,7 @@ fn frozen_function_compatibility_lowering_rejects_rich_modern_bindings() {
         .emit(&CompatibilityAdapter, DeclarationContext::TopLevel)
         .unwrap_err();
     assert!(
-        error
-            .to_string()
-            .contains("compatibility declaration lowerer cannot preserve"),
+        matches!(error, SigilStitchError::MissingFunctionLowerer { .. }),
         "{error}"
     );
 }
@@ -879,7 +1126,7 @@ fn typescript_lowers_named_optional_and_repeated_callable_slots() {
                 element_type: TypeName::primitive("number"),
             },
         ],
-        TypeName::parameter("R"),
+        vec![TypeName::parameter("R")],
     );
     assert_eq!(
         render_type(&TypeScript::new(), &callable),
@@ -915,7 +1162,7 @@ fn haskell_lowers_basic_parameter_application_and_callable() {
             type_name: TypeName::parameter("a"),
             presence: CallableParamPresence::Required,
         }],
-        TypeName::parameter("b"),
+        vec![TypeName::parameter("b")],
     );
     assert_eq!(render_type(&Haskell::new(), &callable), "a -> b");
 }
@@ -981,7 +1228,7 @@ fn haskell_rejects_optional_presence_and_groups_nested_applications() {
             type_name: TypeName::parameter("a"),
             presence: CallableParamPresence::Optional,
         }],
-        TypeName::parameter("b"),
+        vec![TypeName::parameter("b")],
     );
     assert!(Haskell::new().lower_type_name(&optional).is_err());
     let nested = TypeName::application(
@@ -1019,7 +1266,7 @@ fn typescript_callable_generated_labels_are_unique_and_repetition_preserves_prec
                 ]),
             },
         ],
-        TypeName::primitive("void"),
+        vec![TypeName::primitive("void")],
     );
     assert_eq!(
         render_type(&TypeScript::new(), &ty),
@@ -1028,7 +1275,10 @@ fn typescript_callable_generated_labels_are_unique_and_repetition_preserves_prec
     assert_eq!(
         render_type(
             &TypeScript::new(),
-            &TypeName::array(TypeName::callable(vec![], TypeName::primitive("void")))
+            &TypeName::array(TypeName::callable(
+                vec![],
+                vec![TypeName::primitive("void")]
+            ))
         ),
         "(() => void)[]"
     );
@@ -1076,7 +1326,7 @@ fn typescript_rejects_invalid_labels_and_slot_order_without_changing_supplied_na
             slot("last", required),
         ],
     ] {
-        let callable = TypeName::callable(parameters, TypeName::primitive("void"));
+        let callable = TypeName::callable(parameters, vec![TypeName::primitive("void")]);
         assert!(TypeScript::new().lower_type_name(&callable).is_err());
     }
 }
@@ -1100,7 +1350,7 @@ fn typescript_callable_labels_are_preserved_or_rejected_before_rendering() {
             pattern: TypeName::array(TypeName::primitive("number")),
         }],
     ] {
-        let ty = TypeName::callable(parameters, TypeName::primitive("void"));
+        let ty = TypeName::callable(parameters, vec![TypeName::primitive("void")]);
         for width in [8, 120] {
             let error = FileSpec::builder("labels.ts")
                 .add_code(CodeBlock::of("type Handler = %T;", (ty.clone(),)).unwrap())
@@ -1113,7 +1363,7 @@ fn typescript_callable_labels_are_preserved_or_rejected_before_rendering() {
     }
     let ty = TypeName::callable(
         vec![slot("class_"), slot("value")],
-        TypeName::primitive("void"),
+        vec![TypeName::primitive("void")],
     );
     assert_eq!(
         render_type(&TypeScript::new(), &ty),
@@ -1171,7 +1421,7 @@ fn typescript_rejects_non_named_bases_but_preserves_nested_arguments() {
 fn deserialized_named_kind_is_revalidated_before_declaration_emission() {
     let function = FunSpec::builder("identity")
         .add_generic_param(GenericParamSpec::single("T").unwrap())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     let mut encoded = serde_json::to_value(&function).unwrap();

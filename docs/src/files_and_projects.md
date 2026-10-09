@@ -211,7 +211,7 @@ let type_spec = TypeSpec::builder("UserService", TypeKind::Class)
         FunSpec::builder("getUser")
             .is_async()
             .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-            .returns(TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(user_type)]))
+            .returns(vec![TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(user_type)])])
             .body(method_body)
             .build()
             .unwrap(),

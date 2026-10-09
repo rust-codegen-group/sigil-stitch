@@ -195,7 +195,7 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         ),
         TypeName::Callable {
             parameters,
-            return_type,
+            returns,
         } => {
             let mut lowered = Vec::with_capacity(parameters.len());
             for parameter in parameters {
@@ -221,7 +221,16 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             if lowered.is_empty() {
                 return Err(unsupported("Haskell has no nullary callable type"));
             }
-            curried(lowered, lower(return_type)?, " -> ")
+            let return_type = match returns.as_slice() {
+                [] => literal("()"),
+                [return_type] => lower(return_type)?,
+                _ => {
+                    return Err(unsupported(
+                        "Haskell supports at most one callable return slot",
+                    ));
+                }
+            };
+            curried(lowered, return_type, " -> ")
         }
         TypeName::AssociatedType { .. } => Err(unsupported(
             "Haskell has no associated-type projection expression",

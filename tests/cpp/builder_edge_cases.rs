@@ -103,7 +103,7 @@ fn test_full_header() {
     pub_section.add_code(emit_fun(
         &FunSpec::builder("log")
             .add_param(ParameterSpec::new("msg", TypeName::primitive("const char*")).unwrap())
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(log_body)
             .build()
             .unwrap(),
@@ -114,7 +114,7 @@ fn test_full_header() {
     let name_body = CodeBlock::of("return name_;", ()).unwrap();
     pub_section.add_code(emit_fun(
         &FunSpec::builder("name")
-            .returns(TypeName::primitive("const std::string&"))
+            .returns(vec![TypeName::primitive("const std::string&")])
             .suffix("const")
             .body(name_body)
             .build()
@@ -145,7 +145,7 @@ fn test_full_header() {
 fn test_annotation_attribute() {
     let fun = FunSpec::builder("compute")
         .annotate(AnnotationSpec::new("nodiscard"))
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .body(CodeBlock::of("return 42;", ()).unwrap())
         .build()
         .unwrap();

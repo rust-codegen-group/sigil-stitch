@@ -68,14 +68,14 @@ let type_spec = TypeSpec::builder("Repository", TypeKind::Interface)
     .add_method(
         FunSpec::builder("FindByID")
             .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-            .returns(TypeName::raw("(Entity, error)"))
+            .returns(vec![TypeName::primitive("Entity"), TypeName::primitive("error")])
             .build()
             .unwrap(),
     )
     .add_method(
         FunSpec::builder("Save")
             .add_param(ParameterSpec::new("entity", TypeName::primitive("Entity")).unwrap())
-            .returns(TypeName::primitive("error"))
+            .returns(vec![TypeName::primitive("error")])
             .build()
             .unwrap(),
     )
@@ -121,7 +121,7 @@ let fun = FunSpec::builder("Max")
     .add_generic_param(tp)
     .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())
     .add_param(ParameterSpec::new("b", TypeName::primitive("T")).unwrap())
-    .returns(TypeName::primitive("T"))
+    .returns(vec![TypeName::primitive("T")])
     .body(body)
     .build()
     .unwrap();

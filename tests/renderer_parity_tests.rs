@@ -1095,7 +1095,7 @@ fn every_existing_type_name_variant() -> Vec<TypeNameExample> {
                         presence: sigil_stitch::prelude::CallableParamPresence::Required,
                     })
                     .collect(),
-                TypeName::primitive("Result"),
+                vec![TypeName::primitive("Result")],
             ),
         },
         TypeNameExample {

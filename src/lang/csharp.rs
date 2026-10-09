@@ -297,8 +297,8 @@ const CS_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // DefaultParameters = default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = method result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = method result type
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = parameter declarations
     FunctionCapability::TypedParameters,
     // Override = override
@@ -313,7 +313,7 @@ const CS_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     FunctionCapability::BoundedPolymorphism,
     FunctionCapability::DefaultParameters,
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     FunctionCapability::ParametricPolymorphism,
     FunctionCapability::StaticMethod,
@@ -325,7 +325,7 @@ const CS_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::TypedParameters,
 ];
 const CS_REQUIRED_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
 ];
 const CS_MEMBER_INCOMPATIBILITIES: &[(FunctionCapability, FunctionCapability)] = &[
@@ -471,6 +471,7 @@ impl CodeLang for CSharp {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::csharp_function_lowering::validate_returns(self, function)?;
         crate::lang::csharp_function_lowering::validate_generic_parameters(self, function)?;
         for parameter in function.type_params() {
             if let Err(reason) =

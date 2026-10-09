@@ -558,7 +558,7 @@ pub enum SigilStitchError {
         reason: String,
     },
 
-    /// A strict adapter declared function support but omitted complete lowering.
+    /// An adapter omitted complete function lowering.
     #[snafu(display(
         "language {language:?} has no complete lowerer for {form:?} function {function_name:?} in {context:?} context"
     ))]
@@ -718,6 +718,25 @@ pub enum SigilStitchError {
         function_name: String,
         /// The rejected return type.
         return_type: String,
+    },
+
+    /// A language cannot represent the supplied function return sequence.
+    #[snafu(display(
+        "language {language:?} cannot represent {actual} return slot(s) for {form:?} {function_name:?} in {context:?} context: {reason}"
+    ))]
+    UnsupportedFunctionReturns {
+        /// The language file extension.
+        language: String,
+        /// The function being validated.
+        function_name: String,
+        /// The semantic function context.
+        context: FunctionContext,
+        /// The declaration form.
+        form: FunctionForm,
+        /// Number of supplied return slots.
+        actual: usize,
+        /// Why the return sequence is not representable.
+        reason: String,
     },
 
     /// A language does not support one or more function capabilities.

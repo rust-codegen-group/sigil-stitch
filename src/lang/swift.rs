@@ -383,8 +383,8 @@ const SWIFT_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // DefaultParameters = default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = function result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = function result type
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = parameter annotations
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = generic type parameters
@@ -399,8 +399,8 @@ const SWIFT_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // DefaultParameters = default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = method result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = method result type
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = parameter annotations
     FunctionCapability::TypedParameters,
     // Override = override
@@ -414,7 +414,7 @@ const SWIFT_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::AsyncEffect,
     FunctionCapability::Attributes,
     FunctionCapability::BoundedPolymorphism,
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::ParametricPolymorphism,
     FunctionCapability::TypedParameters,
     FunctionCapability::StaticMethod,
@@ -484,6 +484,7 @@ impl CodeLang for Swift {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::swift_function_lowering::validate_returns(self, function)?;
         crate::lang::swift_function_lowering::validate_generic_parameters(self, function)
     }
     fn validate_resolved_imports(

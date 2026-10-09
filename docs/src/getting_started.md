@@ -101,7 +101,7 @@ Here's a function declaration:
 let user_type = TypeName::importable_type("./models", "User");
 
 let fun = FunSpec::builder("getActiveUsers")
-    .returns(TypeName::array(user_type.clone()))
+    .returns(vec![TypeName::array(user_type.clone())])
     .is_async()
     .body(sigil_quote!(TypeScript {
         const users = await fetchAll();

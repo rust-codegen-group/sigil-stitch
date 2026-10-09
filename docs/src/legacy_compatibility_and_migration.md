@@ -22,14 +22,31 @@ The compatibility contract is:
 - Legacy grammar-oriented APIs are deprecated so new use is visible at compile
   time. They may still be read by a frozen compatibility lowerer.
 - Existing external `CodeLang` implementations inherit permissive capability
-  profiles and provided compatibility lowerers.
+  profiles and provided compatibility lowerers except for functions.
 - Compatibility preserves valid old behavior when the semantic input can prove
   it. It does not require a built-in adapter to keep generating malformed or
   unverifiable target code.
 - Concepts introduced after 0.6.8 may change without another compatibility
   layer.
-- Requiring strict profiles or removing provided compatibility lowerers is a
-  separate 0.8 decision, not an automatic consequence of deprecation.
+- Requiring strict profiles or removing other provided compatibility lowerers
+  is a separate decision, not an automatic consequence of deprecation.
+
+Two released function behaviors intentionally change:
+
+1. `FunSpecBuilder::returns(TypeName)` becomes `returns(Vec<TypeName>)`.
+   Replace singleton calls with `.returns(vec![ty])`. Empty means explicitly
+   no payload, omitted means unspecified, and multiple slots are distinct from
+   one tuple-valued return. Go supports multiple slots; other typed built-ins
+   reject them. Upgrade these calls together rather than mixing setter shapes.
+2. External adapters no longer inherit shared function declaration grammar.
+   Implement complete `CodeLang::lower_function()`; without an override,
+   rendering returns `MissingFunctionLowerer` even with permissive profiles.
+   Static validation does not guarantee that a complete lowerer exists.
+
+Released `TypeName::Function` / `function(...)` still use one scalar return;
+their documented JSON fixture is unchanged. The unreleased modern `Callable`
+and `FunSpec` storage have ordinary same-version Serde roundtrips, not old-shape
+readers or a cross-version serialized protocol.
 
 Deprecated does not mean that the shared grammar model is still extensible. Do
 not add a field, flag, or enum variant to a legacy configuration type for new
@@ -40,7 +57,7 @@ syntax.
 | Reader | Current path | Compatibility responsibility |
 |--------|--------------|------------------------------|
 | Ordinary builder user | Use semantic builders and owner-aware `TypeSpec` composition | Replace deprecated aliases and direct facades when the owner affects validity |
-| Existing 0.6.8 external adapter | Provided permissive profiles and frozen lowerers keep the adapter source-compatible | Migrate one declaration family at a time and retain output-parity tests |
+| Existing 0.6.8 external adapter | Permissive profiles and retained frozen lowerers, except functions | Implement complete function lowering; migrate other families with output-parity tests |
 | New external adapter | Declare strict capabilities and implement complete `validate_*` / `lower_*` seams | Do not model new grammar through deprecated configuration |
 | Built-in adapter | Exact strict profiles and language-local lowering | Never consult migrated-family legacy grammar outside compatibility code |
 
@@ -51,12 +68,14 @@ sequences use complete language-owned lowering for every built-in adapter.
 `TypeSpec` validates one complete declaration, constructs `ValidatedType` with
 validated children, and delegates once to `CodeLang::lower_type()`.
 
-The compatibility bridge restores the exact 0.6.8 source signatures touched by
-this migration and marks the shared grammar surface deprecated. A checked
+The compatibility bridge retains the 0.6.8 source signatures except for the
+explicit return-setter change above, and marks shared grammar deprecated. A checked
 external-adapter fixture overrides the complete old trait surface, the finite
 documented `TypeName` JSON set is checked as `serde_json::Value`, and
-`cargo-semver-checks 0.50.0` currently reports no unapproved break from tag
-`0.6.8`. The compatibility manifest and fixtures live under
+`cargo-semver-checks 0.50.0` currently reports only the approved `TypeName`
+non-exhaustive change from tag `0.6.8`. It does not report the setter's argument
+type change or the removed default grammar; compile-failure and rendering tests
+cover those explicit exceptions. The compatibility manifest and fixtures live under
 `tests/compatibility/`.
 
 Type expressions now use complete fallible
@@ -88,13 +107,13 @@ inventory whenever a reader moves behind a frozen compatibility boundary.
 | `TypePresentationConfig`, `TypePresentation`, `FunctionPresentation`, `AssociatedTypeStyle`, `BoundsPresentation`, `WildcardPresentation`; `RendererLang::type_presentation()` | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only type grammar | Built-ins implement complete local `lower_type_name()` operations; only the frozen 0.6.8 default and direct compatibility facade retain the matrix |
 | `RendererLang::module_separator()` | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only qualified-name grammar | Built-ins own qualified-name spelling; the old accessor remains only in the frozen type bridge and direct facade |
 | `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in type rendering | `src/type_name_lowering/compatibility.rs` and the deprecated direct document facade in `src/type_name_render.rs` | Compatibility-only type grammar | Built-ins own generic type application locally; the frozen bridge and direct facade retain the old delimiters and placement |
-| `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in declarations | `src/spec/where_spec.rs`, `src/lang/function_lowering/compatibility.rs`, `src/lang/type_lowering/compatibility.rs`, `src/lang/compatibility_markers.rs`, and the deprecated direct newtype facades in `src/lang/{go,kotlin,scala}.rs` | Compatibility-only declaration grammar | Built-in complete lowerers own type-parameter, bound, lifetime, kind, context-bound, and constraint-clause grammar; the named compatibility modules and direct facades retain the frozen 0.6.8 read |
+| `GenericSyntaxConfig`; `RendererLang::generic_syntax()` in declarations | `src/spec/where_spec.rs`, `src/lang/type_lowering/compatibility.rs`, `src/lang/compatibility_markers.rs`, and the deprecated direct newtype facades in `src/lang/{go,kotlin,scala}.rs` | Compatibility-only declaration grammar | Complete function grammar has no default bridge; the named type compatibility modules and direct facades retain frozen reads |
 | `BlockSyntaxConfig::indent_unit` | `src/spec/where_spec.rs` reads it only in deprecated direct where-clause helpers; compatibility lowerers and the provided renderer-event defaults retain their bridge reads | Compatibility-only declaration and renderer behavior | `indent_unit()` owns final-renderer indentation and built-in declaration lowerers use target-local indentation; compatibility paths retain the frozen field |
 | `BlockSyntaxConfig::{uses_semicolons, block_open, block_close, close_on_transition}` | Only compatibility lowerers and the provided renderer-event defaults consume these fields in production | Compatibility-only renderer and declaration grammar | Complete renderer events and declaration lowerers own built-in grammar; frozen compatibility paths continue to interpret old adapters |
 | `BlockSyntaxConfig::{field_terminator, type_close_terminator, bases_close}` | Only `src/lang/field_lowering/compatibility.rs` and `src/lang/type_lowering/compatibility.rs` consume these fields in production | Compatibility-only declaration grammar | No current replacement config; complete declaration lowerers own these bytes locally and the old fields remain frozen |
-| `FunctionSyntaxConfig`, `OptionalFieldStyle`, `PropertyStyle`, and `property_getter_keyword()` | The function, field, property, and type compatibility modules consume the applicable surfaces | Compatibility-only declaration grammar | Already outside built-in complete lowerers; retain only for the deprecated 0.6.8 bridge |
-| `TypeDeclSyntaxConfig` | The function, field, property, and type compatibility modules read it; deprecated `ParameterSpec::emit_into()` also reads it for the direct 0.6.8 parameter facade | Compatibility-only declaration grammar | Complete built-in lowerers already own these bytes; retain the reads only in frozen compatibility modules and the deprecated direct facade |
-| `EnumAndAnnotationConfig` and `VariantValueFormat` | The function, field, property, type, and variant compatibility modules read them; `AnnotationSpec::emit_with()` and deprecated `ParameterSpec::emit_into()` retain direct 0.6.8 facade behavior; permissive variant dispatch reads `variants_before_fields` through the variant compatibility module | Compatibility-only annotation, parameter, and variant grammar | Complete built-in lowerers use `emit_with_syntax()` and target-local variant grammar; retain shared reads only at the named compatibility boundaries |
+| `FunctionSyntaxConfig`, `OptionalFieldStyle`, `PropertyStyle`, and `property_getter_keyword()` | The field, property, and type compatibility modules consume applicable surfaces; no shared function lowerer remains | Compatibility-only declaration grammar | Already outside built-in complete lowerers; retain applicable reads only for remaining bridges |
+| `TypeDeclSyntaxConfig` | The field, property, and type compatibility modules read it; deprecated `ParameterSpec::emit_into()` also reads it for the direct 0.6.8 parameter facade | Compatibility-only declaration grammar | Complete built-in lowerers already own these bytes; retain the reads only in frozen compatibility modules and the deprecated direct facade |
+| `EnumAndAnnotationConfig` and `VariantValueFormat` | The field, property, type, and variant compatibility modules read them; `AnnotationSpec::emit_with()` and deprecated `ParameterSpec::emit_into()` retain direct 0.6.8 facade behavior; permissive variant dispatch reads `variants_before_fields` through the variant compatibility module | Compatibility-only annotation, parameter, and variant grammar | Complete built-in lowerers use `emit_with_syntax()` and target-local variant grammar; retain shared reads only at the named compatibility boundaries |
 | Shared `QuoteStyle`, the three public `quote_style` fields, and `with_quote_style()` | One narrow helper in each of TypeScript, JavaScript, and Python normalizes the preserved field to a target-local quote character; downstream string and import rendering no longer read the shared enum | Compatibility-held user preference whose concrete grammar belongs to each language | Language-local quote handling owns escaping and conveniences; the old enum, field, and setter remain deprecated shims |
 
 Built-in unit tests that directly inspect config-return values are temporary
@@ -113,13 +132,13 @@ corresponding compatibility surface can be removed in a future major version.
 | Capabilities | No `capabilities()` override | External adapters receive `LanguageCapabilities::permissive()` | Return a strict matrix with exact family profiles |
 | Type expressions | `type_presentation()`, `TypePresentationConfig`, `TypePresentation`, `FunctionPresentation`, `generic_syntax()`, `GenericSyntaxConfig`, qualified-name presentation accessors, and `TypeName::to_doc_with_lang()` | The provided `lower_type_name()` reproduces 0.6.8 output for old `TypeName` variants and rejects `StringLiteral` or any later variant; the direct document method remains only as a deprecated terminal facade | Implement complete fallible `RendererLang::lower_type_name()` and keep imports in the returned `CodeBlock` |
 | `TypeName` matching and documented JSON values | Exhaustive matches over the pre-0.6.8 variants; concrete `TypeName` JSON values documented before 0.7 | Supported Rust constructors remain; checked fixtures preserve the documented JSON values. Generic Serde support does not promise compatibility for other representations, binary encodings, enum ordinals, field order, or serializer bytes | Add a wildcard arm to downstream matches; do not reinterpret unknown data or rely on an undocumented wire format |
-| Functions | `function_keyword()`, `fun_block_open()`, `function_syntax()`, `FunctionSyntaxConfig`, `ParamListStyle`, `FunctionSignatureStyle`, `ConstructorDelegationStyle`, and `WhereClauseStyle` | The provided `lower_function()` interprets them for external adapters | `validate_function()` and complete `lower_function()` |
+| Functions | `function_keyword()`, `fun_block_open()`, `function_syntax()`, `FunctionSyntaxConfig`, `ParamListStyle`, `FunctionSignatureStyle`, `ConstructorDelegationStyle`, and `WhereClauseStyle` | Deprecated hooks remain source-available; no default function grammar reads them | `validate_function()` and complete `lower_function()`; migrate scalar `.returns(ty)` to `.returns(vec![ty])` |
 | Types | `type_keyword()`, `methods_inside_type_body()`, `type_kind_suffix()`, `emit_newtype_decl()`, `type_header_block_open()`, `type_body_prefix()` / `type_body_suffix()`, `emit_type_close_suffix()`, `abstract_type_modifier_is_valid()`, `type_decl_syntax()`, and type-emitter reads of `function_syntax()` / `enum_and_annotation()` | The provided `lower_type()` interprets them only for permissive external adapters and does not infer later closed-sum intent | `validate_type()`, complete `lower_type()`, and the dedicated closed-sum builder |
-| Type parameters | `generic_syntax()`, `render_type_params()`, `render_type_param_kind()`, and `ParameterSpec::emit_into()` | The provided permissive declaration lowerers and direct facades preserve frozen 0.6.8 grammar | Complete language-owned type and function lowering; strict adapters without a complete function lowerer fail with `MissingFunctionLowerer` |
+| Type parameters | `generic_syntax()`, `render_type_params()`, `render_type_param_kind()`, and `ParameterSpec::emit_into()` | Retained type lowerers and direct facades preserve frozen grammar | Complete language-owned type and function lowering; every adapter without a complete function lowerer fails with `MissingFunctionLowerer` |
 | Type application inputs | `TypeName::Generic`, `TypeName::generic()` | Explicitly deprecated; old storage and checked JSON fixtures remain supported | `TypeName::Application` / `application()` with ordered `TypeArgument` values |
 | Callable type inputs | `TypeName::Function`, `TypeName::function()` | Explicitly deprecated; existing scalar-slot meaning remains supported | `TypeName::Callable` / `callable()` with `CallableParam` values |
 | Declaration binding inputs | `TypeParamSpec`, `TypeParamKind`, and `FunSpecBuilder::add_type_param()` / `TypeSpecBuilder::add_type_param()` | Explicitly deprecated; released bounds, context bounds, lifetime intent, and raw Scala suffix metadata remain compatibility inputs | Fallible `GenericParamSpec`, `GenericParamDomain`, `KindExpr`, and `add_generic_param()` |
-| Variable spelling | `variable_prefix()` | Frozen function, field, property, and type compatibility lowerers interpret the adapter's prefix | Complete language-owned declaration lowering |
+| Variable spelling | `variable_prefix()` | Frozen field, property, and type compatibility lowerers interpret the adapter's prefix | Complete language-owned declaration lowering |
 | Preambles | `doc_before_annotations()`, `doc_comment_inside_body()` | Frozen compatibility lowerers may read them | Emit documentation and attributes in each complete lowerer |
 | Fields | `optional_field_style()`, `OptionalFieldStyle` | The provided `lower_fields()` freezes the old field emitter | `FieldCapability`, `FieldContext`, `TypeName::Optional`, and complete `lower_fields()` |
 | Properties | `property_style()`, `property_getter_keyword()`, `PropertyStyle` | The provided `lower_property()` freezes the old property emitter | `PropertyContext`, property capabilities, and complete `lower_property()` |
@@ -143,7 +162,7 @@ for that retained compatibility metadata.
 
 Ordinary legacy application arguments migrate to `TypeArgument::Single`.
 Ordinary legacy callable slots migrate to unnamed required
-`CallableParam::Single` values. Expansion patterns, optional presence, and
+`CallableParam::Single` values and a singleton `returns` vector. Expansion patterns, optional presence, and
 repeated-element segments are new explicit intent; no old vector is
 reinterpreted as a pack. A frozen compatibility adapter rejects modern
 application/callable values or binding domains it cannot preserve.
@@ -195,7 +214,8 @@ of extending the configuration.
 
 Complete function lowerers own all of these choices locally. An adapter may
 share private policy-free helpers, but new syntax must not add another field to
-this table.
+this table. No provided function lowerer interprets this configuration anymore;
+the struct remains for source compatibility and retained type-bridge reads.
 
 ### `TypeDeclSyntaxConfig`
 

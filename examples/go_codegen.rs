@@ -116,7 +116,7 @@ fn builder_approach() -> String {
         .receiver(
             ParameterSpec::new("s", TypeName::pointer(TypeName::primitive("Server"))).unwrap(),
         )
-        .returns(TypeName::primitive("error"))
+        .returns(vec![TypeName::primitive("error")])
         .body(start_body.build().unwrap())
         .build()
         .unwrap();
@@ -151,7 +151,7 @@ fn builder_approach() -> String {
                 .unwrap(),
         )
         .add_param(ParameterSpec::new("items", TypeName::slice(TypeName::primitive("T"))).unwrap())
-        .returns(TypeName::slice(TypeName::primitive("T")))
+        .returns(vec![TypeName::slice(TypeName::primitive("T"))])
         .body(sort_body.build().unwrap())
         .build()
         .unwrap();
@@ -229,7 +229,7 @@ fn macro_approach() -> String {
         .receiver(
             ParameterSpec::new("s", TypeName::pointer(TypeName::primitive("Server"))).unwrap(),
         )
-        .returns(TypeName::primitive("error"))
+        .returns(vec![TypeName::primitive("error")])
         .body(start_body)
         .build()
         .unwrap();
@@ -265,7 +265,7 @@ fn macro_approach() -> String {
                 .unwrap(),
         )
         .add_param(ParameterSpec::new("items", TypeName::slice(TypeName::primitive("T"))).unwrap())
-        .returns(TypeName::slice(TypeName::primitive("T")))
+        .returns(vec![TypeName::slice(TypeName::primitive("T"))])
         .body(sort_body)
         .build()
         .unwrap();

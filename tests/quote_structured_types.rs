@@ -33,7 +33,7 @@ fn type_interpolation_preserves_complete_callable_and_nested_imports() {
                 element_type: TypeName::importable_type("./models", "Item"),
             },
         ],
-        TypeName::importable_type("./results", "Result"),
+        vec![TypeName::importable_type("./results", "Result")],
     );
     let quoted = sigil_quote!(TypeScript { type Handler = $T(callable.clone()); }).unwrap();
     let mut builder = CodeBlock::builder();

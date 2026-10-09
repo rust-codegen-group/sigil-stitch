@@ -298,8 +298,9 @@ pub enum TypeName {
     Callable {
         /// Ordered callable parameter segments.
         parameters: Vec<crate::spec::where_spec::CallableParam>,
-        /// Callable result type.
-        return_type: Box<TypeName>,
+        /// Ordered return slots. Empty uses the target's native no-payload convention.
+        /// A tuple-valued result occupies one slot.
+        returns: Vec<TypeName>,
     },
     /// Raw string escape hatch. No import tracking.
     Raw(String),
@@ -543,11 +544,11 @@ impl TypeName {
     /// Create a structured callable type.
     pub fn callable(
         parameters: Vec<crate::spec::where_spec::CallableParam>,
-        return_type: TypeName,
+        returns: Vec<TypeName>,
     ) -> Self {
         TypeName::Callable {
             parameters,
-            return_type: Box::new(return_type),
+            returns,
         }
     }
 
@@ -1715,7 +1716,7 @@ mod tests {
                 type_name: TypeName::primitive("number"),
                 presence: CallableParamPresence::Required,
             }],
-            TypeName::primitive("string"),
+            vec![TypeName::primitive("string")],
         );
         crate::type_name_lowering::validation::validate_type_name(
             &callable,

@@ -66,7 +66,7 @@ fn test_class_with_methods() {
                 .add_method(
                     FunSpec::builder("getHost")
                         .visibility(Visibility::Public)
-                        .returns(TypeName::primitive("string"))
+                        .returns(vec![TypeName::primitive("string")])
                         .body(CodeBlock::of("return $this->host;", ()).unwrap())
                         .build()
                         .unwrap(),
@@ -74,7 +74,7 @@ fn test_class_with_methods() {
                 .add_method(
                     FunSpec::builder("getPort")
                         .visibility(Visibility::Public)
-                        .returns(TypeName::primitive("int"))
+                        .returns(vec![TypeName::primitive("int")])
                         .body(CodeBlock::of("return $this->port;", ()).unwrap())
                         .build()
                         .unwrap(),
@@ -98,7 +98,7 @@ fn test_interface() {
                 .add_method(
                     FunSpec::builder("findById")
                         .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-                        .returns(TypeName::optional(TypeName::primitive("User")))
+                        .returns(vec![TypeName::optional(TypeName::primitive("User"))])
                         .build()
                         .unwrap(),
                 )
@@ -107,7 +107,7 @@ fn test_interface() {
                         .add_param(
                             ParameterSpec::new("entity", TypeName::primitive("User")).unwrap(),
                         )
-                        .returns(TypeName::primitive("void"))
+                        .returns(vec![TypeName::primitive("void")])
                         .build()
                         .unwrap(),
                 )

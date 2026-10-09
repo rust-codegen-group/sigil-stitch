@@ -15,7 +15,7 @@ fn test_async_function() {
 
     let body = CodeBlock::of("return await api.fetchUser(id);", ()).unwrap();
     let fun = FunSpec::builder("fetchUser")
-        .returns(TypeName::primitive("Future<User>"))
+        .returns(vec![TypeName::primitive("Future<User>")])
         .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
         .is_async()
         .body(body)
@@ -46,7 +46,7 @@ fn test_annotated_method() {
         .extends(TypeName::primitive("Animal"))
         .add_method(
             FunSpec::builder("speak")
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .annotation(CodeBlock::of("@override", ()).unwrap())
                 .body(body)
                 .build()
@@ -70,7 +70,7 @@ fn test_function_with_doc() {
     let fun = FunSpec::builder("greet")
         .doc("Greet the user by name.")
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(body)
         .build()
         .unwrap();

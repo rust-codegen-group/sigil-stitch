@@ -13,7 +13,6 @@ use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::TypeKind;
-use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
 #[allow(
     deprecated,
@@ -1334,7 +1333,7 @@ fn test_spec_error_propagation() {
 #[derive(Debug, Clone, Copy)]
 enum FailingHook {
     Newtype,
-    Context,
+    Function,
     Suffix,
 }
 
@@ -1369,21 +1368,14 @@ impl CodeLang for FailingHookLang {
         CodeBlock::of(&format!("struct {name}(%T);"), inner.clone())
     }
 
-    #[allow(
-        deprecated,
-        reason = "exercise released generic and callable compatibility inputs"
-    )]
-    fn emit_type_context(
+    fn lower_function(
         &self,
-        _type_params: &[TypeParamSpec],
-    ) -> Result<Option<CodeBlock>, SigilStitchError> {
-        if matches!(self.0, FailingHook::Context) {
-            return Err(SigilStitchError::Render {
-                context: "emit_type_context".into(),
-                message: "intentional hook error".into(),
-            });
-        }
-        Ok(None)
+        _function: sigil_stitch::lang::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        Err(SigilStitchError::Render {
+            context: "lower_function".into(),
+            message: "intentional hook error".into(),
+        })
     }
 
     fn emit_type_close_suffix(
@@ -1398,14 +1390,6 @@ impl CodeLang for FailingHookLang {
             });
         }
         Ok(None)
-    }
-
-    #[allow(deprecated)] // Exercises the frozen 0.6.8 compatibility lowerer.
-    fn function_syntax(&self) -> sigil_stitch::lang::config::FunctionSyntaxConfig<'_> {
-        sigil_stitch::lang::config::FunctionSyntaxConfig {
-            function_signature_style: sigil_stitch::spec::fun_spec::FunctionSignatureStyle::Split,
-            ..Default::default()
-        }
     }
 }
 
@@ -1435,19 +1419,17 @@ fn test_structured_hook_errors_propagate_from_file_render() {
 
     let function = FunSpec::builder("display")
         .add_type_param(TypeParamSpec::new("T"))
-        .add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap())
-        .returns(TypeName::primitive("String"))
         .build()
         .unwrap();
     let context_error =
-        FileSpec::builder_with("display.fail", FailingHookLang(FailingHook::Context))
+        FileSpec::builder_with("display.fail", FailingHookLang(FailingHook::Function))
             .add_function(function)
             .build()
             .unwrap()
             .render(80)
             .unwrap_err();
     assert!(
-        context_error.to_string().contains("emit_type_context"),
+        context_error.to_string().contains("lower_function"),
         "{context_error}"
     );
 

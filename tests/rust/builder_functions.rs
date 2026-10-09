@@ -45,7 +45,7 @@ fn test_function_with_doc() {
         .visibility(Visibility::Public)
         .doc("Greet the user by name.")
         .add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(body);
 
     let output = FileSpec::builder_with("greet.rs", Rust::new())

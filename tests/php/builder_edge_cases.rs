@@ -82,7 +82,7 @@ fn test_attribute_on_method() {
     let body = CodeBlock::of("return $this->name;", ()).unwrap();
     let fun = FunSpec::builder("toString")
         .visibility(Visibility::Public)
-        .returns(TypeName::primitive("string"))
+        .returns(vec![TypeName::primitive("string")])
         .annotate(AnnotationSpec::new("Override"))
         .body(body)
         .build()

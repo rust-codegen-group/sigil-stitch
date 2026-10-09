@@ -38,7 +38,7 @@ fn cpp(negative: bool) -> Result<String, SigilStitchError> {
             .add_generic_param(GenericParamSpec::pack("Bs")?)
             .add_param(ParameterSpec::new("left", tuple_pack("As"))?)
             .add_param(ParameterSpec::new("right", tuple_pack("Bs"))?)
-            .returns(result)
+            .returns(vec![result])
             .body(CodeBlock::of(body, ())?)
             .build()
     };
@@ -117,7 +117,7 @@ fn haskell(negative: bool) -> Result<String, SigilStitchError> {
             "right",
             array(TypeName::parameter("m")),
         )?)
-        .returns(array(sum))
+        .returns(vec![array(sum)])
         .body(CodeBlock::of("undefined", ())?)
         .build()?;
     let use_sites = if negative {
@@ -150,11 +150,11 @@ fn typescript(failure: Option<&str>) -> Result<String, SigilStitchError> {
                 presence: CallableParamPresence::Optional,
             },
         ],
-        TypeName::primitive("void"),
+        vec![TypeName::primitive("void")],
     );
     let mut use_sites = CodeBlock::builder();
     use_sites.add(
-        "declare const handler: Handler;\nhandler('ok');\nhandler('ok', 2);\n",
+        "declare const handler: Handler;\nhandler('ok');\nhandler('ok', 2);\nconst completion: Promise<void> = complete();\n",
         (),
     );
     match failure {
@@ -168,6 +168,13 @@ fn typescript(failure: Option<&str>) -> Result<String, SigilStitchError> {
         Some(_) => unreachable!(),
     }
     let output = FileSpec::builder("callable.ts")
+        .add_function(
+            FunSpec::builder("complete")
+                .is_async()
+                .returns(vec![])
+                .body(CodeBlock::of("return;", ())?)
+                .build()?,
+        )
         .add_type(
             TypeSpec::builder("Handler", TypeKind::TypeAlias)
                 .extends(callable)
@@ -177,6 +184,103 @@ fn typescript(failure: Option<&str>) -> Result<String, SigilStitchError> {
         .build()?
         .render(120)?;
     assert!(output.contains("text: string, count?: number"));
+    assert!(output.contains("async function complete(): Promise<void>"));
+    Ok(output)
+}
+
+fn go(negative: bool) -> Result<String, SigilStitchError> {
+    let results = || {
+        vec![
+            TypeName::pointer(TypeName::importable("net/http", "Response")),
+            TypeName::importable("time", "Time"),
+        ]
+    };
+    let fetch_body = CodeBlock::of("return nil, %T{}", TypeName::importable("time", "Time"))?;
+    let receiver = FunSpec::builder("Fetch")
+        .returns(results())
+        .receiver(ParameterSpec::new("self", TypeName::primitive("Client"))?)
+        .body(fetch_body.clone())
+        .build()?;
+    let mut uses = CodeBlock::builder();
+    uses.add(
+        "var emptyCallback %T = Empty\n",
+        TypeName::callable(vec![], vec![]),
+    );
+    uses.add(
+        "var singleCallback %T = Single\n",
+        TypeName::callable(vec![], vec![TypeName::primitive("int")]),
+    );
+    uses.add(
+        "var pairCallback %T = Pair\n",
+        TypeName::callable(
+            vec![],
+            vec![TypeName::primitive("int"), TypeName::primitive("bool")],
+        ),
+    );
+    uses.add(
+        "var fetchCallback %T = Fetch\n",
+        TypeName::callable(vec![], results()),
+    );
+    uses.add("var _ Fetcher = Client{}\nfunc use() {\nemptyCallback()\n_ = singleCallback()\nvalue, ok := pairCallback()\n_, _ = value, ok\nresponse, timestamp := fetchCallback()\n_, _ = response, timestamp\n", ());
+    if negative {
+        uses.add(
+            "var scalar int = Pair() // acceptance-failure\n_ = scalar\n",
+            (),
+        );
+    }
+    uses.add("}\n", ());
+    let output = FileSpec::builder("returns.go")
+        .header(CodeBlock::of("package acceptance\n", ())?)
+        .add_type(TypeSpec::builder("Client", TypeKind::Struct).build()?)
+        .add_type(
+            TypeSpec::builder("Fetcher", TypeKind::Interface)
+                .add_method(FunSpec::builder("Fetch").returns(results()).build()?)
+                .build()?,
+        )
+        .add_function(
+            FunSpec::builder("Empty")
+                .returns(vec![])
+                .body(CodeBlock::of("return", ())?)
+                .build()?,
+        )
+        .add_function(
+            FunSpec::builder("Single")
+                .returns(vec![TypeName::primitive("int")])
+                .body(CodeBlock::of("return 1", ())?)
+                .build()?,
+        )
+        .add_function(
+            FunSpec::builder("Pair")
+                .returns(vec![
+                    TypeName::primitive("int"),
+                    TypeName::primitive("bool"),
+                ])
+                .body(CodeBlock::of("return 1, true", ())?)
+                .build()?,
+        )
+        .add_function(
+            FunSpec::builder("Fetch")
+                .returns(results())
+                .body(fetch_body)
+                .build()?,
+        )
+        .add_function(receiver)
+        .add_code(uses.build()?)
+        .build()?
+        .render(120)?;
+    for expected in [
+        "func Empty() {",
+        "func Single() int {",
+        "func Pair() (int, bool) {",
+        "func Fetch() (*http.Response, time.Time) {",
+        "func (self Client) Fetch() (*http.Response, time.Time) {",
+        "Fetch() (*http.Response, time.Time)",
+        "var fetchCallback func() (*http.Response, time.Time) = Fetch",
+        "\"net/http\"",
+        "\"time\"",
+    ] {
+        assert!(output.contains(expected), "missing {expected}:\n{output}");
+    }
     Ok(output)
 }
 
@@ -196,7 +300,7 @@ fn scala(negative: bool) -> Result<String, SigilStitchError> {
             "value",
             application(TypeName::parameter("F"), vec![TypeName::parameter("A")]),
         )?)
-        .returns(TypeName::parameter("A"))
+        .returns(vec![TypeName::parameter("A")])
         .body(CodeBlock::of("???", ())?)
         .build()?;
     let use_sites = if negative {
@@ -222,6 +326,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     for (name, source) in [
         ("cpp_positive.cpp", cpp(false)?),
         ("cpp_mismatched.cpp", cpp(true)?),
+        ("go_positive.go", go(false)?),
+        ("go_single_value.go", go(true)?),
         ("haskell_positive.hs", haskell(false)?),
         ("haskell_wrong_index.hs", haskell(true)?),
         ("typescript_positive.ts", typescript(None)?),

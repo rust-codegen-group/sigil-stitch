@@ -427,7 +427,7 @@ fn test_rust_project() {
                 .add_function(
                     FunSpec::builder("greet")
                         .visibility(Visibility::Public)
-                        .returns(TypeName::primitive("String"))
+                        .returns(vec![TypeName::primitive("String")])
                         .body(CodeBlock::of("String::from(\"hello\")", ()).unwrap())
                         .build()
                         .unwrap(),

@@ -276,7 +276,7 @@ fn test_rust_constructor() {
             .is_constructor()
             .visibility(Visibility::Public)
             .add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap())
-            .returns(TypeName::primitive("Self"))
+            .returns(vec![TypeName::primitive("Self")])
             .body(CodeBlock::of("Self { name: name.to_string() }", ()).unwrap())
             .build()
             .unwrap(),

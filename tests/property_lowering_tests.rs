@@ -515,7 +515,7 @@ fn target_local_member_namespaces_do_not_create_false_collisions() {
             .add_property(property("value", TypeName::primitive("Int")))
             .add_method(
                 FunSpec::builder("value")
-                    .returns(TypeName::primitive("Void"))
+                    .returns(vec![TypeName::primitive("Void")])
                     .is_static()
                     .body(getter("return"))
                     .build()

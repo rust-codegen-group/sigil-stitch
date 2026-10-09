@@ -163,10 +163,10 @@ fn builder_approach() -> String {
 
     let handler_fn = FunSpec::builder("make_handler")
         .visibility(Visibility::PublicCrate)
-        .returns(TypeName::impl_trait(vec![
+        .returns(vec![TypeName::impl_trait(vec![
             TypeName::primitive("Fn(&Event)"),
             TypeName::primitive("Send"),
-        ]))
+        ])])
         .body(handler_body.build().unwrap())
         .build()
         .unwrap();
@@ -260,10 +260,10 @@ fn macro_approach() -> String {
 
     let handler_fn = FunSpec::builder("make_handler")
         .visibility(Visibility::PublicCrate)
-        .returns(TypeName::impl_trait(vec![
+        .returns(vec![TypeName::impl_trait(vec![
             TypeName::primitive("Fn(&Event)"),
             TypeName::primitive("Send"),
-        ]))
+        ])])
         .body(handler_body)
         .build()
         .unwrap();

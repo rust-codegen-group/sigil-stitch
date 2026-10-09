@@ -42,7 +42,7 @@ let type_spec = TypeSpec::builder("Printable", TypeKind::Trait)
     .add_method(
         FunSpec::builder("prettyPrint")
             .add_param(ParameterSpec::new("a", TypeName::primitive("a")).unwrap())
-            .returns(TypeName::primitive("String"))
+            .returns(vec![TypeName::primitive("String")])
             .build()
             .unwrap(),
     )
@@ -68,7 +68,7 @@ let body = CodeBlock::of("x + y", ()).unwrap();
 let fun = FunSpec::builder("add")
     .add_param(ParameterSpec::new("x", TypeName::primitive("Int")).unwrap())
     .add_param(ParameterSpec::new("y", TypeName::primitive("Int")).unwrap())
-    .returns(TypeName::primitive("Int"))
+    .returns(vec![TypeName::primitive("Int")])
     .body(body)
     .build()
     .unwrap();

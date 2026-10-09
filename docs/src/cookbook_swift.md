@@ -98,7 +98,7 @@ let type_spec = TypeSpec::builder("Repository", TypeKind::Interface)
     .doc("Generic data repository.")
     .add_method(
         FunSpec::builder("findById")
-            .returns(TypeName::primitive("T?"))
+            .returns(vec![TypeName::primitive("T?")])
             .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
             .build()
             .unwrap(),

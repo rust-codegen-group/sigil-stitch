@@ -117,7 +117,7 @@ ordinary-kind capabilities, without suppressing either diagnostic group.
 Function profiles are keyed by both context (`TopLevel`, `ReceiverMethod`,
 `Member`, or `InterfaceMember`) and form (`Function`, `Constructor`, or
 `Destructor`). Omit a profile when that combination is unsupported. Include
-`ExplicitReturnType` and `TypedParameters` only where the form can represent
+`ExplicitReturns` and `TypedParameters` only where the form can represent
 them. Use `with_required_capabilities()` for semantic facts that every
 declaration must provide, `with_body_policy()` for required or forbidden
 implementation bodies, and `with_incompatible_capabilities()` for supported
@@ -125,7 +125,8 @@ features that cannot be combined. Use `with_maximum_parameters()` for
 form-specific arity limits, such as a zero-parameter destructor. Adapters
 written for sigil-stitch 0.6.8 inherit
 `LanguageCapabilities::permissive()` so their existing `CodeLang`
-implementations remain source-compatible.
+implementations remain source-compatible except for the explicit function
+lowering change: permissive profiles do not provide function grammar.
 
 Variant profiles distinguish `Discriminant`, `ConstructorArguments`,
 `PositionalPayload`, `RecordPayload`, and `Attributes`. They must not encode
@@ -191,7 +192,14 @@ target-local checks, but cannot construct or bypass `ValidatedFunction`.
 structured `CodeBlock`. New adapters implement this method as the owner of the
 target's complete function grammar. Both views expose the function form and
 context as well as names, types, parameters, modifiers, annotations,
-constraints, delegation, suffix escape hatches, and the body.
+constraints, delegation, suffix escape hatches, and the body. `returns()` borrows
+`Option<&[TypeName]>`: `None` is unspecified and `Some(&[])` explicitly requests
+no payload. Validate supported slot counts in the existing `validate_function()`
+hook, with declaration-context errors such as `UnsupportedFunctionReturns`.
+Constructor return restrictions belong in that same hook. Preserve each slot
+as a `TypeRef` until complete type lowering; do not render it early, drop later
+slots, or coerce the sequence to a tuple. The provided `lower_function()` always
+returns `MissingFunctionLowerer`, even with permissive profiles.
 
 `CodeLang::validate_variants()` and `CodeLang::lower_variants()` are the
 corresponding complete-sequence seams for enum variants. Adapters that can find
@@ -272,9 +280,8 @@ absorbed by complete language-local lowering rather than multiplied:
 | `function_parameters_require_trailing_defaults()` | `true` / `false` | Require every defaulted parameter to follow required parameters |
 | `validate_function_type_constraints()` | `Result<(), SigilStitchError>` | Validate whether the complete type-constraint set is semantically representable |
 | `requires_complete_function_type_information()` | `true` / `false` | Require partial type metadata to form one complete typed declaration |
-| `constructor_return_type_is_valid()` | `true` / `false` for one type | Restrict constructor return annotations after capability validation |
 | `validate_function()` | `FunctionIntent -> Result<(), _>` | Add target-local checks after crate-owned semantic validation |
-| `lower_function()` | `ValidatedFunction -> CodeBlock` | Own complete function grammar; defaults to the frozen compatibility lowerer |
+| `lower_function()` | `ValidatedFunction -> CodeBlock` | Own complete function grammar; missing overrides fail with `MissingFunctionLowerer` |
 | `validate_fields()` | `FieldSequenceIntent -> Result<(), _>` | Add target-local checks after crate-owned field validation |
 | `collect_field_validation_errors()` | `FieldSequenceIntent + error sink` | Add independent target-local sibling errors during file validation |
 | `lower_fields()` | `ValidatedFields -> CodeBlock` | Own complete field-sequence grammar; defaults to frozen compatibility lowering |
@@ -658,8 +665,8 @@ when migrating an existing adapter family by family.
 form. Declaration placement—where declared type parameters, bounds, bases,
 constructors, and members appear—belongs in the relevant complete declaration
 lowerer. Spell the complete generic declaration grammar locally; do not call
-`generic_syntax()` or `render_type_params()` from a new lowerer. A strict
-function profile without `lower_function()` fails closed with
+`generic_syntax()` or `render_type_params()` from a new lowerer. Every adapter
+without `lower_function()` fails closed with
 `MissingFunctionLowerer`, just as an incomplete strict type family fails with
 `MissingTypeLowerer`.
 

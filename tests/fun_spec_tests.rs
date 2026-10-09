@@ -37,7 +37,7 @@ fn test_ts_simple_function() {
     let body = CodeBlock::of("console.log(name)", ()).unwrap();
     let fun = FunSpec::builder("greet")
         .add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(body)
         .build()
         .unwrap();
@@ -56,10 +56,10 @@ fn test_ts_async_method() {
     let body = CodeBlock::of("return db.find(id)", ()).unwrap();
     let fun = FunSpec::builder("getUser")
         .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-        .returns(TypeName::generic(
+        .returns(vec![TypeName::generic(
             TypeName::primitive("Promise"),
             vec![TypeName::primitive("User")],
-        ))
+        )])
         .is_async()
         .visibility(Visibility::Public)
         .body(body)
@@ -73,7 +73,7 @@ fn test_ts_async_method() {
 fn test_ts_abstract_method() {
     let fun = FunSpec::builder("validate")
         .is_abstract()
-        .returns(TypeName::primitive("boolean"))
+        .returns(vec![TypeName::primitive("boolean")])
         .build()
         .unwrap();
     let output = emit_fun_ts(&fun, DeclarationContext::Member);
@@ -87,7 +87,7 @@ fn test_rust_simple_function() {
         .visibility(Visibility::Public)
         .add_param(ParameterSpec::new("a", TypeName::primitive("i32")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("i32")).unwrap())
-        .returns(TypeName::primitive("i32"))
+        .returns(vec![TypeName::primitive("i32")])
         .body(body)
         .build()
         .unwrap();
@@ -107,7 +107,7 @@ fn test_fun_with_type_params() {
     let fun = FunSpec::builder("serialize")
         .add_type_param(tp)
         .add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap())
-        .returns(TypeName::primitive("string"))
+        .returns(vec![TypeName::primitive("string")])
         .body(body)
         .build()
         .unwrap();
@@ -267,10 +267,10 @@ fn test_lifetime_params_before_type_params() {
             )
             .unwrap(),
         )
-        .returns(TypeName::reference_with_lifetime(
+        .returns(vec![TypeName::reference_with_lifetime(
             TypeName::primitive("str"),
             "'a",
-        ))
+        )])
         .body(CodeBlock::of("x", ()).unwrap())
         .build()
         .unwrap();

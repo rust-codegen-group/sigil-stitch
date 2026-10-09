@@ -22,6 +22,445 @@ use sigil_stitch::spec::type_spec::TypeSpec;
 use sigil_stitch::spec::where_spec::{TypeParamKind, TypeParamSpec};
 use sigil_stitch::type_name::TypeName;
 
+#[path = "shared/languages.rs"]
+mod languages_registry;
+
+#[test]
+fn missing_function_lowerers_fail_for_every_return_shape_and_composition_path() {
+    #[derive(Debug)]
+    struct MissingLang(bool);
+    impl RendererLang for MissingLang {
+        fn file_extension(&self) -> &str {
+            "missing"
+        }
+        fn line_comment_prefix(&self) -> &str {
+            "//"
+        }
+    }
+    impl CodeLang for MissingLang {
+        fn capabilities(&self) -> LanguageCapabilities<'_> {
+            const PROFILES: &[FunctionCapabilityProfile<'_>] = &[
+                FunctionCapabilityProfile::new(
+                    FunctionContext::TopLevel,
+                    FunctionForm::Function,
+                    &[FunctionCapability::ExplicitReturns],
+                ),
+                FunctionCapabilityProfile::new(
+                    FunctionContext::Member,
+                    FunctionForm::Function,
+                    &[FunctionCapability::ExplicitReturns],
+                ),
+            ];
+            let capabilities = LanguageCapabilities::permissive();
+            if self.0 {
+                capabilities.with_functions(PROFILES)
+            } else {
+                capabilities
+            }
+        }
+    }
+    for strict in [false, true] {
+        for returns in [
+            None,
+            Some(vec![]),
+            Some(vec![TypeName::primitive("int")]),
+            Some(vec![
+                TypeName::primitive("int"),
+                TypeName::primitive("bool"),
+            ]),
+        ] {
+            let mut builder = FunSpec::builder("work");
+            if let Some(returns) = returns {
+                builder = builder.returns(returns);
+            }
+            let function = builder.build().unwrap();
+            let lang = MissingLang(strict);
+            function
+                .validate(&lang, DeclarationContext::TopLevel)
+                .unwrap();
+            assert!(matches!(
+                function.emit(&lang, DeclarationContext::TopLevel),
+                Err(SigilStitchError::MissingFunctionLowerer { .. })
+            ));
+            assert!(matches!(
+                Emittable::emit_members(&function, &lang),
+                Err(SigilStitchError::MissingFunctionLowerer { .. })
+            ));
+            let owner = TypeSpec::builder("Owner", TypeKind::Class)
+                .add_method(function.clone())
+                .build()
+                .unwrap();
+            owner.validate(&lang).unwrap();
+            assert!(matches!(
+                Emittable::emit_members(&owner, &lang),
+                Err(SigilStitchError::MissingFunctionLowerer { .. })
+            ));
+            for nested in [false, true] {
+                let mut builder = FileSpec::builder_with("work.missing", MissingLang(strict));
+                builder = if nested {
+                    builder.add_type(owner.clone())
+                } else {
+                    builder.add_function(function.clone())
+                };
+                let file = builder.build().unwrap();
+                file.validate().unwrap();
+                assert!(matches!(
+                    file.render(120),
+                    Err(SigilStitchError::MissingFunctionLowerer { .. })
+                ));
+            }
+        }
+    }
+}
+
+#[test]
+fn explicit_empty_satisfies_required_returns_without_changing_constructor_identity() {
+    let method = FunSpec::builder("work").returns(vec![]).build().unwrap();
+    method
+        .validate(
+            &sigil_stitch::lang::java::Java::new(),
+            DeclarationContext::InterfaceMember,
+        )
+        .unwrap();
+    let omitted = FunSpec::builder("work").build().unwrap();
+    assert!(matches!(
+        omitted.validate(
+            &sigil_stitch::lang::java::Java::new(),
+            DeclarationContext::InterfaceMember
+        ),
+        Err(SigilStitchError::MissingRequiredFunctionCapabilities { .. })
+    ));
+    let ordinary = FunSpec::builder("Owner")
+        .returns(vec![])
+        .body(CodeBlock::of("body", ()).unwrap())
+        .build()
+        .unwrap();
+    TypeSpec::builder("Owner", TypeKind::Class)
+        .add_method(ordinary)
+        .build()
+        .unwrap()
+        .validate(&sigil_stitch::lang::java::Java::new())
+        .unwrap();
+    let constructor = FunSpec::builder("Owner")
+        .is_constructor()
+        .returns(vec![])
+        .body(CodeBlock::of("body", ()).unwrap())
+        .build()
+        .unwrap();
+    assert!(
+        constructor
+            .validate(
+                &sigil_stitch::lang::java::Java::new(),
+                DeclarationContext::Member
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn returns_preserve_presence_order_and_replacing_setter_after_serde() {
+    #[derive(Debug)]
+    struct ViewLang(Option<Vec<TypeName>>);
+    impl RendererLang for ViewLang {
+        fn file_extension(&self) -> &str {
+            "view"
+        }
+        fn line_comment_prefix(&self) -> &str {
+            "//"
+        }
+    }
+    impl CodeLang for ViewLang {
+        fn validate_function(&self, function: FunctionIntent<'_>) -> Result<(), SigilStitchError> {
+            assert_eq!(function.returns(), self.0.as_deref());
+            Ok(())
+        }
+        fn lower_function(
+            &self,
+            function: ValidatedFunction<'_>,
+        ) -> Result<CodeBlock, SigilStitchError> {
+            assert_eq!(function.returns(), self.0.as_deref());
+            CodeBlock::of("view", ())
+        }
+    }
+    for returns in [
+        None,
+        Some(vec![]),
+        Some(vec![TypeName::primitive("int")]),
+        Some(vec![
+            TypeName::primitive("int"),
+            TypeName::primitive("bool"),
+        ]),
+    ] {
+        let mut builder = FunSpec::builder("work");
+        if let Some(returns) = &returns {
+            builder = builder.returns(returns.clone());
+        }
+        let function = builder.build().unwrap();
+        let decoded: FunSpec =
+            serde_json::from_value(serde_json::to_value(&function).unwrap()).unwrap();
+        decoded
+            .emit(&ViewLang(returns), DeclarationContext::TopLevel)
+            .unwrap();
+    }
+    let function = FunSpec::builder("work")
+        .returns(vec![TypeName::primitive("discarded")])
+        .returns(vec![])
+        .build()
+        .unwrap();
+    function
+        .emit(&ViewLang(Some(vec![])), DeclarationContext::TopLevel)
+        .unwrap();
+}
+
+#[test]
+fn builtins_validate_return_cardinality_and_native_empty_conventions() {
+    for descriptor in languages_registry::BUILT_IN_LANGUAGES {
+        let lang = descriptor.adapter();
+        let context = if matches!(descriptor.id, "java" | "csharp") {
+            DeclarationContext::Member
+        } else {
+            DeclarationContext::TopLevel
+        };
+        let function = |returns| {
+            FunSpec::builder("work")
+                .returns(returns)
+                .body(CodeBlock::of("body", ()).unwrap())
+                .build()
+                .unwrap()
+        };
+        let native = match descriptor.id {
+            "bash" | "zsh" | "javascript" | "lua" | "ruby" => None,
+            "go" => Some(""),
+            "kotlin" | "scala" => Some("Unit"),
+            "swift" => Some("Void"),
+            "python" => Some("None"),
+            "haskell" | "rust" => Some("()"),
+            "ocaml" => Some("unit"),
+            _ => Some("void"),
+        };
+        for returns in [
+            vec![],
+            vec![TypeName::primitive("Result")],
+            vec![TypeName::primitive("First"), TypeName::primitive("Second")],
+        ] {
+            let spec = function(returns.clone());
+            let validated = spec.validate(lang.as_ref(), context);
+            if native.is_none() {
+                assert!(
+                    matches!(validated, Err(SigilStitchError::UnsupportedFunctionCapabilities { capabilities, .. })
+                    if capabilities.contains(&FunctionCapability::ExplicitReturns)),
+                    "{}",
+                    descriptor.id
+                );
+            } else if returns.len() > 1 && descriptor.id != "go" {
+                assert!(
+                    matches!(validated, Err(SigilStitchError::UnsupportedFunctionReturns { actual: 2, function_name, .. })
+                    if function_name == "work"),
+                    "{}",
+                    descriptor.id
+                );
+                assert!(matches!(
+                    spec.emit(lang.as_ref(), context),
+                    Err(SigilStitchError::UnsupportedFunctionReturns { .. })
+                ));
+            } else {
+                validated.unwrap();
+                for width in [8, 120] {
+                    render_in_context(&spec, lang.as_ref(), context, width);
+                }
+            }
+        }
+        if let Some(native) = native {
+            for width in [8, 120] {
+                let empty = render_in_context(&function(vec![]), lang.as_ref(), context, width);
+                let equivalent = if descriptor.id == "go" {
+                    FunSpec::builder("work")
+                        .body(CodeBlock::of("body", ()).unwrap())
+                        .build()
+                        .unwrap()
+                } else {
+                    function(vec![TypeName::primitive(native)])
+                };
+                assert_eq!(
+                    empty,
+                    render_in_context(&equivalent, lang.as_ref(), context, width),
+                    "{}",
+                    descriptor.id
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn go_declarations_keep_all_slots_structured_in_each_existing_context() {
+    let lang = sigil_stitch::lang::go::Go::new();
+    for context in [
+        DeclarationContext::TopLevel,
+        DeclarationContext::InterfaceMember,
+    ] {
+        for receiver in [false, true] {
+            if receiver && context == DeclarationContext::InterfaceMember {
+                continue;
+            }
+            for returns in [
+                vec![],
+                vec![TypeName::primitive("int")],
+                vec![TypeName::primitive("int"), TypeName::primitive("bool")],
+            ] {
+                let mut builder = FunSpec::builder("work").returns(returns.clone());
+                if receiver {
+                    builder =
+                        builder.receiver(ParameterSpec::of("self", TypeName::primitive("Owner")));
+                }
+                if context == DeclarationContext::TopLevel {
+                    builder = builder.body(CodeBlock::of("body", ()).unwrap());
+                }
+                let spec = builder.build().unwrap();
+                let block = spec.emit(&lang, context).unwrap();
+                // Every result survives declaration emission as a distinct TypeRef.
+                fn refs(nodes: &[sigil_stitch::code_node::CodeNode]) -> Vec<TypeName> {
+                    nodes
+                        .iter()
+                        .flat_map(|node| match node {
+                            sigil_stitch::code_node::CodeNode::TypeRef(ty) => vec![ty.clone()],
+                            sigil_stitch::code_node::CodeNode::Nested(block) => {
+                                refs(block.clone().nodes_mut())
+                            }
+                            sigil_stitch::code_node::CodeNode::Sequence(nodes) => refs(nodes),
+                            _ => vec![],
+                        })
+                        .collect()
+                }
+                assert!(refs(block.clone().nodes_mut()).ends_with(&returns));
+                let output = render_in_context(&spec, &lang, context, 120);
+                let clause = match returns.len() {
+                    0 => "work()",
+                    1 => "work() int",
+                    _ => "work() (int, bool)",
+                };
+                assert!(output.contains(clause), "{output}");
+            }
+        }
+    }
+    let tuple = FunSpec::builder("work")
+        .returns(vec![TypeName::tuple(vec![
+            TypeName::primitive("int"),
+            TypeName::primitive("bool"),
+        ])])
+        .body(CodeBlock::of("body", ()).unwrap())
+        .build()
+        .unwrap();
+    let error = FileSpec::builder("tuple.go")
+        .add_function(tuple)
+        .build()
+        .unwrap()
+        .render(120)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::UnsupportedTypeName { .. }
+    ));
+}
+
+#[test]
+fn typescript_async_empty_returns_are_structured_promise_void_only_when_empty() {
+    let lang = sigil_stitch::lang::typescript::TypeScript::new();
+    for (returns, expected) in [
+        (vec![], "Promise<void>"),
+        (vec![TypeName::primitive("Payload")], "Payload"),
+    ] {
+        let function = FunSpec::builder("work")
+            .is_async()
+            .returns(returns)
+            .body(CodeBlock::of("body", ()).unwrap())
+            .build()
+            .unwrap();
+        let output = render_in_context(&function, &lang, DeclarationContext::TopLevel, 120);
+        assert!(
+            output.contains(&format!("async function work(): {expected}")),
+            "{output}"
+        );
+        assert!(!output.contains("Promise<Payload>"));
+    }
+}
+
+#[test]
+fn same_version_function_return_lists_are_revalidated_on_target_selection() {
+    let function = FunSpec::builder("work")
+        .returns(vec![
+            TypeName::primitive("int"),
+            TypeName::primitive("bool"),
+        ])
+        .body(CodeBlock::of("body", ()).unwrap())
+        .build()
+        .unwrap();
+    let decoded: FunSpec =
+        serde_json::from_value(serde_json::to_value(&function).unwrap()).unwrap();
+    decoded
+        .validate(
+            &sigil_stitch::lang::go::Go::new(),
+            DeclarationContext::TopLevel,
+        )
+        .unwrap();
+    assert!(matches!(
+        decoded.validate(
+            &sigil_stitch::lang::typescript::TypeScript::new(),
+            DeclarationContext::TopLevel
+        ),
+        Err(SigilStitchError::UnsupportedFunctionReturns { actual: 2, .. })
+    ));
+    let file = FileSpec::builder("invalid.ts")
+        .add_function(decoded)
+        .build()
+        .unwrap();
+    assert!(
+        matches!(file.validate(), Err(SigilStitchError::FileSpecValidation { errors, .. }) if matches!(errors.as_slice(), [SigilStitchError::UnsupportedFunctionReturns { actual: 2, .. }]))
+    );
+}
+
+#[test]
+fn python_constructor_return_sequence_keeps_existing_diagnostics() {
+    let lang = sigil_stitch::lang::python::Python::new();
+    for (returns, valid) in [
+        (vec![], true),
+        (vec![TypeName::primitive("None")], true),
+        (vec![TypeName::primitive("str")], false),
+    ] {
+        let function = FunSpec::builder("__init__")
+            .is_constructor()
+            .returns(returns)
+            .body(CodeBlock::of("pass", ()).unwrap())
+            .build()
+            .unwrap();
+        let result = function.validate(&lang, DeclarationContext::Member);
+        if valid {
+            result.unwrap();
+        } else {
+            assert!(matches!(
+                result,
+                Err(SigilStitchError::InvalidConstructorReturnType { .. })
+            ));
+        }
+    }
+    let multiple = FunSpec::builder("__init__")
+        .is_constructor()
+        .returns(vec![
+            TypeName::primitive("None"),
+            TypeName::primitive("str"),
+        ])
+        .body(CodeBlock::of("pass", ()).unwrap())
+        .build()
+        .unwrap();
+    assert!(matches!(
+        multiple.validate(&lang, DeclarationContext::Member),
+        Err(SigilStitchError::UnsupportedFunctionReturns {
+            form: FunctionForm::Constructor,
+            ..
+        })
+    ));
+}
+
 #[derive(Debug, Clone)]
 struct NovelLang {
     calls: Arc<AtomicUsize>,
@@ -166,7 +605,10 @@ impl CodeLang for SemanticViewLang {
         assert!(!parameters[1].is_property());
         assert!(parameters[1].is_mutable_property());
 
-        assert_eq!(function.return_type(), Some(&TypeName::primitive("Output")));
+        assert_eq!(
+            function.returns(),
+            Some([TypeName::primitive("Output")].as_slice())
+        );
         assert!(function.body().is_some());
         assert_eq!(function.modifiers().visibility, Visibility::Public);
         assert!(function.modifiers().is_async);
@@ -227,15 +669,19 @@ impl CodeLang for SemanticViewLang {
 }
 
 #[test]
-fn legacy_adapter_uses_the_default_compatibility_lowerer() {
+fn permissive_adapter_requires_complete_function_lowering() {
     let function = FunSpec::builder("work")
         .add_param(ParameterSpec::of("value", TypeName::primitive("Text")))
-        .returns(TypeName::primitive("Result"))
+        .returns(vec![TypeName::primitive("Result")])
         .build()
         .unwrap();
 
-    let rendered = render(&function, &LegacyLang, 80);
-    assert_eq!(rendered, "legacy_fn work(value: Text): Result;\n");
+    assert!(matches!(
+        function
+            .emit(&LegacyLang, DeclarationContext::TopLevel)
+            .unwrap_err(),
+        SigilStitchError::MissingFunctionLowerer { .. }
+    ));
 }
 
 #[test]
@@ -315,7 +761,7 @@ fn validated_function_exposes_complete_read_only_semantic_intent() {
                 .build()
                 .unwrap(),
         )
-        .returns(TypeName::primitive("Output"))
+        .returns(vec![TypeName::primitive("Output")])
         .body(CodeBlock::of("work", ()).unwrap())
         .visibility(Visibility::Public)
         .is_async()
@@ -360,7 +806,7 @@ fn scala_rejects_empty_raw_higher_kinded_function_parameters() {
     let function = FunSpec::builder("transform")
         .add_type_param(TypeParamSpec::new("F").with_kind(TypeParamKind::Raw("".to_string())))
         .add_param(ParameterSpec::of("value", TypeName::primitive("Int")))
-        .returns(TypeName::primitive("Unit"))
+        .returns(vec![TypeName::primitive("Unit")])
         .body(CodeBlock::of("()", ()).unwrap())
         .build()
         .unwrap();
@@ -457,7 +903,7 @@ fn dynamic_languages_lower_complete_function_intent() {
 fn c_dart_go_haskell_and_java_lower_reachable_function_features() {
     let c = FunSpec::builder("work")
         .add_param(ParameterSpec::of("value", TypeName::primitive("int")))
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .annotation(CodeBlock::of("__attribute__((cold))", ()).unwrap())
         .suffix("__attribute__((noreturn))")
         .body(CodeBlock::of("return value;", ()).unwrap())
@@ -499,7 +945,7 @@ fn c_dart_go_haskell_and_java_lower_reachable_function_features() {
 
     let haskell = FunSpec::builder("work")
         .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
-        .returns(TypeName::primitive("Result"))
+        .returns(vec![TypeName::primitive("Result")])
         .suffix("-- tail")
         .body(CodeBlock::of("use value", ()).unwrap())
         .build()
@@ -526,7 +972,7 @@ fn c_dart_go_haskell_and_java_lower_reachable_function_features() {
 
     let java = FunSpec::builder("work")
         .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
-        .returns(TypeName::primitive("Result"))
+        .returns(vec![TypeName::primitive("Result")])
         .suffix("throws Failure")
         .body(CodeBlock::of("return use(value);", ()).unwrap())
         .build()
@@ -659,7 +1105,7 @@ fn tupled_builtin_lowerers_cover_direct_and_pretty_rendering() {
             ))
             .body(CodeBlock::of("use(first_argument_name)", ()).unwrap());
         if case.typed {
-            direct = direct.returns(TypeName::primitive("LongResult"));
+            direct = direct.returns(vec![TypeName::primitive("LongResult")]);
         }
         let direct = direct.build().unwrap();
         render_in_context(&direct, case.lang.as_ref(), case.context, 120);
@@ -675,7 +1121,7 @@ fn tupled_builtin_lowerers_cover_direct_and_pretty_rendering() {
             ))
             .body(CodeBlock::of("use(second_argument_name)", ()).unwrap());
         if case.typed {
-            pretty = pretty.returns(TypeName::primitive("LongResult"));
+            pretty = pretty.returns(vec![TypeName::primitive("LongResult")]);
         }
         let pretty = pretty.build().unwrap();
         let output = render_in_context(&pretty, case.lang.as_ref(), case.context, 18);
@@ -737,7 +1183,7 @@ fn javascript_ocaml_php_and_python_lower_reachable_function_features() {
 
     let ocaml = FunSpec::builder("work")
         .add_param(ParameterSpec::of("value", TypeName::primitive("value")))
-        .returns(TypeName::primitive("result"))
+        .returns(vec![TypeName::primitive("result")])
         .suffix("(* tail *)")
         .body(CodeBlock::of("use value", ()).unwrap())
         .build()
@@ -755,7 +1201,7 @@ fn javascript_ocaml_php_and_python_lower_reachable_function_features() {
                 .build()
                 .unwrap(),
         )
-        .returns(TypeName::primitive("Result"))
+        .returns(vec![TypeName::primitive("Result")])
         .annotation(CodeBlock::of("#[Raw]", ()).unwrap())
         .suffix("/* tail */")
         .is_override()

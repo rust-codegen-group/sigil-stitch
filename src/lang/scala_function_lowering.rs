@@ -12,10 +12,30 @@ use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::parameter_spec::ParameterSpec;
 
+pub(crate) fn validate_returns(
+    lang: &Scala,
+    function: crate::lang::FunctionIntent<'_>,
+) -> Result<(), SigilStitchError> {
+    if let Some(returns) = function.returns()
+        && returns.len() > 1
+    {
+        return Err(SigilStitchError::UnsupportedFunctionReturns {
+            language: lang.file_extension().into(),
+            function_name: function.name().into(),
+            context: function.function_context(),
+            form: function.form(),
+            actual: returns.len(),
+            reason: "this language supports at most one return slot".into(),
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn lower(
     lang: &Scala,
     function: ValidatedFunction<'_>,
 ) -> Result<CodeBlock, SigilStitchError> {
+    validate_returns(lang, *function)?;
     let mut block = CodeBlock::builder();
     emit_preamble(&mut block, lang, function)?;
 
@@ -38,7 +58,9 @@ pub(crate) fn lower(
     )?);
     signature.push_literal(")");
     append_suffixes(&mut signature, function);
-    if let Some(return_type) = function.return_type() {
+    if let Some(returns) = function.returns() {
+        let native_empty = crate::type_name::TypeName::primitive("Unit");
+        let return_type = returns.first().unwrap_or(&native_empty);
         signature.push_literal(": ");
         signature.push_type(return_type);
     }

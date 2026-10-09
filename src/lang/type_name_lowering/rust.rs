@@ -144,14 +144,12 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             None if *mutable => prefix("&mut ", lower(inner)?),
             None => prefix("&", lower(inner)?),
         },
-        TypeName::Function { return_type, .. } | TypeName::Callable { return_type, .. } => {
-            concat([
-                literal("fn"),
-                delimited("(", lower_callable_parameters(type_name)?, ", ", ")"),
-                literal(" -> "),
-                lower(return_type)?,
-            ])
-        }
+        TypeName::Function { .. } | TypeName::Callable { .. } => concat([
+            literal("fn"),
+            delimited("(", lower_callable_parameters(type_name)?, ", ", ")"),
+            literal(" -> "),
+            lower_callable_returns(type_name)?,
+        ]),
         TypeName::AssociatedType {
             base,
             qualifier,
@@ -230,4 +228,19 @@ fn lower_callable_parameters(type_name: &TypeName) -> Result<Vec<CodeBlock>, Sig
         _ => unreachable!("callable helper receives only callable inputs"),
     };
     Ok(values)
+}
+
+#[expect(deprecated, reason = "preserve released scalar Function results")]
+fn lower_callable_returns(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
+    match type_name {
+        TypeName::Function { return_type, .. } => lower(return_type),
+        TypeName::Callable { returns, .. } => match returns.as_slice() {
+            [] => Ok(literal("()")),
+            [return_type] => lower(return_type),
+            _ => Err(unsupported(
+                "this language supports at most one callable return slot",
+            )),
+        },
+        _ => unreachable!("called only for callable types"),
+    }
 }

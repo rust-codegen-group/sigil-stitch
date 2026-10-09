@@ -118,6 +118,14 @@ patterns. Optional presence belongs to a scalar slot and differs from an
 optional value. Labels and ordering restrictions belong to the selected
 language, not to a shared rest-parameter grammar.
 
+### Function return sequence
+
+Ordered typed return slots shared by declaration and callable intent. An
+explicitly empty sequence means no payload; a tuple-valued return is one slot.
+A declaration may leave return information unspecified instead. Languages own
+the native representation and supported slot counts; the sequence does not
+define shared return grammar or infer a type from the body.
+
 ### String literal type
 
 A type inhabited by exactly one decoded string value.

@@ -52,7 +52,7 @@ fn matched_type(index: usize, modern: bool, callable: bool) -> TypeName {
                 type_name: application,
                 presence: CallableParamPresence::Required,
             }],
-            value,
+            vec![value],
         )
     } else {
         TypeName::function(vec![application], value)

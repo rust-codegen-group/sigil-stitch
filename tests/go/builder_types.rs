@@ -73,7 +73,7 @@ fn test_struct_with_methods() {
         .receiver(
             ParameterSpec::new("s", TypeName::pointer(TypeName::primitive("Server"))).unwrap(),
         )
-        .returns(TypeName::primitive("error"))
+        .returns(vec![TypeName::primitive("error")])
         .body(CodeBlock::of("return nil", ()).unwrap());
 
     // Method 2: ToJSON.
@@ -87,7 +87,7 @@ fn test_struct_with_methods() {
                     ParameterSpec::new("s", TypeName::pointer(TypeName::primitive("Server")))
                         .unwrap(),
                 )
-                .returns(TypeName::raw("([]byte, error)"))
+                .returns(vec![TypeName::raw("([]byte, error)")])
                 .body(CodeBlock::of("return %T(s)", (json_marshal,)).unwrap())
                 .build()
                 .unwrap(),
@@ -109,7 +109,7 @@ fn test_interface() {
                 .add_method(
                     FunSpec::builder("FindByID")
                         .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-                        .returns(TypeName::raw("(Entity, error)"))
+                        .returns(vec![TypeName::raw("(Entity, error)")])
                         .build()
                         .unwrap(),
                 )
@@ -118,7 +118,7 @@ fn test_interface() {
                         .add_param(
                             ParameterSpec::new("entity", TypeName::primitive("Entity")).unwrap(),
                         )
-                        .returns(TypeName::primitive("error"))
+                        .returns(vec![TypeName::primitive("error")])
                         .build()
                         .unwrap(),
                 )
@@ -151,7 +151,7 @@ fn test_generic_function() {
         .add_type_param(tp)
         .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("T")).unwrap())
-        .returns(TypeName::primitive("T"))
+        .returns(vec![TypeName::primitive("T")])
         .body(body);
 
     let file = FileSpec::builder_with("max.go", Go::new())

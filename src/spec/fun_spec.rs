@@ -44,7 +44,7 @@ pub enum FunctionSignatureStyle {
 
 /// A function or method specification.
 ///
-/// `FunSpec` models a function declaration with parameters, return type, body,
+/// `FunSpec` models a function declaration with parameters, ordered return slots, body,
 /// modifiers (visibility, async, static, abstract, constructor), type parameters,
 /// annotations, and doc comments. It emits a language-appropriate `CodeBlock` via
 /// [`FunSpec::emit()`].
@@ -62,7 +62,7 @@ pub enum FunctionSignatureStyle {
 /// let body = CodeBlock::of("return this.name", ()).unwrap();
 ///
 /// let fun = FunSpec::builder("getName")
-///     .returns(TypeName::primitive("string"))
+///     .returns(vec![TypeName::primitive("string")])
 ///     .body(body)
 ///     .build().unwrap();
 /// ```
@@ -70,7 +70,7 @@ pub enum FunctionSignatureStyle {
 pub struct FunSpec {
     pub(crate) name: String,
     pub(crate) params: Vec<ParameterSpec>,
-    pub(crate) return_type: Option<TypeName>,
+    pub(crate) returns: Option<Vec<TypeName>>,
     pub(crate) body: Option<CodeBlock>,
     pub(crate) modifiers: Modifiers,
     pub(crate) doc: Vec<String>,
@@ -136,9 +136,12 @@ impl<'a> FunctionIntent<'a> {
         &self.spec.params
     }
 
-    /// Explicit return type, when present.
-    pub fn return_type(self) -> Option<&'a TypeName> {
-        self.spec.return_type.as_ref()
+    /// Explicit ordered return slots, when supplied.
+    ///
+    /// `None` leaves return information unspecified. An empty slice explicitly
+    /// requests the target's native no-payload convention. A tuple is one slot.
+    pub fn returns(self) -> Option<&'a [TypeName]> {
+        self.spec.returns.as_deref()
     }
 
     /// Function body, when present.
@@ -248,7 +251,7 @@ impl FunSpec {
         FunSpecBuilder {
             name: name.to_string(),
             params: Vec::new(),
-            return_type: None,
+            returns: None,
             body: None,
             modifiers: Modifiers::default(),
             doc: Vec::new(),
@@ -353,12 +356,12 @@ impl FunSpec {
                 && capabilities.supports_function_form(context, FunctionForm::Constructor)
                 && if self.modifiers.is_static {
                     lang.static_constructor_name_matches(&self.name, None)
-                        || ((self.return_type.is_none()
+                        || ((self.returns.is_none()
                             || !lang.constructor_name_with_return_type_is_function())
                             && lang.static_constructor_name_matches(&self.name, Some(owner_name)))
                 } else {
                     lang.constructor_name_matches(&self.name, None)
-                        || ((self.return_type.is_none()
+                        || ((self.returns.is_none()
                             || !lang.constructor_name_with_return_type_is_function())
                             && lang.constructor_name_matches(&self.name, Some(owner_name)))
                 }
@@ -669,10 +672,7 @@ impl FunSpec {
             FunctionCapability::Attributes,
             !self.annotations.is_empty() || !self.annotation_specs.is_empty(),
         );
-        request(
-            FunctionCapability::ExplicitReturnType,
-            self.return_type.is_some(),
-        );
+        request(FunctionCapability::ExplicitReturns, self.returns.is_some());
         request(
             FunctionCapability::TypedParameters,
             self.params.iter().any(|param| !param.param_type.is_empty())
@@ -752,7 +752,7 @@ impl FunSpec {
             .iter()
             .copied()
             .filter(|capability| match capability {
-                FunctionCapability::ExplicitReturnType => self.return_type.is_none(),
+                FunctionCapability::ExplicitReturns => self.returns.is_none(),
                 FunctionCapability::TypedParameters => {
                     !lang.function_parameters_are_typed(&self.params, context, form)
                 }
@@ -769,11 +769,11 @@ impl FunSpec {
                 || !self.generic_entries.is_empty()
                 || !self.where_constraints.is_empty();
 
-            if self.return_type.is_none() && has_signature_metadata {
-                if !missing_required.contains(&FunctionCapability::ExplicitReturnType) {
-                    missing_required.push(FunctionCapability::ExplicitReturnType);
+            if self.returns.is_none() && has_signature_metadata {
+                if !missing_required.contains(&FunctionCapability::ExplicitReturns) {
+                    missing_required.push(FunctionCapability::ExplicitReturns);
                 }
-            } else if self.return_type.is_some()
+            } else if self.returns.is_some()
                 && !lang.function_parameters_are_typed(&self.params, context, form)
                 && !missing_required.contains(&FunctionCapability::TypedParameters)
             {
@@ -788,18 +788,6 @@ impl FunSpec {
                 context,
                 form,
                 capabilities: missing_required,
-            });
-        }
-
-        if !permissive_validation
-            && form == FunctionForm::Constructor
-            && let Some(return_type) = &self.return_type
-            && !lang.constructor_return_type_is_valid(return_type)
-        {
-            return Err(SigilStitchError::InvalidConstructorReturnType {
-                language,
-                function_name: self.name.clone(),
-                return_type: format!("{return_type:?}"),
             });
         }
 
@@ -844,16 +832,16 @@ impl FunSpec {
         declaration_context == DeclarationContext::Member
             && !capabilities.function_validation_is_permissive()
             && !self.modifiers.is_constructor
-            && self.return_type.is_none()
+            && self.returns.is_none()
             && lang.function_form(&self.name, false) == FunctionForm::Function
             && capabilities
                 .supports_function_form(FunctionContext::Member, FunctionForm::Constructor)
             && capabilities
                 .required_function_capabilities(FunctionContext::Member, FunctionForm::Function)
-                .contains(&FunctionCapability::ExplicitReturnType)
+                .contains(&FunctionCapability::ExplicitReturns)
             && !capabilities
                 .required_function_capabilities(FunctionContext::Member, FunctionForm::Constructor)
-                .contains(&FunctionCapability::ExplicitReturnType)
+                .contains(&FunctionCapability::ExplicitReturns)
     }
 
     fn is_implicit_direct_constructor(
@@ -906,7 +894,7 @@ impl FunSpec {
 pub struct FunSpecBuilder {
     name: String,
     params: Vec<ParameterSpec>,
-    return_type: Option<TypeName>,
+    returns: Option<Vec<TypeName>>,
     body: Option<CodeBlock>,
     modifiers: Modifiers,
     doc: Vec<String>,
@@ -926,9 +914,21 @@ impl FunSpecBuilder {
         self
     }
 
-    /// Set the return type.
-    pub fn returns(mut self, ret: TypeName) -> Self {
-        self.return_type = Some(ret);
+    /// Replace the complete ordered return sequence.
+    ///
+    /// An empty vector explicitly requests no result payload; omitting this
+    /// setter leaves return information unspecified. A tuple-valued result is
+    /// one entry, not several return slots. Target syntax and supported slot
+    /// counts are checked by the selected language.
+    ///
+    /// Scalar calls must be upgraded to a vector:
+    ///
+    /// ```compile_fail,E0308
+    /// use sigil_stitch::prelude::*;
+    /// let _ = FunSpec::builder("work").returns(TypeName::primitive("int"));
+    /// ```
+    pub fn returns(mut self, returns: Vec<TypeName>) -> Self {
+        self.returns = Some(returns);
         self
     }
 
@@ -1073,7 +1073,7 @@ impl FunSpecBuilder {
         Ok(FunSpec {
             name: self.name,
             params: self.params,
-            return_type: self.return_type,
+            returns: self.returns,
             body: self.body,
             modifiers: self.modifiers,
             doc: self.doc,

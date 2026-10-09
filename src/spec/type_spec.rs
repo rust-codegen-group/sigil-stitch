@@ -49,7 +49,7 @@ use crate::type_name::TypeName;
 ///     )
 ///     .add_method(
 ///         FunSpec::builder("getName")
-///             .returns(TypeName::primitive("string"))
+///             .returns(vec![TypeName::primitive("string")])
 ///             .body(body)
 ///             .build().unwrap(),
 ///     )

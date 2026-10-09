@@ -462,8 +462,8 @@ const PY_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = return annotation
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = return annotation
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
 ];
 const PY_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
@@ -473,8 +473,8 @@ const PY_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = return annotation
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = return annotation
+    FunctionCapability::ExplicitReturns,
     // StaticMethod = is_static paired with the frozen decorator recognizer
     FunctionCapability::StaticMethod,
     FunctionCapability::TypedParameters,
@@ -483,7 +483,7 @@ const PY_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     FunctionCapability::ConstructorDelegation,
     FunctionCapability::DefaultParameters,
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
 ];
 const PY_FUNCTIONS: &[FunctionCapabilityProfile] = &[
@@ -636,6 +636,19 @@ impl CodeLang for Python {
     }
 
     fn validate_function(&self, function: FunctionIntent<'_>) -> Result<(), SigilStitchError> {
+        if let Some(returns) = function.returns() {
+            crate::lang::python_function_lowering::validate_returns(self, function)?;
+            if function.form() == FunctionForm::Constructor
+                && let [return_type] = returns
+                && return_type.simple_name() != Some("None")
+            {
+                return Err(SigilStitchError::InvalidConstructorReturnType {
+                    language: self.file_extension().into(),
+                    function_name: function.name().into(),
+                    return_type: format!("{return_type:?}"),
+                });
+            }
+        }
         let legacy_static_decorator = matches!(
             function.function_context(),
             FunctionContext::Member | FunctionContext::InterfaceMember
@@ -663,10 +676,6 @@ impl CodeLang for Python {
         _form: FunctionForm,
     ) -> bool {
         true
-    }
-
-    fn constructor_return_type_is_valid(&self, return_type: &crate::type_name::TypeName) -> bool {
-        return_type.simple_name() == Some("None")
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {

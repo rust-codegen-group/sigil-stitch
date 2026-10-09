@@ -14,7 +14,7 @@ fn test_top_level_function() {
         .add_function(
             FunSpec::builder("greet")
                 .add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap())
-                .returns(TypeName::primitive("string"))
+                .returns(vec![TypeName::primitive("string")])
                 .body(CodeBlock::of("return \"Hello, \" . $name . \"!\";", ()).unwrap())
                 .build()
                 .unwrap(),
@@ -34,7 +34,7 @@ fn test_function_with_doc() {
         .doc("Add returns the sum of two integers.")
         .add_param(ParameterSpec::new("a", TypeName::primitive("int")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("int")).unwrap())
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .body(body)
         .build()
         .unwrap();
@@ -53,7 +53,7 @@ fn test_method() {
     let body = CodeBlock::of("return \"Name: \" . $this->name;", ()).unwrap();
     let fun = FunSpec::builder("getName")
         .visibility(Visibility::Public)
-        .returns(TypeName::primitive("string"))
+        .returns(vec![TypeName::primitive("string")])
         .body(body)
         .build()
         .unwrap();

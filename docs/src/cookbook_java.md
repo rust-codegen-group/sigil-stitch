@@ -26,7 +26,7 @@ let type_spec = TypeSpec::builder("UserService", TypeKind::Class)
         FunSpec::builder("getUser")
             .visibility(Visibility::Public)
             .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
-            .returns(TypeName::primitive("User"))
+            .returns(vec![TypeName::primitive("User")])
             .body(body)
             .build()
             .unwrap(),
@@ -59,21 +59,21 @@ let type_spec = TypeSpec::builder("Repository", TypeKind::Interface)
     .doc("Generic data repository.")
     .add_method(
         FunSpec::builder("findById")
-            .returns(TypeName::primitive("T"))
+            .returns(vec![TypeName::primitive("T")])
             .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
             .build()
             .unwrap(),
     )
     .add_method(
         FunSpec::builder("save")
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
             .build()
             .unwrap(),
     )
     .add_method(
         FunSpec::builder("delete")
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
             .build()
             .unwrap(),
@@ -138,7 +138,7 @@ let type_spec = TypeSpec::builder("Shape", TypeKind::Class)
     .add_method(
         FunSpec::builder("describe")
             .visibility(Visibility::Public)
-            .returns(TypeName::primitive("String"))
+            .returns(vec![TypeName::primitive("String")])
             .body(desc_body)
             .build()
             .unwrap(),
@@ -147,7 +147,7 @@ let type_spec = TypeSpec::builder("Shape", TypeKind::Class)
         FunSpec::builder("area")
             .visibility(Visibility::Public)
             .is_abstract()
-            .returns(TypeName::primitive("double"))
+            .returns(vec![TypeName::primitive("double")])
             .build()
             .unwrap(),
     )

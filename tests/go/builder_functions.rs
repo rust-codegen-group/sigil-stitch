@@ -17,7 +17,7 @@ fn test_top_level_function() {
         .add_function(
             FunSpec::builder("Greet")
                 .add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap())
-                .returns(TypeName::primitive("string"))
+                .returns(vec![TypeName::primitive("string")])
                 .body(CodeBlock::of("return %T(\"Hello, %%s!\", name)", (fmt_sprintf,)).unwrap())
                 .build()
                 .unwrap(),
@@ -37,7 +37,7 @@ fn test_function_with_doc() {
         .doc("Add returns the sum of two integers.")
         .add_param(ParameterSpec::new("a", TypeName::primitive("int")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("int")).unwrap())
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .body(body)
         .build()
         .unwrap();

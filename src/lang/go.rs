@@ -37,9 +37,13 @@ use crate::type_name::{FunctionPresentation, TypeName, TypePresentation, Wildcar
 ///
 /// # Multiple return values
 ///
-/// Go functions commonly return `(T, error)`. Use [`crate::type_name::TypeName::raw`] for this:
+/// Go functions commonly return `(T, error)`. Represent each result as an
+/// ordered return slot:
 /// ```text
-/// fb.returns(TypeName::raw("(int, error)"));
+/// fb.returns(vec![
+///     TypeName::primitive("int"),
+///     TypeName::primitive("error"),
+/// ]);
 /// ```
 #[derive(Debug, Clone)]
 pub struct Go {
@@ -444,8 +448,8 @@ const GO_TYPES: &[TypeKindCapabilityProfile] = &[
 const GO_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // BoundedPolymorphism = type constraints
     FunctionCapability::BoundedPolymorphism,
-    // ExplicitReturnType = result type or tuple
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = result type or tuple
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = type parameters
     FunctionCapability::ParametricPolymorphism,
@@ -462,7 +466,7 @@ const GO_FUNCTIONS: &[FunctionCapabilityProfile] = &[
         FunctionContext::ReceiverMethod,
         FunctionForm::Function,
         &[
-            FunctionCapability::ExplicitReturnType,
+            FunctionCapability::ExplicitReturns,
             FunctionCapability::TypedParameters,
         ],
     )
@@ -472,7 +476,7 @@ const GO_FUNCTIONS: &[FunctionCapabilityProfile] = &[
         FunctionContext::InterfaceMember,
         FunctionForm::Function,
         &[
-            FunctionCapability::ExplicitReturnType,
+            FunctionCapability::ExplicitReturns,
             FunctionCapability::TypedParameters,
         ],
     )

@@ -221,7 +221,7 @@ fn schema_driven_codegen() {
             })
             .unwrap();
             let getter = FunSpec::builder(&format!("get{}", capitalize(field.name)))
-                .returns(TypeName::primitive(field.ty))
+                .returns(vec![TypeName::primitive(field.ty)])
                 .body(body)
                 .build()
                 .unwrap();

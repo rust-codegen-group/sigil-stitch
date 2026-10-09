@@ -25,7 +25,7 @@ fn test_top_level_function() {
         .visibility(Visibility::Public)
         .add_type_param(tp)
         .add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap())
-        .returns(TypeName::primitive("string"))
+        .returns(vec![TypeName::primitive("string")])
         .body(body);
 
     let output = FileSpec::builder("serialize.ts")
@@ -45,7 +45,7 @@ fn test_function_with_doc() {
         .visibility(Visibility::Public)
         .doc("Greet the user by name.")
         .add_param(ParameterSpec::new("name", TypeName::primitive("string")).unwrap())
-        .returns(TypeName::primitive("string"))
+        .returns(vec![TypeName::primitive("string")])
         .body(body);
 
     let output = FileSpec::builder("greet.ts")
