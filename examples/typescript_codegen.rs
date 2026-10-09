@@ -57,35 +57,35 @@ fn builder_approach() -> String {
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("Promise"),
                     vec![TypeArgument::Single(TypeName::union(vec![
                         TypeName::primitive("T"),
                         TypeName::primitive("null"),
                     ]))],
-                ))
+                )])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("save")
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("Promise"),
                     vec![TypeArgument::Single(TypeName::primitive("void"))],
-                ))
+                )])
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("Promise"),
                     vec![TypeArgument::Single(TypeName::array(TypeName::primitive(
                         "T",
                     )))],
-                ))
+                )])
                 .add_param(
                     ParameterSpec::builder("limit", TypeName::primitive("number"))
                         .default_value(CodeBlock::of("10", ()).unwrap())
@@ -131,7 +131,7 @@ fn builder_approach() -> String {
                             presence: CallableParamPresence::Required,
                         },
                     ],
-                    TypeName::primitive("void"),
+                    vec![TypeName::primitive("void")],
                 ),
             )
             .is_optional()
@@ -166,10 +166,10 @@ fn builder_approach() -> String {
     let get_user = FunSpec::builder("getUser")
         .is_async()
         .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("Promise"),
             vec![TypeArgument::Single(user_type)],
-        ))
+        )])
         .body(body.build().unwrap())
         .build()
         .unwrap();
@@ -198,7 +198,7 @@ fn builder_approach() -> String {
     to_json_body.add("};", ());
 
     let to_json = FunSpec::builder("toJson")
-        .returns(TypeName::primitive("Record<string, unknown>"))
+        .returns(vec![TypeName::primitive("Record<string, unknown>")])
         .body(to_json_body.build().unwrap())
         .build()
         .unwrap();
@@ -260,35 +260,35 @@ fn macro_approach() -> String {
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("Promise"),
                     vec![TypeArgument::Single(TypeName::union(vec![
                         TypeName::primitive("T"),
                         TypeName::primitive("null"),
                     ]))],
-                ))
+                )])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("save")
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("Promise"),
                     vec![TypeArgument::Single(TypeName::primitive("void"))],
-                ))
+                )])
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("Promise"),
                     vec![TypeArgument::Single(TypeName::array(TypeName::primitive(
                         "T",
                     )))],
-                ))
+                )])
                 .add_param(
                     ParameterSpec::builder("limit", TypeName::primitive("number"))
                         .default_value(CodeBlock::of("10", ()).unwrap())
@@ -317,10 +317,10 @@ fn macro_approach() -> String {
     let get_user = FunSpec::builder("getUser")
         .is_async()
         .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("Promise"),
             vec![TypeArgument::Single(user_type)],
-        ))
+        )])
         .body(body)
         .build()
         .unwrap();
@@ -351,7 +351,7 @@ fn macro_approach() -> String {
     .unwrap();
 
     let to_json = FunSpec::builder("toJson")
-        .returns(TypeName::primitive("Record<string, unknown>"))
+        .returns(vec![TypeName::primitive("Record<string, unknown>")])
         .body(to_json_body)
         .build()
         .unwrap();
@@ -398,7 +398,7 @@ fn macro_approach() -> String {
                             presence: CallableParamPresence::Required,
                         },
                     ],
-                    TypeName::primitive("void"),
+                    vec![TypeName::primitive("void")],
                 ),
             )
             .is_optional()

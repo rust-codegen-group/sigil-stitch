@@ -71,7 +71,7 @@ pub fn collect_imports(tn: &TypeName, out: &mut Vec<ImportRef>) {
         }
         TypeName::Callable {
             parameters,
-            return_type,
+            returns,
         } => {
             for parameter in parameters {
                 match parameter {
@@ -86,7 +86,9 @@ pub fn collect_imports(tn: &TypeName, out: &mut Vec<ImportRef>) {
                     }
                 }
             }
-            collect_imports(return_type, out);
+            for return_type in returns {
+                collect_imports(return_type, out);
+            }
         }
         TypeName::AssociatedType {
             base, qualifier, ..
@@ -147,7 +149,10 @@ mod tests {
                     ),
                 },
             ],
-            TypeName::importable("Results", "Result"),
+            vec![
+                TypeName::importable("Results", "Result"),
+                TypeName::importable("Errors", "Failure"),
+            ],
         );
         let mut imports = Vec::new();
         collect_imports(&ty, &mut imports);
@@ -156,7 +161,7 @@ mod tests {
                 .iter()
                 .map(|import| import.name.as_str())
                 .collect::<Vec<_>>(),
-            ["Input", "Item", "Container", "Pattern", "Result"]
+            ["Input", "Item", "Container", "Pattern", "Result", "Failure"]
         );
     }
 }

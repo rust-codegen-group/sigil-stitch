@@ -11,7 +11,7 @@ use super::golden;
 fn test_function_with_params() {
     let body = CodeBlock::of("List.map f xs", ()).unwrap();
     let fun = FunSpec::builder("transform")
-        .returns(TypeName::primitive("'b list"))
+        .returns(vec![TypeName::primitive("'b list")])
         .add_param(ParameterSpec::new("f", TypeName::primitive("'a -> 'b")).unwrap())
         .add_param(ParameterSpec::new("xs", TypeName::primitive("'a list")).unwrap())
         .body(body)
@@ -32,7 +32,7 @@ fn test_function_with_doc() {
     let body = CodeBlock::of("List.map f xs", ()).unwrap();
     let fun = FunSpec::builder("transform")
         .doc("Transform a list using a mapping function.")
-        .returns(TypeName::primitive("'b list"))
+        .returns(vec![TypeName::primitive("'b list")])
         .add_param(ParameterSpec::new("f", TypeName::primitive("'a -> 'b")).unwrap())
         .add_param(ParameterSpec::new("xs", TypeName::primitive("'a list")).unwrap())
         .body(body)

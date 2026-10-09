@@ -52,7 +52,7 @@ fn test_class_with_methods() {
         .add_method(
             FunSpec::builder("FindUser")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("User"))
+                .returns(vec![TypeName::primitive("User")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
                 .body(find_body)
                 .build()
@@ -84,14 +84,14 @@ fn test_interface() {
         .doc("Generic data repository.")
         .add_method(
             FunSpec::builder("FindById")
-                .returns(TypeName::primitive("T"))
+                .returns(vec![TypeName::primitive("T")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("Save")
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
                 .build()
                 .unwrap(),
@@ -118,7 +118,7 @@ fn test_class_extends_implements() {
         .add_method(
             FunSpec::builder("Dispose")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .body(CodeBlock::of("// cleanup", ()).unwrap())
                 .build()
                 .unwrap(),
@@ -159,7 +159,7 @@ fn test_generic_class() {
         .add_method(
             FunSpec::builder("Add")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("item", TypeName::primitive("T")).unwrap())
                 .body(CodeBlock::of("items.Add(item);\nitems.Sort();", ()).unwrap())
                 .build()
@@ -293,7 +293,7 @@ fn test_where_clause_multiple() {
         .add_method(
             FunSpec::builder("Map")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("TOut"))
+                .returns(vec![TypeName::primitive("TOut")])
                 .add_param(ParameterSpec::new("input", TypeName::primitive("TIn")).unwrap())
                 .body(CodeBlock::of("throw new NotImplementedException();", ()).unwrap())
                 .build()

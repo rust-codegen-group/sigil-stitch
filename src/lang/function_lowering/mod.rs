@@ -2,10 +2,8 @@
 //!
 //! Language adapters choose every token and its relative order. These helpers
 //! only keep `TypeName` and nested `CodeBlock` values structured while building
-//! format strings. The frozen compatibility module is the sole interpreter of
-//! pre-0.6.8 declaration configuration.
-
-mod compatibility;
+//! format strings. Function grammar is owned entirely by complete language
+//! lowerers, including external adapters.
 
 use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
@@ -13,8 +11,6 @@ use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::parameter_spec::ParameterSpec;
 use crate::spec::where_spec::{GenericParamView, WhereConstraint};
 use crate::type_name::TypeName;
-
-pub(crate) use compatibility::lower as lower_compatibility;
 
 /// Structured signature accumulator with no language or grammar policy.
 pub(crate) struct SignatureBuilder {

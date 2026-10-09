@@ -563,8 +563,8 @@ const HASKELL_CLOSED_SUM: ClosedSumCapabilityProfile<'static> = ClosedSumCapabil
 const HASKELL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // BoundedPolymorphism = class constraints
     FunctionCapability::BoundedPolymorphism,
-    // ExplicitReturnType = result in the type signature
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = result in the type signature
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = type variables
     FunctionCapability::ParametricPolymorphism,
@@ -588,7 +588,7 @@ const HASKELL_FUNCTIONS: &[FunctionCapabilityProfile] = &[
         HASKELL_FUNCTION_CAPABILITIES,
     )
     .with_required_capabilities(&[
-        FunctionCapability::ExplicitReturnType,
+        FunctionCapability::ExplicitReturns,
         FunctionCapability::TypedParameters,
     ]),
 ];
@@ -732,6 +732,7 @@ impl CodeLang for Haskell {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::haskell_function_lowering::validate_returns(self, function)?;
         for parameter in function.generic_params() {
             if !parameter.has_kind_or_pack_domain() {
                 continue;
@@ -743,7 +744,7 @@ impl CodeLang for Haskell {
                 .parameters()
                 .iter()
                 .map(|parameter| parameter.param_type())
-                .chain(function.return_type())
+                .chain(function.returns().into_iter().flatten())
                 .any(|type_name| type_name_contains_parameter(type_name, parameter.name()))
         }) {
             return Err(SigilStitchError::InvalidFunctionTypeParameter {
@@ -1127,7 +1128,7 @@ fn type_name_contains_parameter(type_name: &TypeName, parameter_name: &str) -> b
         }
         TypeName::Callable {
             parameters,
-            return_type,
+            returns,
         } => {
             parameters.iter().any(|parameter| match parameter {
                 crate::spec::where_spec::CallableParam::Single { type_name, .. } => {
@@ -1139,7 +1140,9 @@ fn type_name_contains_parameter(type_name: &TypeName, parameter_name: &str) -> b
                 crate::spec::where_spec::CallableParam::Expansion { pattern, .. } => {
                     type_name_contains_parameter(pattern, parameter_name)
                 }
-            }) || type_name_contains_parameter(return_type, parameter_name)
+            }) || returns
+                .iter()
+                .any(|return_type| type_name_contains_parameter(return_type, parameter_name))
         }
         TypeName::AssociatedType {
             base, qualifier, ..
@@ -1587,7 +1590,7 @@ mod tests {
                 TypeName::parameter("f"),
                 vec![TypeArgument::Single(TypeName::callable(
                     vec![parameter],
-                    TypeName::parameter("r"),
+                    vec![TypeName::parameter("r")],
                 ))],
             );
             for name in ["a", "f", "r"] {

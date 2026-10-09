@@ -461,8 +461,8 @@ const TS_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // DefaultParameters = default parameters
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = return type annotation
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = return type annotation
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = optional parameter annotations
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = generic type parameters
@@ -481,8 +481,8 @@ const TS_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // DefaultParameters = default parameters
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = return type annotation
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = return type annotation
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = optional parameter annotations
     FunctionCapability::TypedParameters,
     // Override = override
@@ -496,7 +496,7 @@ const TS_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
 ];
 const TS_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::ParametricPolymorphism,
     FunctionCapability::TypedParameters,
     FunctionCapability::VariadicParameters,
@@ -555,6 +555,7 @@ impl CodeLang for TypeScript {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::typescript_function_lowering::validate_returns(self, function)?;
         crate::lang::typescript_function_lowering::validate_generic_parameters(self, function)
     }
     fn validate_resolved_imports(

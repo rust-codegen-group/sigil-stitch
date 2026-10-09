@@ -237,8 +237,17 @@ fn lower_unparenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchE
         }
         TypeName::Callable {
             parameters,
-            return_type,
+            returns,
         } => {
+            let return_type = match returns.as_slice() {
+                [] => literal("void"),
+                [return_type] => lower_at(return_type, Precedence::Function)?,
+                _ => {
+                    return Err(unsupported(
+                        "TypeScript supports at most one callable return slot",
+                    ));
+                }
+            };
             use crate::spec::where_spec::{CallableParam, CallableParamPresence};
             let mut labels = std::collections::HashSet::new();
             for parameter in parameters {
@@ -338,7 +347,7 @@ fn lower_unparenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchE
             concat([
                 delimited_soft("(", params, ",", ")"),
                 literal(" => "),
-                lower_at(return_type, Precedence::Function)?,
+                return_type,
             ])
         }
         TypeName::AssociatedType {

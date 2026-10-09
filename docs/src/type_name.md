@@ -298,9 +298,9 @@ let callback = TypeName::callable(
         name: Some("value".into()),
         type_name: TypeName::primitive("string"),
         presence: CallableParamPresence::Optional,
-    }],
+    }],vec![
     TypeName::primitive("void"),
-);
+]);
 // TypeScript: (value?: string) => void
 ```
 
@@ -318,13 +318,23 @@ them. The older `Function` representation remains a compatibility input.
 // Python:     Callable[[str, int], bool]
 // C++:        std::function<bool(string, int)>
 // Dart:       bool Function(String, int)
-let f = TypeName::callable(vec![CallableParam::Single { name: None, type_name: TypeName::primitive("string"), presence: CallableParamPresence::Required }, CallableParam::Single { name: None, type_name: TypeName::primitive("number"), presence: CallableParamPresence::Required }], TypeName::primitive("boolean"));
+let f = TypeName::callable(vec![CallableParam::Single { name: None, type_name: TypeName::primitive("string"), presence: CallableParamPresence::Required }, CallableParam::Single { name: None, type_name: TypeName::primitive("number"), presence: CallableParamPresence::Required }],vec![ TypeName::primitive("boolean")]);
 # }
 ```
 
 Function type grammar varies significantly across languages. The selected
 adapter owns the complete construct, including parameter order, delimiters,
 arrows or keywords, wrapping, and any target-derived imports.
+
+`callable(parameters, returns)` takes an ordered `Vec<TypeName>` of return
+slots. Empty returns use the language's native no-payload convention. Go
+supports multiple slots, for example
+`TypeName::callable(vec![], vec![TypeName::primitive("int"), TypeName::primitive("bool")])`
+lowers to `func() (int, bool)`. Other supported callable targets reject multiple
+slots rather than turning them into a tuple. A tuple type supplied as one
+entry remains one result. Existing parameter and nullary restrictions still
+apply, and targets without callable support remain unsupported. The released
+`Function` / `function(...)` compatibility input keeps its scalar return type.
 
 ## String literal types
 

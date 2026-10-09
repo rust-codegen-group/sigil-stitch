@@ -71,7 +71,7 @@ fn builder_approach() -> String {
 
     let greet_fn = FunSpec::builder("greet")
         .add_param(ParameterSpec::new("p", TypeName::primitive("person")).unwrap())
-        .returns(TypeName::primitive("string"))
+        .returns(vec![TypeName::primitive("string")])
         .body(greet_body.build().unwrap())
         .build()
         .unwrap();
@@ -94,16 +94,16 @@ fn builder_approach() -> String {
                         type_name: TypeName::primitive("'a"),
                         presence: CallableParamPresence::Required,
                     }],
-                    TypeName::primitive("'b"),
+                    vec![TypeName::primitive("'b")],
                 ),
             )
             .unwrap(),
         )
         .add_param(ParameterSpec::new("x", TypeName::primitive("'a")).unwrap())
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("list"),
             vec![TypeArgument::Single(TypeName::primitive("'b"))],
-        ))
+        )])
         .body(map_pair_body.build().unwrap())
         .build()
         .unwrap();
@@ -152,7 +152,7 @@ fn macro_approach() -> String {
 
     let greet_fn = FunSpec::builder("greet")
         .add_param(ParameterSpec::new("p", TypeName::primitive("person")).unwrap())
-        .returns(TypeName::primitive("string"))
+        .returns(vec![TypeName::primitive("string")])
         .body(greet_body)
         .build()
         .unwrap();
@@ -177,16 +177,16 @@ fn macro_approach() -> String {
                         type_name: TypeName::primitive("'a"),
                         presence: CallableParamPresence::Required,
                     }],
-                    TypeName::primitive("'b"),
+                    vec![TypeName::primitive("'b")],
                 ),
             )
             .unwrap(),
         )
         .add_param(ParameterSpec::new("x", TypeName::primitive("'a")).unwrap())
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("list"),
             vec![TypeArgument::Single(TypeName::primitive("'b"))],
-        ))
+        )])
         .body(map_pair_body)
         .build()
         .unwrap();

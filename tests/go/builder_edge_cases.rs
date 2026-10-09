@@ -147,7 +147,7 @@ fn test_embedded_with_methods() {
                     ParameterSpec::new("a", TypeName::pointer(TypeName::primitive("Endpoint")))
                         .unwrap(),
                 )
-                .returns(TypeName::primitive("string"))
+                .returns(vec![TypeName::primitive("string")])
                 .body(body)
                 .build()
                 .unwrap(),

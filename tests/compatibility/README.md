@@ -16,7 +16,11 @@ The inventory is checked in three ways:
   external crate boundary and exercises the compatibility bridges.
 - `cargo-semver-checks 0.50.0` checks the entire public Rust surface against
   tag `0.6.8`; the allowlist contains only the approved change that makes
-  `TypeName` non-exhaustive.
+  `TypeName` non-exhaustive. The checker does not report the approved
+  `FunSpecBuilder::returns(TypeName)` to `returns(Vec<TypeName>)` signature
+  change or removal of external adapters' default function grammar. Dedicated
+  compile-failure and complete-render tests cover these exceptions; the
+  observed allowlist remains exact rather than adding invented lint records.
 - The manifest test rejects malformed or duplicate inventory records and
   requires the restored signatures, JSON fixture, complete legacy grammar-hook
   inventory, quote shims, and both infallible import resolvers to be named.

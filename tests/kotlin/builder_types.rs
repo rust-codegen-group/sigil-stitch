@@ -38,7 +38,7 @@ fn test_class_with_properties() {
         )
         .add_method(
             FunSpec::builder("findUser")
-                .returns(TypeName::primitive("User"))
+                .returns(vec![TypeName::primitive("User")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .body(find_body)
                 .build()
@@ -104,7 +104,7 @@ fn test_interface() {
         .doc("Generic data repository.")
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::primitive("T?"))
+                .returns(vec![TypeName::primitive("T?")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
@@ -142,7 +142,7 @@ fn test_abstract_class() {
         .is_abstract()
         .add_method(
             FunSpec::builder("describe")
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(desc_body)
                 .build()
                 .unwrap(),
@@ -150,7 +150,7 @@ fn test_abstract_class() {
         .add_method(
             FunSpec::builder("area")
                 .is_abstract()
-                .returns(TypeName::primitive("Double"))
+                .returns(vec![TypeName::primitive("Double")])
                 .build()
                 .unwrap(),
         )
@@ -180,7 +180,7 @@ fn test_class_extends_implements() {
         .implements(serial)
         .add_method(
             FunSpec::builder("isAdmin")
-                .returns(TypeName::primitive("Boolean"))
+                .returns(vec![TypeName::primitive("Boolean")])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -239,7 +239,7 @@ fn test_enum_with_values() {
         )
         .add_method(
             FunSpec::builder("getValue")
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(CodeBlock::of("return value", ()).unwrap())
                 .build()
                 .unwrap(),
@@ -268,7 +268,7 @@ fn test_override_method() {
         .extends(TypeName::primitive("Animal"))
         .add_method(
             FunSpec::builder("speak")
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .is_override()
                 .body(body)
                 .build()

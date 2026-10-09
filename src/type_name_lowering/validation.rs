@@ -156,7 +156,7 @@ pub(crate) fn validate_type_name(
         }
         TypeName::Callable {
             parameters,
-            return_type,
+            returns,
         } => {
             for (index, parameter) in parameters.iter().enumerate() {
                 let parameter_path = path.indexed("callable.parameters", index);
@@ -172,7 +172,9 @@ pub(crate) fn validate_type_name(
                     }
                 }
             }
-            validate_type_name(return_type, &path.child("callable.return"))?;
+            for (index, return_type) in returns.iter().enumerate() {
+                validate_type_name(return_type, &path.indexed("callable.returns", index))?;
+            }
         }
         TypeName::AssociatedType {
             base,

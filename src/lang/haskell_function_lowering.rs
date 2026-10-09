@@ -9,14 +9,36 @@ use crate::lang::haskell::Haskell;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
 
+pub(crate) fn validate_returns(
+    lang: &Haskell,
+    function: crate::lang::FunctionIntent<'_>,
+) -> Result<(), SigilStitchError> {
+    if let Some(returns) = function.returns()
+        && returns.len() > 1
+    {
+        return Err(SigilStitchError::UnsupportedFunctionReturns {
+            language: lang.file_extension().into(),
+            function_name: function.name().into(),
+            context: function.function_context(),
+            form: function.form(),
+            actual: returns.len(),
+            reason: "this language supports at most one return slot".into(),
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn lower(
     lang: &Haskell,
     function: ValidatedFunction<'_>,
 ) -> Result<CodeBlock, SigilStitchError> {
+    validate_returns(lang, *function)?;
     let mut block = CodeBlock::builder();
     emit_preamble(&mut block, lang, function);
 
-    if let Some(return_type) = function.return_type() {
+    if let Some(returns) = function.returns() {
+        let native_empty = crate::type_name::TypeName::primitive("()");
+        let return_type = returns.first().unwrap_or(&native_empty);
         let type_params = type_params_with_inline_constraints(function, lang.file_extension())?;
         block.add("%L :: ", function.name());
         if type_params.iter().any(|parameter| {
@@ -49,7 +71,7 @@ pub(crate) fn lower(
             block.add(" %L", lang.escape_reserved(parameter.name()));
         }
         block.add(" =", ());
-        if function.return_type().is_none() {
+        if function.returns().is_none() {
             append_suffixes(&mut block, function);
         }
         block.add_line();

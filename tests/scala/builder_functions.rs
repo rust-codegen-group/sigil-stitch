@@ -14,7 +14,7 @@ fn test_function_with_return() {
 
     let body = CodeBlock::of("api.fetchUser(id)", ()).unwrap();
     let fun = FunSpec::builder("fetchUser")
-        .returns(user)
+        .returns(vec![user])
         .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
         .body(body)
         .build()
@@ -36,7 +36,7 @@ fn test_function_with_doc() {
         .visibility(Visibility::Public)
         .doc("Greet the user by name.")
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(body)
         .build()
         .unwrap();

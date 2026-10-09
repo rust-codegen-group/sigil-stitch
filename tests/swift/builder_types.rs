@@ -39,7 +39,7 @@ fn test_class_with_properties() {
         .add_method(
             FunSpec::builder("findUser")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("User?"))
+                .returns(vec![TypeName::primitive("User?")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .body(find_body)
                 .build()
@@ -107,7 +107,7 @@ fn test_protocol() {
         .doc("Generic data repository.")
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::primitive("T?"))
+                .returns(vec![TypeName::primitive("T?")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
@@ -145,14 +145,14 @@ fn test_abstract_class() {
         .doc("Abstract shape base class.")
         .add_method(
             FunSpec::builder("describe")
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(desc_body)
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("area")
-                .returns(TypeName::primitive("Double"))
+                .returns(vec![TypeName::primitive("Double")])
                 .body(area_body)
                 .build()
                 .unwrap(),
@@ -183,7 +183,7 @@ fn test_class_extends_implements() {
         .implements(hashable)
         .add_method(
             FunSpec::builder("isAdmin")
-                .returns(TypeName::primitive("Bool"))
+                .returns(vec![TypeName::primitive("Bool")])
                 .body(body)
                 .build()
                 .unwrap(),

@@ -28,7 +28,7 @@ fn build_shared_types() -> TypeSpec {
         .add_method(
             FunSpec::builder("findById")
                 .visibility(Visibility::Public)
-                .returns(TypeName::optional(TypeName::primitive("User")))
+                .returns(vec![TypeName::optional(TypeName::primitive("User"))])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("int")).unwrap())
                 .build()
                 .unwrap(),
@@ -36,7 +36,7 @@ fn build_shared_types() -> TypeSpec {
         .add_method(
             FunSpec::builder("save")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("User")).unwrap())
                 .build()
                 .unwrap(),
@@ -57,7 +57,7 @@ fn builder_approach() -> String {
         .add_method(
             FunSpec::builder("log")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("message", TypeName::primitive("string")).unwrap())
                 .body(log_body.build().unwrap())
                 .build()
@@ -107,7 +107,7 @@ fn builder_approach() -> String {
         .add_method(
             FunSpec::builder("describe")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("string"))
+                .returns(vec![TypeName::primitive("string")])
                 .body({
                     let mut b = CodeBlock::builder();
                     b.add("return match ($this->status) {", ());
@@ -158,7 +158,7 @@ fn builder_approach() -> String {
         .add_method(
             FunSpec::builder("getEmail")
                 .visibility(Visibility::Public)
-                .returns(TypeName::optional(TypeName::primitive("string")))
+                .returns(vec![TypeName::optional(TypeName::primitive("string"))])
                 .body(CodeBlock::of("return $this->email;", ()).unwrap())
                 .build()
                 .unwrap(),
@@ -168,7 +168,7 @@ fn builder_approach() -> String {
 
     // --- Standalone function ---
     let create_logger = FunSpec::builder("createLogger")
-        .returns(TypeName::primitive("LoggerInterface"))
+        .returns(vec![TypeName::primitive("LoggerInterface")])
         .body({
             let mut b = CodeBlock::builder();
             b.add_statement("return new %T()", (logger_interface,));
@@ -205,7 +205,7 @@ fn macro_approach() -> String {
         .add_method(
             FunSpec::builder("log")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("message", TypeName::primitive("string")).unwrap())
                 .body(log_body)
                 .build()
@@ -256,7 +256,7 @@ fn macro_approach() -> String {
         .add_method(
             FunSpec::builder("describe")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("string"))
+                .returns(vec![TypeName::primitive("string")])
                 .body(
                     sigil_quote!(Php {
                         return match ($$this->status) {
@@ -304,7 +304,7 @@ fn macro_approach() -> String {
         .add_method(
             FunSpec::builder("getEmail")
                 .visibility(Visibility::Public)
-                .returns(TypeName::optional(TypeName::primitive("string")))
+                .returns(vec![TypeName::optional(TypeName::primitive("string"))])
                 .body(
                     sigil_quote!(Php {
                         return $$this->email;
@@ -319,7 +319,7 @@ fn macro_approach() -> String {
 
     // --- Standalone function ---
     let create_logger = FunSpec::builder("createLogger")
-        .returns(TypeName::primitive("LoggerInterface"))
+        .returns(vec![TypeName::primitive("LoggerInterface")])
         .body(
             sigil_quote!(Php {
                 return new $T(logger_interface)();

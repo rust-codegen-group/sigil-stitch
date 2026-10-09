@@ -287,8 +287,8 @@ const C_VARIANTS: &[VariantCapabilityProfile] = &[VariantCapabilityProfile::new(
 const C_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // Attributes = __attribute__((...))
     FunctionCapability::Attributes,
-    // ExplicitReturnType = C result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = C result type
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = C parameter declarations
     FunctionCapability::TypedParameters,
     // StaticFunction = internal-linkage function
@@ -300,11 +300,18 @@ const C_FUNCTIONS: &[FunctionCapabilityProfile] = &[FunctionCapabilityProfile::n
     C_TOP_LEVEL_FUNCTION_CAPABILITIES,
 )
 .with_required_capabilities(&[
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
 ])];
 
 impl CodeLang for C {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::c_function_lowering::validate_returns(self, function)
+    }
+
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,

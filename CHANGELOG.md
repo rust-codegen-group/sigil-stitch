@@ -24,6 +24,16 @@
 
 ### Changed
 
+- `FunSpecBuilder::returns()` now replaces an ordered `Vec<TypeName>`.
+  Upgrade scalar calls to `.returns(vec![ty])`; an empty vector explicitly
+  requests no payload, while omission remains unspecified. Modern
+  `TypeName::callable()` also takes a return vector. Go declarations and callable
+  types support multiple slots without tuple coercion; other typed built-ins
+  reject multiple returns. Explicit async TypeScript empty returns emit
+  `Promise<void>`; singleton return types are never auto-wrapped.
+- The unreleased function capability `ExplicitReturnType` is renamed
+  `ExplicitReturns`; empty explicit intent still requests that capability.
+
 - `ProjectSpec::render()` now validates every file before rendering any file;
   `write_to()` therefore performs no filesystem writes when project validation
   fails.
@@ -38,9 +48,10 @@
   clauses entirely in language-owned lowerers. Deprecated
   `GenericSyntaxConfig` remains only for permissive 0.6.8 adapters and direct
   compatibility facades.
-- Strict adapters that advertise a function profile but omit complete
-  `lower_function()` support now fail with `MissingFunctionLowerer` instead of
-  falling through to the permissive shared-grammar lowerer.
+- Every adapter that omits complete `lower_function()` support now fails with
+  `MissingFunctionLowerer`, including permissive external adapters. Implement
+  the complete hook when upgrading; the other legacy lowerers and released
+  scalar `TypeName::Function` remain available.
 - `FileSpec` now rewrites source trees and lowers type references before import
   collection, so rewrite-introduced and target-derived imports participate in
   the authoritative alias assignment.

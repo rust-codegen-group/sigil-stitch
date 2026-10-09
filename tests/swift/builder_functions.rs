@@ -16,7 +16,7 @@ fn test_async_function() {
     let body = CodeBlock::of("return try await api.fetchUser(id: id)", ()).unwrap();
     let fun = FunSpec::builder("fetchUser")
         .is_async()
-        .returns(user)
+        .returns(vec![user])
         .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
         .body(body)
         .build()
@@ -43,7 +43,7 @@ fn test_override_method() {
         .extends(TypeName::primitive("Animal"))
         .add_method(
             FunSpec::builder("speak")
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .is_override()
                 .body(body)
                 .build()
@@ -68,7 +68,7 @@ fn test_function_with_doc() {
         .visibility(Visibility::Public)
         .doc("Greet the user by name.")
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(body)
         .build()
         .unwrap();

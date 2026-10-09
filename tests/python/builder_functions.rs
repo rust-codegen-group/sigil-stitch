@@ -18,7 +18,7 @@ fn test_top_level_function() {
             FunSpec::builder("serialize")
                 .doc("Serialize an object to JSON.")
                 .add_param(ParameterSpec::new("value", TypeName::primitive("object")).unwrap())
-                .returns(TypeName::primitive("str"))
+                .returns(vec![TypeName::primitive("str")])
                 .body(CodeBlock::of("return %T(value)", (json_dumps,)).unwrap())
                 .build()
                 .unwrap(),
@@ -36,7 +36,7 @@ fn test_function_with_doc() {
     let fun = FunSpec::builder("greet")
         .doc("Greet the user by name.")
         .add_param(ParameterSpec::new("name", TypeName::primitive("str")).unwrap())
-        .returns(TypeName::primitive("str"))
+        .returns(vec![TypeName::primitive("str")])
         .body(body)
         .build()
         .unwrap();
@@ -62,7 +62,7 @@ fn test_static_method_no_keyword() {
                 .add_param(ParameterSpec::new("cls", TypeName::primitive("")).unwrap())
                 .add_param(ParameterSpec::new("name", TypeName::primitive("str")).unwrap())
                 .add_param(ParameterSpec::new("age", TypeName::primitive("int")).unwrap())
-                .returns(TypeName::primitive("User"))
+                .returns(vec![TypeName::primitive("User")])
                 .body(body)
                 .build()
                 .unwrap(),

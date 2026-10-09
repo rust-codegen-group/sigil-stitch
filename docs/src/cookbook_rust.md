@@ -29,7 +29,7 @@ let type_spec = TypeSpec::builder("Config", TypeKind::Struct)
             .visibility(Visibility::Public)
             .add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap())
             .add_param(ParameterSpec::new("port", TypeName::primitive("u16")).unwrap())
-            .returns(TypeName::primitive("Self"))
+            .returns(vec![TypeName::primitive("Self")])
             .body(body)
             .build()
             .unwrap(),
@@ -122,14 +122,14 @@ let type_spec = TypeSpec::builder("Summary", TypeKind::Trait)
     .add_method(
         FunSpec::builder("summarize")
             .add_param(ParameterSpec::new("&self", TypeName::primitive("")).unwrap())
-            .returns(TypeName::primitive("String"))
+            .returns(vec![TypeName::primitive("String")])
             .build()
             .unwrap(),
     )
     .add_method(
         FunSpec::builder("preview")
             .add_param(ParameterSpec::new("&self", TypeName::primitive("")).unwrap())
-            .returns(TypeName::primitive("String"))
+            .returns(vec![TypeName::primitive("String")])
             .body(CodeBlock::of("self.summarize()[..50].to_string()", ()).unwrap())
             .build()
             .unwrap(),

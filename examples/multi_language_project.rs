@@ -117,10 +117,10 @@ fn build_typescript_client(schema: &[SchemaField]) -> FileSpec {
             FunSpec::builder("getUser")
                 .is_async()
                 .add_param(ParameterSpec::new("id", TypeName::primitive("number")).unwrap())
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("Promise"),
                     vec![TypeArgument::Single(TypeName::primitive("User"))],
-                ))
+                )])
                 .body(get_body)
                 .build()
                 .unwrap(),
@@ -131,10 +131,10 @@ fn build_typescript_client(schema: &[SchemaField]) -> FileSpec {
                 .add_param(
                     ParameterSpec::new("data", TypeName::primitive("Omit<User, 'id'>")).unwrap(),
                 )
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("Promise"),
                     vec![TypeArgument::Single(TypeName::primitive("User"))],
-                ))
+                )])
                 .body(create_body)
                 .build()
                 .unwrap(),
@@ -257,7 +257,7 @@ fn build_csharp_model(schema: &[SchemaField]) -> FileSpec {
         FunSpec::builder("ToString")
             .visibility(Visibility::Public)
             .is_override()
-            .returns(TypeName::primitive("string"))
+            .returns(vec![TypeName::primitive("string")])
             .body(to_string_body.build().unwrap())
             .build()
             .unwrap(),

@@ -55,7 +55,7 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 /// not a signature prefix. Set `is_async()` on the builder and use
 /// `Future<T>` as the return type:
 /// ```text
-/// fb.returns(TypeName::primitive("Future<User>"))
+/// fb.returns(vec![TypeName::primitive("Future<User>")])
 ///   .is_async();
 /// ```
 #[derive(Debug, Clone)]
@@ -321,8 +321,8 @@ const DART_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // BoundedPolymorphism = generic bounds
     FunctionCapability::BoundedPolymorphism,
-    // ExplicitReturnType = function result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = function result type
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = generic type parameters
     FunctionCapability::ParametricPolymorphism,
@@ -336,8 +336,8 @@ const DART_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // BoundedPolymorphism = generic bounds
     FunctionCapability::BoundedPolymorphism,
-    // ExplicitReturnType = method result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = method result type
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = generic type parameters
     FunctionCapability::ParametricPolymorphism,
@@ -349,7 +349,7 @@ const DART_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::AsyncEffect,
     FunctionCapability::Attributes,
     FunctionCapability::BoundedPolymorphism,
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     FunctionCapability::ParametricPolymorphism,
     FunctionCapability::StaticMethod,
@@ -406,6 +406,7 @@ impl CodeLang for Dart {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::dart_function_lowering::validate_returns(self, function)?;
         crate::lang::dart_function_lowering::validate_generic_parameters(self, function)
     }
     fn validate_resolved_imports(

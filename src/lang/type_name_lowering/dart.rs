@@ -106,13 +106,11 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             ")",
         ),
         TypeName::Reference { .. } => Err(unsupported("Dart has no reference type expression"))?,
-        TypeName::Function { return_type, .. } | TypeName::Callable { return_type, .. } => {
-            concat([
-                lower(return_type)?,
-                literal(" Function"),
-                delimited("(", lower_callable_parameters(type_name)?, ", ", ")"),
-            ])
-        }
+        TypeName::Function { .. } | TypeName::Callable { .. } => concat([
+            lower_callable_returns(type_name)?,
+            literal(" Function"),
+            delimited("(", lower_callable_parameters(type_name)?, ", ", ")"),
+        ]),
         TypeName::AssociatedType { .. } => {
             Err(unsupported("Dart has no associated-type expression"))?
         }
@@ -174,4 +172,19 @@ fn lower_callable_parameters(type_name: &TypeName) -> Result<Vec<CodeBlock>, Sig
         _ => unreachable!("callable helper receives only callable inputs"),
     };
     Ok(values)
+}
+
+#[expect(deprecated, reason = "preserve released scalar Function results")]
+fn lower_callable_returns(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
+    match type_name {
+        TypeName::Function { return_type, .. } => lower(return_type),
+        TypeName::Callable { returns, .. } => match returns.as_slice() {
+            [] => Ok(literal("void")),
+            [return_type] => lower(return_type),
+            _ => Err(unsupported(
+                "this language supports at most one callable return slot",
+            )),
+        },
+        _ => unreachable!("called only for callable types"),
+    }
 }

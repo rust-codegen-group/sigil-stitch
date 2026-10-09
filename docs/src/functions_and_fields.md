@@ -21,7 +21,7 @@ All spec types live in `src/spec/`. They follow a consistent builder pattern:
 # let body = CodeBlock::of("todo!()", ()).unwrap();
 // Correct:
 let fun = FunSpec::builder("greet")
-    .returns(TypeName::primitive("string"))
+    .returns(vec![TypeName::primitive("string")])
     .body(body)
     .build()
     .unwrap();
@@ -191,7 +191,21 @@ for the compatibility boundary and adapter migration sequence.
 
 ## FunSpec
 
-A function or method: parameters, return type, body, modifiers (async, static, abstract, constructor, override), type parameters, annotations, and doc comments.
+A function or method: parameters, an ordered return sequence, body, modifiers (async, static, abstract, constructor, override), type parameters, annotations, and doc comments.
+
+`.returns(Vec<TypeName>)` replaces the complete sequence. Omitting it leaves
+return information unspecified; `.returns(vec![])` explicitly requests no
+payload. A tuple-valued result is one entry, not several return slots. Go can
+represent multiple slots; other typed built-ins reject them, and dynamic/shell
+profiles reject explicit typed returns, including an empty sequence.
+
+Empty sequences use native `void`, `Unit`, `Void`, `None`, `()`, or `unit`
+conventions. Go omits its result clause. TypeScript emits `void` for synchronous
+declarations and `Promise<void>` when `.is_async()` is explicitly supplied.
+Singleton types are emitted as supplied, without automatic async wrapping.
+Capability checks use presence: an empty sequence requests `ExplicitReturns`
+and satisfies profiles that require it. Constructor profiles still decide
+whether explicit returns are allowed.
 
 ```rust
 # extern crate sigil_stitch;
@@ -201,7 +215,7 @@ A function or method: parameters, return type, body, modifiers (async, static, a
 let body = CodeBlock::of("return this.name", ()).unwrap();
 
 let fun = FunSpec::builder("getName")
-    .returns(TypeName::primitive("string"))
+    .returns(vec![TypeName::primitive("string")])
     .body(body)
     .build()
     .unwrap();
@@ -222,7 +236,7 @@ let fun = FunSpec::builder("fetchUser")
     .is_async()
     .visibility(Visibility::Public)
     .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-    .returns(TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(TypeName::primitive("User"))]))
+    .returns(vec![TypeName::application(TypeName::primitive("Promise"), vec![TypeArgument::Single(TypeName::primitive("User"))])])
     .body(body)
     .build()
     .unwrap();
@@ -245,7 +259,7 @@ let body = CodeBlock::of("return JSON.stringify(value)", ()).unwrap();
 let fun = FunSpec::builder("serialize")
     .add_generic_param(tp)
     .add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap())
-    .returns(TypeName::primitive("string"))
+    .returns(vec![TypeName::primitive("string")])
     .body(body)
     .build()
     .unwrap();
@@ -265,7 +279,7 @@ When no body is provided, the function renders as a declaration. Combined with `
 # fn main() {
 let fun = FunSpec::builder("validate")
     .is_abstract()
-    .returns(TypeName::primitive("boolean"))
+    .returns(vec![TypeName::primitive("boolean")])
     .build()
     .unwrap();
 // abstract validate(): boolean;

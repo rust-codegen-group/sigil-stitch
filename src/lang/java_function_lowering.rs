@@ -37,10 +37,30 @@ pub(crate) fn validate_generic_parameters(
     Ok(())
 }
 
+pub(crate) fn validate_returns(
+    lang: &Java,
+    function: crate::lang::FunctionIntent<'_>,
+) -> Result<(), SigilStitchError> {
+    if let Some(returns) = function.returns()
+        && returns.len() > 1
+    {
+        return Err(SigilStitchError::UnsupportedFunctionReturns {
+            language: lang.file_extension().into(),
+            function_name: function.name().into(),
+            context: function.function_context(),
+            form: function.form(),
+            actual: returns.len(),
+            reason: "this language supports at most one return slot".into(),
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn lower(
     lang: &Java,
     function: ValidatedFunction<'_>,
 ) -> Result<CodeBlock, SigilStitchError> {
+    validate_returns(lang, *function)?;
     let mut block = CodeBlock::builder();
     emit_preamble(&mut block, lang, function)?;
 
@@ -59,7 +79,9 @@ pub(crate) fn lower(
     if append_type_parameters(&mut signature, type_params.as_ref()) {
         signature.push_literal(" ");
     }
-    if let Some(return_type) = function.return_type() {
+    if let Some(returns) = function.returns() {
+        let native_empty = crate::type_name::TypeName::primitive("void");
+        let return_type = returns.first().unwrap_or(&native_empty);
         signature.push_type(return_type);
         signature.push_literal(" ");
     }

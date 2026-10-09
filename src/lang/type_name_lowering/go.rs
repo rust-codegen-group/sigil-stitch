@@ -85,14 +85,11 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::Reference { .. } => Err(unsupported(
             "Go pointers do not preserve reference mutability semantics",
         ))?,
-        TypeName::Function { return_type, .. } | TypeName::Callable { return_type, .. } => {
-            concat([
-                literal("func"),
-                delimited("(", lower_callable_parameters(type_name)?, ", ", ")"),
-                literal(" "),
-                lower(return_type)?,
-            ])
-        }
+        TypeName::Function { .. } | TypeName::Callable { .. } => concat([
+            literal("func"),
+            delimited("(", lower_callable_parameters(type_name)?, ", ", ")"),
+            lower_callable_returns(type_name)?,
+        ]),
         TypeName::AssociatedType { .. } => {
             Err(unsupported("Go has no associated-type expression"))?
         }
@@ -119,6 +116,27 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
 
 #[cfg(test)]
 assert_string_literal_rejection!("go", "Go has no string singleton type expression");
+
+#[expect(deprecated, reason = "preserve released scalar Function results")]
+fn lower_callable_returns(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
+    match type_name {
+        TypeName::Function { return_type, .. } => Ok(concat([literal(" "), lower(return_type)?])),
+        TypeName::Callable { returns, .. } => match returns.as_slice() {
+            [] => Ok(literal("")),
+            [return_type] => Ok(concat([literal(" "), lower(return_type)?])),
+            returns => Ok(concat([
+                literal(" "),
+                delimited_soft(
+                    "(",
+                    returns.iter().map(lower).collect::<Result<_, _>>()?,
+                    ",",
+                    ")",
+                ),
+            ])),
+        },
+        _ => unreachable!("called only for callable types"),
+    }
+}
 
 #[expect(
     deprecated,

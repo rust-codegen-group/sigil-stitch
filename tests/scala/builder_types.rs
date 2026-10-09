@@ -53,7 +53,7 @@ fn test_trait_with_type_param() {
         .doc("Generic data repository.")
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::primitive("Option[T]"))
+                .returns(vec![TypeName::primitive("Option[T]")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
@@ -87,7 +87,7 @@ fn test_class_extends() {
         .implements(serial)
         .add_method(
             FunSpec::builder("isAdmin")
-                .returns(TypeName::primitive("Boolean"))
+                .returns(vec![TypeName::primitive("Boolean")])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -156,7 +156,7 @@ fn test_hkt_type_param() {
     let fun = FunSpec::builder("traverse")
         .add_type_param(tp_f)
         .add_type_param(tp_a)
-        .returns(TypeName::primitive("F[List[A]]"))
+        .returns(vec![TypeName::primitive("F[List[A]]")])
         .add_param(ParameterSpec::new("list", TypeName::primitive("List[A]")).unwrap())
         .add_param(ParameterSpec::new("f", TypeName::primitive("A => F[A]")).unwrap())
         .body(body)
@@ -183,7 +183,7 @@ fn test_bounded_type_param() {
     let body = CodeBlock::of("if (a.compareTo(b) >= 0) a else b", ()).unwrap();
     let fun = FunSpec::builder("max")
         .add_type_param(tp)
-        .returns(TypeName::primitive("T"))
+        .returns(vec![TypeName::primitive("T")])
         .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("T")).unwrap())
         .body(body)
@@ -208,7 +208,7 @@ fn test_abstract_class() {
         .is_abstract()
         .add_method(
             FunSpec::builder("describe")
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(desc_body)
                 .build()
                 .unwrap(),
@@ -216,7 +216,7 @@ fn test_abstract_class() {
         .add_method(
             FunSpec::builder("area")
                 .is_abstract()
-                .returns(TypeName::primitive("Double"))
+                .returns(vec![TypeName::primitive("Double")])
                 .build()
                 .unwrap(),
         )
@@ -243,10 +243,10 @@ fn test_context_bound() {
         .add_type_param(TypeParamSpec::new("T").with_context_bound(TypeName::primitive("Ordering")))
         .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("T")).unwrap())
-        .returns(TypeName::generic(
+        .returns(vec![TypeName::generic(
             TypeName::primitive("Tuple2"),
             vec![TypeName::primitive("T"), TypeName::primitive("T")],
-        ))
+        )])
         .body(body)
         .build()
         .unwrap();
@@ -291,7 +291,7 @@ fn test_multiple_context_bounds() {
         )
         .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("T")).unwrap())
-        .returns(TypeName::primitive("Int"))
+        .returns(vec![TypeName::primitive("Int")])
         .body(body)
         .build()
         .unwrap();

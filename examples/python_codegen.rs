@@ -72,7 +72,7 @@ fn builder_approach() -> String {
     let to_json = FunSpec::builder("to_json")
         .doc("Serialize to JSON string.")
         .add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap())
-        .returns(TypeName::primitive("str"))
+        .returns(vec![TypeName::primitive("str")])
         .body(to_json_body.build().unwrap())
         .build()
         .unwrap();
@@ -96,7 +96,7 @@ fn builder_approach() -> String {
                 .build()
                 .unwrap(),
         )
-        .returns(TypeName::primitive("Config"))
+        .returns(vec![TypeName::primitive("Config")])
         .body(from_env_body.build().unwrap())
         .build()
         .unwrap();
@@ -161,7 +161,7 @@ fn builder_approach() -> String {
 
     let greet = FunSpec::builder("greet")
         .add_param(ParameterSpec::new("name", TypeName::primitive("str")).unwrap())
-        .returns(TypeName::primitive("str"))
+        .returns(vec![TypeName::primitive("str")])
         .body(greet_body.build().unwrap())
         .build()
         .unwrap();
@@ -202,7 +202,7 @@ fn macro_approach() -> String {
     let to_json = FunSpec::builder("to_json")
         .doc("Serialize to JSON string.")
         .add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap())
-        .returns(TypeName::primitive("str"))
+        .returns(vec![TypeName::primitive("str")])
         .body(to_json_body)
         .build()
         .unwrap();
@@ -228,7 +228,7 @@ fn macro_approach() -> String {
                 .build()
                 .unwrap(),
         )
-        .returns(TypeName::primitive("Config"))
+        .returns(vec![TypeName::primitive("Config")])
         .body(from_env_body)
         .build()
         .unwrap();
@@ -294,7 +294,7 @@ fn macro_approach() -> String {
 
     let greet = FunSpec::builder("greet")
         .add_param(ParameterSpec::new("name", TypeName::primitive("str")).unwrap())
-        .returns(TypeName::primitive("str"))
+        .returns(vec![TypeName::primitive("str")])
         .body(greet_body)
         .build()
         .unwrap();

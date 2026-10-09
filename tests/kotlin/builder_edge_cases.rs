@@ -34,14 +34,14 @@ fn test_full_module() {
     let iface_spec = TypeSpec::builder("UserRepository", TypeKind::Interface)
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::primitive("User?"))
+                .returns(vec![TypeName::primitive("User?")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(list.clone())
+                .returns(vec![list.clone()])
                 .build()
                 .unwrap(),
         )
@@ -65,7 +65,7 @@ fn test_full_module() {
     let find_body = CodeBlock::of("return users.firstOrNull { it.id == id }", ()).unwrap();
     let cls = cls.add_method(
         FunSpec::builder("findById")
-            .returns(TypeName::primitive("User?"))
+            .returns(vec![TypeName::primitive("User?")])
             .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
             .is_override()
             .body(find_body)
@@ -77,7 +77,7 @@ fn test_full_module() {
     let find_all_body = CodeBlock::of("return %T(users)", (array_list,)).unwrap();
     let cls = cls.add_method(
         FunSpec::builder("findAll")
-            .returns(list)
+            .returns(vec![list])
             .is_override()
             .body(find_all_body)
             .build()

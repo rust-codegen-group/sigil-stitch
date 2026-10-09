@@ -126,9 +126,9 @@ let handler = TypeName::callable(
         name: Some("value".into()),
         type_name: input,
         presence: CallableParamPresence::Optional,
-    }],
+    }],vec![
     TypeName::importable_type("./results", "Result"),
-);
+]);
 let block = sigil_quote!(TypeScript {
     type Handler<T> = $T(handler);
 })?;

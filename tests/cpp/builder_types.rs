@@ -68,7 +68,7 @@ fn test_class_with_methods() {
     let inc_body = CodeBlock::of("++count_;", ()).unwrap();
     pub_section.add_code(emit_fun(
         &FunSpec::builder("increment")
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(inc_body)
             .build()
             .unwrap(),
@@ -79,7 +79,7 @@ fn test_class_with_methods() {
     let get_body = CodeBlock::of("return count_;", ()).unwrap();
     pub_section.add_code(emit_fun(
         &FunSpec::builder("get_count")
-            .returns(TypeName::primitive("int"))
+            .returns(vec![TypeName::primitive("int")])
             .suffix("const")
             .body(get_body)
             .build()
@@ -166,7 +166,7 @@ fn test_virtual_method() {
     pub_section.add_code(emit_fun(
         &FunSpec::builder("area")
             .is_abstract()
-            .returns(TypeName::primitive("double"))
+            .returns(vec![TypeName::primitive("double")])
             .suffix("const")
             .suffix("= 0")
             .build()
@@ -231,7 +231,7 @@ fn test_template_class() {
     pub_section.add_code(emit_fun(
         &FunSpec::builder("push")
             .add_param(ParameterSpec::new("value", TypeName::primitive("const T&")).unwrap())
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(push_body)
             .build()
             .unwrap(),
@@ -241,7 +241,7 @@ fn test_template_class() {
     let empty_body = CodeBlock::of("return data_.empty();", ()).unwrap();
     pub_section.add_code(emit_fun(
         &FunSpec::builder("empty")
-            .returns(TypeName::primitive("bool"))
+            .returns(vec![TypeName::primitive("bool")])
             .suffix("const")
             .body(empty_body)
             .build()
@@ -274,7 +274,7 @@ fn test_inheritance() {
     pub_section.add_code(emit_fun(
         &FunSpec::builder("speak")
             .is_abstract()
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .suffix("const")
             .suffix("= 0")
             .build()
@@ -294,7 +294,7 @@ fn test_inheritance() {
     let body = CodeBlock::of("// bark", ()).unwrap();
     pub_section2.add_code(emit_fun(
         &FunSpec::builder("speak")
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .suffix("const")
             .suffix("override")
             .body(body)

@@ -44,7 +44,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::optional(TypeName::primitive("T")))
+                .returns(vec![TypeName::optional(TypeName::primitive("T"))])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
@@ -57,7 +57,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(TypeName::array(TypeName::primitive("T")))
+                .returns(vec![TypeName::array(TypeName::primitive("T"))])
                 .build()
                 .unwrap(),
         )
@@ -128,7 +128,7 @@ fn builder_approach() -> String {
     let make_url = FunSpec::builder("makeURL")
         .visibility(Visibility::Public)
         .is_static()
-        .returns(TypeName::optional(TypeName::primitive("URL")))
+        .returns(vec![TypeName::optional(TypeName::primitive("URL"))])
         .add_param(ParameterSpec::new("urlString", TypeName::primitive("String")).unwrap())
         .body(factory_body.build().unwrap())
         .build()
@@ -146,7 +146,7 @@ fn builder_approach() -> String {
         .visibility(Visibility::Public)
         .is_async()
         .add_param(ParameterSpec::new("url", TypeName::primitive("URL")).unwrap())
-        .returns(TypeName::primitive("Data"))
+        .returns(vec![TypeName::primitive("Data")])
         .body(fetch_body.build().unwrap())
         .build()
         .unwrap();
@@ -232,7 +232,7 @@ fn macro_approach() -> String {
     let make_url = FunSpec::builder("makeURL")
         .visibility(Visibility::Public)
         .is_static()
-        .returns(TypeName::optional(TypeName::primitive("URL")))
+        .returns(vec![TypeName::optional(TypeName::primitive("URL"))])
         .add_param(ParameterSpec::new("urlString", TypeName::primitive("String")).unwrap())
         .body(factory_body)
         .build()
@@ -248,7 +248,7 @@ fn macro_approach() -> String {
         .visibility(Visibility::Public)
         .is_async()
         .add_param(ParameterSpec::new("url", TypeName::primitive("URL")).unwrap())
-        .returns(TypeName::primitive("Data"))
+        .returns(vec![TypeName::primitive("Data")])
         .body(fetch_body)
         .build()
         .unwrap();

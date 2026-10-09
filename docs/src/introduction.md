@@ -75,7 +75,7 @@ chain calls fluently:
 # fn main() {
 # let body = CodeBlock::of("todo!()", ()).unwrap();
 let fun = FunSpec::builder("greet")
-    .returns(TypeName::primitive("string"))
+    .returns(vec![TypeName::primitive("string")])
     .body(body)
     .build()
     .unwrap();

@@ -431,8 +431,8 @@ pub enum FunctionCapability {
     HigherKindedPolymorphism,
     /// Declaration metadata / annotations.
     Attributes,
-    /// An explicitly declared return type.
-    ExplicitReturnType,
+    /// Explicit return information, including an empty no-payload sequence.
+    ExplicitReturns,
     /// Type annotations on function parameters.
     TypedParameters,
     /// Asynchronous effect.

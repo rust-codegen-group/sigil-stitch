@@ -43,7 +43,7 @@ let type_spec = TypeSpec::builder("Repository", TypeKind::Trait)
     .doc("Generic data repository.")
     .add_method(
         FunSpec::builder("findById")
-            .returns(TypeName::primitive("Option[T]"))
+            .returns(vec![TypeName::primitive("Option[T]")])
             .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
             .build()
             .unwrap(),
@@ -110,7 +110,7 @@ let fun = FunSpec::builder("max")
     .add_generic_param(
         GenericParamSpec::single("T").unwrap().with_bound(TypeName::primitive("Comparable[T]")).unwrap(),
     )
-    .returns(TypeName::primitive("T"))
+    .returns(vec![TypeName::primitive("T")])
     .add_param(ParameterSpec::new("a", TypeName::primitive("T")).unwrap())
     .add_param(ParameterSpec::new("b", TypeName::primitive("T")).unwrap())
     .body(body)

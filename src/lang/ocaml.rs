@@ -405,13 +405,20 @@ const OCAML_FUNCTIONS: &[FunctionCapabilityProfile] = &[FunctionCapabilityProfil
     FunctionContext::TopLevel,
     FunctionForm::Function,
     &[
-        FunctionCapability::ExplicitReturnType,
+        FunctionCapability::ExplicitReturns,
         FunctionCapability::TypedParameters,
     ],
 )
 .with_body_policy(FunctionBodyPolicy::Required)];
 
 impl CodeLang for OCaml {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::ocaml_function_lowering::validate_returns(self, function)
+    }
+
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,

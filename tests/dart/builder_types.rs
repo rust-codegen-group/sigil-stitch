@@ -49,7 +49,7 @@ fn test_class_with_fields() {
         )
         .add_method(
             FunSpec::builder("findUser")
-                .returns(TypeName::primitive("User?"))
+                .returns(vec![TypeName::primitive("User?")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .body(find_body)
                 .build()
@@ -77,7 +77,7 @@ fn test_abstract_class() {
         .is_abstract()
         .add_method(
             FunSpec::builder("describe")
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(desc_body)
                 .build()
                 .unwrap(),
@@ -85,7 +85,7 @@ fn test_abstract_class() {
         .add_method(
             FunSpec::builder("area")
                 .is_abstract()
-                .returns(TypeName::primitive("double"))
+                .returns(vec![TypeName::primitive("double")])
                 .build()
                 .unwrap(),
         )
@@ -114,7 +114,7 @@ fn test_class_extends_implements() {
         .implements(serial)
         .add_method(
             FunSpec::builder("isAdmin")
-                .returns(TypeName::primitive("bool"))
+                .returns(vec![TypeName::primitive("bool")])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -170,7 +170,7 @@ fn test_generic_class() {
         )
         .add_method(
             FunSpec::builder("add")
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("item", TypeName::primitive("T")).unwrap())
                 .body(add_body)
                 .build()

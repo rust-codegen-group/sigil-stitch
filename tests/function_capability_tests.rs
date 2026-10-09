@@ -48,7 +48,7 @@ impl RendererLang for LegacyVirtualLang {
 }
 
 impl CodeLang for LegacyVirtualLang {
-    #[allow(deprecated)] // Exercises the frozen 0.6.8 compatibility lowerer.
+    #[allow(deprecated)] // Grammar configuration no longer supplies a complete function lowerer.
     fn function_syntax(&self) -> sigil_stitch::lang::config::FunctionSyntaxConfig<'_> {
         sigil_stitch::lang::config::FunctionSyntaxConfig {
             abstract_keyword: "virtual ",
@@ -210,7 +210,7 @@ fn haskell_interface_methods_require_a_type_signature() {
         Err(SigilStitchError::MissingRequiredFunctionCapabilities {
             capabilities,
             ..
-        }) if capabilities == vec![FunctionCapability::ExplicitReturnType]
+        }) if capabilities == vec![FunctionCapability::ExplicitReturns]
     ));
 }
 
@@ -323,7 +323,7 @@ fn constructor_names_are_classified_and_validated_in_type_context() {
     let java_method_named_like_owner = TypeSpec::builder("Widget", TypeKind::Class)
         .add_method(
             FunSpec::builder("Widget")
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .body(CodeBlock::of("return;", ()).unwrap())
                 .build()
                 .unwrap(),
@@ -340,7 +340,7 @@ fn constructor_names_are_classified_and_validated_in_type_context() {
         let invalid = TypeSpec::builder("Widget", TypeKind::Class)
             .add_method(
                 FunSpec::builder("Widget")
-                    .returns(TypeName::primitive("int"))
+                    .returns(vec![TypeName::primitive("int")])
                     .body(CodeBlock::of("return 0;", ()).unwrap())
                     .build()
                     .unwrap(),
@@ -353,7 +353,7 @@ fn constructor_names_are_classified_and_validated_in_type_context() {
                 form: FunctionForm::Constructor,
                 capabilities,
                 ..
-            }) if capabilities == vec![FunctionCapability::ExplicitReturnType]
+            }) if capabilities == vec![FunctionCapability::ExplicitReturns]
         ));
     }
 }
@@ -486,7 +486,7 @@ fn php_traits_use_concrete_member_rules_without_becoming_concrete_types() {
         .add_method(
             FunSpec::builder("work")
                 .visibility(sigil_stitch::spec::modifiers::Visibility::Private)
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .body(CodeBlock::of("return", ()).unwrap())
                 .build()
                 .unwrap(),
@@ -494,7 +494,7 @@ fn php_traits_use_concrete_member_rules_without_becoming_concrete_types() {
         .add_method(
             FunSpec::builder("deferred")
                 .is_abstract()
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap(),
         )
@@ -649,7 +649,7 @@ fn abstract_methods_require_an_abstract_concrete_type() {
             .add_method(
                 FunSpec::builder("work")
                     .is_abstract()
-                    .returns(TypeName::primitive("void"))
+                    .returns(vec![TypeName::primitive("void")])
                     .build()
                     .unwrap(),
             )
@@ -669,7 +669,7 @@ fn abstract_methods_require_an_abstract_concrete_type() {
         .add_method(
             FunSpec::builder("work")
                 .is_abstract()
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap(),
         )
@@ -724,7 +724,7 @@ fn abstract_function_with_a_body_is_rejected() {
 fn cplusplus_virtual_method_with_a_body_preserves_legacy_semantics() {
     let method = FunSpec::builder("draw")
         .is_abstract()
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("draw_impl();", ()).unwrap())
         .build()
         .unwrap();
@@ -735,7 +735,7 @@ fn cplusplus_virtual_method_with_a_body_preserves_legacy_semantics() {
 }
 
 #[test]
-fn permissive_legacy_adapter_accepts_abstract_function_with_a_body() {
+fn permissive_validation_does_not_supply_abstract_function_lowering() {
     let method = FunSpec::builder("draw")
         .is_abstract()
         .body(CodeBlock::of("draw_impl();", ()).unwrap())
@@ -747,13 +747,14 @@ fn permissive_legacy_adapter_accepts_abstract_function_with_a_body() {
             .validate(&LegacyVirtualLang, DeclarationContext::Member)
             .is_ok()
     );
-    let output = render_function(&method, &LegacyVirtualLang, DeclarationContext::Member);
-    assert!(output.starts_with("virtual draw() {"), "{output}");
-    assert!(output.contains("draw_impl();"), "{output}");
+    assert!(matches!(
+        method.emit(&LegacyVirtualLang, DeclarationContext::Member),
+        Err(SigilStitchError::MissingFunctionLowerer { .. })
+    ));
 }
 
 #[test]
-fn permissive_legacy_adapter_preserves_pre_validation_function_shapes() {
+fn permissive_validation_accepts_function_intent_without_a_lowerer() {
     let receiver = ParameterSpec::builder("self", TypeName::primitive("Widget"))
         .default_value(CodeBlock::of("Widget{}", ()).unwrap())
         .variadic()
@@ -778,7 +779,7 @@ fn permissive_legacy_adapter_preserves_pre_validation_function_shapes() {
 
     assert!(
         method
-            .emit(&LegacyVirtualLang, DeclarationContext::Member)
+            .validate(&LegacyVirtualLang, DeclarationContext::Member)
             .is_ok()
     );
 }
@@ -795,7 +796,7 @@ fn inline_where_constraints_are_merged_into_type_parameters() {
             TypeName::primitive("T"),
             vec![TypeName::primitive("Cloneable")],
         )
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -814,7 +815,7 @@ fn duplicate_inline_where_constraints_are_merged_once() {
     let fun = FunSpec::builder("copy")
         .add_type_param(TypeParamSpec::new("T").with_bound(cloneable.clone()))
         .add_where_constraint(TypeName::primitive("T"), vec![cloneable])
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -835,7 +836,7 @@ fn unmatched_inline_where_constraint_fails_closed() {
             TypeName::primitive("U"),
             vec![TypeName::primitive("Cloneable")],
         )
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -877,7 +878,7 @@ fn typescript_rejects_decorators_on_top_level_functions() {
 fn cplusplus_renders_function_capabilities_in_their_grammar_positions() {
     let abstract_method = FunSpec::builder("draw")
         .is_abstract()
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     assert_eq!(
@@ -888,7 +889,7 @@ fn cplusplus_renders_function_capabilities_in_their_grammar_positions() {
     let explicit_pure_virtual_suffix = FunSpec::builder("erase")
         .is_abstract()
         .suffix("= 0")
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     assert_eq!(
@@ -904,7 +905,7 @@ fn cplusplus_renders_function_capabilities_in_their_grammar_positions() {
         .is_abstract()
         .is_override()
         .suffix("= 0")
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     assert_eq!(
@@ -932,7 +933,7 @@ fn cplusplus_renders_function_capabilities_in_their_grammar_positions() {
 
     let override_method = FunSpec::builder("draw")
         .is_override()
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     assert_eq!(
@@ -1299,7 +1300,7 @@ fn constructor_form_separates_generic_and_attribute_capabilities() {
         &FunSpec::builder("new")
             .is_constructor()
             .add_type_param(TypeParamSpec::new("T"))
-            .returns(TypeName::primitive("Self"))
+            .returns(vec![TypeName::primitive("Self")])
             .body(CodeBlock::of("Self", ()).unwrap())
             .build()
             .unwrap(),
@@ -1353,7 +1354,7 @@ fn constructor_form_separates_generic_and_attribute_capabilities() {
 #[test]
 fn explicit_return_types_fail_closed_when_the_form_cannot_render_them() {
     let typed_function = FunSpec::builder("value")
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .build()
         .unwrap();
 
@@ -1367,7 +1368,7 @@ fn explicit_return_types_fail_closed_when_the_form_cannot_render_them() {
         assert!(matches!(
             error,
             SigilStitchError::UnsupportedFunctionCapabilities { capabilities, .. }
-                if capabilities == vec![FunctionCapability::ExplicitReturnType]
+                if capabilities == vec![FunctionCapability::ExplicitReturns]
         ));
     }
 
@@ -1380,7 +1381,7 @@ fn explicit_return_types_fail_closed_when_the_form_cannot_render_them() {
     ] {
         let typed_constructor = FunSpec::builder(name)
             .is_constructor()
-            .returns(TypeName::primitive("Widget"))
+            .returns(vec![TypeName::primitive("Widget")])
             .build()
             .unwrap();
         let error = typed_constructor
@@ -1392,13 +1393,13 @@ fn explicit_return_types_fail_closed_when_the_form_cannot_render_them() {
                 form: FunctionForm::Constructor,
                 capabilities,
                 ..
-            } if capabilities == vec![FunctionCapability::ExplicitReturnType]
+            } if capabilities == vec![FunctionCapability::ExplicitReturns]
         ));
     }
 
     let python_none = FunSpec::builder("__init__")
         .is_constructor()
-        .returns(TypeName::primitive("None"))
+        .returns(vec![TypeName::primitive("None")])
         .build()
         .unwrap();
     assert!(
@@ -1409,7 +1410,7 @@ fn explicit_return_types_fail_closed_when_the_form_cannot_render_them() {
 
     let python_value = FunSpec::builder("__init__")
         .is_constructor()
-        .returns(TypeName::primitive("str"))
+        .returns(vec![TypeName::primitive("str")])
         .build()
         .unwrap();
     assert!(matches!(
@@ -1438,7 +1439,7 @@ fn incompatible_method_modifiers_fail_closed_by_profile() {
             FunSpec::builder("work")
                 .is_static()
                 .is_abstract()
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap(),
             vec![
@@ -1451,7 +1452,7 @@ fn incompatible_method_modifiers_fail_closed_by_profile() {
             FunSpec::builder("work")
                 .is_static()
                 .is_override()
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap(),
             vec![
@@ -1464,7 +1465,7 @@ fn incompatible_method_modifiers_fail_closed_by_profile() {
             FunSpec::builder("Work")
                 .is_abstract()
                 .is_async()
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap(),
             vec![
@@ -1477,7 +1478,7 @@ fn incompatible_method_modifiers_fail_closed_by_profile() {
             FunSpec::builder("work")
                 .is_abstract()
                 .is_static()
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap(),
             vec![
@@ -1490,7 +1491,7 @@ fn incompatible_method_modifiers_fail_closed_by_profile() {
             FunSpec::builder("work")
                 .is_static()
                 .is_override()
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap(),
             vec![
@@ -1503,7 +1504,7 @@ fn incompatible_method_modifiers_fail_closed_by_profile() {
             FunSpec::builder("work")
                 .is_abstract()
                 .is_async()
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap(),
             vec![
@@ -1516,7 +1517,7 @@ fn incompatible_method_modifiers_fail_closed_by_profile() {
             FunSpec::builder("work")
                 .is_static()
                 .is_override()
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap(),
             vec![
@@ -1646,7 +1647,7 @@ fn required_parameters_cannot_follow_defaults_in_ordered_default_languages() {
             .add_param(required())
             .body(CodeBlock::of("return", ()).unwrap());
         if let Some(return_type) = return_type {
-            builder = builder.returns(return_type);
+            builder = builder.returns(vec![return_type]);
         }
         let function = builder.build().unwrap();
         assert!(matches!(
@@ -1791,7 +1792,7 @@ fn csharp_static_abstract_interface_members_are_supported() {
                 .is_static()
                 .is_abstract()
                 .add_param(parameter)
-                .returns(TypeName::primitive("bool"))
+                .returns(vec![TypeName::primitive("bool")])
                 .build()
                 .unwrap(),
         )
@@ -1812,7 +1813,7 @@ fn csharp_static_abstract_interface_members_are_supported() {
 fn scala_function_annotations_are_supported_in_all_contexts() {
     let function = FunSpec::builder("work")
         .annotate(AnnotationSpec::new("deprecated"))
-        .returns(TypeName::primitive("Unit"))
+        .returns(vec![TypeName::primitive("Unit")])
         .body(CodeBlock::of("()", ()).unwrap())
         .build()
         .unwrap();
@@ -1835,7 +1836,7 @@ fn required_return_types_fail_closed_without_rejecting_cpp_destructors() {
         Err(SigilStitchError::MissingRequiredFunctionCapabilities {
             capabilities,
             ..
-        }) if capabilities == vec![FunctionCapability::ExplicitReturnType]
+        }) if capabilities == vec![FunctionCapability::ExplicitReturns]
     ));
 
     let member = |body| {
@@ -1861,7 +1862,7 @@ fn required_return_types_fail_closed_without_rejecting_cpp_destructors() {
             Err(SigilStitchError::MissingRequiredFunctionCapabilities {
                 capabilities,
                 ..
-            }) if capabilities == vec![FunctionCapability::ExplicitReturnType]
+            }) if capabilities == vec![FunctionCapability::ExplicitReturns]
         ));
     }
 
@@ -1911,12 +1912,12 @@ fn c_family_and_java_require_types_on_declared_parameters() {
     let parameter = ParameterSpec::new("value", TypeName::primitive("")).unwrap();
     let c = FunSpec::builder("work")
         .add_param(parameter.clone())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     let cpp = FunSpec::builder("work")
         .add_param(parameter.clone())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     let cpp_constructor = FunSpec::builder("Widget")
@@ -1926,7 +1927,7 @@ fn c_family_and_java_require_types_on_declared_parameters() {
         .unwrap();
     let java = FunSpec::builder("work")
         .add_param(parameter.clone())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -1938,7 +1939,7 @@ fn c_family_and_java_require_types_on_declared_parameters() {
         .unwrap();
     let csharp = FunSpec::builder("Work")
         .add_param(parameter.clone())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     let csharp_constructor = FunSpec::builder("Widget")
@@ -1977,7 +1978,7 @@ fn c_family_and_java_require_types_on_declared_parameters() {
 #[test]
 fn body_policies_reject_missing_implementations_and_interface_bodies() {
     let java_method = FunSpec::builder("work")
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     let java_constructor = FunSpec::builder("Widget").is_constructor().build().unwrap();
@@ -2006,7 +2007,7 @@ fn body_policies_reject_missing_implementations_and_interface_bodies() {
 
     let abstract_java_method = FunSpec::builder("work")
         .is_abstract()
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     assert!(
@@ -2016,7 +2017,7 @@ fn body_policies_reject_missing_implementations_and_interface_bodies() {
     );
 
     let java_interface_body = FunSpec::builder("work")
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -2027,7 +2028,7 @@ fn body_policies_reject_missing_implementations_and_interface_bodies() {
 
     let java_static_declaration = FunSpec::builder("work")
         .is_static()
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     assert!(matches!(
@@ -2037,7 +2038,7 @@ fn body_policies_reject_missing_implementations_and_interface_bodies() {
 
     let java_static_definition = FunSpec::builder("work")
         .is_static()
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -2052,12 +2053,12 @@ fn body_policies_reject_missing_implementations_and_interface_bodies() {
 fn static_csharp_and_dart_contract_members_require_bodies() {
     let declaration = FunSpec::builder("work")
         .is_static()
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     let definition = FunSpec::builder("work")
         .is_static()
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -2232,7 +2233,7 @@ fn typescript_rejects_invalid_abstract_combinations() {
 fn csharp_interface_async_fails_closed() {
     let function = FunSpec::builder("Work")
         .is_async()
-        .returns(TypeName::primitive("Task"))
+        .returns(vec![TypeName::primitive("Task")])
         .build()
         .unwrap();
     assert!(matches!(
@@ -2245,14 +2246,19 @@ fn csharp_interface_async_fails_closed() {
 }
 
 #[test]
-fn permissive_body_style_delegation_without_a_body_remains_a_declaration() {
+fn permissive_constructor_requires_complete_lowering() {
     let constructor = FunSpec::builder("Legacy")
         .is_constructor()
         .delegation(CodeBlock::of("legacy_delegate()", ()).unwrap())
         .build()
         .unwrap();
-    let output = render_function(&constructor, &LegacyVirtualLang, DeclarationContext::Member);
-    assert_eq!(output, "Legacy();\n");
+    assert!(matches!(
+        constructor.emit(&LegacyVirtualLang, DeclarationContext::Member),
+        Err(SigilStitchError::MissingFunctionLowerer {
+            form: FunctionForm::Constructor,
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -2435,7 +2441,7 @@ fn type_error_does_not_hide_contained_method_error() {
 fn csharp_direct_type_parameter_bounds_use_where_clauses() {
     let function = FunSpec::builder("Convert")
         .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("IFoo")))
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -2458,7 +2464,7 @@ fn csharp_rejects_constraints_on_non_parameter_subjects() {
             TypeName::generic(TypeName::primitive("List"), vec![TypeName::primitive("T")]),
             vec![TypeName::primitive("IFoo")],
         )
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -2495,7 +2501,7 @@ fn kotlin_multiple_type_parameter_bounds_use_a_where_clause() {
 fn strict_local_lowerers_preserve_or_reject_interface_visibility() {
     let public_typescript = FunSpec::builder("work")
         .visibility(Visibility::Public)
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     let output = render_function(
@@ -2507,7 +2513,7 @@ fn strict_local_lowerers_preserve_or_reject_interface_visibility() {
 
     let public_csharp = FunSpec::builder("Work")
         .visibility(Visibility::Public)
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
     let output = render_function(
@@ -2519,7 +2525,7 @@ fn strict_local_lowerers_preserve_or_reject_interface_visibility() {
 
     let public_kotlin = FunSpec::builder("work")
         .visibility(Visibility::Public)
-        .returns(TypeName::primitive("Unit"))
+        .returns(vec![TypeName::primitive("Unit")])
         .build()
         .unwrap();
     let output = render_function(
@@ -2537,7 +2543,7 @@ fn strict_local_lowerers_preserve_or_reject_interface_visibility() {
         ] {
             let function = FunSpec::builder("work")
                 .visibility(visibility)
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .build()
                 .unwrap();
             assert!(matches!(
@@ -2552,7 +2558,7 @@ fn strict_local_lowerers_preserve_or_reject_interface_visibility() {
 fn cpp_rejects_explicit_function_visibility() {
     let function = FunSpec::builder("work")
         .visibility(Visibility::Public)
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .build()
         .unwrap();
 
@@ -2658,7 +2664,7 @@ fn go_visibility_must_match_identifier_export_status() {
 #[test]
 fn csharp_inherited_function_visibility_emits_no_modifier() {
     let function = FunSpec::builder("Work")
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("return;", ()).unwrap())
         .build()
         .unwrap();
@@ -2691,7 +2697,7 @@ fn scala_rejects_crate_visibility_instead_of_narrowing_it() {
 #[test]
 fn kotlin_inherited_function_visibility_emits_no_modifier() {
     let function = FunSpec::builder("work")
-        .returns(TypeName::primitive("Unit"))
+        .returns(vec![TypeName::primitive("Unit")])
         .body(CodeBlock::of("return", ()).unwrap())
         .build()
         .unwrap();

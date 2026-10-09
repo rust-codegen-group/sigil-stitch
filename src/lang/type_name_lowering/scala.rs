@@ -120,12 +120,16 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             }).collect::<Result<_, _>>()?,
             "[", "]",
         ),
-        TypeName::Callable { parameters, return_type } => concat([
+        TypeName::Callable { parameters, returns } => concat([
             delimited("(", parameters.iter().map(|parameter| match parameter {
                 crate::spec::where_spec::CallableParam::Single { name: None, type_name, presence: crate::spec::where_spec::CallableParamPresence::Required } => lower(type_name),
                 _ => Err(unsupported("Scala function types cannot preserve this labelled, optional, repeated, or expanded parameter")),
             }).collect::<Result<_, _>>()?, ", ", ")"),
-            literal(" => "), lower(return_type)?,
+            literal(" => "), match returns.as_slice() {
+                [] => literal("Unit"),
+                [return_type] => lower(return_type)?,
+                _ => return Err(unsupported("Scala supports at most one callable return slot")),
+            },
         ]),
         TypeName::Union(members) => infix(
             members.iter().map(union_member).collect::<Result<_, _>>()?,

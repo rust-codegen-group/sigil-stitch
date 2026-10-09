@@ -113,11 +113,11 @@ fn capability_profile_builders_preserve_semantic_policy() {
     let context = std::hint::black_box(FunctionContext::Member);
     let capabilities = std::hint::black_box(
         &[
-            FunctionCapability::ExplicitReturnType,
+            FunctionCapability::ExplicitReturns,
             FunctionCapability::TypedParameters,
         ][..],
     );
-    let required = std::hint::black_box(&[FunctionCapability::ExplicitReturnType][..]);
+    let required = std::hint::black_box(&[FunctionCapability::ExplicitReturns][..]);
     let incompatible = [(
         FunctionCapability::AsyncEffect,
         FunctionCapability::StaticMethod,

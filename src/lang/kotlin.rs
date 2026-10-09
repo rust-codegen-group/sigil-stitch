@@ -399,8 +399,8 @@ const KOTLIN_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = function result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = function result type
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = generic type parameters
     FunctionCapability::ParametricPolymorphism,
@@ -416,8 +416,8 @@ const KOTLIN_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = method result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = method result type
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     // Override = override
     FunctionCapability::Override,
@@ -430,7 +430,7 @@ const KOTLIN_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     FunctionCapability::BoundedPolymorphism,
     FunctionCapability::DefaultParameters,
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     FunctionCapability::Override,
     FunctionCapability::ParametricPolymorphism,
@@ -476,6 +476,7 @@ impl CodeLang for Kotlin {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::kotlin_function_lowering::validate_returns(self, function)?;
         crate::lang::kotlin_function_lowering::validate_generic_parameters(self, function)
     }
     fn validate_resolved_imports(

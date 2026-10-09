@@ -109,7 +109,7 @@ pub_section.add("%>", ());
 pub_section.add_code(emit_fun(
     &FunSpec::builder("area")
         .is_abstract()
-        .returns(TypeName::primitive("double"))
+        .returns(vec![TypeName::primitive("double")])
         .suffix("const")
         .suffix("= 0")
         .build()

@@ -303,8 +303,8 @@ const PHP_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // DefaultParameters = default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = return type declaration
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = return type declaration
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = optional parameter declarations
     FunctionCapability::TypedParameters,
 ];
@@ -315,8 +315,8 @@ const PHP_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // DefaultParameters = default parameter values
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = return type declaration
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = return type declaration
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = optional parameter declarations
     FunctionCapability::TypedParameters,
     // Override = #[Override]
@@ -327,7 +327,7 @@ const PHP_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
 const PHP_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     FunctionCapability::DefaultParameters,
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     FunctionCapability::Override,
     FunctionCapability::StaticMethod,
@@ -377,6 +377,13 @@ const PHP_FUNCTIONS: &[FunctionCapabilityProfile] = &[
 ];
 
 impl CodeLang for Php {
+    fn validate_function(
+        &self,
+        function: crate::lang::FunctionIntent<'_>,
+    ) -> Result<(), SigilStitchError> {
+        crate::lang::php_function_lowering::validate_returns(self, function)
+    }
+
     fn validate_resolved_imports(
         &self,
         imports: &crate::import::ImportGroup,

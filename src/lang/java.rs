@@ -384,8 +384,8 @@ const JAVA_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // BoundedPolymorphism = bounded type parameters
     FunctionCapability::BoundedPolymorphism,
-    // ExplicitReturnType = method result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = method result type
+    FunctionCapability::ExplicitReturns,
     // TypedParameters = parameter declarations
     FunctionCapability::TypedParameters,
     // Override = @Override
@@ -399,7 +399,7 @@ const JAVA_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::AbstractMethod,
     FunctionCapability::Attributes,
     FunctionCapability::BoundedPolymorphism,
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     FunctionCapability::Override,
     FunctionCapability::ParametricPolymorphism,
@@ -413,7 +413,7 @@ const JAVA_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::TypedParameters,
 ];
 const JAVA_REQUIRED_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
-    FunctionCapability::ExplicitReturnType,
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
 ];
 const JAVA_MEMBER_INCOMPATIBILITIES: &[(FunctionCapability, FunctionCapability)] = &[
@@ -456,6 +456,7 @@ impl CodeLang for Java {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::java_function_lowering::validate_returns(self, function)?;
         crate::lang::java_function_lowering::validate_generic_parameters(self, function)
     }
     fn validate_resolved_imports(

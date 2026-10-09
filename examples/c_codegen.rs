@@ -118,7 +118,7 @@ fn builder_approach() -> String {
     let config_create = FunSpec::builder("config_create")
         .add_param(ParameterSpec::new("host", TypeName::primitive("const char*")).unwrap())
         .add_param(ParameterSpec::new("port", TypeName::primitive("int")).unwrap())
-        .returns(TypeName::primitive("struct Config*"))
+        .returns(vec![TypeName::primitive("struct Config*")])
         .body(create_body.build().unwrap())
         .build()
         .unwrap();
@@ -126,7 +126,7 @@ fn builder_approach() -> String {
     let destroy_body = CodeBlock::of("%T(cfg);", (free,)).unwrap();
     let config_destroy = FunSpec::builder("config_destroy")
         .add_param(ParameterSpec::new("cfg", TypeName::primitive("struct Config*")).unwrap())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(destroy_body)
         .build()
         .unwrap();
@@ -141,7 +141,7 @@ fn builder_approach() -> String {
     .unwrap();
     let config_print = FunSpec::builder("config_print")
         .add_param(ParameterSpec::new("cfg", TypeName::primitive("const struct Config*")).unwrap())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(print_body)
         .build()
         .unwrap();
@@ -184,7 +184,7 @@ fn macro_approach() -> String {
     let config_create = FunSpec::builder("config_create")
         .add_param(ParameterSpec::new("host", TypeName::primitive("const char*")).unwrap())
         .add_param(ParameterSpec::new("port", TypeName::primitive("int")).unwrap())
-        .returns(TypeName::primitive("struct Config*"))
+        .returns(vec![TypeName::primitive("struct Config*")])
         .body(create_body)
         .build()
         .unwrap();
@@ -192,7 +192,7 @@ fn macro_approach() -> String {
     let destroy_body = sigil_quote!(C { $T(free)(cfg); }).unwrap();
     let config_destroy = FunSpec::builder("config_destroy")
         .add_param(ParameterSpec::new("cfg", TypeName::primitive("struct Config*")).unwrap())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(destroy_body)
         .build()
         .unwrap();
@@ -203,7 +203,7 @@ fn macro_approach() -> String {
     .unwrap();
     let config_print = FunSpec::builder("config_print")
         .add_param(ParameterSpec::new("cfg", TypeName::primitive("const struct Config*")).unwrap())
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(print_body)
         .build()
         .unwrap();

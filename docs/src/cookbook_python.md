@@ -15,7 +15,7 @@ let body = CodeBlock::of("return await db.query(User).filter(active=True)", ()).
 let fun = FunSpec::builder("get_active_users")
     .is_async()
     .add_param(ParameterSpec::new("db", TypeName::primitive("Database")).unwrap())
-    .returns(TypeName::application(TypeName::primitive("list"), vec![TypeArgument::Single(user_type)]))
+    .returns(vec![TypeName::application(TypeName::primitive("list"), vec![TypeArgument::Single(user_type)])])
     .body(body)
     .build()
     .unwrap();
@@ -56,7 +56,7 @@ let type_spec = TypeSpec::builder("AdminService", TypeKind::Class)
     .add_method(
         FunSpec::builder("is_admin")
             .add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap())
-            .returns(TypeName::primitive("bool"))
+            .returns(vec![TypeName::primitive("bool")])
             .body(CodeBlock::of("return True", ()).unwrap())
             .build()
             .unwrap(),

@@ -153,7 +153,7 @@ fn test_type_class_via_type_spec() {
         .add_method(
             FunSpec::builder("prettyPrint")
                 .add_param(ParameterSpec::new("x", TypeName::primitive("a")).unwrap())
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .build()
                 .unwrap(),
         )

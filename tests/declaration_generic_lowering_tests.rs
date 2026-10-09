@@ -215,7 +215,7 @@ fn function_with_imported_constraints(language: &str) -> FunSpec {
         .add_where_constraint(TypeName::primitive(first_name), vec![first_bound])
         .add_where_constraint(TypeName::primitive(second_name), vec![second_bound])
         .add_param(ParameterSpec::of("value", TypeName::primitive(first_name)))
-        .returns(TypeName::primitive(second_name))
+        .returns(vec![TypeName::primitive(second_name)])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap()
@@ -246,7 +246,7 @@ fn generic_function(language: &str, parameter_count: usize, bound: bool) -> FunS
     let mut builder = FunSpec::builder("work").body(CodeBlock::of("body", ()).unwrap());
     if parameter_count == 0 {
         if matches!(language, "c" | "cpp" | "csharp" | "java") {
-            builder = builder.returns(TypeName::primitive("Value"));
+            builder = builder.returns(vec![TypeName::primitive("Value")]);
         }
         return builder.build().unwrap();
     }
@@ -265,7 +265,7 @@ fn generic_function(language: &str, parameter_count: usize, bound: bool) -> FunS
             ));
     }
     builder
-        .returns(TypeName::primitive(parameter_name(language, 0)))
+        .returns(vec![TypeName::primitive(parameter_name(language, 0))])
         .build()
         .unwrap()
 }
@@ -278,7 +278,7 @@ fn function_with_type_parameter(parameter: TypeParamSpec) -> FunSpec {
     FunSpec::builder("work")
         .add_type_param(parameter)
         .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
-        .returns(TypeName::primitive("Value"))
+        .returns(vec![TypeName::primitive("Value")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap()
@@ -293,7 +293,7 @@ fn function_with_where_constraint(language: &str) -> FunSpec {
     FunSpec::builder("work")
         .add_type_param(TypeParamSpec::new(name))
         .add_param(ParameterSpec::of("value", TypeName::primitive(name)))
-        .returns(TypeName::primitive(name))
+        .returns(vec![TypeName::primitive(name)])
         .add_where_constraint(
             TypeName::primitive(name),
             vec![TypeName::primitive("Bound")],
@@ -758,7 +758,7 @@ fn function_type_parameter_semantics_are_lowered_or_rejected() {
             vec![TypeName::primitive("Second")],
         )
         .add_param(ParameterSpec::of("value", TypeName::primitive("T")))
-        .returns(TypeName::primitive("T"))
+        .returns(vec![TypeName::primitive("T")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -771,7 +771,7 @@ fn function_type_parameter_semantics_are_lowered_or_rejected() {
         .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("Bound")))
         .add_where_constraint(TypeName::primitive("T"), vec![TypeName::primitive("Bound")])
         .add_param(ParameterSpec::of("value", TypeName::primitive("T")))
-        .returns(TypeName::primitive("T"))
+        .returns(vec![TypeName::primitive("T")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -815,7 +815,7 @@ fn function_type_parameter_semantics_are_lowered_or_rejected() {
         .add_type_param(TypeParamSpec::lifetime("'b"))
         .add_type_param(TypeParamSpec::lifetime("'a").with_bound(TypeName::primitive("'b")))
         .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
-        .returns(TypeName::primitive("Value"))
+        .returns(vec![TypeName::primitive("Value")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -897,7 +897,7 @@ fn haskell_function_type_parameters_must_occur_in_the_signature() {
             "values",
             TypeName::array(TypeName::primitive("a")),
         ))
-        .returns(TypeName::primitive("Value"))
+        .returns(vec![TypeName::primitive("Value")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -930,7 +930,7 @@ fn java_declaration_constraints_deduplicate_exact_direct_bounds() {
     let function = FunSpec::builder("work")
         .add_type_param(parameter())
         .add_param(ParameterSpec::of("value", TypeName::primitive("T")))
-        .returns(TypeName::primitive("T"))
+        .returns(vec![TypeName::primitive("T")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -966,7 +966,7 @@ fn java_declaration_constraints_reject_duplicate_bound_erasures() {
         .add_type_param(TypeParamSpec::new("T").with_bound(container("String")))
         .add_where_constraint(TypeName::primitive("T"), vec![container("Integer")])
         .add_param(ParameterSpec::of("value", TypeName::primitive("T")))
-        .returns(TypeName::primitive("T"))
+        .returns(vec![TypeName::primitive("T")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -1052,7 +1052,7 @@ fn csharp_function_constraints_deduplicate_semantic_imports() {
             TypeName::primitive("T"),
             vec![bound.with_alias("PreferredBound")],
         )
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -1148,7 +1148,7 @@ fn csharp_constraint_sources_share_target_order() {
     let function = FunSpec::builder("Work")
         .add_type_param(parameter())
         .add_where_constraint(TypeName::primitive("T"), vec![TypeName::primitive("class")])
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -1199,7 +1199,7 @@ fn csharp_conflicting_special_constraints_fail_closed() {
             .unwrap();
         let function = FunSpec::builder("Work")
             .add_type_param(function_parameter)
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("body", ()).unwrap())
             .build()
             .unwrap();
@@ -1227,14 +1227,14 @@ fn csharp_default_constraint_requires_an_override_and_stands_alone() {
         .unwrap();
     let ordinary_function = FunSpec::builder("Work")
         .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("default")))
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
     let override_function = FunSpec::builder("Work")
         .is_override()
         .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive("default")))
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -1245,7 +1245,7 @@ fn csharp_default_constraint_requires_an_override_and_stands_alone() {
                 .with_bound(TypeName::primitive("default"))
                 .with_bound(TypeName::primitive("IDisposable")),
         )
-        .returns(TypeName::primitive("void"))
+        .returns(vec![TypeName::primitive("void")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -1285,7 +1285,7 @@ fn csharp_override_constraints_follow_target_rules() {
         let function = FunSpec::builder("Work")
             .is_override()
             .add_type_param(TypeParamSpec::new("T").with_bound(bound))
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("body", ()).unwrap())
             .build()
             .unwrap();
@@ -1300,7 +1300,7 @@ fn csharp_override_constraints_follow_target_rules() {
         let function = FunSpec::builder("Work")
             .is_override()
             .add_type_param(TypeParamSpec::new("T").with_bound(TypeName::primitive(bound)))
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("body", ()).unwrap())
             .build()
             .unwrap();
@@ -1331,7 +1331,7 @@ fn csharp_constraints_reject_invalid_type_shapes() {
             .unwrap();
         let function = FunSpec::builder("Work")
             .add_type_param(TypeParamSpec::new("T").with_bound(bound))
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("body", ()).unwrap())
             .build()
             .unwrap();
@@ -1368,7 +1368,7 @@ fn csharp_nullable_and_non_nullable_constraints_cannot_repeat() {
             .unwrap();
         let function = FunSpec::builder("Work")
             .add_type_param(parameter())
-            .returns(TypeName::primitive("void"))
+            .returns(vec![TypeName::primitive("void")])
             .body(CodeBlock::of("body", ()).unwrap())
             .build()
             .unwrap();
@@ -1478,7 +1478,7 @@ fn inline_function_constraints_require_primitive_declared_parameter_subjects() {
                 .add_type_param(TypeParamSpec::new(parameter))
                 .add_where_constraint(subject, vec![TypeName::primitive("Bound")])
                 .add_param(ParameterSpec::of("value", TypeName::primitive(parameter)))
-                .returns(TypeName::primitive(parameter))
+                .returns(vec![TypeName::primitive(parameter)])
                 .body(CodeBlock::of("body", ()).unwrap())
                 .build()
                 .unwrap();
@@ -1504,7 +1504,7 @@ fn duplicate_function_type_parameters_are_intrinsically_invalid() {
         .add_type_param(TypeParamSpec::new("T"))
         .add_type_param(TypeParamSpec::new("T"))
         .add_param(ParameterSpec::of("value", TypeName::primitive("T")))
-        .returns(TypeName::primitive("T"))
+        .returns(vec![TypeName::primitive("T")])
         .body(CodeBlock::of("body", ()).unwrap())
         .build()
         .unwrap();
@@ -1635,7 +1635,7 @@ fn lifetimes_kinds_context_bounds_and_where_constraints_remain_target_local() {
         )
         .add_method(
             FunSpec::builder("get")
-                .returns(TypeName::primitive("T"))
+                .returns(vec![TypeName::primitive("T")])
                 .body(CodeBlock::of("self.value", ()).unwrap())
                 .build()
                 .unwrap(),
@@ -1706,7 +1706,7 @@ fn lifetimes_kinds_context_bounds_and_where_constraints_remain_target_local() {
     let rust_where = FunSpec::builder("copy")
         .add_type_param(TypeParamSpec::new("T"))
         .add_param(ParameterSpec::of("value", TypeName::primitive("T")))
-        .returns(TypeName::primitive("T"))
+        .returns(vec![TypeName::primitive("T")])
         .add_where_constraint(
             TypeName::primitive("T"),
             vec![TypeName::primitive("Clone"), TypeName::primitive("Send")],
@@ -1738,7 +1738,7 @@ fn imported_bound_aliases_survive_type_and_function_lowering() {
         .add_type_param(TypeParamSpec::new("T").with_bound(first))
         .add_type_param(TypeParamSpec::new("U").with_bound(second))
         .add_param(ParameterSpec::of("value", TypeName::primitive("T")))
-        .returns(TypeName::primitive("U"))
+        .returns(vec![TypeName::primitive("U")])
         .body(CodeBlock::of("value as U", ()).unwrap())
         .build()
         .unwrap();

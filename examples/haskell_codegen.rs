@@ -91,7 +91,7 @@ fn builder_approach() -> String {
 
     let greet_fn = FunSpec::builder("greet")
         .add_param(ParameterSpec::new("p", TypeName::primitive("Person")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(greet_body.build().unwrap())
         .build()
         .unwrap();
@@ -108,7 +108,7 @@ fn builder_approach() -> String {
                 .unwrap(),
         )
         .add_param(ParameterSpec::new("x", TypeName::primitive("a")).unwrap())
-        .returns(TypeName::primitive("IO ()"))
+        .returns(vec![TypeName::primitive("IO ()")])
         .body(show_body.build().unwrap())
         .build()
         .unwrap();
@@ -152,7 +152,7 @@ fn macro_approach() -> String {
 
     let greet_fn = FunSpec::builder("greet")
         .add_param(ParameterSpec::new("p", TypeName::primitive("Person")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(greet_body)
         .build()
         .unwrap();
@@ -170,7 +170,7 @@ fn macro_approach() -> String {
                 .unwrap(),
         )
         .add_param(ParameterSpec::new("x", TypeName::primitive("a")).unwrap())
-        .returns(TypeName::primitive("IO ()"))
+        .returns(vec![TypeName::primitive("IO ()")])
         .body(print_body)
         .build()
         .unwrap();

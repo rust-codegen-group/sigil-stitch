@@ -89,6 +89,15 @@ impl RendererLang for RichLegacyTypeLang {
 
 #[allow(deprecated)]
 impl CodeLang for RichLegacyTypeLang {
+    // These tests cover retained type grammar. Functions have an explicit
+    // complete implementation instead of inheriting a shared default.
+    fn lower_function(
+        &self,
+        function: sigil_stitch::lang::ValidatedFunction<'_>,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        Rust::new().lower_function(function)
+    }
+
     fn render_visibility(
         &self,
         _visibility: Visibility,
@@ -438,7 +447,7 @@ fn legacy_property(name: &str) -> PropertySpec {
 fn legacy_method(name: &str) -> FunSpec {
     FunSpec::builder(name)
         .add_param(ParameterSpec::of("value", TypeName::primitive("Value")))
-        .returns(TypeName::primitive("Value"))
+        .returns(vec![TypeName::primitive("Value")])
         .body(CodeBlock::of("return value", ()).unwrap())
         .build()
         .unwrap()
@@ -821,7 +830,7 @@ fn test_ts_class() {
         )
         .add_method(
             FunSpec::builder("getName")
-                .returns(TypeName::primitive("string"))
+                .returns(vec![TypeName::primitive("string")])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -844,10 +853,10 @@ fn test_ts_interface() {
         .add_method(
             FunSpec::builder("findById")
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-                .returns(TypeName::generic(
+                .returns(vec![TypeName::generic(
                     TypeName::primitive("Promise"),
                     vec![TypeName::primitive("Entity")],
-                ))
+                )])
                 .build()
                 .unwrap(),
         )
@@ -875,7 +884,7 @@ fn test_rust_struct_with_impl() {
             FunSpec::builder("new")
                 .visibility(Visibility::Public)
                 .add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap())
-                .returns(TypeName::primitive("Self"))
+                .returns(vec![TypeName::primitive("Self")])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -1418,7 +1427,7 @@ fn test_where_clause_rust_struct() {
             FunSpec::builder("new")
                 .visibility(Visibility::Public)
                 .add_param(ParameterSpec::new("value", TypeName::primitive("T")).unwrap())
-                .returns(TypeName::primitive("Self"))
+                .returns(vec![TypeName::primitive("Self")])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -1583,7 +1592,7 @@ fn test_embedded_with_methods_fails_closed() {
         )
         .add_method(
             FunSpec::builder("handle")
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .body(CodeBlock::of("// handle", ()).unwrap())
                 .build()
                 .unwrap(),

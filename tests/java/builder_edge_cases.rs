@@ -59,7 +59,7 @@ fn test_annotated_method() {
         .add_method(
             FunSpec::builder("speak")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .annotation(CodeBlock::of("@Override", ()).unwrap())
                 .body(body)
                 .build()
@@ -93,7 +93,7 @@ fn test_full_module() {
         .visibility(Visibility::Public)
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::primitive("User"))
+                .returns(vec![TypeName::primitive("User")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .annotation(CodeBlock::of("@%T", (nullable.clone(),)).unwrap())
                 .build()
@@ -101,7 +101,7 @@ fn test_full_module() {
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(list_user.clone())
+                .returns(vec![list_user.clone()])
                 .build()
                 .unwrap(),
         )
@@ -139,7 +139,7 @@ fn test_full_module() {
         .add_method(
             FunSpec::builder("findById")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("User"))
+                .returns(vec![TypeName::primitive("User")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .annotation(CodeBlock::of("@Override", ()).unwrap())
                 .annotation(CodeBlock::of("@%T", (nullable,)).unwrap())
@@ -150,7 +150,7 @@ fn test_full_module() {
         .add_method(
             FunSpec::builder("findAll")
                 .visibility(Visibility::Public)
-                .returns(list_user)
+                .returns(vec![list_user])
                 .annotation(CodeBlock::of("@Override", ()).unwrap())
                 .body(find_all_body)
                 .build()

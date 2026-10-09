@@ -42,10 +42,10 @@ fn test_class_with_fields_and_methods() {
             FunSpec::builder("getUser")
                 .is_async()
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-                .returns(TypeName::generic(
+                .returns(vec![TypeName::generic(
                     TypeName::primitive("Promise"),
                     vec![TypeName::importable_type("./models", "User")],
-                ))
+                )])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -74,20 +74,20 @@ fn test_interface_generic() {
         .add_method(
             FunSpec::builder("findById")
                 .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
-                .returns(TypeName::generic(
+                .returns(vec![TypeName::generic(
                     TypeName::primitive("Promise"),
                     vec![TypeName::primitive("T")],
-                ))
+                )])
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("save")
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
-                .returns(TypeName::generic(
+                .returns(vec![TypeName::generic(
                     TypeName::primitive("Promise"),
                     vec![TypeName::primitive("void")],
-                ))
+                )])
                 .build()
                 .unwrap(),
         );
@@ -112,7 +112,7 @@ fn test_abstract_class() {
             FunSpec::builder("handleRequest")
                 .is_abstract()
                 .add_param(ParameterSpec::new("req", TypeName::primitive("Request")).unwrap())
-                .returns(TypeName::primitive("Response"))
+                .returns(vec![TypeName::primitive("Response")])
                 .build()
                 .unwrap(),
         )
@@ -144,7 +144,7 @@ fn test_class_extends_implements() {
         .implements(TypeName::importable_type("./serial", "Serializable"))
         .add_method(
             FunSpec::builder("isAdmin")
-                .returns(TypeName::primitive("boolean"))
+                .returns(vec![TypeName::primitive("boolean")])
                 .body(body)
                 .build()
                 .unwrap(),

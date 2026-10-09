@@ -63,7 +63,7 @@ fn test_struct_with_impl() {
             FunSpec::builder("new")
                 .visibility(Visibility::Public)
                 .add_param(ParameterSpec::new("name", TypeName::primitive("&str")).unwrap())
-                .returns(TypeName::primitive("Self"))
+                .returns(vec![TypeName::primitive("Self")])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -106,7 +106,7 @@ fn test_generic_struct() {
             FunSpec::builder("len")
                 .visibility(Visibility::Public)
                 .add_param(ParameterSpec::new("&self", TypeName::primitive("")).unwrap())
-                .returns(TypeName::primitive("usize"))
+                .returns(vec![TypeName::primitive("usize")])
                 .body(body)
                 .build()
                 .unwrap(),

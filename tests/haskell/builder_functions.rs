@@ -13,7 +13,7 @@ use super::golden;
 fn test_function_with_params() {
     let body = CodeBlock::of("x + y", ()).unwrap();
     let fun = FunSpec::builder("add")
-        .returns(TypeName::primitive("Int"))
+        .returns(vec![TypeName::primitive("Int")])
         .add_param(ParameterSpec::new("x", TypeName::primitive("Int")).unwrap())
         .add_param(ParameterSpec::new("y", TypeName::primitive("Int")).unwrap())
         .body(body)
@@ -35,7 +35,7 @@ fn test_function_with_import() {
 
     let body = CodeBlock::of("Data.Map.empty", ()).unwrap();
     let fun = FunSpec::builder("emptyMap")
-        .returns(map_type)
+        .returns(vec![map_type])
         .body(body)
         .build()
         .unwrap();
@@ -62,7 +62,7 @@ fn test_split_signature_preserves_compound_param_and_return_types() {
     let return_type = TypeName::generic(map, vec![text.clone(), TypeName::optional(user)]);
     let fun = FunSpec::builder("transform")
         .add_param(ParameterSpec::new("value", TypeName::optional(text)).unwrap())
-        .returns(return_type)
+        .returns(vec![return_type])
         .body(CodeBlock::of("undefined", ()).unwrap())
         .build()
         .unwrap();
@@ -106,7 +106,7 @@ fn test_split_signature_rejects_parameter_types_without_return_type() {
             if matches!(errors.as_slice(), [SigilStitchError::MissingRequiredFunctionCapabilities {
                 capabilities,
                 ..
-            }] if capabilities == &vec![FunctionCapability::ExplicitReturnType])
+            }] if capabilities == &vec![FunctionCapability::ExplicitReturns])
     ));
 }
 
@@ -114,7 +114,7 @@ fn test_split_signature_rejects_parameter_types_without_return_type() {
 fn test_split_signature_rejects_untyped_parameters_with_return_type() {
     let consume = FunSpec::builder("consume")
         .add_param(ParameterSpec::new("value", TypeName::primitive("")).unwrap())
-        .returns(TypeName::primitive("Int"))
+        .returns(vec![TypeName::primitive("Int")])
         .body(CodeBlock::of("0", ()).unwrap())
         .build()
         .unwrap();
@@ -142,7 +142,7 @@ fn test_split_signature_qualifies_conflicting_import_names() {
         .add_param(
             ParameterSpec::new("value", TypeName::importable("Domain.Input", "Value")).unwrap(),
         )
-        .returns(TypeName::importable("Domain.Output", "Value"))
+        .returns(vec![TypeName::importable("Domain.Output", "Value")])
         .body(CodeBlock::of("undefined", ()).unwrap())
         .build()
         .unwrap();
@@ -180,7 +180,7 @@ fn test_split_signature_preserves_imported_context_bounds() {
                 ),
         )
         .add_param(ParameterSpec::new("value", TypeName::primitive("a")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(CodeBlock::of("show value", ()).unwrap())
         .build()
         .unwrap();
@@ -219,7 +219,7 @@ fn test_function_with_context() {
                 .with_bound(TypeName::primitive("Show")),
         )
         .add_param(ParameterSpec::new("x", TypeName::primitive("a")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(body)
         .build()
         .unwrap();
@@ -236,7 +236,7 @@ fn test_function_with_context() {
 #[test]
 fn test_function_no_body() {
     let fun = FunSpec::builder("add")
-        .returns(TypeName::primitive("Int"))
+        .returns(vec![TypeName::primitive("Int")])
         .add_param(ParameterSpec::new("x", TypeName::primitive("Int")).unwrap())
         .add_param(ParameterSpec::new("y", TypeName::primitive("Int")).unwrap())
         .build()
@@ -262,7 +262,7 @@ fn test_function_with_doc() {
     let fun = FunSpec::builder("greet")
         .doc("Greet the user by name.")
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
-        .returns(TypeName::primitive("IO ()"))
+        .returns(vec![TypeName::primitive("IO ()")])
         .body(body)
         .build()
         .unwrap();
@@ -290,7 +290,7 @@ fn test_multi_constraint_context() {
                 .with_bound(TypeName::primitive("Eq")),
         )
         .add_param(ParameterSpec::new("x", TypeName::primitive("a")).unwrap())
-        .returns(TypeName::primitive("String"))
+        .returns(vec![TypeName::primitive("String")])
         .body(body)
         .build()
         .unwrap();

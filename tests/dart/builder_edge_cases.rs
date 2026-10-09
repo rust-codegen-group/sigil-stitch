@@ -19,14 +19,14 @@ fn test_full_module() {
     let iface_spec = TypeSpec::builder("UserRepository", TypeKind::Interface)
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::primitive("User?"))
+                .returns(vec![TypeName::primitive("User?")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("findAll")
-                .returns(TypeName::primitive("List<User>"))
+                .returns(vec![TypeName::primitive("List<User>")])
                 .build()
                 .unwrap(),
         )
@@ -54,7 +54,7 @@ fn test_full_module() {
     .unwrap();
     let cls = cls.add_method(
         FunSpec::builder("findById")
-            .returns(TypeName::primitive("User?"))
+            .returns(vec![TypeName::primitive("User?")])
             .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
             .annotation(CodeBlock::of("@override", ()).unwrap())
             .body(find_body)
@@ -66,7 +66,7 @@ fn test_full_module() {
     let find_all_body = CodeBlock::of("return List.unmodifiable(_users);", ()).unwrap();
     let cls = cls.add_method(
         FunSpec::builder("findAll")
-            .returns(TypeName::primitive("List<User>"))
+            .returns(vec![TypeName::primitive("List<User>")])
             .annotation(CodeBlock::of("@override", ()).unwrap())
             .body(find_all_body)
             .build()
@@ -82,7 +82,7 @@ fn test_full_module() {
     )
     .unwrap();
     let parse_user = FunSpec::builder("parseUser")
-        .returns(TypeName::primitive("User"))
+        .returns(vec![TypeName::primitive("User")])
         .add_param(ParameterSpec::new("json", TypeName::primitive("String")).unwrap())
         .body(parse_body)
         .build()

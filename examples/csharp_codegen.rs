@@ -36,12 +36,12 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
         .add_method(
             FunSpec::builder("FindByIdAsync")
                 .is_async()
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("Task"),
                     vec![TypeArgument::Single(TypeName::optional(
                         TypeName::primitive("T"),
                     ))],
-                ))
+                )])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("int")).unwrap())
                 .build()
                 .unwrap(),
@@ -49,7 +49,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
         .add_method(
             FunSpec::builder("SaveAsync")
                 .is_async()
-                .returns(TypeName::primitive("Task"))
+                .returns(vec![TypeName::primitive("Task")])
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
                 .build()
                 .unwrap(),
@@ -89,7 +89,7 @@ fn builder_approach() -> String {
             FunSpec::builder("Validate")
                 .visibility(Visibility::Public)
                 .is_abstract()
-                .returns(TypeName::primitive("bool"))
+                .returns(vec![TypeName::primitive("bool")])
                 .build()
                 .unwrap(),
         )
@@ -97,7 +97,7 @@ fn builder_approach() -> String {
             FunSpec::builder("ToString")
                 .visibility(Visibility::Public)
                 .is_override()
-                .returns(TypeName::primitive("string"))
+                .returns(vec![TypeName::primitive("string")])
                 .body({
                     let mut b = CodeBlock::builder();
                     b.add_attribute("Obsolete(\"Use newMethod instead\")");
@@ -144,7 +144,7 @@ fn builder_approach() -> String {
             FunSpec::builder("Validate")
                 .visibility(Visibility::Public)
                 .is_override()
-                .returns(TypeName::primitive("bool"))
+                .returns(vec![TypeName::primitive("bool")])
                 .body(validate_body.build().unwrap())
                 .build()
                 .unwrap(),
@@ -200,7 +200,7 @@ fn macro_approach() -> String {
             FunSpec::builder("Validate")
                 .visibility(Visibility::Public)
                 .is_abstract()
-                .returns(TypeName::primitive("bool"))
+                .returns(vec![TypeName::primitive("bool")])
                 .build()
                 .unwrap(),
         )
@@ -208,7 +208,7 @@ fn macro_approach() -> String {
             FunSpec::builder("ToString")
                 .visibility(Visibility::Public)
                 .is_override()
-                .returns(TypeName::primitive("string"))
+                .returns(vec![TypeName::primitive("string")])
                 .body(
                     sigil_quote!(CSharp {
                         $attr("Obsolete(\"Use newMethod instead\")");
@@ -244,7 +244,7 @@ fn macro_approach() -> String {
             FunSpec::builder("Validate")
                 .visibility(Visibility::Public)
                 .is_override()
-                .returns(TypeName::primitive("bool"))
+                .returns(vec![TypeName::primitive("bool")])
                 .body(
                     sigil_quote!(CSharp {
                         return !string.IsNullOrEmpty(Name);

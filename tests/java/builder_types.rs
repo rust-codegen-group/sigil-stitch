@@ -55,7 +55,7 @@ fn test_class_with_methods() {
         .add_method(
             FunSpec::builder("findUser")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("User"))
+                .returns(vec![TypeName::primitive("User")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .body(find_body)
                 .build()
@@ -87,21 +87,21 @@ fn test_interface() {
         .doc("Generic data repository.")
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::primitive("T"))
+                .returns(vec![TypeName::primitive("T")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("save")
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
                 .build()
                 .unwrap(),
         )
         .add_method(
             FunSpec::builder("delete")
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("String")).unwrap())
                 .build()
                 .unwrap(),
@@ -129,7 +129,7 @@ fn test_abstract_class() {
         .add_method(
             FunSpec::builder("describe")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(desc_body)
                 .build()
                 .unwrap(),
@@ -138,7 +138,7 @@ fn test_abstract_class() {
             FunSpec::builder("area")
                 .visibility(Visibility::Public)
                 .is_abstract()
-                .returns(TypeName::primitive("double"))
+                .returns(vec![TypeName::primitive("double")])
                 .build()
                 .unwrap(),
         )
@@ -170,7 +170,7 @@ fn test_class_extends_implements() {
         .add_method(
             FunSpec::builder("isAdmin")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("boolean"))
+                .returns(vec![TypeName::primitive("boolean")])
                 .body(body)
                 .build()
                 .unwrap(),
@@ -247,7 +247,7 @@ fn test_enum_with_values() {
         .add_method(
             FunSpec::builder("getValue")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("String"))
+                .returns(vec![TypeName::primitive("String")])
                 .body(CodeBlock::of("return this.value;", ()).unwrap())
                 .build()
                 .unwrap(),
@@ -288,7 +288,7 @@ fn test_generic_class() {
         .add_method(
             FunSpec::builder("add")
                 .visibility(Visibility::Public)
-                .returns(TypeName::primitive("void"))
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("item", TypeName::primitive("T")).unwrap())
                 .body(add_body)
                 .build()

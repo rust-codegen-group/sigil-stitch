@@ -61,7 +61,7 @@ fn test_class_with_methods() {
                         .add_param(
                             ParameterSpec::new("user_id", TypeName::primitive("str")).unwrap(),
                         )
-                        .returns(TypeName::primitive("User"))
+                        .returns(vec![TypeName::primitive("User")])
                         .body(CodeBlock::of("return self._repo.find(user_id)", ()).unwrap())
                         .build()
                         .unwrap(),
@@ -70,7 +70,7 @@ fn test_class_with_methods() {
                     FunSpec::builder("save_user")
                         .add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap())
                         .add_param(ParameterSpec::new("user", TypeName::primitive("User")).unwrap())
-                        .returns(TypeName::primitive("None"))
+                        .returns(vec![TypeName::primitive("None")])
                         .body(CodeBlock::of("self._repo.save(user)", ()).unwrap())
                         .build()
                         .unwrap(),
@@ -98,7 +98,7 @@ fn test_class_with_bases() {
                 .add_method(
                     FunSpec::builder("is_admin")
                         .add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap())
-                        .returns(TypeName::primitive("bool"))
+                        .returns(vec![TypeName::primitive("bool")])
                         .body(CodeBlock::of("return True", ()).unwrap())
                         .build()
                         .unwrap(),
@@ -126,7 +126,7 @@ fn test_protocol() {
                     FunSpec::builder("find_by_id")
                         .add_param(ParameterSpec::new("self", TypeName::primitive("")).unwrap())
                         .add_param(ParameterSpec::new("id", TypeName::primitive("str")).unwrap())
-                        .returns(TypeName::primitive("Entity"))
+                        .returns(vec![TypeName::primitive("Entity")])
                         .build()
                         .unwrap(),
                 )
@@ -136,7 +136,7 @@ fn test_protocol() {
                         .add_param(
                             ParameterSpec::new("entity", TypeName::primitive("Entity")).unwrap(),
                         )
-                        .returns(TypeName::primitive("None"))
+                        .returns(vec![TypeName::primitive("None")])
                         .build()
                         .unwrap(),
                 )

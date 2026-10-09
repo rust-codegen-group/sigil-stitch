@@ -368,8 +368,8 @@ const RUST_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     // BoundedPolymorphism = trait bounds
     FunctionCapability::BoundedPolymorphism,
-    // ExplicitReturnType = function result type
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = function result type
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = generic type parameters
     FunctionCapability::ParametricPolymorphism,
@@ -424,6 +424,7 @@ impl CodeLang for Rust {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::rust_function_lowering::validate_returns(self, function)?;
         crate::lang::rust_function_lowering::validate_generic_parameters(self, function)
     }
     fn validate_resolved_imports(

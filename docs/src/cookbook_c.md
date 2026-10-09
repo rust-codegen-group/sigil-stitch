@@ -74,7 +74,7 @@ struct Config {
 let fun = FunSpec::builder("process")
     .add_param(ParameterSpec::new("data", TypeName::primitive("const char*")).unwrap())
     .add_param(ParameterSpec::new("len", TypeName::primitive("size_t")).unwrap())
-    .returns(TypeName::primitive("int"))
+    .returns(vec![TypeName::primitive("int")])
     .build()
     .unwrap();
 

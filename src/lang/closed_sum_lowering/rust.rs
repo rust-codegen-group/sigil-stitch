@@ -212,7 +212,7 @@ fn contains_parameter(ty: &crate::type_name::TypeName, name: &str) -> bool {
         }
         TypeName::Callable {
             parameters,
-            return_type,
+            returns,
         } => {
             parameters.iter().any(|parameter| match parameter {
                 crate::spec::where_spec::CallableParam::Single { type_name, .. } => {
@@ -224,7 +224,9 @@ fn contains_parameter(ty: &crate::type_name::TypeName, name: &str) -> bool {
                 crate::spec::where_spec::CallableParam::Expansion { pattern, .. } => {
                     contains_parameter(pattern, name)
                 }
-            }) || contains_parameter(return_type, name)
+            }) || returns
+                .iter()
+                .any(|return_type| contains_parameter(return_type, name))
         }
         TypeName::AssociatedType {
             base, qualifier, ..
@@ -381,7 +383,7 @@ mod occurrence_tests {
                 TypeName::parameter("F"),
                 vec![TypeArgument::Single(TypeName::callable(
                     vec![parameter],
-                    TypeName::parameter("R"),
+                    vec![TypeName::parameter("R")],
                 ))],
             );
             for name in ["T", "F", "R"] {

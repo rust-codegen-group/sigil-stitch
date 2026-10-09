@@ -20,7 +20,7 @@ fn test_full_module() {
         .add_method(
             FunSpec::builder("fetchData")
                 .is_async()
-                .returns(data.clone())
+                .returns(vec![data.clone()])
                 .add_param(ParameterSpec::new("from", TypeName::primitive("URL")).unwrap())
                 .build()
                 .unwrap(),
@@ -68,7 +68,7 @@ fn test_full_module() {
     let cls = cls.add_method(
         FunSpec::builder("fetchData")
             .is_async()
-            .returns(data)
+            .returns(vec![data])
             .add_param(ParameterSpec::new("from", TypeName::primitive("URL")).unwrap())
             .body(fetch_body)
             .build()
@@ -80,7 +80,7 @@ fn test_full_module() {
     // Standalone function using URL import.
     let make_body = CodeBlock::of("return %T(string: urlString)!", (url,)).unwrap();
     let make_url = FunSpec::builder("makeURL")
-        .returns(TypeName::primitive("URL"))
+        .returns(vec![TypeName::primitive("URL")])
         .add_param(ParameterSpec::new("urlString", TypeName::primitive("String")).unwrap())
         .body(make_body)
         .build()

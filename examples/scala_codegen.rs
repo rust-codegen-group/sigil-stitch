@@ -24,7 +24,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("findById")
-                .returns(TypeName::optional(TypeName::primitive("T")))
+                .returns(vec![TypeName::optional(TypeName::primitive("T"))])
                 .add_param(ParameterSpec::new("id", TypeName::primitive("Long")).unwrap())
                 .build()
                 .unwrap(),
@@ -32,7 +32,7 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
         .add_method(
             FunSpec::builder("save")
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
-                .returns(TypeName::primitive("Unit"))
+                .returns(vec![TypeName::primitive("Unit")])
                 .build()
                 .unwrap(),
         )
@@ -90,10 +90,10 @@ fn builder_approach() -> String {
             )
             .unwrap(),
         )
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("List"),
             vec![TypeArgument::Single(TypeName::primitive("T"))],
-        ))
+        )])
         .body(sort_body.build().unwrap())
         .build()
         .unwrap();
@@ -108,10 +108,10 @@ fn builder_approach() -> String {
 
     let collect_fn = FunSpec::builder("collectNames")
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("List"),
             vec![TypeArgument::Single(TypeName::primitive("String"))],
-        ))
+        )])
         .body(collect_body.build().unwrap())
         .build()
         .unwrap();
@@ -153,15 +153,15 @@ fn builder_approach() -> String {
                                 type_name: TypeName::primitive("A"),
                                 presence: CallableParamPresence::Required,
                             }],
-                            TypeName::primitive("B"),
+                            vec![TypeName::primitive("B")],
                         ),
                     )
                     .unwrap(),
                 )
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("F"),
                     vec![TypeArgument::Single(TypeName::primitive("B"))],
-                ))
+                )])
                 .build()
                 .unwrap(),
         )
@@ -213,10 +213,10 @@ fn macro_approach() -> String {
             )
             .unwrap(),
         )
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("List"),
             vec![TypeArgument::Single(TypeName::primitive("T"))],
-        ))
+        )])
         .body(sort_body)
         .build()
         .unwrap();
@@ -230,10 +230,10 @@ fn macro_approach() -> String {
 
     let collect_fn = FunSpec::builder("collectNames")
         .add_param(ParameterSpec::new("name", TypeName::primitive("String")).unwrap())
-        .returns(TypeName::application(
+        .returns(vec![TypeName::application(
             TypeName::primitive("List"),
             vec![TypeArgument::Single(TypeName::primitive("String"))],
-        ))
+        )])
         .body(collect_body)
         .build()
         .unwrap();
@@ -274,15 +274,15 @@ fn macro_approach() -> String {
                                 type_name: TypeName::primitive("A"),
                                 presence: CallableParamPresence::Required,
                             }],
-                            TypeName::primitive("B"),
+                            vec![TypeName::primitive("B")],
                         ),
                     )
                     .unwrap(),
                 )
-                .returns(TypeName::application(
+                .returns(vec![TypeName::application(
                     TypeName::primitive("F"),
                     vec![TypeArgument::Single(TypeName::primitive("B"))],
-                ))
+                )])
                 .build()
                 .unwrap(),
         )

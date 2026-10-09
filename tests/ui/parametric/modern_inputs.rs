@@ -14,12 +14,12 @@ fn main() {
             name: Some("value".into()),
             type_name: application,
             presence: CallableParamPresence::Required,
-        }],
+        }],vec![
         value,
-    );
+    ]);
     let _ = FunSpec::builder("work")
         .add_generic_param(binding.clone())
-        .returns(callable)
+        .returns(vec![callable])
         .build()
         .unwrap();
     let _ = TypeSpec::builder("Owner", TypeKind::Class)

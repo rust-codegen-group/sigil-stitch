@@ -10,7 +10,7 @@ use super::golden;
 #[test]
 fn test_const_method() {
     let fun = FunSpec::builder("size")
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .suffix("const")
         .suffix("noexcept")
         .build()
@@ -32,7 +32,7 @@ fn test_template_function() {
         .annotation(CodeBlock::of("template<typename T>", ()).unwrap())
         .add_param(ParameterSpec::new("a", TypeName::primitive("const T&")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("const T&")).unwrap())
-        .returns(TypeName::primitive("T"))
+        .returns(vec![TypeName::primitive("T")])
         .body(body)
         .build()
         .unwrap();
@@ -51,7 +51,7 @@ fn test_static_method() {
     let body = CodeBlock::of("return instance_count_;", ()).unwrap();
     let fun = FunSpec::builder("count")
         .is_static()
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .body(body)
         .build()
         .unwrap();
@@ -72,7 +72,7 @@ fn test_function_with_doc() {
         .doc("Return the larger of two values.")
         .add_param(ParameterSpec::new("a", TypeName::primitive("int")).unwrap())
         .add_param(ParameterSpec::new("b", TypeName::primitive("int")).unwrap())
-        .returns(TypeName::primitive("int"))
+        .returns(vec![TypeName::primitive("int")])
         .body(body)
         .build()
         .unwrap();

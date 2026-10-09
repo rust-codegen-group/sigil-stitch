@@ -428,8 +428,8 @@ const SCALA_TOP_LEVEL_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // DefaultParameters = default parameters
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = result annotation
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = result annotation
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     // ParametricPolymorphism = type parameters
     FunctionCapability::ParametricPolymorphism,
@@ -444,8 +444,8 @@ const SCALA_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // DefaultParameters = default parameters
     FunctionCapability::DefaultParameters,
-    // ExplicitReturnType = result annotation
-    FunctionCapability::ExplicitReturnType,
+    // ExplicitReturns = result annotation
+    FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
     // Override = override
     FunctionCapability::Override,
@@ -481,6 +481,7 @@ impl CodeLang for Scala {
         &self,
         function: crate::lang::FunctionIntent<'_>,
     ) -> Result<(), SigilStitchError> {
+        crate::lang::scala_function_lowering::validate_returns(self, function)?;
         for parameter in function.generic_params() {
             validate_generic_domain(&parameter)?;
         }
