@@ -433,6 +433,8 @@ pub enum FunctionCapability {
     Attributes,
     /// Explicit return information, including an empty no-payload sequence.
     ExplicitReturns,
+    /// Declared exception types in a function signature.
+    DeclaredExceptions,
     /// Type annotations on function parameters.
     TypedParameters,
     /// Asynchronous effect.
@@ -592,7 +594,8 @@ impl<T> CapabilityProfiles<'_, T> {
 /// Built-in languages construct a fail-closed matrix with [`Self::strict`].
 /// The [`CodeLang`](crate::lang::CodeLang) default uses [`Self::permissive`]
 /// so adapters written for sigil-stitch 0.6.8 continue to compile and retain
-/// their previous behavior.
+/// their previous behavior. New capabilities that require an explicit opt-in
+/// may still be disabled by the permissive default.
 #[derive(Debug, Clone, Copy)]
 pub struct LanguageCapabilities<'a> {
     types: CapabilityProfiles<'a, TypeKindCapabilityProfile<'a>>,
@@ -745,7 +748,8 @@ impl<'a> LanguageCapabilities<'a> {
         form: FunctionForm,
         capability: FunctionCapability,
     ) -> bool {
-        self.functions.resolve(true, |profiles| {
+        let permissive_answer = capability != FunctionCapability::DeclaredExceptions;
+        self.functions.resolve(permissive_answer, |profiles| {
             profiles
                 .iter()
                 .find(|profile| profile.context() == context && profile.form() == form)
@@ -954,6 +958,11 @@ mod tests {
             FunctionForm::Function,
             FunctionCapability::AsyncEffect
         ));
+        assert!(!capabilities.supports_function_capability(
+            FunctionContext::ReceiverMethod,
+            FunctionForm::Function,
+            FunctionCapability::DeclaredExceptions
+        ));
         assert!(capabilities.function_validation_is_permissive());
         assert!(capabilities.supports_variant_owner(TypeKind::Enum));
         assert!(
@@ -1083,5 +1092,20 @@ mod tests {
             capabilities.required_property_capabilities(property_context),
             &[PropertyCapability::ReadAccessor]
         );
+    }
+
+    #[test]
+    fn permissive_function_families_can_explicitly_opt_into_declared_exceptions() {
+        const FUNCTIONS: &[FunctionCapabilityProfile] = &[FunctionCapabilityProfile::new(
+            FunctionContext::TopLevel,
+            FunctionForm::Function,
+            &[FunctionCapability::DeclaredExceptions],
+        )];
+        let capabilities = LanguageCapabilities::permissive().with_functions(FUNCTIONS);
+        assert!(capabilities.supports_function_capability(
+            FunctionContext::TopLevel,
+            FunctionForm::Function,
+            FunctionCapability::DeclaredExceptions
+        ));
     }
 }

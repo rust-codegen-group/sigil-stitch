@@ -44,9 +44,10 @@ pub enum FunctionSignatureStyle {
 
 /// A function or method specification.
 ///
-/// `FunSpec` models a function declaration with parameters, ordered return slots, body,
-/// modifiers (visibility, async, static, abstract, constructor), type parameters,
-/// annotations, and doc comments. It emits a language-appropriate `CodeBlock` via
+/// `FunSpec` models a function declaration with parameters, ordered return slots,
+/// declared exception types, body, modifiers (visibility, async, static, abstract,
+/// constructor), type parameters, annotations, and doc comments. It emits a
+/// language-appropriate `CodeBlock` via
 /// [`FunSpec::emit()`].
 ///
 /// Use [`FunSpec::builder()`] to construct. Add to a [`FileSpec`](crate::spec::file_spec::FileSpec)
@@ -82,6 +83,9 @@ pub struct FunSpec {
     pub(crate) receiver: Option<ParameterSpec>,
     /// Suffixes appended after the parameter list (e.g., C++: `const`, `override`, `= 0`).
     pub(crate) suffixes: Vec<String>,
+    /// Exception types declared by the target language's function grammar.
+    #[serde(default)]
+    pub(crate) throws: Vec<TypeName>,
     /// Constructor delegation call (e.g., `super(arg1, arg2)` or `this(arg1)`).
     ///
     /// For body-style languages (TS, Java, Swift): emitted as the first
@@ -191,6 +195,11 @@ impl<'a> FunctionIntent<'a> {
         &self.spec.suffixes
     }
 
+    /// Declared exception types, in source order.
+    pub fn throws(self) -> &'a [TypeName] {
+        &self.spec.throws
+    }
+
     /// Constructor delegation expression, when present.
     pub fn delegation(self) -> Option<&'a CodeBlock> {
         self.spec.delegation.as_ref()
@@ -260,6 +269,7 @@ impl FunSpec {
             annotation_specs: Vec::new(),
             receiver: None,
             suffixes: Vec::new(),
+            throws: Vec::new(),
             delegation: None,
             where_constraints: Vec::new(),
         }
@@ -394,6 +404,15 @@ impl FunSpec {
             if let GenericParamEntry::Modern(parameter) = entry {
                 parameter.validate()?;
             }
+        }
+        for (index, exception) in self.throws.iter().enumerate() {
+            crate::type_name_lowering::validation::validate_type_name(
+                exception,
+                &crate::type_name_lowering::DiagnosticPath::root(&format!(
+                    "function.{}.throws[{index}]",
+                    self.name
+                )),
+            )?;
         }
         let capabilities = lang.capabilities();
         let permissive_validation = capabilities.function_validation_is_permissive();
@@ -674,6 +693,10 @@ impl FunSpec {
         );
         request(FunctionCapability::ExplicitReturns, self.returns.is_some());
         request(
+            FunctionCapability::DeclaredExceptions,
+            !self.throws.is_empty(),
+        );
+        request(
             FunctionCapability::TypedParameters,
             self.params.iter().any(|param| !param.param_type.is_empty())
                 || self
@@ -903,6 +926,7 @@ pub struct FunSpecBuilder {
     annotation_specs: Vec<AnnotationSpec>,
     receiver: Option<ParameterSpec>,
     suffixes: Vec<String>,
+    throws: Vec<TypeName>,
     delegation: Option<CodeBlock>,
     where_constraints: Vec<WhereConstraint>,
 }
@@ -1022,6 +1046,15 @@ impl FunSpecBuilder {
         self
     }
 
+    /// Replace the complete ordered list of declared exception types.
+    ///
+    /// An empty vector is equivalent to omitting this setter. The declaration
+    /// does not promise that the function is non-throwing.
+    pub fn throws(mut self, throws: Vec<TypeName>) -> Self {
+        self.throws = throws;
+        self
+    }
+
     /// Set a constructor delegation call (e.g., `super(arg1, arg2)` or `this(arg1)`).
     ///
     /// For body-style languages (TS, JS, Java, Swift), this is emitted as
@@ -1082,6 +1115,7 @@ impl FunSpecBuilder {
             annotation_specs: self.annotation_specs,
             receiver: self.receiver,
             suffixes: self.suffixes,
+            throws: self.throws,
             delegation: self.delegation,
             where_constraints: self.where_constraints,
         })

@@ -207,6 +207,31 @@ Capability checks use presence: an empty sequence requests `ExplicitReturns`
 and satisfies profiles that require it. Constructor profiles still decide
 whether explicit returns are allowed.
 
+`.throws(Vec<TypeName>)` replaces the complete ordered list of declared
+exception types. An omitted or empty list emits no exception clause and does
+not promise that the function is non-throwing. This capability is currently
+implemented by Java member methods, interface methods, and constructors; the
+other strict built-in adapters reject a non-empty list. Java lowers each entry
+as a structured `TypeName`, so imports and aliases follow the normal type
+pipeline, while `javac` remains responsible for Java's `throws` legality and
+checked-exception rules. Opaque `.suffix()` text remains after the structured
+clause and is not parsed or merged.
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let fun = FunSpec::builder("read")
+    .returns(vec![TypeName::primitive("void")])
+    .throws(vec![TypeName::importable_type("java.io", "IOException")])
+    .body(CodeBlock::of("return;", ()).unwrap())
+    .build()
+    .unwrap();
+# let _ = fun;
+// Java member lowering: void read() throws IOException { ... }
+# }
+```
+
 ```rust
 # extern crate sigil_stitch;
 # use sigil_stitch::prelude::*;

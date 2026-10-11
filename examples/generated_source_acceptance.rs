@@ -317,6 +317,55 @@ fn scala(negative: bool) -> Result<String, SigilStitchError> {
     Ok(output)
 }
 
+fn java(variant: Option<&str>) -> Result<String, SigilStitchError> {
+    let exception = TypeName::importable_type("java.io", "IOException");
+    let read_body = if variant == Some("illegal") {
+        "return;"
+    } else {
+        "throw new IOException();"
+    };
+    let mut read = FunSpec::builder("read")
+        .visibility(Visibility::Public)
+        .is_static()
+        .returns(vec![TypeName::primitive("void")])
+        .throws(if variant == Some("illegal") {
+            vec![TypeName::array(exception.clone())]
+        } else {
+            vec![exception.clone()]
+        })
+        .body(CodeBlock::of(read_body, ())?);
+    if variant == Some("illegal") {
+        read = read.suffix("/* acceptance-failure */");
+    }
+    let main_body = match variant {
+        Some("missing") => "read(); // acceptance-failure",
+        Some("illegal") => "return;",
+        None => "try { read(); } catch (IOException error) { }",
+        Some(_) => unreachable!(),
+    };
+    let main = FunSpec::builder("main")
+        .visibility(Visibility::Public)
+        .is_static()
+        .returns(vec![TypeName::primitive("void")])
+        .body(CodeBlock::of(main_body, ())?);
+    let output = FileSpec::builder_with(
+        "ExceptionFixture.java",
+        sigil_stitch::lang::java::Java::new(),
+    )
+    .add_type(
+        TypeSpec::builder("ExceptionFixture", TypeKind::Class)
+            .add_method(read.build()?)
+            .add_method(main.build()?)
+            .build()?,
+    )
+    .build()?
+    .render(120)?;
+    if variant != Some("illegal") {
+        assert!(output.contains("throws IOException"), "{output}");
+    }
+    Ok(output)
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let directory = std::env::args_os()
         .nth(1)
@@ -335,6 +384,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         ("typescript_wrong_type.ts", typescript(Some("type"))?),
         ("scala_positive.scala", scala(false)?),
         ("scala_wrong_kind.scala", scala(true)?),
+        ("java_positive.java", java(None)?),
+        ("java_missing.java", java(Some("missing"))?),
+        ("java_illegal_exception.java", java(Some("illegal"))?),
     ] {
         std::fs::write(directory.join(name), source)?;
     }

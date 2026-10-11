@@ -386,6 +386,8 @@ const JAVA_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     // ExplicitReturns = method result type
     FunctionCapability::ExplicitReturns,
+    // DeclaredExceptions = checked exception clause
+    FunctionCapability::DeclaredExceptions,
     // TypedParameters = parameter declarations
     FunctionCapability::TypedParameters,
     // Override = @Override
@@ -400,6 +402,7 @@ const JAVA_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     FunctionCapability::BoundedPolymorphism,
     FunctionCapability::ExplicitReturns,
+    FunctionCapability::DeclaredExceptions,
     FunctionCapability::TypedParameters,
     FunctionCapability::Override,
     FunctionCapability::ParametricPolymorphism,
@@ -409,6 +412,7 @@ const JAVA_CONSTRUCTOR_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::Attributes,
     FunctionCapability::BoundedPolymorphism,
     FunctionCapability::ConstructorDelegation,
+    FunctionCapability::DeclaredExceptions,
     FunctionCapability::ParametricPolymorphism,
     FunctionCapability::TypedParameters,
 ];

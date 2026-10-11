@@ -83,8 +83,11 @@ target and is not a portable cross-language program.
   and returns a structured `CodeBlock`. Every adapter that omits this operation
   fails with `MissingFunctionLowerer`, including permissive adapters. The
   borrowed `returns()` view preserves unspecified, empty, and ordered typed
-  slots. Language validation owns cardinality; a tuple is one slot, never a
-  substitute for several returns. Fields follow the same pattern at
+  slots, while `throws()` exposes the ordered declared exception types. The
+  latter is currently supported only by Java's member, interface-member, and
+  constructor profiles; an empty list is intentionally inert on every target.
+  Language validation owns cardinality; a tuple is one slot, never a substitute
+  for several returns. Fields follow the same pattern at
   sequence granularity: `validate_fields()` receives `FieldSequenceIntent`,
   `collect_field_validation_errors()` preserves independent sibling failures,
   and `lower_fields()` receives `ValidatedFields`. Properties use

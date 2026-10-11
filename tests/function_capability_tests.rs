@@ -27,6 +27,7 @@ use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
+use sigil_stitch::spec::where_spec::TypeArgument;
 #[allow(
     deprecated,
     reason = "exercise released generic and callable compatibility inputs"
@@ -142,6 +143,59 @@ fn unsupported_function_context_has_its_own_error() {
             context: FunctionContext::TopLevel,
             ..
         }
+    ));
+}
+
+#[test]
+fn declared_exceptions_are_rejected_by_strict_languages_without_the_capability() {
+    let function = FunSpec::builder("read")
+        .returns(vec![])
+        .throws(vec![TypeName::primitive("IOException")])
+        .body(CodeBlock::of("return;", ()).unwrap())
+        .build()
+        .unwrap();
+
+    assert!(matches!(
+        function.validate(&TypeScript::new(), DeclarationContext::TopLevel),
+        Err(SigilStitchError::UnsupportedFunctionCapabilities {
+            capabilities,
+            ..
+        }) if capabilities == vec![FunctionCapability::DeclaredExceptions]
+    ));
+}
+
+#[test]
+fn declared_exception_types_keep_indexed_intrinsic_diagnostics() {
+    let function = FunSpec::builder("read")
+        .returns(vec![])
+        .throws(vec![TypeName::application(
+            TypeName::primitive(""),
+            vec![TypeArgument::Single(TypeName::primitive("IOException"))],
+        )])
+        .body(CodeBlock::of("return;", ()).unwrap())
+        .build()
+        .unwrap();
+
+    assert!(matches!(
+        function.validate(&TypeScript::new(), DeclarationContext::TopLevel),
+        Err(SigilStitchError::InvalidTypeName { context, .. })
+            if context.contains("function.read.throws[0].application.base")
+    ));
+}
+
+#[test]
+fn permissive_adapters_must_opt_into_declared_exceptions() {
+    let function = FunSpec::builder("read")
+        .throws(vec![TypeName::primitive("IOException")])
+        .build()
+        .unwrap();
+
+    assert!(matches!(
+        function.validate(&LegacyVirtualLang, DeclarationContext::TopLevel),
+        Err(SigilStitchError::UnsupportedFunctionCapabilities {
+            capabilities,
+            ..
+        }) if capabilities == vec![FunctionCapability::DeclaredExceptions]
     ));
 }
 
