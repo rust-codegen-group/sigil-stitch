@@ -35,7 +35,6 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
         .add_generic_param(GenericParamSpec::single("T").unwrap())
         .add_method(
             FunSpec::builder("FindByIdAsync")
-                .is_async()
                 .returns(vec![TypeName::application(
                     TypeName::primitive("Task"),
                     vec![TypeArgument::Single(TypeName::optional(
@@ -48,7 +47,6 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
         )
         .add_method(
             FunSpec::builder("SaveAsync")
-                .is_async()
                 .returns(vec![TypeName::primitive("Task")])
                 .add_param(ParameterSpec::new("entity", TypeName::primitive("T")).unwrap())
                 .build()
@@ -153,6 +151,7 @@ fn builder_approach() -> String {
             FunSpec::builder("Log")
                 .visibility(Visibility::Public)
                 .is_static()
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("message", TypeName::primitive("string")).unwrap())
                 .body(log_body.build().unwrap())
                 .build()
@@ -258,6 +257,7 @@ fn macro_approach() -> String {
             FunSpec::builder("Log")
                 .visibility(Visibility::Public)
                 .is_static()
+                .returns(vec![TypeName::primitive("void")])
                 .add_param(ParameterSpec::new("message", TypeName::primitive("string")).unwrap())
                 .body(
                     sigil_quote!(CSharp {
