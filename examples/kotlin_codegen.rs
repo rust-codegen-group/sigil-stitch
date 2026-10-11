@@ -61,13 +61,22 @@ fn build_shared_types() -> (TypeSpec, TypeSpec) {
     let task = TypeSpec::builder("Task", TypeKind::Struct)
         .doc("A task entity.")
         .add_primary_constructor_param(
-            ParameterSpec::new("id", TypeName::primitive("String")).unwrap(),
+            ParameterSpec::builder("id", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
         )
         .add_primary_constructor_param(
-            ParameterSpec::new("name", TypeName::primitive("String")).unwrap(),
+            ParameterSpec::builder("name", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
         )
         .add_primary_constructor_param(
-            ParameterSpec::new("status", TypeName::primitive("Status")).unwrap(),
+            ParameterSpec::builder("status", TypeName::primitive("Status"))
+                .is_property()
+                .build()
+                .unwrap(),
         )
         .add_field(
             FieldSpec::builder("done", TypeName::primitive("Boolean"))

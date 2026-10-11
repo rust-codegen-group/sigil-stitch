@@ -132,7 +132,6 @@ fn builder_approach() -> String {
                 .returns(vec![TypeName::primitive("bool")])
                 .body({
                     let mut vb = CodeBlock::builder();
-                    vb.add_attribute("override");
                     vb.add("return id.isNotEmpty && name.isNotEmpty", ());
                     vb.build().unwrap()
                 })
@@ -253,7 +252,6 @@ fn macro_approach() -> String {
     .unwrap();
 
     let validate_body = sigil_quote!(Dart {
-        $attr("override");
         return id.isNotEmpty && name.isNotEmpty
     })
     .unwrap();

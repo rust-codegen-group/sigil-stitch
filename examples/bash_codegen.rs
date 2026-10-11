@@ -22,7 +22,6 @@ fn main() {
 }
 
 fn builder_approach() -> String {
-    let utils = TypeName::importable("./utils.sh", "");
     let comment_label = "INFO";
     let comment_reason = "Deploy to target environment";
     let comment_note = "check env var";
@@ -82,11 +81,9 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
-    let trigger = CodeBlock::of("# %T", (utils,)).unwrap();
-
     FileSpec::builder_with("deploy.bash", Bash::new())
         .header(CodeBlock::of("#!/usr/bin/env bash\nset -euo pipefail", ()).unwrap())
-        .add_code(trigger)
+        .add_import(ImportSpec::side_effect("./utils.sh"))
         .add_function(log_fn)
         .add_function(deploy_fn)
         .build()
@@ -96,7 +93,6 @@ fn builder_approach() -> String {
 }
 
 fn macro_approach() -> String {
-    let utils = TypeName::importable("./utils.sh", "");
     let comment_label = "INFO";
     let comment_reason = "Deploy to target environment";
     let comment_note = "check env var";
@@ -144,11 +140,9 @@ fn macro_approach() -> String {
         .build()
         .unwrap();
 
-    let trigger = CodeBlock::of("# %T", (utils,)).unwrap();
-
     FileSpec::builder_with("deploy.bash", Bash::new())
         .header(CodeBlock::of("#!/usr/bin/env bash\nset -euo pipefail", ()).unwrap())
-        .add_code(trigger)
+        .add_import(ImportSpec::side_effect("./utils.sh"))
         .add_function(log_fn)
         .add_function(deploy_fn)
         .build()

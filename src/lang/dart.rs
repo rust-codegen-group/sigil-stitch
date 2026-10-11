@@ -339,6 +339,8 @@ const DART_MEMBER_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     // ExplicitReturns = method result type
     FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
+    // Override = @override annotation
+    FunctionCapability::Override,
     // ParametricPolymorphism = generic type parameters
     FunctionCapability::ParametricPolymorphism,
     // StaticMethod = static
@@ -351,6 +353,7 @@ const DART_INTERFACE_FUNCTION_CAPABILITIES: &[FunctionCapability] = &[
     FunctionCapability::BoundedPolymorphism,
     FunctionCapability::ExplicitReturns,
     FunctionCapability::TypedParameters,
+    FunctionCapability::Override,
     FunctionCapability::ParametricPolymorphism,
     FunctionCapability::StaticMethod,
 ];

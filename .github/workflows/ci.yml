@@ -84,10 +84,20 @@ jobs:
       - uses: taiki-e/install-action@just
       - run: just semver-check
 
+  examples:
+    name: Examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@just
+      - run: just example-smoke
+
   basics:
     name: Basics
     runs-on: ubuntu-latest
-    needs: [fmt, clippy, doc, semver]
+    needs: [fmt, clippy, doc, semver, examples]
     steps:
       - run: exit 0
 

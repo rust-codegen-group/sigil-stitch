@@ -156,6 +156,10 @@ fn emit_preamble(
         block.add("%L", lang.render_doc_comment(&lines));
         block.add_line();
     }
+    if function.modifiers().is_override {
+        block.add("@override", ());
+        block.add_line();
+    }
     for annotation in function.annotation_specs() {
         block.add_code(annotation.emit_with_syntax("@", "")?);
         block.add_line();

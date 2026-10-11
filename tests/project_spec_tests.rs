@@ -172,11 +172,11 @@ fn project_validation_aggregates_complete_file_errors_in_project_order() {
     let mut remaining_display = display.as_str();
     for expected in [
         "ProjectSpec has 2 invalid file(s):",
-        "FileSpecValidation { filename: \"first.ts\", error_count: 2",
-        "message: \"first-a\"",
-        "message: \"first-b\"",
-        "FileSpecValidation { filename: \"third.ts\", error_count: 1",
-        "message: \"third-a\"",
+        "FileSpec \"first.ts\" has 2 validation error(s):",
+        "1. validating first: first-a",
+        "2. validating first: first-b",
+        "FileSpec \"third.ts\" has 1 validation error(s):",
+        "1. validating third: third-a",
     ] {
         let Some((_, remaining)) = remaining_display.split_once(expected) else {
             panic!("expected {expected:?} in order within {display:?}");

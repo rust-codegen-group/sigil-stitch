@@ -83,8 +83,6 @@ fn builder_approach() -> String {
     map_pair_body.add("%T f [x; x]", (list_map,));
 
     let map_pair_fn = FunSpec::builder("map_pair")
-        .add_generic_param(GenericParamSpec::single("'a").unwrap())
-        .add_generic_param(GenericParamSpec::single("'b").unwrap())
         .add_param(
             ParameterSpec::new(
                 "f",
@@ -166,8 +164,6 @@ fn macro_approach() -> String {
     .unwrap();
 
     let map_pair_fn = FunSpec::builder("map_pair")
-        .add_generic_param(GenericParamSpec::single("'a").unwrap())
-        .add_generic_param(GenericParamSpec::single("'b").unwrap())
         .add_param(
             ParameterSpec::new(
                 "f",

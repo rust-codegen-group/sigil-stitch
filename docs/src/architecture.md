@@ -511,6 +511,11 @@ global uniqueness before the selected language validates identifier grammar,
 reserved words, alias support, and import form. Any failure aborts the file
 before an import header or body is returned.
 
+Resolvers create assignments with `ImportAliasAssignment::new` and inspect the
+validated claim and binding through `claim_id()` and `local_name()`; the
+assignment fields are intentionally not a mutation surface for downstream
+resolvers.
+
 Ordinary `FileSpec` rendering uses a deterministic default resolver. Encounter
 order is only that resolver's compatibility tie-break: it may give the natural
 name to one peer and module-derived aliases to the others, but this does not

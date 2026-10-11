@@ -20,13 +20,10 @@ fn main() {
 }
 
 fn build_shared_types() -> (TypeSpec,) {
-    let enum_import = TypeName::importable("enum", "Enum");
-
     // --- Enum ---
     let level_enum = TypeSpec::builder("LogLevel", TypeKind::Enum)
         .extends(TypeName::primitive("str"))
         .extends(TypeName::raw("Enum"))
-        .annotation(CodeBlock::of("# %T", (enum_import,)).unwrap())
         .add_variant(
             EnumVariantSpec::builder("DEBUG")
                 .discriminant(CodeBlock::of("%S", (StringLitArg("debug".into()),)).unwrap())
@@ -173,6 +170,7 @@ fn builder_approach() -> String {
     join_body.add("%T", (date,));
 
     FileSpec::builder_with("config.py", Python::new())
+        .add_import(ImportSpec::named("enum", "Enum"))
         .add_type(level_enum)
         .add_type(config_with_methods)
         .add_function(greet)
@@ -314,6 +312,7 @@ fn macro_approach() -> String {
     .unwrap();
 
     FileSpec::builder_with("config.py", Python::new())
+        .add_import(ImportSpec::named("enum", "Enum"))
         .add_type(level_enum)
         .add_type(config_with_methods)
         .add_function(greet)

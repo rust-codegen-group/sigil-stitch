@@ -759,6 +759,7 @@ fn dart_matrix() {
         FunctionCapability::BoundedPolymorphism,
         FunctionCapability::ExplicitReturns,
         FunctionCapability::TypedParameters,
+        FunctionCapability::Override,
         FunctionCapability::ParametricPolymorphism,
         FunctionCapability::StaticMethod,
     ];

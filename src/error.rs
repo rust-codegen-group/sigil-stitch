@@ -9,6 +9,14 @@ use crate::lang::capability::{
 };
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 
+fn format_validation_errors(errors: &[SigilStitchError]) -> String {
+    errors
+        .iter()
+        .enumerate()
+        .map(|(index, error)| format!("\n  {}. {error}", index + 1))
+        .collect()
+}
+
 /// Semantic source of a target-emitted type member name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -425,7 +433,10 @@ pub enum SigilStitchError {
     /// Validation is collected rather than fail-fast: every invalid
     /// [`TypeSpec`](crate::spec::type_spec::TypeSpec) is checked and all
     /// resulting errors are returned together.
-    #[snafu(display("FileSpec {filename:?} has {error_count} validation error(s): {errors:?}"))]
+    #[snafu(display(
+        "FileSpec {filename:?} has {error_count} validation error(s):{details}",
+        details = format_validation_errors(errors)
+    ))]
     FileSpecValidation {
         /// The filename of the invalid FileSpec.
         filename: String,
@@ -439,7 +450,10 @@ pub enum SigilStitchError {
     ///
     /// Each entry is the complete validation failure returned by one
     /// [`FileSpec`](crate::spec::file_spec::FileSpec), in project file order.
-    #[snafu(display("ProjectSpec has {invalid_file_count} invalid file(s): {errors:?}"))]
+    #[snafu(display(
+        "ProjectSpec has {invalid_file_count} invalid file(s):{details}",
+        details = format_validation_errors(errors)
+    ))]
     ProjectSpecValidation {
         /// The number of invalid files. Equal to `errors.len()`.
         invalid_file_count: usize,

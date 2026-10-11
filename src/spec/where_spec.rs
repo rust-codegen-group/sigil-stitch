@@ -61,6 +61,7 @@ pub enum TypeArgument {
 
 /// Whether one callable slot is required or may be omitted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum CallableParamPresence {
     /// The caller must supply the slot.
     Required,

@@ -273,18 +273,18 @@ impl crate::import::ImportAliasConflictResolver for HaskellImportAliasResolver {
             .chain(
                 assignments
                     .iter()
-                    .map(|assignment| assignment.local_name.clone()),
+                    .map(|assignment| assignment.local_name().to_string()),
             )
             .collect();
         for (index, assignment) in assignments.iter_mut().enumerate() {
-            let claim = claims.get(&assignment.claim_id).ok_or_else(|| {
+            let claim = claims.get(&assignment.claim_id()).ok_or_else(|| {
                 crate::import::ImportAliasRejection::new(
                     "default resolver returned an unknown import claim",
                 )
             })?;
             if claim.request_kind() == ImportAliasRequestKind::Exact
-                || assignment.local_name == claim.name()
-                || is_valid_import_alias(&assignment.local_name)
+                || assignment.local_name() == claim.name()
+                || is_valid_import_alias(assignment.local_name())
             {
                 continue;
             }
@@ -293,7 +293,7 @@ impl crate::import::ImportAliasConflictResolver for HaskellImportAliasResolver {
                 alias.push('_');
             }
             reserved.insert(alias.clone());
-            assignment.local_name = alias;
+            *assignment = crate::import::ImportAliasAssignment::new(assignment.claim_id(), alias);
         }
         Ok(assignments)
     }
@@ -925,7 +925,13 @@ impl CodeLang for Haskell {
         let mut constraints = Vec::new();
         for type_param in type_params {
             for bound in &type_param.bounds {
-                let bound = bound.render(80, &resolve).unwrap_or_default();
+                // This deprecated hook cannot propagate a rendering error because its
+                // released signature returns `String`. Fail explicitly instead of
+                // silently dropping an invalid bound; built-in lowering uses the
+                // fallible `emit_type_context` path below.
+                let bound = bound.render(80, &resolve).unwrap_or_else(|error| {
+                    panic!("legacy Haskell type-context bound must render: {error}")
+                });
                 constraints.push(format!("{bound} {}", type_param.name));
             }
         }

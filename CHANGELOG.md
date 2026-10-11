@@ -21,6 +21,14 @@
 - Complete-peer import conflict resolution through
   `ImportGroup::try_resolve()`, `ImportGroup::try_resolve_with()`, and borrowed
   per-render resolver entry points on `FileSpec` and `ProjectSpec`.
+- Semantic declaration families for closed sums (`ClosedSumSpec`), callable and
+  application types, ordered function returns, generic parameter domains, and
+  declared function exceptions, with language capability validation and
+  strict-lowering diagnostics.
+- Structured `BlockIntent` and typed `sigil_quote!` lowering for language-owned
+  declaration and renderer paths.
+- A CI example smoke recipe that executes every ordinary example; compiler
+  acceptance fixtures remain an explicit, toolchain-dependent local check.
 
 ### Changed
 
@@ -67,6 +75,20 @@
   safe text, global uniqueness, or target-local alias rules now fail before any
   generated source is returned. Upgrade the 0.7 core, language adapters, and
   callers together; partial migration is unsupported.
+- Renderer indentation uses explicit structural scopes and Unicode display
+  width, and all declaration `emit_*` hooks lower through structured blocks.
+- Deprecated direct `TypeName::render` / `to_doc` facades and the old
+  `FunSpec` Serde `return_type` shape are no longer part of the modern public
+  lowering path; use language-owned lowering and the ordered `returns` field.
+- Built-in examples now use valid target-language declaration contexts,
+  structured side-effect imports, Kotlin property constructor parameters, and
+  language-native generic/override forms. Dart override modifiers lower to
+  `@override`.
+- `FileSpecValidation` and `ProjectSpecValidation` display nested diagnostics
+  with stable, readable numbered messages instead of Debug representations.
+- `CallableParamPresence` and `AnnotationNameRef` are non-exhaustive, and
+  `ImportAliasAssignment` is now a non-exhaustive opaque assignment with
+  `claim_id()` and `local_name()` accessors rather than public mutable fields.
 
 ### Deprecated
 

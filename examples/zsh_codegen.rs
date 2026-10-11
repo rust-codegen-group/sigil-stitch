@@ -59,7 +59,6 @@ fn builder_approach() -> String {
     b.add_line();
 
     // Check with [[ ... ]] conditional
-    b.add("%<", ());
     b.add("if [[ -z \"$ENV\" ]]; then", ());
     b.add_line();
     b.add("%>", ());
@@ -70,7 +69,6 @@ fn builder_approach() -> String {
     b.add("%<", ());
     b.add("fi", ());
     b.add_line();
-    b.add("%>", ());
     b.add_line();
 
     // Loop over array
@@ -82,7 +80,6 @@ fn builder_approach() -> String {
     b.add("%<", ());
     b.add("done", ());
     b.add_line();
-    b.add("%>", ());
     b.add_line();
 
     // Parameter expansion with defaults
