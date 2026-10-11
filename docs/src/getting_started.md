@@ -12,10 +12,10 @@ Or add it directly to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sigil-stitch = "0.6"
+sigil-stitch = "0.7"
 ```
 
-sigil-stitch requires Rust edition 2024 and MSRV 1.88.0. Runtime dependencies (`pretty`, `serde` with `derive`, and `snafu`) are pulled in automatically. No feature flags are needed -- all spec types implement `serde::Serialize` and `serde::Deserialize` out of the box.
+sigil-stitch requires Rust edition 2024 and MSRV 1.88.0. Runtime dependencies (`pretty`, `serde` with `derive`, and `snafu`) are pulled in automatically. No feature flags are needed. First-class serializable spec and source values support same-version round-trips with a caller-provided Serde format; `FileSpec::add_spec()` extension members are not serializable, and a deserialized `FileSpec`, or each file inside a deserialized `ProjectSpec`, needs a language configured again before rendering. These representations are not a versioned wire protocol.
 
 ## Your First CodeBlock
 
@@ -87,7 +87,7 @@ The macro is a good fit when you're writing a block of target-language code with
 ## Building Structured Declarations
 
 For functions, types, and other declarations, use the spec layer. Specs carry
-declaration intent such as name, return type, visibility, and modifiers. The
+declaration intent such as name, ordered return slots, visibility, and modifiers. The
 selected language validates that intent and lowers it to a structured
 `CodeBlock`.
 
@@ -191,7 +191,7 @@ Now that you've seen the basics:
 - [Format Specifiers](format_specifiers.md) explains every `%` specifier in depth.
 - [TypeName](type_name.md) covers semantic type references, import tracking, and language-owned lowering.
 - [Building Functions & Fields](functions_and_fields.md) covers ParameterSpec, FieldSpec, and FunSpec.
-- [Building Types & Enums](types_and_enums.md) covers TypeSpec, PropertySpec, AnnotationSpec, and EnumVariantSpec.
+- [Building Types & Enums](types_and_enums.md) covers TypeSpec, ClosedSumSpec, ClosedSumCaseSpec, PropertySpec, AnnotationSpec, and EnumVariantSpec.
 - [Files & Projects](files_and_projects.md) covers ImportSpec, FileSpec, and ProjectSpec.
 - [sigil_quote! Macro](sigil_quote.md) has the full guide for the macro syntax.
 - [Code Templates](code_templates.md) covers reusable named-parameter templates.

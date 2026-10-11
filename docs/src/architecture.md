@@ -420,6 +420,7 @@ exception because a pure virtual member makes the class abstract structurally.
 
 Declaration specs are validated and converted to `CodeBlock`s:
 - `FileMember::Type(TypeSpec)` calls `type_spec.emit(&lang)` -> `Vec<CodeBlock>`
+- `FileSpecBuilder::add_closed_sum(ClosedSumSpec)` stores a first-class closed-sum member and calls `closed_sum_spec.emit(&lang)` -> `Vec<CodeBlock>`
 - `FileMember::Fun(FunSpec)` calls `fun_spec.emit(&lang, ctx)` -> `CodeBlock`
 - `FileMember::Code(CodeBlock)` is cloned into an owned source block
 - `FileMember::RawContent(String)` remains opaque

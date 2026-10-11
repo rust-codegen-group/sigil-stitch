@@ -63,7 +63,7 @@ Only two methods have no default:
 
 Override `render_verbatim_string()` if your language has string interpolation (e.g., Bash `"$x"`, TypeScript `` `${x}` ``, Python `f"{x}"`).
 
-Implement all four renderer-event methods as local target-language behavior.
+Implement all five renderer-event methods as local target-language behavior.
 For keyword-delimited languages, match on `BlockIntent`; for brace languages,
 several arms may deliberately return the same bytes. The legacy
 `block_syntax()`, `block_open_for()`, `block_close_for()`, and intent-aware

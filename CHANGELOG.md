@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
 
 ### Added
 
@@ -39,7 +39,7 @@
   types support multiple slots without tuple coercion; other typed built-ins
   reject multiple returns. Explicit async TypeScript empty returns emit
   `Promise<void>`; singleton return types are never auto-wrapped.
-- The unreleased function capability `ExplicitReturnType` is renamed
+- The function capability `ExplicitReturnType` is renamed
   `ExplicitReturns`; empty explicit intent still requests that capability.
 
 - `ProjectSpec::render()` now validates every file before rendering any file;

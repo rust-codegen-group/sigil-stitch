@@ -504,7 +504,7 @@ dependencies = [
 
 [[package]]
 name = "sigil-stitch"
-version = "0.6.8"
+version = "0.7.0"
 dependencies = [
  "criterion",
  "pretty",
@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "sigil-stitch-macros"
-version = "0.6.8"
+version = "0.7.0"
 dependencies = [
  "proc-macro2",
  "quote",

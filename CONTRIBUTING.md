@@ -17,9 +17,8 @@ sigil-stitch/
 │   ├── code_template.rs    # Named-parameter templates
 │   ├── type_name.rs        # Semantic TypeName enum + legacy presentation data
 │   ├── type_name_render.rs # TypeName renderer retiring to the 0.6.8 bridge
-│   ├── import.rs           # Import types and conflict resolution
+│   ├── import.rs           # Import types and complete-set conflict resolution
 │   ├── import_collector.rs # Import extraction from CodeBlock trees
-│   ├── name_allocator.rs   # Alias generation for import conflicts
 │   ├── error.rs            # Error types (snafu)
 │   ├── lang/               # Language traits, adapters, and compatibility seams
 │   │   ├── mod.rs          # RendererLang and CodeLang traits
@@ -31,16 +30,18 @@ sigil-stitch/
 │   │                       # cpp, bash, zsh, lua, csharp
 │   └── spec/               # Structural builders (emit CodeBlocks)
 │       ├── type_spec.rs    # Class, struct, interface, trait, enum, type alias, newtype
+│       ├── closed_sum_spec.rs      # Complete closed-sum declarations
+│       ├── closed_sum_case_spec.rs # Unit, positional, and record cases
 │       ├── fun_spec.rs     # Functions and methods
 │       ├── field_spec.rs   # Struct fields / class properties
 │       ├── file_spec.rs    # Top-level file orchestrator
 │       ├── project_spec.rs # Multi-file generation
 │       └── ...             # ParameterSpec, PropertySpec, AnnotationSpec, etc.
 ├── macros/                 # sigil_quote! proc macro crate
-│   └── src/parse/          # Tokenizer: format.rs (annotations), statements.rs, types.rs (MacroLang)
+│   └── src/parse/          # Tokenizer: lang.rs (MacroLang), format.rs, statements.rs
 ├── tests/                  # Integration tests (one directory per language)
 │   ├── <lang>/             # main.rs + quote_*.rs + builder_*.rs submodules
-│   └── golden.rs           # Golden test assertion helper
+│   └── shared/golden.rs    # Golden test assertion helper
 ├── test-goldens/           # Golden test output files (one directory per language)
 └── docs/                   # mdbook documentation
 ```
@@ -55,9 +56,10 @@ Requires Rust edition 2024, MSRV 1.88.0. Install [just](https://github.com/casey
 
 ```bash
 # Core workflow
-just test              # cargo test --workspace
+just test              # cargo nextest + doctests
 just lint              # cargo clippy -- -D warnings
-just check             # test + lint
+just check             # fmt + test + lint
+just example-smoke     # run every ordinary example
 
 # Golden tests
 just bless             # BLESS=1 cargo test — regenerate golden files
@@ -66,14 +68,19 @@ just bless             # BLESS=1 cargo test — regenerate golden files
 just coverage          # summary table
 just coverage-html     # HTML report, opens in browser
 just coverage-lcov     # LCOV output for CI/editors
+just coverage-nextest  # LCOV from the nextest test suite
+just semver-check      # verify the documented 0.6.8 compatibility delta
 
 # Documentation
 just doc               # cargo doc --no-deps --open
 just book              # mdbook build docs
+just book-test         # compile and run mdBook examples
 just book-serve        # mdbook serve with live reload
 ```
 
-CI runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo doc -D warnings`, and coverage upload on every PR.
+CI runs formatting, clippy, documentation, mdBook, semver, example-smoke,
+nextest, MSRV, and coverage jobs on every PR. The local equivalents are the
+recipes listed above; the test and coverage jobs use `cargo-nextest`.
 
 ## Code Style
 
@@ -81,7 +88,7 @@ CI runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo do
 - **Linting:** `cargo clippy -- -D warnings`. All warnings are errors in CI (`RUSTFLAGS=-Dwarnings`).
 - **No comments by default.** Only add a comment when the _why_ is non-obvious — a hidden constraint, a workaround, a surprising invariant. Don't explain what the code does; well-named identifiers do that.
 - **No unnecessary abstractions.** Three similar lines are better than a premature helper. Don't add features, refactoring, or error handling beyond what the task requires.
-- **Builder pattern:** Spec builders (`TypeSpec`, `FunSpec`, `FieldSpec`, `FileSpec`, etc.) take `mut self` and return `Self` for every setter -- chain them fluently: `FunSpec::builder("f").returns(vec![t]).body(b).build()`. `CodeBlockBuilder` takes `&mut self` -- use a `let mut` binding and call methods on it.
+- **Builder pattern:** Spec builders (`TypeSpec`, `ClosedSumSpec`, `ClosedSumCaseSpec`, `FunSpec`, `FieldSpec`, `FileSpec`, etc.) take `mut self` and return `Self` for every setter -- chain them fluently: `FunSpec::builder("f").returns(vec![t]).body(b).build()`. `CodeBlockBuilder` takes `&mut self` -- use a `let mut` binding and call methods on it.
 - **Trait objects for language:** Public types no longer carry a language generic. The language enters at render time as `&dyn CodeLang`. `FileSpec` stores the language internally. `CodeBlock`, `TypeName`, and all specs have language-agnostic Rust types, but literal `CodeBlock` content is target-associated rather than automatically portable.
 - **`BoxDoc` never appears in a language hook:** Current complete declaration
   lowerers and the accepted type-name seam return structured `CodeBlock`
