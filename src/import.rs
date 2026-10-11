@@ -180,11 +180,12 @@ impl<'a> ImportAliasConflicts<'a> {
 
 /// One complete local-name assignment returned by a conflict resolver.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ImportAliasAssignment {
     /// Claim being assigned.
-    pub claim_id: ImportAliasClaimId,
+    claim_id: ImportAliasClaimId,
     /// Final local binding for that claim.
-    pub local_name: String,
+    local_name: String,
 }
 
 impl ImportAliasAssignment {
@@ -194,6 +195,16 @@ impl ImportAliasAssignment {
             claim_id,
             local_name: local_name.into(),
         }
+    }
+
+    /// Claim receiving this local binding.
+    pub fn claim_id(&self) -> ImportAliasClaimId {
+        self.claim_id
+    }
+
+    /// Final local binding selected for the claim.
+    pub fn local_name(&self) -> &str {
+        &self.local_name
     }
 }
 

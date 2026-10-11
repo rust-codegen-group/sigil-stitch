@@ -289,12 +289,17 @@ fn builder_approach() -> String {
         (),
     );
 
+    let utility = TypeSpec::builder("CollectionsUtil", TypeKind::Class)
+        .add_method(sort_fn)
+        .build()
+        .unwrap();
+
     FileSpec::builder_with("User.java", Java::new())
         .add_type(priority_enum)
         .add_type(repo_iface)
         .add_type(base_entity)
         .add_type(user_cls)
-        .add_function(sort_fn)
+        .add_type(utility)
         .add_code(join_body.build().unwrap())
         .build()
         .unwrap()
@@ -462,12 +467,17 @@ fn macro_approach() -> String {
     })
     .unwrap();
 
+    let utility = TypeSpec::builder("CollectionsUtil", TypeKind::Class)
+        .add_method(sort_fn)
+        .build()
+        .unwrap();
+
     FileSpec::builder_with("User.java", Java::new())
         .add_type(priority_enum)
         .add_type(repo_iface)
         .add_type(base_entity)
         .add_type(user_cls)
-        .add_function(sort_fn)
+        .add_type(utility)
         .add_code(join_body)
         .build()
         .unwrap()

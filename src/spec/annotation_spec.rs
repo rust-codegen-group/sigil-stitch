@@ -56,6 +56,7 @@ pub(crate) enum AnnotationName {
 
 /// Borrowed semantic name of a structured annotation.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum AnnotationNameRef<'a> {
     /// A simple unqualified annotation name.
     Simple(&'a str),

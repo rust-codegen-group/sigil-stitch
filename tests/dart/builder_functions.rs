@@ -47,7 +47,7 @@ fn test_annotated_method() {
         .add_method(
             FunSpec::builder("speak")
                 .returns(vec![TypeName::primitive("String")])
-                .annotation(CodeBlock::of("@override", ()).unwrap())
+                .is_override()
                 .body(body)
                 .build()
                 .unwrap(),

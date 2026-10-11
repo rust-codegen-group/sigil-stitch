@@ -86,12 +86,7 @@ fn builder_approach() -> String {
                         "T",
                     )))],
                 )])
-                .add_param(
-                    ParameterSpec::builder("limit", TypeName::primitive("number"))
-                        .default_value(CodeBlock::of("10", ()).unwrap())
-                        .build()
-                        .unwrap(),
-                )
+                .add_param(ParameterSpec::new("limit", TypeName::primitive("number")).unwrap())
                 .build()
                 .unwrap(),
         )
@@ -165,7 +160,12 @@ fn builder_approach() -> String {
 
     let get_user = FunSpec::builder("getUser")
         .is_async()
-        .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
+        .add_param(
+            ParameterSpec::builder("id", TypeName::primitive("string"))
+                .default_value(CodeBlock::of("%S", (StringLitArg("default".into()),)).unwrap())
+                .build()
+                .unwrap(),
+        )
         .returns(vec![TypeName::application(
             TypeName::primitive("Promise"),
             vec![TypeArgument::Single(user_type)],
@@ -289,12 +289,7 @@ fn macro_approach() -> String {
                         "T",
                     )))],
                 )])
-                .add_param(
-                    ParameterSpec::builder("limit", TypeName::primitive("number"))
-                        .default_value(CodeBlock::of("10", ()).unwrap())
-                        .build()
-                        .unwrap(),
-                )
+                .add_param(ParameterSpec::new("limit", TypeName::primitive("number")).unwrap())
                 .build()
                 .unwrap(),
         )
@@ -316,7 +311,12 @@ fn macro_approach() -> String {
 
     let get_user = FunSpec::builder("getUser")
         .is_async()
-        .add_param(ParameterSpec::new("id", TypeName::primitive("string")).unwrap())
+        .add_param(
+            ParameterSpec::builder("id", TypeName::primitive("string"))
+                .default_value(CodeBlock::of("%S", (StringLitArg("default".into()),)).unwrap())
+                .build()
+                .unwrap(),
+        )
         .returns(vec![TypeName::application(
             TypeName::primitive("Promise"),
             vec![TypeArgument::Single(user_type)],

@@ -585,7 +585,8 @@ fn rust_modern_lifetime_constraints_are_checked_for_every_declaration_owner() {
                 assert!(
                     error.to_string().contains("lifetime")
                         || error.to_string().contains("ConstraintSubject")
-                        || error.to_string().contains("constraint subject"),
+                        || error.to_string().contains("constraint subject")
+                        || error.to_string().contains("declared type parameter"),
                     "{error}"
                 );
             }

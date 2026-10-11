@@ -113,7 +113,7 @@ fn builder_approach() -> String {
         .build()
         .unwrap();
 
-    // --- Static factory method ---
+    // --- Top-level factory function ---
     let mut factory_body = CodeBlock::builder();
     factory_body.add_attribute("available(*, iOS 15)");
     factory_body.add_comment(&format!("{}: {}", comment_label, comment_reason));
@@ -127,7 +127,6 @@ fn builder_approach() -> String {
 
     let make_url = FunSpec::builder("makeURL")
         .visibility(Visibility::Public)
-        .is_static()
         .returns(vec![TypeName::optional(TypeName::primitive("URL"))])
         .add_param(ParameterSpec::new("urlString", TypeName::primitive("String")).unwrap())
         .body(factory_body.build().unwrap())
@@ -231,7 +230,6 @@ fn macro_approach() -> String {
 
     let make_url = FunSpec::builder("makeURL")
         .visibility(Visibility::Public)
-        .is_static()
         .returns(vec![TypeName::optional(TypeName::primitive("URL"))])
         .add_param(ParameterSpec::new("urlString", TypeName::primitive("String")).unwrap())
         .body(factory_body)
