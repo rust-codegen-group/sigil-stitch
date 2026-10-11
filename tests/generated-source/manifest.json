@@ -45,5 +45,15 @@
     "negative": [
       {"file": "scala_wrong_kind.scala", "diagnostic": "Type argument Int does not conform to upper bound \\[_\\] =>> Any"}
     ]
+  },
+  "java": {
+    "compiler": "javac",
+    "version_flags": ["-version"],
+    "flags": [],
+    "positive": "java_positive.java",
+    "negative": [
+      {"file": "java_missing.java", "diagnostic": "unreported exception IOException; must be caught or declared to be thrown"},
+      {"file": "java_illegal_exception.java", "diagnostic": "';' expected|illegal start of type|incompatible types|Throwable"}
+    ]
   }
 }

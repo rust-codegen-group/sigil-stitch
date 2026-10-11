@@ -8,8 +8,8 @@ declaration, and `TypeName` APIs:
 just generated-source-acceptance
 ```
 
-The Rust runner requires Cargo, Clang C++, Go, GHC, Vite+'s `vp`, and Scala 3's
-`scalac` on PATH. TypeScript runs through
+The Rust runner requires Cargo, Clang C++, Go, GHC, a JDK's `javac`, Vite+'s
+`vp`, and Scala 3's `scalac` on PATH. TypeScript runs through
 `vp dlx --package typescript@7.0.2 tsc`, without a global `tsc` installation
 or repository npm dependencies. The first run may download that package into
 vp's package cache. The command is deliberately separate from `just check`, `just test`,
@@ -21,8 +21,8 @@ No global compiler installation is performed.
 expected diagnostics. The runner prints compiler versions on each run and uses
 a temporary directory for generated sources and compiler artifacts. These are
 local prerequisites, not a compiler minimum-version support promise.
-The fixtures have been checked with Apple Clang 21.0.0, GHC 9.14.1,
-Go 1.27.1, TypeScript 7.0.2 through vp, and Homebrew Scala 3.9.0.
+The fixtures have been checked with Apple Clang 21.0.0, GHC 9.14.1, OpenJDK
+21.0.12, Go 1.27.1, TypeScript 7.0.2 through vp, and Homebrew Scala 3.9.0.
 
 Each negative fixture shares the positive declaration and setup. A unique
 `acceptance-failure` marker identifies its intended failing use-site; the
@@ -37,6 +37,7 @@ expected message for the marked use-site.
 | C++ | Independent packs of different lengths, matching simultaneous `Pair<As, Bs>...`, empty packs and `Bundle<>` | Mismatched simultaneous pack lengths |
 | Haskell | `Array 2 Int -> Array 3 Int -> Array 5 Int` | Result declared as `Array 6 Int` |
 | Go | Zero/single/multiple declaration and callable returns, receiver/interface conformance, imported result slots and destructuring | Assign a two-result call to one scalar |
+| Java | A checked `IOException` declaration and caller that handles it | Caller omits handling; a lowerable `List<IOException>` exception shape rejected by `javac` |
 | TypeScript | Supplied and omitted optional scalar slots; explicit async empty returns used as `Promise<void>` | Missing required slot; incompatible argument |
 | Scala | `List` supplied to a constructor-kind binder | Scalar `Int` supplied as that constructor |
 

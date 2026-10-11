@@ -98,11 +98,18 @@ fn intended_failure(
         regex::escape(filename)
     ))?;
     let go_note = Regex::new(r"^.+\.go:\d+:\d+: (?i:note|warning):")?;
+    let javac_location = Regex::new(&format!(
+        r"^(?:.*[/\\])?{}:{line}: error:",
+        regex::escape(filename)
+    ))?;
+    let javac_header = Regex::new(r"^.+\.java:\d+: (?:error|warning):")?;
     let expected = Regex::new(&format!("(?s:{diagnostic})"))?;
     let lines: Vec<_> = output.lines().collect();
     for (index, header) in lines.iter().enumerate() {
         let matches_header = if language == "go" {
             go_location.is_match(header) && !go_note.is_match(header)
+        } else if language == "java" {
+            javac_location.is_match(header)
         } else {
             location.is_match(header) && error.is_match(header)
         };
@@ -115,6 +122,8 @@ fn intended_failure(
             .position(|line| {
                 if language == "go" {
                     go_header.is_match(line)
+                } else if language == "java" {
+                    javac_header.is_match(line)
                 } else {
                     error.is_match(line) && any_location.is_match(line)
                 }
@@ -247,6 +256,19 @@ mod tests {
     #[test]
     fn colon_location_and_diagnostic() {
         assert!(check("negative.ts:2:3: error: TS2345 wrong argument"));
+    }
+
+    #[test]
+    fn javac_location_and_diagnostic() {
+        let source = "class Fixture {\n  void read() { read(); // acceptance-failure\n  }\n}\n";
+        assert!(intended_failure(
+            "java",
+            "negative.java",
+            source,
+            "negative.java:2: error: unreported exception IOException; must be caught or declared to be thrown",
+            "unreported exception IOException; must be caught or declared to be thrown"
+        )
+        .unwrap());
     }
 
     #[test]

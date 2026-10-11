@@ -2,6 +2,7 @@ use sigil_stitch::code_renderer::CodeRenderer;
 use sigil_stitch::import::ImportGroup;
 use sigil_stitch::lang::CodeLang;
 use sigil_stitch::lang::haskell::Haskell;
+use sigil_stitch::lang::java::Java;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::prelude::*;
 
@@ -639,6 +640,34 @@ fn same_version_nested_parametric_values_roundtrip_and_revalidate() {
             .unwrap()
     };
     assert_eq!(render_function(decoded), render_function(function));
+
+    let java_function = FunSpec::builder("read")
+        .returns(vec![TypeName::primitive("void")])
+        .throws(vec![TypeName::importable_type("java.io", "IOException")])
+        .body(CodeBlock::of("return;", ()).unwrap())
+        .build()
+        .unwrap();
+    let java_json = serde_json::to_value(&java_function).unwrap();
+    let java_decoded: FunSpec = serde_json::from_value(java_json.clone()).unwrap();
+    let render_java = |function| {
+        FileSpec::builder_with("Reader.java", Java::new())
+            .add_type(
+                TypeSpec::builder("Reader", TypeKind::Class)
+                    .add_method(function)
+                    .build()
+                    .unwrap(),
+            )
+            .build()
+            .unwrap()
+            .render(120)
+            .unwrap()
+    };
+    assert_eq!(render_java(java_decoded), render_java(java_function));
+
+    let mut legacy_json = java_json;
+    legacy_json.as_object_mut().unwrap().remove("throws");
+    let legacy_decoded: FunSpec = serde_json::from_value(legacy_json).unwrap();
+    assert!(!render_java(legacy_decoded).contains("throws"));
 
     let binding = || {
         GenericParamSpec::new(

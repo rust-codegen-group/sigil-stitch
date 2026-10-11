@@ -92,6 +92,7 @@ pub(crate) fn lower(
         |parameters, parameter| emit_parameter(parameters, lang, parameter),
     )?);
     signature.push_literal(")");
+    append_declared_exceptions(&mut signature, function);
     append_suffixes(&mut signature, function);
 
     if let Some(body) = function.body() {
@@ -155,6 +156,19 @@ fn append_suffixes(signature: &mut SignatureBuilder, function: ValidatedFunction
     for suffix in function.suffixes() {
         signature.push_literal(" ");
         signature.push_literal(suffix);
+    }
+}
+
+fn append_declared_exceptions(signature: &mut SignatureBuilder, function: ValidatedFunction<'_>) {
+    if function.throws().is_empty() {
+        return;
+    }
+    signature.push_literal(" throws ");
+    for (index, exception) in function.throws().iter().enumerate() {
+        if index > 0 {
+            signature.push_literal(", ");
+        }
+        signature.push_type(exception);
     }
 }
 

@@ -21,12 +21,13 @@ const ALL_FORMS: [FunctionForm; 3] = [
     FunctionForm::Destructor,
 ];
 
-const ALL_CAPABILITIES: [FunctionCapability; 17] = [
+const ALL_CAPABILITIES: [FunctionCapability; 18] = [
     FunctionCapability::ParametricPolymorphism,
     FunctionCapability::BoundedPolymorphism,
     FunctionCapability::HigherKindedPolymorphism,
     FunctionCapability::Attributes,
     FunctionCapability::ExplicitReturns,
+    FunctionCapability::DeclaredExceptions,
     FunctionCapability::TypedParameters,
     FunctionCapability::AsyncEffect,
     FunctionCapability::StaticFunction,
@@ -876,6 +877,7 @@ fn java_matrix() {
         FunctionCapability::Attributes,
         FunctionCapability::BoundedPolymorphism,
         FunctionCapability::ExplicitReturns,
+        FunctionCapability::DeclaredExceptions,
         FunctionCapability::TypedParameters,
         FunctionCapability::Override,
         FunctionCapability::ParametricPolymorphism,
@@ -892,6 +894,7 @@ fn java_matrix() {
                     FunctionCapability::Attributes,
                     FunctionCapability::BoundedPolymorphism,
                     FunctionCapability::ConstructorDelegation,
+                    FunctionCapability::DeclaredExceptions,
                     FunctionCapability::ParametricPolymorphism,
                     FunctionCapability::TypedParameters,
                 ],

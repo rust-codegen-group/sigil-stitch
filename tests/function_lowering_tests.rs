@@ -19,7 +19,7 @@ use sigil_stitch::spec::type_spec::TypeSpec;
     deprecated,
     reason = "exercise released generic and callable compatibility inputs"
 )]
-use sigil_stitch::spec::where_spec::{TypeParamKind, TypeParamSpec};
+use sigil_stitch::spec::where_spec::{TypeArgument, TypeParamKind, TypeParamSpec};
 use sigil_stitch::type_name::TypeName;
 
 #[path = "shared/languages.rs"]
@@ -655,6 +655,7 @@ impl CodeLang for SemanticViewLang {
         assert!(annotations[1].arguments().is_empty());
 
         assert_eq!(function.suffixes(), &["const"]);
+        assert!(function.throws().is_empty());
         assert!(function.delegation().is_some());
         let constraints = function.where_constraints();
         assert_eq!(constraints.len(), 1);
@@ -1003,6 +1004,233 @@ fn shell_lowerers_preserve_suffix_escape_hatches() {
         let output = render(&function, lang.as_ref(), 80);
         assert!(output.contains("function work() { # tail\n"), "{output}");
     }
+}
+
+#[test]
+fn java_declared_exceptions_are_structured_before_opaque_suffixes() {
+    let function = FunSpec::builder("read")
+        .returns(vec![TypeName::primitive("void")])
+        .throws(vec![TypeName::primitive("Discarded")])
+        .throws(vec![
+            TypeName::importable_type("java.io", "IOException"),
+            TypeName::qualified("example.errors", "Retryable"),
+        ])
+        .suffix("/* tail */")
+        .body(CodeBlock::of("return;", ()).unwrap())
+        .build()
+        .unwrap();
+
+    let direct = render_in_context(
+        &function,
+        &sigil_stitch::lang::java::Java::new(),
+        DeclarationContext::Member,
+        80,
+    );
+    assert!(
+        direct.contains("void read() throws IOException, example.errors.Retryable /* tail */ {"),
+        "{direct}"
+    );
+
+    let file = FileSpec::builder_with("Reader.java", sigil_stitch::lang::java::Java::new())
+        .add_type(
+            TypeSpec::builder("Reader", TypeKind::Class)
+                .add_method(function)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let pretty = file.render(28).unwrap();
+    assert!(pretty.contains("import java.io.IOException;"), "{pretty}");
+    assert!(pretty.contains("throws IOException"), "{pretty}");
+}
+
+#[test]
+fn java_declared_exceptions_cover_interface_methods_and_constructors() {
+    let exception = TypeName::importable_type("java.io", "IOException");
+    let interface = TypeSpec::builder("Readable", TypeKind::Interface)
+        .add_method(
+            FunSpec::builder("read")
+                .is_abstract()
+                .returns(vec![TypeName::primitive("void")])
+                .throws(vec![exception.clone()])
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let interface_output =
+        FileSpec::builder_with("Readable.java", sigil_stitch::lang::java::Java::new())
+            .add_type(interface)
+            .build()
+            .unwrap()
+            .render(80)
+            .unwrap();
+    assert!(
+        interface_output.contains("void read() throws IOException;"),
+        "{interface_output}"
+    );
+
+    let constructor = TypeSpec::builder("Reader", TypeKind::Class)
+        .add_method(
+            FunSpec::builder("Reader")
+                .is_constructor()
+                .throws(vec![exception])
+                .body(CodeBlock::of("return;", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let constructor_output =
+        FileSpec::builder_with("Reader.java", sigil_stitch::lang::java::Java::new())
+            .add_type(constructor)
+            .build()
+            .unwrap()
+            .render(80)
+            .unwrap();
+    assert!(
+        constructor_output.contains("Reader() throws IOException {"),
+        "{constructor_output}"
+    );
+}
+
+#[test]
+fn explicit_external_profiles_receive_ordered_declared_exceptions() {
+    #[derive(Debug)]
+    struct ThrowsViewLang;
+
+    impl RendererLang for ThrowsViewLang {
+        fn file_extension(&self) -> &str {
+            "throws-view"
+        }
+
+        fn line_comment_prefix(&self) -> &str {
+            "//"
+        }
+    }
+
+    const FUNCTIONS: &[FunctionCapabilityProfile<'_>] = &[FunctionCapabilityProfile::new(
+        FunctionContext::TopLevel,
+        FunctionForm::Function,
+        &[FunctionCapability::DeclaredExceptions],
+    )];
+
+    impl CodeLang for ThrowsViewLang {
+        fn capabilities(&self) -> LanguageCapabilities<'_> {
+            LanguageCapabilities::strict().with_functions(FUNCTIONS)
+        }
+
+        fn validate_function(&self, function: FunctionIntent<'_>) -> Result<(), SigilStitchError> {
+            assert_eq!(
+                function.throws(),
+                [TypeName::primitive("First"), TypeName::primitive("Second")].as_slice()
+            );
+            Ok(())
+        }
+
+        fn lower_function(
+            &self,
+            function: ValidatedFunction<'_>,
+        ) -> Result<CodeBlock, SigilStitchError> {
+            assert_eq!(
+                function.throws(),
+                [TypeName::primitive("First"), TypeName::primitive("Second")].as_slice()
+            );
+            CodeBlock::of("throws-view", ())
+        }
+    }
+
+    FunSpec::builder("read")
+        .throws(vec![
+            TypeName::primitive("First"),
+            TypeName::primitive("Second"),
+        ])
+        .build()
+        .unwrap()
+        .emit(&ThrowsViewLang, DeclarationContext::TopLevel)
+        .unwrap();
+}
+
+#[test]
+fn java_exception_types_follow_the_ordinary_type_lowerer() {
+    let render = |exception: TypeName| {
+        let function = FunSpec::builder("read")
+            .returns(vec![TypeName::primitive("void")])
+            .throws(vec![exception])
+            .body(CodeBlock::of("return;", ()).unwrap())
+            .build()
+            .unwrap();
+        render_in_context(
+            &function,
+            &sigil_stitch::lang::java::Java::new(),
+            DeclarationContext::Member,
+            80,
+        )
+    };
+
+    assert!(render(TypeName::qualified("example", "Retryable")).contains("example.Retryable"));
+    assert!(
+        render(TypeName::associated_type(
+            TypeName::primitive("Outer"),
+            None,
+            "Inner",
+        ))
+        .contains("Outer.Inner")
+    );
+    assert!(render(TypeName::raw("Failure")).contains("throws Failure"));
+
+    assert!(render(TypeName::parameter("E")).contains("throws E"));
+
+    let union = FunSpec::builder("read")
+        .returns(vec![TypeName::primitive("void")])
+        .throws(vec![TypeName::union(vec![
+            TypeName::primitive("First"),
+            TypeName::primitive("Second"),
+        ])])
+        .body(CodeBlock::of("return;", ()).unwrap())
+        .build()
+        .unwrap();
+    let union_error = FileSpec::builder_with("Reader.java", sigil_stitch::lang::java::Java::new())
+        .add_type(
+            TypeSpec::builder("Reader", TypeKind::Class)
+                .add_method(union)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap_err();
+    assert!(matches!(
+        union_error,
+        SigilStitchError::UnsupportedTypeName { .. }
+    ));
+
+    let disguised_function = FunSpec::builder("read")
+        .returns(vec![TypeName::primitive("void")])
+        .throws(vec![TypeName::application(
+            TypeName::array(TypeName::primitive("IOException")),
+            vec![TypeArgument::Single(TypeName::primitive("Cause"))],
+        )])
+        .body(CodeBlock::of("return;", ()).unwrap())
+        .build()
+        .unwrap();
+    let disguised = FileSpec::builder_with("Reader.java", sigil_stitch::lang::java::Java::new())
+        .add_type(
+            TypeSpec::builder("Reader", TypeKind::Class)
+                .add_method(disguised_function)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap()
+        .render(80)
+        .unwrap();
+    assert!(
+        disguised.contains("throws List<IOException><Cause>"),
+        "{disguised}"
+    );
 }
 
 #[test]

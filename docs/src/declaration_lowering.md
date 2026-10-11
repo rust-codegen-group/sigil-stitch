@@ -99,6 +99,10 @@ literal syntax. A private Python validator recognizes the documented 0.6.8
 `is_static` plus decorator pattern as a frozen adapter-local compatibility
 exception; new behavior must use semantic intent instead of extending it.
 
+Function declared exception types are a separate structured `TypeName` list.
+The selected adapter decides whether that semantic intent is representable and
+where its target-local clause appears; it is not an opaque suffix grammar.
+
 ## Capabilities Are Semantic
 
 The shared capability vocabulary describes representability. For example,
