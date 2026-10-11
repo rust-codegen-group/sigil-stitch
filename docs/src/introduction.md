@@ -59,12 +59,18 @@ remain independent of declaration kinds while retaining structured type
 references.
 
 **Minimal dependencies.** The runtime dependencies are `pretty` (v0.12) for
-Wadler-Lindig formatting, `serde` (v1, with `derive`) so every spec can round-trip
-to JSON or YAML, and `snafu` for structured errors. Everything else -- parsing
+Wadler-Lindig formatting, `serde` (v1, with `derive`) for same-version
+round-trips of first-class serializable specs with a caller-provided format such
+as JSON or YAML, and `snafu` for structured errors. `FileSpec::add_spec()`
+extension members are not serializable; a deserialized `FileSpec`, or each file
+inside a deserialized `ProjectSpec`, needs a language configured again before
+rendering. These representations are not a versioned wire protocol. Everything
+else -- parsing
 format strings, collecting imports, resolving conflicts, rendering output -- is
 implemented in sigil-stitch itself.
 
-**Two builder flavours.** Spec builders (`TypeSpec`, `FunSpec`, `FieldSpec`,
+**Two builder flavours.** Spec builders (`TypeSpec`, `ClosedSumSpec`,
+`ClosedSumCaseSpec`, `FunSpec`, `FieldSpec`,
 `FileSpec`, `EnumVariantSpec`, `PropertySpec`, `AnnotationSpec`, `ProjectSpec`) use an
 owning chain pattern -- every setter takes `mut self` and returns `Self`, so you
 chain calls fluently:

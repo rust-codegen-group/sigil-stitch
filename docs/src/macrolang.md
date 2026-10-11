@@ -179,7 +179,7 @@ patching. The runtime passes remain as safety nets for the builder API path.
 
 If your language has tokenizer conflicts that universal heuristics can't handle:
 
-1. Add a variant to `MacroLang` in `macros/src/parse/types.rs`
+1. Add a variant to `MacroLang` in `macros/src/parse/lang.rs`
 2. Map the language identifier in `parse_macro_lang()` in `macros/src/parse/mod.rs`
 3. Add language-guarded annotation logic in `annotate_tokens()` in `macros/src/parse/format.rs`
 4. If the fix is in spacing after a token, you may also need to adjust `state.prev` assignment

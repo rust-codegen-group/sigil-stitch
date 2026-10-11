@@ -1,6 +1,6 @@
 # Building Types & Enums
 
-This chapter covers type declarations (classes, structs, interfaces, enums, type aliases, newtypes), computed properties, annotations, and enum variants. These specs follow the same builder pattern described in [Building Functions & Fields](functions_and_fields.md): `mut self` for setters that return `Self`, `self` for `.build()`, and fluent chaining: `Builder::new(...).method().method().build()`.
+This chapter covers type declarations (classes, structs, interfaces, enums, type aliases, newtypes), complete closed-sum declarations, computed properties, annotations, and enum variants. These specs follow the same builder pattern described in [Building Functions & Fields](functions_and_fields.md): `mut self` for setters that return `Self`, `self` for `.build()`, and fluent chaining: `Builder::new(...).method().method().build()`.
 
 ## TypeSpec
 

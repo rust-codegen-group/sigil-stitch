@@ -62,7 +62,7 @@ The integration suites are grouped by the contract they protect:
   the language-owned lowerers.
 - `tests/file_spec_tests.rs` owns complete-file pipeline traces and fail-closed
   ordering. Its stateful external adapter records validation, custom-spec
-  emission, source rewrite, per-root type lowering, and all four renderer
+  emission, source rewrite, per-root type lowering, and all five renderer
   events. Its pipeline matrices cross preserve, remove, replace, and introduce
   rewrite effects with root, nested, and sequence positions; cover headers,
   stored code, one-block specs, and every block from multi-block specs; and

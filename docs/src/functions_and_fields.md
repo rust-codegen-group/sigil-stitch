@@ -30,7 +30,7 @@ let fun = FunSpec::builder("greet")
 
 (`CodeBlockBuilder` is different: it uses `&mut self`, so you keep it in a `let mut` binding and call methods on it.)
 
-Every spec type (including `CodeBlock`, `TypeName`, `FileSpec`, and `ProjectSpec`) derives `serde::Serialize` and `serde::Deserialize`, so you can round-trip specs through JSON, YAML, or any other serde format. This is useful for caching materialized specs, shipping them across process boundaries, or diffing them in tests.
+First-class serializable spec and source values (including `CodeBlock`, `TypeName`, `FileSpec`, and `ProjectSpec` when they contain only serializable members) derive `serde::Serialize` and `serde::Deserialize`, so you can perform same-version round-trips with a caller-provided Serde format such as JSON or YAML. This is useful for caching materialized specs or diffing them in tests. `FileSpec::add_spec()` extension members are not serializable; a deserialized `FileSpec`, or each file inside a deserialized `ProjectSpec`, needs a language configured again before rendering. These representations are not a versioned wire protocol.
 
 ## ParameterSpec
 

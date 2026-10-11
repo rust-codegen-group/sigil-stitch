@@ -44,9 +44,9 @@ Two released function behaviors intentionally change:
    Static validation does not guarantee that a complete lowerer exists.
 
 Released `TypeName::Function` / `function(...)` still use one scalar return;
-their documented JSON fixture is unchanged. The unreleased modern `Callable`
-and `FunSpec` storage have ordinary same-version Serde roundtrips, not old-shape
-readers or a cross-version serialized protocol.
+their documented JSON fixture is unchanged. The modern `Callable` and `FunSpec`
+storage introduced in 0.7 have ordinary same-version Serde roundtrips, not
+old-shape readers or a cross-version serialized protocol.
 
 Deprecated does not mean that the shared grammar model is still extensible. Do
 not add a field, flag, or enum variant to a legacy configuration type for new
@@ -169,8 +169,8 @@ application/callable values or binding domains it cannot preserve.
 
 The new expression enums and binding domains are non-exhaustive for downstream
 matching. This adds no unknown-node or cross-version serialization contract.
-Unreleased owner-view APIs and the unreleased closed-sum builder are not
-classified as released legacy surfaces.
+The owner-view APIs and closed-sum builder introduced in 0.7 are not classified
+as 0.6.8 legacy surfaces.
 
 ## Frozen Grammar Configuration
 

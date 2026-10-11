@@ -17,7 +17,7 @@ tracks every import for you, resolves naming conflicts, and emits width-aware fo
 cargo add sigil-stitch
 ```
 
-Requires Rust edition 2024, MSRV 1.88.0. Runtime dependencies: `pretty` (Wadler-Lindig formatting), `serde` with `derive` (every spec type implements `Serialize`/`Deserialize` out of the box, so you can round-trip specs as JSON or YAML), and `snafu` (structured errors).
+Requires Rust edition 2024, MSRV 1.88.0. Runtime dependencies: `pretty` (Wadler-Lindig formatting), `serde` with `derive` (first-class serializable specs and source values support same-version round-trips with a caller-provided Serde format such as JSON or YAML), and `snafu` (structured errors). `FileSpec::add_spec()` extension members are not serializable; a deserialized `FileSpec`, or each file inside a deserialized `ProjectSpec`, needs a language configured again before rendering. These Serde representations are not a versioned wire protocol.
 
 ## Builder vs Macro
 
@@ -105,14 +105,15 @@ Build structured declarations with the spec builders:
 |------|---------|
 | **ParameterSpec** | Function parameter (name + type + default + variadic + property) |
 | **FieldSpec** | Struct field / class property (visibility, static, readonly) |
-| **FunSpec** | Function or method (params, return type, body, async, abstract) |
+| **FunSpec** | Function or method (params, ordered return slots, body, async, abstract) |
 | **TypeSpec** | Class, struct, interface, trait, enum, type alias, newtype, embedded types |
+| **ClosedSumSpec** | A complete named set of unit, positional, or record cases |
 | **PropertySpec** | Computed property with getter/setter |
 | **AnnotationSpec** | `@Override`, `#[derive(...)]`, `[[nodiscard]]` |
 | **EnumVariantSpec** | Enum variant with a discriminant, constructor arguments, or positional/record payload |
 | **ImportSpec** | Explicit imports (aliased, side-effect, wildcard) |
 | **FileSpec** | Top-level file with automatic import resolution |
-| **ProjectSpec** | Multi-file project generation |
+| **ProjectSpec** | Multi-file project generation with pre-write validation |
 | **CodeTemplate** | Reusable parameterized templates with named parameters |
 
 Specs record declaration intent. At render time the selected language validates
@@ -158,7 +159,7 @@ The [sigil-stitch book](docs/src/SUMMARY.md) covers everything in depth:
 - [Format Specifiers](docs/src/format_specifiers.md) -- deep dive on `%T`, `%N`, `%S`, `%V`, `%L`, `%W`, and friends
 - [TypeName](docs/src/type_name.md) -- semantic type references, import tracking, and language-owned lowering
 - [Building Functions & Fields](docs/src/functions_and_fields.md) -- ParameterSpec, FieldSpec, FunSpec
-- [Building Types & Enums](docs/src/types_and_enums.md) -- TypeSpec, PropertySpec, AnnotationSpec, EnumVariantSpec
+- [Building Types & Enums](docs/src/types_and_enums.md) -- TypeSpec, ClosedSumSpec, ClosedSumCaseSpec, PropertySpec, AnnotationSpec, EnumVariantSpec
 - [Files & Projects](docs/src/files_and_projects.md) -- ImportSpec, FileSpec, ProjectSpec
 - [sigil_quote! Macro](docs/src/sigil_quote.md) -- inline code with `$T`/`$S`/`$N`/`$L`/`$V`/`$C_each`/`$if`/`$for`/`$let`/`$join`/`$+`/`$attr`/`$T_join` interpolation, plus Go paren-block support
 - [Code Templates](docs/src/code_templates.md) -- reusable `#{name:K}` templates

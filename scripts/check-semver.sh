@@ -223,9 +223,13 @@ semver_output="${run_dir}/cargo-semver-checks.txt"
 set +e
 (
   cd "${REPO_ROOT}"
+  # In the 0.x series, 0.7.0 is the next semver-compatible minor line.
+  # cargo-semver-checks otherwise treats it as a major release and skips
+  # the compatibility report that this allowlist verifies.
   cargo semver-checks check-release \
     --workspace \
     --baseline-rev 0.6.8 \
+    --release-type minor \
     --color never
 ) > "${semver_output}" 2>&1
 semver_exit=$?

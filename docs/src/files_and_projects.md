@@ -97,7 +97,7 @@ the selected adapter's `CodeLang::validate_resolved_imports()` before passing
 the group to `render_imports()`. `FileSpec` and `ProjectSpec` perform this
 target-local validation automatically.
 
-You can mix member types freely: `add_code()` for raw CodeBlocks, `add_type()` for TypeSpec, `add_function()` for FunSpec, `add_raw()` for escape-hatch strings with no import tracking.
+You can mix member types freely: `add_code()` for raw CodeBlocks, `add_type()` for TypeSpec, `add_closed_sum()` for a first-class ClosedSumSpec, `add_function()` for FunSpec, and `add_raw()` for escape-hatch strings with no import tracking. Closed-sum declarations are stored and lowered like the other first-class members; see [Building Types & Enums](types_and_enums.md#closed-sums) for case shapes and target support.
 
 A file header (license comment, package declaration) can be set with `.header()`:
 
