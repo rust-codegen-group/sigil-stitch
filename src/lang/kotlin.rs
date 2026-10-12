@@ -301,6 +301,7 @@ const KOTLIN_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::NominalSubtyping,
     TypeCapability::InterfaceImplementation,
     TypeCapability::PrimaryConstructorParameters,
+    TypeCapability::PrimaryConstructorStorageAttributes,
 ];
 const KOTLIN_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
     TypeDeclarationCapability::ParametricPolymorphism,

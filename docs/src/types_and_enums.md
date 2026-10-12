@@ -317,6 +317,43 @@ an immutable or mutable property. Haskell and OCaml algebraic constructor data
 uses variant positional or record payloads instead; it is not modeled as a
 primary constructor.
 
+Storage metadata belongs to a promoted primary-constructor property, not to the
+parameter independently. Use `annotate_storage()` for a structured,
+import-aware annotation or `storage_annotation()` for a target-specific escape
+hatch:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let serialized_name = AnnotationSpec::importable(TypeName::importable(
+    "com.google.gson.annotations",
+    "SerializedName",
+))
+.arg("\"snake_case_field\"");
+
+let type_spec = TypeSpec::builder("NamingConventionTest", TypeKind::Struct)
+    .add_primary_constructor_param(
+        ParameterSpec::builder("snakeCaseField", TypeName::primitive("String?"))
+            .is_property()
+            .annotate_storage(serialized_name)
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap();
+# let _ = type_spec;
+// Kotlin: @field:SerializedName("snake_case_field")
+//         val snakeCaseField: String?
+# }
+```
+
+The `PrimaryConstructorStorageAttributes` capability is distinct from
+`PrimaryConstructorParameters`: an adapter must opt in only when it can preserve
+this metadata on the target's promoted storage. Kotlin currently owns the
+`@field:` placement. Other languages reject the intent until their own lowering
+defines an appropriate attachment; no shared placement enum is implied.
+
 ### Enums with EnumVariantSpec
 
 TypeSpec with `TypeKind::Enum` uses `add_variant()` instead of `add_field()`. See the [EnumVariantSpec](#enumvariantspec) section below for variant forms.

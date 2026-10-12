@@ -9,6 +9,8 @@ use sigil_stitch::lang::python::Python;
 use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::swift::Swift;
 use sigil_stitch::lang::typescript::TypeScript;
+use sigil_stitch::spec::annotation_spec::AnnotationSpec;
+use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
@@ -706,6 +708,177 @@ fn test_kotlin_data_class_primary_constructor() {
         &kt,
     );
     assert!(output.contains("data class Point(val x: Int, val y: Int) {"));
+}
+
+#[test]
+fn test_kotlin_primary_constructor_storage_annotations_are_imported_and_placed() {
+    let kt = Kotlin::new();
+    let type_spec = TypeSpec::builder("NamingConventionTest", TypeKind::Struct)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("snakeCaseField", TypeName::primitive("String?"))
+                .is_property()
+                .annotate_storage(
+                    AnnotationSpec::importable(TypeName::importable(
+                        "com.google.gson.annotations",
+                        "SerializedName",
+                    ))
+                    .arg("\"snake_case_field\""),
+                )
+                .build()
+                .unwrap(),
+        )
+        .add_primary_constructor_param(
+            ParameterSpec::builder("mutableField", TypeName::primitive("String"))
+                .is_mutable_property()
+                .storage_annotation(CodeBlock::of("@field:CustomMarker", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("NamingConventionTest.kt", kt)
+        .add_type(type_spec)
+        .build()
+        .unwrap()
+        .render(100)
+        .unwrap();
+
+    assert!(
+        output.contains("import com.google.gson.annotations.SerializedName"),
+        "{output}"
+    );
+    assert!(
+        output.contains(
+            "@field:SerializedName(\"snake_case_field\")\n    val snakeCaseField: String?"
+        ),
+        "{output}"
+    );
+    assert!(
+        output.contains("@field:CustomMarker\n    var mutableField: String"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_storage_annotations_require_promoted_primary_constructor_storage() {
+    let spec = TypeSpec::builder("Invalid", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .annotate_storage(AnnotationSpec::new("SerializedName"))
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = spec.emit(&Kotlin::new()).unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::InvalidTypeDeclaration { reason, .. }
+            if reason.contains("without property promotion")
+    ));
+}
+
+#[test]
+fn test_storage_annotations_are_rejected_on_function_parameters() {
+    let function = FunSpec::builder("run")
+        .add_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .annotate_storage(AnnotationSpec::new("SerializedName"))
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = function
+        .emit(&Kotlin::new(), DeclarationContext::TopLevel)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::InvalidFunctionTypeParameter { reason, .. }
+            if reason.contains("only on promoted primary-constructor properties")
+    ));
+}
+
+#[test]
+fn test_storage_annotations_are_rejected_when_language_lacks_the_capability() {
+    let spec = TypeSpec::builder("Invalid", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .is_property()
+                .annotate_storage(AnnotationSpec::new("SerializedName"))
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = spec
+        .emit(&sigil_stitch::lang::scala::Scala::new())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::UnsupportedTypeCapabilities {
+            capabilities, ..
+        } if capabilities == vec![TypeCapability::PrimaryConstructorStorageAttributes]
+    ));
+}
+
+#[test]
+fn test_empty_storage_annotation_blocks_are_rejected() {
+    let spec = TypeSpec::builder("Invalid", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .is_property()
+                .storage_annotation(CodeBlock::of("", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = spec.emit(&Kotlin::new()).unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::InvalidTypeDeclaration { reason, .. }
+            if reason.contains("storage annotation 0") && reason.contains("is empty")
+    ));
+}
+
+#[test]
+fn test_empty_structured_storage_annotation_names_are_rejected() {
+    let spec = TypeSpec::builder("Invalid", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .is_property()
+                .annotate_storage(AnnotationSpec::new(""))
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = spec.emit(&Kotlin::new()).unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::InvalidTypeDeclaration { reason, .. }
+            if reason.contains("storage annotation 0") && reason.contains("empty name")
+    ));
+}
+
+#[test]
+fn test_parameter_serde_defaults_storage_annotation_fields() {
+    let parameter = ParameterSpec::of("value", TypeName::primitive("String"));
+    let mut serialized = serde_json::to_value(parameter).unwrap();
+    let object = serialized.as_object_mut().unwrap();
+    object.remove("storage_annotations");
+    object.remove("storage_annotation_specs");
+
+    let restored: ParameterSpec = serde_json::from_value(serialized).unwrap();
+    assert!(restored.storage_annotations().is_empty());
+    assert!(restored.storage_annotation_specs().is_empty());
 }
 
 #[test]

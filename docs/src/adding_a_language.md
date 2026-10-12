@@ -112,7 +112,11 @@ declaration context or owning type kind.
 Ordinary type profiles take separate declaration-wide and ordinary-kind
 capability slices. `TypeDeclarationCapability` owns polymorphism and root
 attributes; `TypeCapability` owns fields, methods, relationships, constructors,
-and variants. Missing declaration-wide capabilities are reported before
+and variants. `PrimaryConstructorStorageAttributes` is separate from
+`PrimaryConstructorParameters`: advertise it only when the adapter can preserve
+metadata attached to promoted constructor storage. The adapter owns the
+annotation or attribute placement and spelling. Missing declaration-wide
+capabilities are reported before
 ordinary-kind capabilities, without suppressing either diagnostic group.
 Function profiles are keyed by both context (`TopLevel`, `ReceiverMethod`,
 `Member`, or `InterfaceMember`) and form (`Function`, `Constructor`, or

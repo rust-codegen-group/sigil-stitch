@@ -12,6 +12,7 @@ use sigil_stitch::lang::config::{
     OptionalFieldStyle, QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
 };
 use sigil_stitch::lang::{CodeLang, RendererLang};
+use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, PropertyStyle, TypeKind, Visibility};
 use sigil_stitch::spec::parameter_spec::ParameterSpec;
 use sigil_stitch::spec::type_spec::TypeSpec;
@@ -443,6 +444,30 @@ fn default_empty_legacy_bridges_remain_empty() {
             .unwrap()
             .is_none()
     );
+}
+
+#[test]
+fn permissive_adapters_reject_storage_metadata_instead_of_dropping_it() {
+    let spec = TypeSpec::builder("Record", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("Value"))
+                .is_property()
+                .annotate_storage(AnnotationSpec::new("SerializedName"))
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = spec
+        .emit(&Legacy068Adapter::new(MarkerMode::Standard))
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::UnsupportedTypeCapabilities {
+            capabilities, ..
+        } if capabilities == vec![sigil_stitch::lang::capability::TypeCapability::PrimaryConstructorStorageAttributes]
+    ));
 }
 
 fn import_ref(module: &str, name: &str) -> ImportRef {
