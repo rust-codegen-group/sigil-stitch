@@ -621,6 +621,46 @@ impl TypeSpec {
                 });
             }
         }
+        for parameter in &self.primary_constructor {
+            if !parameter.has_storage_annotations() {
+                continue;
+            }
+            if !parameter.is_property() && !parameter.is_mutable_property() {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: self.name.clone(),
+                    reason: format!(
+                        "primary-constructor parameter {:?} cannot attach storage metadata without property promotion",
+                        parameter.name()
+                    ),
+                });
+            }
+            for (index, annotation) in parameter.storage_annotations().iter().enumerate() {
+                if annotation.is_empty() {
+                    errors.push(SigilStitchError::InvalidTypeDeclaration {
+                        type_name: self.name.clone(),
+                        reason: format!(
+                            "storage annotation {index} on primary-constructor parameter {:?} is empty",
+                            parameter.name()
+                        ),
+                    });
+                }
+            }
+            for (index, annotation) in parameter.storage_annotation_specs().iter().enumerate() {
+                let name_is_empty = match annotation.name() {
+                    AnnotationNameRef::Simple(name) => name.is_empty(),
+                    AnnotationNameRef::Importable(type_name) => type_name.is_empty(),
+                };
+                if name_is_empty {
+                    errors.push(SigilStitchError::InvalidTypeDeclaration {
+                        type_name: self.name.clone(),
+                        reason: format!(
+                            "storage annotation {index} on primary-constructor parameter {:?} has an empty name",
+                            parameter.name()
+                        ),
+                    });
+                }
+            }
+        }
         for (index, member) in self.extra_members.iter().enumerate() {
             if member.is_empty() {
                 errors.push(SigilStitchError::InvalidTypeDeclaration {
@@ -826,6 +866,19 @@ impl TypeSpec {
             !self.primary_constructor.is_empty(),
             &mut missing,
         );
+        let has_storage_annotations = self
+            .primary_constructor
+            .iter()
+            .any(ParameterSpec::has_storage_annotations);
+        if has_storage_annotations
+            && (capabilities.type_validation_is_permissive()
+                || !capabilities.supports_type_capability(
+                    self.kind,
+                    TypeCapability::PrimaryConstructorStorageAttributes,
+                ))
+        {
+            missing.push(TypeCapability::PrimaryConstructorStorageAttributes);
+        }
         require(
             TypeCapability::Variants,
             !self.variants.is_empty(),

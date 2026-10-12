@@ -118,6 +118,9 @@ pub enum TypeCapability {
     InterfaceImplementation,
     /// Parameters introduced directly by a declaration constructor.
     PrimaryConstructorParameters,
+    /// Metadata attached to storage promoted by a declaration constructor
+    /// parameter.
+    PrimaryConstructorStorageAttributes,
     /// Sum-type variants.
     Variants,
 }

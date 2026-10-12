@@ -1,7 +1,8 @@
 //! Parameter specification for function/method signatures.
 
-use crate::code_block::{Arg, CodeBlockBuilder};
+use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use crate::lang::CodeLang;
+use crate::spec::annotation_spec::AnnotationSpec;
 use crate::type_name::TypeName;
 
 /// A single function parameter.
@@ -34,6 +35,12 @@ pub struct ParameterSpec {
     pub(crate) is_variadic: bool,
     pub(crate) is_property: bool,
     pub(crate) is_mutable_property: bool,
+    /// Raw metadata attached to storage promoted by this parameter.
+    #[serde(default)]
+    pub(crate) storage_annotations: Vec<CodeBlock>,
+    /// Structured metadata attached to storage promoted by this parameter.
+    #[serde(default)]
+    pub(crate) storage_annotation_specs: Vec<AnnotationSpec>,
 }
 
 impl ParameterSpec {
@@ -46,6 +53,8 @@ impl ParameterSpec {
             is_variadic: false,
             is_property: false,
             is_mutable_property: false,
+            storage_annotations: Vec::new(),
+            storage_annotation_specs: Vec::new(),
         }
     }
 
@@ -91,6 +100,21 @@ impl ParameterSpec {
     /// Whether this parameter promotes a mutable constructor property.
     pub fn is_mutable_property(&self) -> bool {
         self.is_mutable_property
+    }
+
+    /// Return opaque metadata blocks attached to promoted storage.
+    pub fn storage_annotations(&self) -> &[CodeBlock] {
+        &self.storage_annotations
+    }
+
+    /// Return structured metadata declarations attached to promoted storage.
+    pub fn storage_annotation_specs(&self) -> &[AnnotationSpec] {
+        &self.storage_annotation_specs
+    }
+
+    /// Whether this parameter requests metadata on promoted storage.
+    pub(crate) fn has_storage_annotations(&self) -> bool {
+        !self.storage_annotations.is_empty() || !self.storage_annotation_specs.is_empty()
     }
 
     /// Emit this parameter with the pre-0.6.8 shared declaration grammar.
@@ -165,6 +189,8 @@ pub struct ParameterSpecBuilder {
     is_variadic: bool,
     is_property: bool,
     is_mutable_property: bool,
+    storage_annotations: Vec<CodeBlock>,
+    storage_annotation_specs: Vec<AnnotationSpec>,
 }
 
 impl ParameterSpecBuilder {
@@ -204,6 +230,22 @@ impl ParameterSpecBuilder {
         self
     }
 
+    /// Add a raw metadata block for storage promoted by this parameter.
+    ///
+    /// The block is target-specific source and is emitted exactly as supplied
+    /// by the selected language adapter. Use [`Self::annotate_storage`] for
+    /// structured, import-aware metadata.
+    pub fn storage_annotation(mut self, annotation: CodeBlock) -> Self {
+        self.storage_annotations.push(annotation);
+        self
+    }
+
+    /// Add structured metadata for storage promoted by this parameter.
+    pub fn annotate_storage(mut self, annotation: AnnotationSpec) -> Self {
+        self.storage_annotation_specs.push(annotation);
+        self
+    }
+
     /// Build the [`ParameterSpec`].
     ///
     /// # Errors
@@ -223,6 +265,8 @@ impl ParameterSpecBuilder {
             is_variadic: self.is_variadic,
             is_property: self.is_property,
             is_mutable_property: self.is_mutable_property,
+            storage_annotations: self.storage_annotations,
+            storage_annotation_specs: self.storage_annotation_specs,
         })
     }
 }

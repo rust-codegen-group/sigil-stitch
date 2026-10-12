@@ -49,6 +49,18 @@ parameters and constraints, type relationships, primary-constructor
 parameters, variants, and member families without choosing their source order
 or spelling.
 
+### Primary-constructor storage metadata
+
+Metadata attached to storage promoted by a primary-constructor parameter. The
+parameter must request immutable or mutable property promotion; the metadata is
+not a general parameter annotation and does not select a target placement.
+`ParameterSpec::annotate_storage()` keeps an `AnnotationSpec` structured so an
+adapter can preserve imports, while `storage_annotation()` is an explicit
+target-specific escape hatch. `PrimaryConstructorStorageAttributes` is the
+capability for this semantic fact. Each language that supports it owns the
+attachment spelling and placement; the built-in Kotlin adapter emits
+`@field:` before `val` or `var`.
+
 ### Closed sum
 
 A type declaration whose complete ordered set of named cases is part of its

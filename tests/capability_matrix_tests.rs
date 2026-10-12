@@ -21,7 +21,7 @@ const ALL_KINDS: [TypeKind; 7] = [
     TypeKind::Newtype,
 ];
 
-const ALL_CAPABILITIES: [TypeCapability; 8] = [
+const ALL_CAPABILITIES: [TypeCapability; 9] = [
     TypeCapability::RecordFields,
     TypeCapability::AccessorMethods,
     TypeCapability::Methods,
@@ -29,6 +29,7 @@ const ALL_CAPABILITIES: [TypeCapability; 8] = [
     TypeCapability::NominalSubtyping,
     TypeCapability::InterfaceImplementation,
     TypeCapability::PrimaryConstructorParameters,
+    TypeCapability::PrimaryConstructorStorageAttributes,
     TypeCapability::Variants,
 ];
 const ALL_DECLARATION_CAPABILITIES: [TypeDeclarationCapability; 4] = [
@@ -487,6 +488,7 @@ fn kotlin_matrix() {
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
         TypeCapability::PrimaryConstructorParameters,
+        TypeCapability::PrimaryConstructorStorageAttributes,
     ];
     let contract_caps_declaration = &[
         TypeDeclarationCapability::ParametricPolymorphism,

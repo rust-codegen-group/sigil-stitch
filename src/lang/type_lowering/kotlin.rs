@@ -374,6 +374,14 @@ fn primary_constructor(parameters: &[ParameterSpec]) -> Result<CodeBlock, SigilS
         if index > 0 {
             block.add(",%W", ());
         }
+        for annotation in parameter.storage_annotation_specs() {
+            block.add_code(annotation.emit_with_syntax("@field:", "")?);
+            block.add_line();
+        }
+        for annotation in parameter.storage_annotations() {
+            block.add_code(annotation.clone());
+            block.add_line();
+        }
         if parameter.is_mutable_property() {
             block.add("var ", ());
         } else if parameter.is_property() {

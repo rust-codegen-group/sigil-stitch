@@ -416,6 +416,21 @@ impl FunSpec {
         }
         let capabilities = lang.capabilities();
         let permissive_validation = capabilities.function_validation_is_permissive();
+        let language = lang.file_extension().to_string();
+        if let Some(parameter) = self
+            .receiver
+            .iter()
+            .chain(self.params.iter())
+            .find(|parameter| parameter.has_storage_annotations())
+        {
+            return Err(SigilStitchError::InvalidFunctionTypeParameter {
+                language,
+                function_name: self.name.clone(),
+                parameter_name: parameter.name.clone(),
+                reason: "storage metadata is valid only on promoted primary-constructor properties"
+                    .to_string(),
+            });
+        }
         let context = intent.function_context();
         let form = intent.form();
         if !permissive_validation
@@ -443,7 +458,6 @@ impl FunSpec {
                 });
             }
         }
-        let language = lang.file_extension().to_string();
         let mut type_parameter_names = std::collections::HashSet::new();
         for parameter in self.generic_params() {
             if !type_parameter_names.insert(parameter.name()) {
