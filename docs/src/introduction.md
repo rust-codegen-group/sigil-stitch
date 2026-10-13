@@ -1,24 +1,26 @@
 # Introduction
 
-sigil-stitch is a Rust library for type-safe, import-aware, width-aware code generation
-across multiple languages. It combines two ideas: JavaPoet's builder model for constructing
-structured code, and the Wadler-Lindig algorithm for width-aware formatting. You describe
-code with builders and format specifiers, and the library handles imports, name conflicts,
-indentation, and line breaking.
+sigil-stitch is a structured, language-aware Rust code generation toolkit. You can build
+source with composable `CodeBlock`s, declaration specs, or the `sigil_quote!` macro. Semantic
+types, functions, properties, enums, closed sums, annotations, and imports stay structured
+until a selected language adapter validates the intent and lowers it to target syntax. File
+and project rendering then rewrites and validates the prepared source tree, resolves import
+aliases and naming conflicts, and applies Wadler-Lindig layout for width-aware output across
+the supported languages.
 
-## Where the ideas come from
+## How the pieces fit
 
-**JavaPoet's builder model.** JavaPoet (by Square) introduced the idea of building code
-with `CodeBlock` format strings and structural `Spec` types (TypeSpec, FunSpec, etc.).
-You write a format string like `"const user: %T = getUser()"`, pass a `TypeName` for
-the `%T` slot, and the library renders the type reference *and* tracks the import.
-sigil-stitch adopts this model directly, extending it from Java-only to multiple languages.
+**Structured source construction.** `CodeBlock` is the shared source container for typed
+format arguments, nested blocks, annotations, and layout markers. `TypeName` values remain
+semantic references, so `%T` can contribute both target-language source and import evidence.
+Declaration specs record intent such as visibility, type parameters, properties, variants,
+and ordered returns without choosing target-language punctuation or keyword order.
 
-**Wadler-Lindig pretty printing.** The `pretty` crate implements the Wadler-Lindig
-algorithm, which decides where to break lines based on a target width. sigil-stitch
-uses this via the `%W` (soft line break) specifier -- you mark where breaks *can*
-happen, and the algorithm decides where they *should* happen. Without `%W`, output
-is rendered with direct string concatenation (no pretty-printer overhead).
+**Language-owned lowering and rendering.** The selected adapter decides whether an intent is
+representable and lowers it to target-language structure. File and project rendering then
+rewrites and validates the complete source tree, lowers every type reference, resolves all
+imports, and chooses direct or Wadler-Lindig layout for the prepared tree. A target width
+controls soft breaks such as `%W`; source that does not need a break stays compact.
 
 ## Four key properties
 

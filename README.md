@@ -6,10 +6,13 @@ Type-safe, import-aware, width-aware code generation for multiple languages.
 [![docs.rs](https://docs.rs/sigil-stitch/badge.svg)](https://docs.rs/sigil-stitch)
 [![CI](https://github.com/rust-codegen-group/sigil-stitch/actions/workflows/ci.yml/badge.svg)](https://github.com/rust-codegen-group/sigil-stitch/actions/workflows/ci.yml)
 
-sigil-stitch combines [JavaPoet](https://github.com/square/javapoet)'s builder + CodeBlock
-model with [Wadler-Lindig pretty printing](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf)
-and multi-language support. Reference types with `%T` in format strings, and the library
-tracks every import for you, resolves naming conflicts, and emits width-aware formatted output.
+sigil-stitch is a structured, language-aware code generation toolkit for Rust. Build source
+with composable `CodeBlock`s, declaration specs, or the `sigil_quote!` macro. Semantic types,
+functions, properties, enums, closed sums, annotations, and imports stay structured until a
+selected language adapter validates the intent and lowers it to target syntax. File and project
+rendering then rewrites and validates the prepared source tree, resolves import aliases and
+naming conflicts, and applies Wadler-Lindig layout for width-aware output across the supported
+languages.
 
 ## Quick Start
 
