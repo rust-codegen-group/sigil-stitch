@@ -78,6 +78,13 @@ when the type is empty. Likewise, `is_property()` and
 `is_mutable_property()` record constructor-property intent; the adapter chooses
 spellings such as `val`/`var` in Kotlin or `readonly` in C#.
 
+For a promoted primary-constructor property, use `annotate_storage()` for
+structured, import-aware metadata or `storage_annotation()` for a
+target-specific source block. Storage metadata requires `is_property()` or
+`is_mutable_property()`; Kotlin emits structured metadata with the `@field:`
+use-site target. See [Types and Enums](types_and_enums.md) for a complete
+example and the language capability boundary.
+
 ## FieldSpec
 
 A struct field or class property: name, type, visibility, static/readonly flags, initializer, annotations, and doc comments.

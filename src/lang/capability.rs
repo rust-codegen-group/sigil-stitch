@@ -118,11 +118,11 @@ pub enum TypeCapability {
     InterfaceImplementation,
     /// Parameters introduced directly by a declaration constructor.
     PrimaryConstructorParameters,
+    /// Sum-type variants.
+    Variants,
     /// Metadata attached to storage promoted by a declaration constructor
     /// parameter.
     PrimaryConstructorStorageAttributes,
-    /// Sum-type variants.
-    Variants,
 }
 
 /// The semantic context in which a complete field sequence is emitted.
