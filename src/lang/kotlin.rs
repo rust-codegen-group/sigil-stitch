@@ -345,6 +345,7 @@ const KOTLIN_TYPES: &[TypeKindCapabilityProfile] = &[
             TypeCapability::Methods,
             TypeCapability::InterfaceImplementation,
             TypeCapability::PrimaryConstructorParameters,
+            TypeCapability::PrimaryConstructorStorageAttributes,
             TypeCapability::Variants,
         ],
     ),

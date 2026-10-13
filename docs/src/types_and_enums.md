@@ -351,8 +351,9 @@ let type_spec = TypeSpec::builder("NamingConventionTest", TypeKind::Struct)
 The `PrimaryConstructorStorageAttributes` capability is distinct from
 `PrimaryConstructorParameters`: an adapter must opt in only when it can preserve
 this metadata on the target's promoted storage. Kotlin currently owns the
-`@field:` placement. Other languages reject the intent until their own lowering
-defines an appropriate attachment; no shared placement enum is implied.
+`@field:` placement for class, data-class, and enum primary-constructor
+properties. Other languages reject the intent until their own lowering defines
+an appropriate attachment; no shared placement enum is implied.
 
 ### Enums with EnumVariantSpec
 

@@ -507,6 +507,7 @@ fn kotlin_matrix() {
         TypeCapability::Methods,
         TypeCapability::InterfaceImplementation,
         TypeCapability::PrimaryConstructorParameters,
+        TypeCapability::PrimaryConstructorStorageAttributes,
         TypeCapability::Variants,
     ];
     let newtype_caps_declaration = &[
