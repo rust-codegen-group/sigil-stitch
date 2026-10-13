@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.1
+
+### Added
+
+- Storage metadata for promoted primary-constructor properties through
+  `ParameterSpec::annotate_storage()` and `storage_annotation()`. Kotlin
+  lowers structured metadata with the `@field:` use-site target and preserves
+  import tracking, including for enum primary-constructor properties.
+
+### Fixed
+
+- Preserved the existing `TypeCapability` discriminant ordering while adding
+  primary-constructor storage metadata, keeping downstream enum matches stable
+  across the 0.7 patch line.
+
+### Changed
+
+- The semver check now verifies the 0.7.0 to 0.7.1 patch boundary with no
+  approved breaking API changes.
+
 ## 0.7.0
 
 ### Added

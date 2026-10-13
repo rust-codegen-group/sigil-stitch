@@ -4,7 +4,10 @@ Thank you for your interest in contributing!
 
 ## Project Overview
 
-sigil-stitch is a Rust library for type-safe, import-aware, width-aware code generation across multiple languages. It combines JavaPoet's builder + CodeBlock model with Wadler-Lindig pretty printing.
+sigil-stitch is a structured, language-aware Rust code generation toolkit. It
+keeps semantic declarations and type references structured until a selected
+language adapter validates and lowers them, then prepares imports and renders
+width-aware output for the target language.
 
 **Workspace layout:**
 
