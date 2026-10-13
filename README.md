@@ -1,10 +1,10 @@
 # sigil-stitch
 
-Type-safe, import-aware, width-aware code generation for multiple languages.
-
 [![Crates.io](https://img.shields.io/crates/v/sigil-stitch.svg)](https://crates.io/crates/sigil-stitch)
 [![docs.rs](https://docs.rs/sigil-stitch/badge.svg)](https://docs.rs/sigil-stitch)
 [![CI](https://github.com/rust-codegen-group/sigil-stitch/actions/workflows/ci.yml/badge.svg)](https://github.com/rust-codegen-group/sigil-stitch/actions/workflows/ci.yml)
+
+Type-safe, import-aware, width-aware code generation for multiple languages.
 
 sigil-stitch is a structured, language-aware code generation toolkit for Rust. Build source
 with composable `CodeBlock`s, declaration specs, or the `sigil_quote!` macro. Semantic types,
