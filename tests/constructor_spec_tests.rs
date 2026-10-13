@@ -10,6 +10,7 @@ use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::swift::Swift;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::spec::annotation_spec::AnnotationSpec;
+use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
 use sigil_stitch::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -758,6 +759,40 @@ fn test_kotlin_primary_constructor_storage_annotations_are_imported_and_placed()
         output.contains("@field:CustomMarker\n    var mutableField: String"),
         "{output}"
     );
+}
+
+#[test]
+fn test_kotlin_enum_primary_constructor_storage_annotations_are_supported() {
+    let kt = Kotlin::new();
+    let type_spec = TypeSpec::builder("Status", TypeKind::Enum)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("wireName", TypeName::primitive("String"))
+                .is_property()
+                .annotate_storage(AnnotationSpec::new("SerializedName").arg("\"wire_name\""))
+                .build()
+                .unwrap(),
+        )
+        .add_variant(
+            EnumVariantSpec::builder("ACTIVE")
+                .constructor_argument(CodeBlock::of("\"active\"", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("Status.kt", kt)
+        .add_type(type_spec)
+        .build()
+        .unwrap()
+        .render(100)
+        .unwrap();
+
+    assert!(
+        output.contains("@field:SerializedName(\"wire_name\")"),
+        "{output}"
+    );
+    assert!(output.contains("val wireName: String"), "{output}");
 }
 
 #[test]
