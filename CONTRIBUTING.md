@@ -69,7 +69,7 @@ just coverage          # summary table
 just coverage-html     # HTML report, opens in browser
 just coverage-lcov     # LCOV output for CI/editors
 just coverage-nextest  # LCOV from the nextest test suite
-just semver-check      # verify the documented 0.6.8 compatibility delta
+just semver-check      # verify the active patch compatibility delta
 
 # Documentation
 just doc               # cargo doc --no-deps --open

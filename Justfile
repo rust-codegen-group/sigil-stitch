@@ -37,7 +37,7 @@ build:
 # Run all checks (fmt + lint + test)
 check: fmt-check lint test
 
-# Verify the exact supported public API delta from 0.6.8.
+# Verify the exact supported public API delta for the active patch release.
 semver-check:
     cargo test --test compatibility_semver_script
     scripts/check-semver.sh
