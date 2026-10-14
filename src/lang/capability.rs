@@ -123,6 +123,9 @@ pub enum TypeCapability {
     /// Metadata attached to storage promoted by a declaration constructor
     /// parameter.
     PrimaryConstructorStorageAttributes,
+    /// Accessibility of storage promoted by a declaration constructor
+    /// parameter.
+    PrimaryConstructorStorageVisibility,
 }
 
 /// The semantic context in which a complete field sequence is emitted.

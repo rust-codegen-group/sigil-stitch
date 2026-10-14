@@ -326,6 +326,7 @@ const SCALA_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::NominalSubtyping,
     TypeCapability::InterfaceImplementation,
     TypeCapability::PrimaryConstructorParameters,
+    TypeCapability::PrimaryConstructorStorageVisibility,
 ];
 const SCALA_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
     TypeDeclarationCapability::ParametricPolymorphism,

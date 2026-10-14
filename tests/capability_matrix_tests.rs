@@ -21,7 +21,7 @@ const ALL_KINDS: [TypeKind; 7] = [
     TypeKind::Newtype,
 ];
 
-const ALL_CAPABILITIES: [TypeCapability; 9] = [
+const ALL_CAPABILITIES: [TypeCapability; 10] = [
     TypeCapability::RecordFields,
     TypeCapability::AccessorMethods,
     TypeCapability::Methods,
@@ -30,6 +30,7 @@ const ALL_CAPABILITIES: [TypeCapability; 9] = [
     TypeCapability::InterfaceImplementation,
     TypeCapability::PrimaryConstructorParameters,
     TypeCapability::PrimaryConstructorStorageAttributes,
+    TypeCapability::PrimaryConstructorStorageVisibility,
     TypeCapability::Variants,
 ];
 const ALL_DECLARATION_CAPABILITIES: [TypeDeclarationCapability; 4] = [
@@ -489,6 +490,7 @@ fn kotlin_matrix() {
         TypeCapability::InterfaceImplementation,
         TypeCapability::PrimaryConstructorParameters,
         TypeCapability::PrimaryConstructorStorageAttributes,
+        TypeCapability::PrimaryConstructorStorageVisibility,
     ];
     let contract_caps_declaration = &[
         TypeDeclarationCapability::ParametricPolymorphism,
@@ -508,6 +510,7 @@ fn kotlin_matrix() {
         TypeCapability::InterfaceImplementation,
         TypeCapability::PrimaryConstructorParameters,
         TypeCapability::PrimaryConstructorStorageAttributes,
+        TypeCapability::PrimaryConstructorStorageVisibility,
         TypeCapability::Variants,
     ];
     let newtype_caps_declaration = &[
@@ -722,6 +725,7 @@ fn scala_matrix() {
         TypeCapability::NominalSubtyping,
         TypeCapability::InterfaceImplementation,
         TypeCapability::PrimaryConstructorParameters,
+        TypeCapability::PrimaryConstructorStorageVisibility,
     ];
     let contract_caps_declaration = &[
         TypeDeclarationCapability::ParametricPolymorphism,

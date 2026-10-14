@@ -421,14 +421,17 @@ impl FunSpec {
             .receiver
             .iter()
             .chain(self.params.iter())
-            .find(|parameter| parameter.has_storage_annotations())
+            .find(|parameter| {
+                parameter.has_storage_annotations() || parameter.has_storage_visibility()
+            })
         {
             return Err(SigilStitchError::InvalidFunctionTypeParameter {
                 language,
                 function_name: self.name.clone(),
                 parameter_name: parameter.name.clone(),
-                reason: "storage metadata is valid only on promoted primary-constructor properties"
-                    .to_string(),
+                reason:
+                    "storage metadata and visibility are valid only on promoted primary-constructor properties"
+                        .to_string(),
             });
         }
         let context = intent.function_context();

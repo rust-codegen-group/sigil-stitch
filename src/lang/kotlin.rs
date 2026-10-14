@@ -302,6 +302,7 @@ const KOTLIN_CLASS_CAPABILITIES: &[TypeCapability] = &[
     TypeCapability::InterfaceImplementation,
     TypeCapability::PrimaryConstructorParameters,
     TypeCapability::PrimaryConstructorStorageAttributes,
+    TypeCapability::PrimaryConstructorStorageVisibility,
 ];
 const KOTLIN_CONTRACT_DECLARATION_CAPABILITIES: &[TypeDeclarationCapability] = &[
     TypeDeclarationCapability::ParametricPolymorphism,
@@ -346,6 +347,7 @@ const KOTLIN_TYPES: &[TypeKindCapabilityProfile] = &[
             TypeCapability::InterfaceImplementation,
             TypeCapability::PrimaryConstructorParameters,
             TypeCapability::PrimaryConstructorStorageAttributes,
+            TypeCapability::PrimaryConstructorStorageVisibility,
             TypeCapability::Variants,
         ],
     ),

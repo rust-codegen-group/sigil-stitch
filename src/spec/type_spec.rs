@@ -622,10 +622,20 @@ impl TypeSpec {
             }
         }
         for parameter in &self.primary_constructor {
+            let promotes = parameter.is_property() || parameter.is_mutable_property();
+            if parameter.has_storage_visibility() && !promotes {
+                errors.push(SigilStitchError::InvalidTypeDeclaration {
+                    type_name: self.name.clone(),
+                    reason: format!(
+                        "primary-constructor parameter {:?} cannot set storage visibility without property promotion",
+                        parameter.name()
+                    ),
+                });
+            }
             if !parameter.has_storage_annotations() {
                 continue;
             }
-            if !parameter.is_property() && !parameter.is_mutable_property() {
+            if !promotes {
                 errors.push(SigilStitchError::InvalidTypeDeclaration {
                     type_name: self.name.clone(),
                     reason: format!(
@@ -878,6 +888,19 @@ impl TypeSpec {
                 ))
         {
             missing.push(TypeCapability::PrimaryConstructorStorageAttributes);
+        }
+        let has_storage_visibility = self
+            .primary_constructor
+            .iter()
+            .any(ParameterSpec::has_storage_visibility);
+        if has_storage_visibility
+            && (capabilities.type_validation_is_permissive()
+                || !capabilities.supports_type_capability(
+                    self.kind,
+                    TypeCapability::PrimaryConstructorStorageVisibility,
+                ))
+        {
+            missing.push(TypeCapability::PrimaryConstructorStorageVisibility);
         }
         require(
             TypeCapability::Variants,

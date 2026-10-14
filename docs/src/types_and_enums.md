@@ -355,6 +355,38 @@ this metadata on the target's promoted storage. Kotlin currently owns the
 properties. Other languages reject the intent until their own lowering defines
 an appropriate attachment; no shared placement enum is implied.
 
+A promoted primary-constructor property can also carry an accessibility with
+`storage_visibility()`:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::spec::modifiers::Visibility;
+# fn main() {
+let client = ParameterSpec::builder("client", TypeName::primitive("ApiClient"))
+    .is_property()
+    .storage_visibility(Visibility::Private)
+    .build()
+    .unwrap();
+
+let type_spec = TypeSpec::builder("PetApi", TypeKind::Class)
+    .visibility(Visibility::Public)
+    .add_primary_constructor_param(client)
+    .build()
+    .unwrap();
+# let _ = type_spec;
+// Kotlin and Scala: class PetApi(private val client: ApiClient)
+# }
+```
+
+This is separate from the type declaration's own visibility and from a
+separately declared field. `PrimaryConstructorStorageVisibility` is the
+capability for this fact; Kotlin and Scala opt in, and other languages reject
+the intent. The visibility governs the promoted property's accessor, not the
+secrecy of the value: a data class still includes the value in generated value
+functions such as `toString()`. To keep a value out of those generated
+functions, declare it as a body member instead of promoting it.
+
 ### Enums with EnumVariantSpec
 
 TypeSpec with `TypeKind::Enum` uses `add_variant()` instead of `add_field()`. See the [EnumVariantSpec](#enumvariantspec) section below for variant forms.

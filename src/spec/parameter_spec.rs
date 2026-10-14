@@ -3,6 +3,7 @@
 use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use crate::lang::CodeLang;
 use crate::spec::annotation_spec::AnnotationSpec;
+use crate::spec::modifiers::Visibility;
 use crate::type_name::TypeName;
 
 /// A single function parameter.
@@ -41,6 +42,9 @@ pub struct ParameterSpec {
     /// Structured metadata attached to storage promoted by this parameter.
     #[serde(default)]
     pub(crate) storage_annotation_specs: Vec<AnnotationSpec>,
+    /// Accessibility of storage promoted by this parameter.
+    #[serde(default)]
+    pub(crate) storage_visibility: Visibility,
 }
 
 impl ParameterSpec {
@@ -55,6 +59,7 @@ impl ParameterSpec {
             is_mutable_property: false,
             storage_annotations: Vec::new(),
             storage_annotation_specs: Vec::new(),
+            storage_visibility: Visibility::default(),
         }
     }
 
@@ -115,6 +120,21 @@ impl ParameterSpec {
     /// Whether this parameter requests metadata on promoted storage.
     pub(crate) fn has_storage_annotations(&self) -> bool {
         !self.storage_annotations.is_empty() || !self.storage_annotation_specs.is_empty()
+    }
+
+    /// Return the requested accessibility of promoted storage.
+    ///
+    /// This governs the visibility of the promoted property's accessor, not the
+    /// visibility of the value itself. It is meaningful only when the parameter
+    /// promotes immutable or mutable property storage.
+    pub fn storage_visibility(&self) -> Visibility {
+        self.storage_visibility
+    }
+
+    /// Whether this parameter requests an explicit accessibility on promoted
+    /// storage.
+    pub(crate) fn has_storage_visibility(&self) -> bool {
+        self.storage_visibility != Visibility::default()
     }
 
     /// Emit this parameter with the pre-0.6.8 shared declaration grammar.
@@ -191,6 +211,7 @@ pub struct ParameterSpecBuilder {
     is_mutable_property: bool,
     storage_annotations: Vec<CodeBlock>,
     storage_annotation_specs: Vec<AnnotationSpec>,
+    storage_visibility: Visibility,
 }
 
 impl ParameterSpecBuilder {
@@ -246,6 +267,19 @@ impl ParameterSpecBuilder {
         self
     }
 
+    /// Set the accessibility of storage promoted by this parameter.
+    ///
+    /// The visibility applies to the promoted property (for example Kotlin's
+    /// `private val`), not to the type declaration or a separately declared
+    /// field. It is only meaningful together with [`Self::is_property`] or
+    /// [`Self::is_mutable_property`]; languages reject a promoted-storage
+    /// visibility on a parameter that does not request promotion. The default,
+    /// [`Visibility::Inherited`], emits no modifier.
+    pub fn storage_visibility(mut self, visibility: Visibility) -> Self {
+        self.storage_visibility = visibility;
+        self
+    }
+
     /// Build the [`ParameterSpec`].
     ///
     /// # Errors
@@ -267,6 +301,7 @@ impl ParameterSpecBuilder {
             is_mutable_property: self.is_mutable_property,
             storage_annotations: self.storage_annotations,
             storage_annotation_specs: self.storage_annotation_specs,
+            storage_visibility: self.storage_visibility,
         })
     }
 }
