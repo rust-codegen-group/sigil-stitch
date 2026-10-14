@@ -796,6 +796,35 @@ fn test_kotlin_enum_primary_constructor_storage_annotations_are_supported() {
 }
 
 #[test]
+fn test_kotlin_enum_primary_constructor_storage_visibility_is_supported() {
+    let type_spec = TypeSpec::builder("Status", TypeKind::Enum)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("wireName", TypeName::primitive("String"))
+                .is_property()
+                .storage_visibility(Visibility::Private)
+                .build()
+                .unwrap(),
+        )
+        .add_variant(
+            EnumVariantSpec::builder("ACTIVE")
+                .constructor_argument(CodeBlock::of("\"active\"", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("Status.kt", Kotlin::new())
+        .add_type(type_spec)
+        .build()
+        .unwrap()
+        .render(100)
+        .unwrap();
+
+    assert!(output.contains("private val wireName: String"), "{output}");
+}
+
+#[test]
 fn test_storage_annotations_require_promoted_primary_constructor_storage() {
     let spec = TypeSpec::builder("Invalid", TypeKind::Class)
         .add_primary_constructor_param(
@@ -914,6 +943,207 @@ fn test_parameter_serde_defaults_storage_annotation_fields() {
     let restored: ParameterSpec = serde_json::from_value(serialized).unwrap();
     assert!(restored.storage_annotations().is_empty());
     assert!(restored.storage_annotation_specs().is_empty());
+}
+
+#[test]
+fn test_kotlin_primary_constructor_storage_visibility_is_rendered() {
+    let type_spec = TypeSpec::builder("PetApi", TypeKind::Class)
+        .visibility(Visibility::Public)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("client", TypeName::primitive("ApiClient"))
+                .is_property()
+                .storage_visibility(Visibility::Private)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("PetApi.kt", Kotlin::new())
+        .add_type(type_spec)
+        .build()
+        .unwrap()
+        .render(100)
+        .unwrap();
+
+    assert!(
+        output.contains("class PetApi(private val client: ApiClient)"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_kotlin_primary_constructor_storage_visibility_precedes_property_keyword() {
+    let type_spec = TypeSpec::builder("NamingConventionTest", TypeKind::Struct)
+        .visibility(Visibility::Public)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("snakeCaseField", TypeName::primitive("String?"))
+                .is_property()
+                .annotate_storage(AnnotationSpec::new("SerializedName"))
+                .storage_visibility(Visibility::Private)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("NamingConventionTest.kt", Kotlin::new())
+        .add_type(type_spec)
+        .build()
+        .unwrap()
+        .render(100)
+        .unwrap();
+
+    assert!(
+        output.contains("@field:SerializedName\n    private val snakeCaseField: String?"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_scala_primary_constructor_storage_visibility_is_rendered() {
+    let type_spec = TypeSpec::builder("PetApi", TypeKind::Class)
+        .visibility(Visibility::Public)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("client", TypeName::primitive("ApiClient"))
+                .is_property()
+                .storage_visibility(Visibility::Private)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let output = FileSpec::builder_with("PetApi.scala", sigil_stitch::lang::scala::Scala::new())
+        .add_type(type_spec)
+        .build()
+        .unwrap()
+        .render(100)
+        .unwrap();
+
+    assert!(
+        output.contains("class PetApi(private val client: ApiClient)"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_storage_visibility_requires_promoted_primary_constructor_storage() {
+    let spec = TypeSpec::builder("Invalid", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .storage_visibility(Visibility::Private)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = spec.emit(&Kotlin::new()).unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::InvalidTypeDeclaration { reason, .. }
+            if reason.contains("without property promotion")
+    ));
+}
+
+#[test]
+fn test_storage_visibility_is_rejected_on_function_parameters() {
+    let function = FunSpec::builder("run")
+        .add_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .storage_visibility(Visibility::Private)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = function
+        .emit(&Kotlin::new(), DeclarationContext::TopLevel)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::InvalidFunctionTypeParameter { reason, .. }
+            if reason.contains("only on promoted primary-constructor properties")
+    ));
+}
+
+#[test]
+fn test_storage_visibility_is_rejected_when_language_lacks_the_capability() {
+    let spec = TypeSpec::builder("Invalid", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .is_property()
+                .storage_visibility(Visibility::Private)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = spec
+        .emit(&sigil_stitch::lang::javascript::JavaScript::new())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::UnsupportedTypeCapabilities {
+            capabilities, ..
+        } if capabilities.contains(&TypeCapability::PrimaryConstructorParameters)
+            && capabilities.contains(&TypeCapability::PrimaryConstructorStorageVisibility)
+    ));
+}
+
+#[test]
+fn test_storage_visibility_rejects_unsupported_visibility_kind() {
+    let kotlin = TypeSpec::builder("Invalid", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .is_property()
+                .storage_visibility(Visibility::PublicSuper)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let error = kotlin.emit(&Kotlin::new()).unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::InvalidTypeDeclaration { reason, .. }
+            if reason.contains("does not support") && reason.contains("PublicSuper")
+    ));
+
+    let scala = TypeSpec::builder("Invalid", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("String"))
+                .is_property()
+                .storage_visibility(Visibility::PublicCrate)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let error = scala
+        .emit(&sigil_stitch::lang::scala::Scala::new())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        sigil_stitch::error::SigilStitchError::InvalidTypeDeclaration { reason, .. }
+            if reason.contains("does not support") && reason.contains("PublicCrate")
+    ));
+}
+
+#[test]
+fn test_parameter_serde_defaults_storage_visibility() {
+    let parameter = ParameterSpec::of("value", TypeName::primitive("String"));
+    let mut serialized = serde_json::to_value(parameter).unwrap();
+    serialized
+        .as_object_mut()
+        .unwrap()
+        .remove("storage_visibility");
+
+    let restored: ParameterSpec = serde_json::from_value(serialized).unwrap();
+    assert_eq!(restored.storage_visibility(), Visibility::Inherited);
 }
 
 #[test]

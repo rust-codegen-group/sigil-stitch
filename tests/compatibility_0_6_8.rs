@@ -470,6 +470,30 @@ fn permissive_adapters_reject_storage_metadata_instead_of_dropping_it() {
     ));
 }
 
+#[test]
+fn permissive_adapters_reject_storage_visibility_instead_of_dropping_it() {
+    let spec = TypeSpec::builder("Record", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("value", TypeName::primitive("Value"))
+                .is_property()
+                .storage_visibility(Visibility::Private)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let error = spec
+        .emit(&Legacy068Adapter::new(MarkerMode::Standard))
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        SigilStitchError::UnsupportedTypeCapabilities {
+            capabilities, ..
+        } if capabilities == vec![sigil_stitch::lang::capability::TypeCapability::PrimaryConstructorStorageVisibility]
+    ));
+}
+
 fn import_ref(module: &str, name: &str) -> ImportRef {
     ImportRef {
         module: module.to_string(),

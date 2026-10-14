@@ -87,6 +87,21 @@ pub(crate) fn validate(lang: &Scala, type_: TypeIntent<'_>) -> Result<(), SigilS
                 ),
             });
         }
+        if parameter.has_storage_visibility()
+            && !matches!(
+                parameter.storage_visibility(),
+                Visibility::Public | Visibility::Private | Visibility::Protected
+            )
+        {
+            return Err(SigilStitchError::InvalidTypeDeclaration {
+                type_name: type_.name().to_string(),
+                reason: format!(
+                    "Scala primary-constructor property {:?} does not support {:?} visibility",
+                    parameter.name(),
+                    parameter.storage_visibility()
+                ),
+            });
+        }
         if parameter.default_value().is_some_and(CodeBlock::is_empty) {
             return Err(SigilStitchError::InvalidTypeDeclaration {
                 type_name: type_.name().to_string(),
@@ -173,6 +188,7 @@ pub(crate) fn lower(
     if !type_.primary_constructor_parameters().is_empty() {
         format.push_str("(%L)");
         arguments.push(Arg::Code(primary_constructor(
+            lang,
             type_.primary_constructor_parameters(),
         )?));
     } else if type_.kind() == TypeKind::Struct {
@@ -291,11 +307,20 @@ fn preamble(
     Ok(())
 }
 
-fn primary_constructor(parameters: &[ParameterSpec]) -> Result<CodeBlock, SigilStitchError> {
+fn primary_constructor(
+    lang: &Scala,
+    parameters: &[ParameterSpec],
+) -> Result<CodeBlock, SigilStitchError> {
     let mut block = CodeBlock::builder();
     for (index, parameter) in parameters.iter().enumerate() {
         if index > 0 {
             block.add(",%W", ());
+        }
+        if parameter.has_storage_visibility() {
+            block.add(
+                lang.render_visibility(parameter.storage_visibility(), DeclarationContext::Member),
+                (),
+            );
         }
         if parameter.is_mutable_property() {
             block.add("var ", ());

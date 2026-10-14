@@ -114,9 +114,11 @@ capability slices. `TypeDeclarationCapability` owns polymorphism and root
 attributes; `TypeCapability` owns fields, methods, relationships, constructors,
 and variants. `PrimaryConstructorStorageAttributes` is separate from
 `PrimaryConstructorParameters`: advertise it only when the adapter can preserve
-metadata attached to promoted constructor storage. The adapter owns the
-annotation or attribute placement and spelling. Missing declaration-wide
-capabilities are reported before
+metadata attached to promoted constructor storage. Likewise
+`PrimaryConstructorStorageVisibility` is advertised only when the adapter can
+express the promoted property's accessor visibility. The adapter owns the
+annotation, attribute, or visibility-modifier placement and spelling. Missing
+declaration-wide capabilities are reported before
 ordinary-kind capabilities, without suppressing either diagnostic group.
 Function profiles are keyed by both context (`TopLevel`, `ReceiverMethod`,
 `Member`, or `InterfaceMember`) and form (`Function`, `Constructor`, or

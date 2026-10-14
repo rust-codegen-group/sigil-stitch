@@ -61,6 +61,19 @@ capability for this semantic fact. Each language that supports it owns the
 attachment spelling and placement; the built-in Kotlin adapter emits
 `@field:` before `val` or `var`.
 
+### Primary-constructor storage visibility
+
+The accessibility of storage promoted by a primary-constructor parameter. Like
+storage metadata, the parameter must request immutable or mutable property
+promotion; the visibility is not the visibility of the type declaration and not
+a separately declared field. `ParameterSpecBuilder::storage_visibility()` sets
+it, and `PrimaryConstructorStorageVisibility` is the capability for this
+semantic fact. It governs the promoted property's accessor — its getter,
+setter, and destructuring component — not the secrecy of the value: a target
+may still include the value in generated value functions. Kotlin and Scala own
+the modifier spelling and placement; they emit it before the `val` or `var`
+keyword, after any storage annotations.
+
 ### Closed sum
 
 A type declaration whose complete ordered set of named cases is part of its
