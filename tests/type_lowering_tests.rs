@@ -107,6 +107,40 @@ fn type_validation_aggregates_intrinsic_adapter_and_child_errors() {
 }
 
 #[test]
+fn kotlin_primary_constructor_escapes_keyword_parameter_names() {
+    let type_ = TypeSpec::builder("Envelope", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("file", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
+        )
+        .add_primary_constructor_param(
+            ParameterSpec::builder("data", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
+        )
+        .add_primary_constructor_param(
+            ParameterSpec::builder("class", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let rendered = render_type(
+        sigil_stitch::lang::kotlin::Kotlin::new(),
+        "Envelope.kt",
+        type_,
+    );
+    assert!(rendered.contains("val `file`: String"));
+    assert!(rendered.contains("val `data`: String"));
+    assert!(rendered.contains("val `class`: String"));
+}
+
+#[test]
 fn alias_and_newtype_inputs_that_have_no_grammar_fail_instead_of_disappearing() {
     let alias = TypeSpec::builder("Alias", TypeKind::TypeAlias)
         .extends(TypeName::primitive("String"))
