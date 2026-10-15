@@ -141,6 +141,40 @@ fn kotlin_primary_constructor_escapes_keyword_parameter_names() {
 }
 
 #[test]
+fn scala_primary_constructor_escapes_keyword_parameter_names() {
+    let type_ = TypeSpec::builder("Envelope", TypeKind::Class)
+        .add_primary_constructor_param(
+            ParameterSpec::builder("type", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
+        )
+        .add_primary_constructor_param(
+            ParameterSpec::builder("match", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
+        )
+        .add_primary_constructor_param(
+            ParameterSpec::builder("override", TypeName::primitive("String"))
+                .is_property()
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    let rendered = render_type(
+        sigil_stitch::lang::scala::Scala::new(),
+        "Envelope.scala",
+        type_,
+    );
+    assert!(rendered.contains("val `type`: String"));
+    assert!(rendered.contains("val `match`: String"));
+    assert!(rendered.contains("val `override`: String"));
+}
+
+#[test]
 fn alias_and_newtype_inputs_that_have_no_grammar_fail_instead_of_disappearing() {
     let alias = TypeSpec::builder("Alias", TypeKind::TypeAlias)
         .extends(TypeName::primitive("String"))

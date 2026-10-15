@@ -57,7 +57,6 @@ pub(crate) fn validate(lang: &Scala, type_: TypeIntent<'_>) -> Result<(), SigilS
     for parameter in type_.primary_constructor_parameters() {
         if !is_identifier(parameter.name())
             || parameter.name() == "_"
-            || lang.reserved_words().contains(&parameter.name())
             || parameter.param_type().is_empty()
             || parameter.is_variadic()
         {
@@ -328,8 +327,11 @@ fn primary_constructor(
             block.add("val ", ());
         }
         block.add(
-            &format!("{}: %T", parameter.name()),
-            parameter.param_type().clone(),
+            "%L: %T",
+            (
+                lang.escape_reserved(parameter.name()),
+                parameter.param_type().clone(),
+            ),
         );
         if let Some(default) = parameter.default_value() {
             block.add(" = %L", default.clone());
