@@ -75,10 +75,7 @@ pub(crate) fn validate(lang: &Kotlin, type_: TypeIntent<'_>) -> Result<(), Sigil
     }
     let mut constructor_names = std::collections::HashSet::new();
     for parameter in type_.primary_constructor_parameters() {
-        if !common::is_identifier(parameter.name())
-            || parameter.name() == "_"
-            || lang.reserved_words().contains(&parameter.name())
-        {
+        if !common::is_identifier(parameter.name()) || parameter.name() == "_" {
             return Err(SigilStitchError::InvalidTypeDeclaration {
                 type_name: type_.name().to_string(),
                 reason: format!(
@@ -416,8 +413,11 @@ fn primary_constructor(
             block.add("val ", ());
         }
         block.add(
-            &format!("{}: %T", parameter.name()),
-            parameter.param_type().clone(),
+            "%L: %T",
+            (
+                lang.escape_reserved(parameter.name()),
+                parameter.param_type().clone(),
+            ),
         );
         if let Some(default) = parameter.default_value() {
             block.add(" = %L", default.clone());
