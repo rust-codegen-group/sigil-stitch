@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.2
+
+### Added
+
+- Primary-constructor storage visibility through `ParameterSpecBuilder::storage_visibility()`. Kotlin and Scala lower supported visibility before the `val` or `var` property keyword, including enum primary-constructor properties in Kotlin.
+
+### Fixed
+
+- Unsupported, unpromoted, and permissive-adapter storage visibility now fails with an explicit validation error instead of being silently dropped.
+
+### Changed
+
+- The semver check now verifies the 0.7.1 to 0.7.2 patch boundary against the published 0.7.1 baseline.
+
 ## 0.7.1
 
 ### Added
