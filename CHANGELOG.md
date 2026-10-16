@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.3
+
+### Fixed
+
+- Kotlin and Scala primary-constructor parameters now preserve valid keyword-shaped names through target-language escaping.
+- `CodeBlockBuilder` rejects orphan branch transitions before malformed control-flow nodes reach rendering.
+
 ## 0.7.2
 
 ### Added

@@ -15,8 +15,8 @@ The inventory is checked in three ways:
 - `compatibility_0_6_8.rs` compiles exact restored signatures through the
   external crate boundary and exercises the compatibility bridges.
 - `cargo-semver-checks 0.50.0` checks the active release boundary selected by
-  `scripts/check-semver.sh`. For the 0.7.2 patch release this is tag `0.7.1`
-  with `semver-0.7.1-allowlist.txt`; the allowlist is empty because the patch
+  `scripts/check-semver.sh`. For the 0.7.3 patch release this is tag `0.7.2`
+  with `semver-0.7.2-allowlist.txt`; the allowlist is empty because the patch
   must introduce no new breaking public API. The 0.6.8 inventory and external
   compatibility fixture remain the historical migration boundary.
 - The manifest test rejects malformed or duplicate inventory records and
