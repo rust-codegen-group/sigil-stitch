@@ -1277,4 +1277,13 @@ pub enum SigilStitchError {
         /// Final-render occurrence.
         context: String,
     },
+
+    /// A control-flow builder operation did not have a matching active block.
+    #[snafu(display("invalid control-flow operation {operation:?}: {reason}"))]
+    InvalidControlFlow {
+        /// The builder operation that detected the invalid state.
+        operation: &'static str,
+        /// Why the operation cannot be represented in the current block.
+        reason: String,
+    },
 }

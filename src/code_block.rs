@@ -476,11 +476,15 @@ impl CodeBlockBuilder {
         format: &str,
         args: impl IntoArgs,
     ) -> &mut Self {
-        let frame = self
-            .block_stack
-            .last()
-            .cloned()
-            .unwrap_or_else(BlockFrame::fallback);
+        let Some(frame) = self.block_stack.last().cloned() else {
+            self.errors
+                .push(crate::error::SigilStitchError::InvalidControlFlow {
+                    operation: "next_control_flow",
+                    reason: "cannot add a branch transition without an active control-flow block"
+                        .to_string(),
+                });
+            return self;
+        };
         self.nodes.push(CodeNode::Dedent);
         self.indent_depth -= 1;
         self.nodes.push(CodeNode::BranchCloseIntent {
@@ -591,6 +595,12 @@ impl CodeBlockBuilder {
         if self.indent_depth != 0 {
             return Err(crate::error::SigilStitchError::UnbalancedIndent {
                 depth: self.indent_depth,
+            });
+        }
+        if !self.block_stack.is_empty() {
+            return Err(crate::error::SigilStitchError::InvalidControlFlow {
+                operation: "build",
+                reason: "control-flow stack is not empty".to_string(),
             });
         }
         validate_relative_indent_markers(&self.nodes)?;
@@ -1089,6 +1099,43 @@ mod tests {
         let result = b.build();
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("unbalanced"));
+    }
+
+    #[test]
+    fn test_builder_rejects_branch_without_control_flow() {
+        let mut b = CodeBlock::builder();
+        b.next_control_flow("else", ());
+
+        let error = b.build().unwrap_err();
+        assert!(error.to_string().contains("next_control_flow"));
+        assert!(error.to_string().contains("active control-flow block"));
+    }
+
+    #[test]
+    fn test_builder_preserves_opening_frame_after_branch_transition() {
+        let mut b = CodeBlock::builder();
+        b.begin_control_flow_with_intent(BlockIntent::If, "if (x)", ());
+        b.next_control_flow_with_intent(BlockIntent::Else, "else", ());
+        b.end_control_flow();
+
+        let block = b.build().unwrap();
+        assert!(matches!(block.nodes.last(), Some(CodeNode::Newline)));
+        assert!(matches!(
+            block.nodes.get(block.nodes.len() - 2),
+            Some(CodeNode::BlockCloseIntent { condition, intent })
+                if condition == "if (x)" && *intent == BlockIntent::If
+        ));
+    }
+
+    #[test]
+    fn test_builder_closes_after_multiple_branch_transitions() {
+        let mut b = CodeBlock::builder();
+        b.begin_control_flow_with_intent(BlockIntent::If, "if (x)", ());
+        b.next_control_flow_with_intent(BlockIntent::ElseIf, "else if (y)", ());
+        b.next_control_flow_with_intent(BlockIntent::Else, "else", ());
+        b.end_control_flow();
+
+        assert!(b.build().is_ok());
     }
 
     #[test]
