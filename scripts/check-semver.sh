@@ -4,7 +4,7 @@ set -euo pipefail
 readonly EXPECTED_VERSION="cargo-semver-checks 0.50.0"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-readonly DEFAULT_ALLOWLIST="${REPO_ROOT}/tests/compatibility/semver-0.7.1-allowlist.txt"
+readonly DEFAULT_ALLOWLIST="${REPO_ROOT}/tests/compatibility/semver-0.7.2-allowlist.txt"
 
 die() {
   echo "semver-check: $*" >&2
@@ -223,11 +223,11 @@ semver_output="${run_dir}/cargo-semver-checks.txt"
 set +e
 (
   cd "${REPO_ROOT}"
-  # Check the 0.7.1 to 0.7.2 patch boundary explicitly. The release type
+  # Check the 0.7.2 to 0.7.3 patch boundary explicitly. The release type
   # keeps cargo-semver-checks from interpreting this 0.x patch as a major line.
   cargo semver-checks check-release \
     --workspace \
-    --baseline-rev 0.7.1 \
+    --baseline-rev 0.7.2 \
     --release-type patch \
     --color never
 ) > "${semver_output}" 2>&1
