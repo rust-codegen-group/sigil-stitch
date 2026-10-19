@@ -16,7 +16,7 @@ test-ci:
 # Compiler-acceptance examples are intentionally separate because they require
 # installed target compilers and generate fixtures for source_acceptance.
 example-smoke:
-    set -eu; for example in bash_codegen c_codegen code_fragments cpp_codegen csharp_codegen dart_codegen go_codegen haskell_codegen inline_control_flow java_codegen js_codegen kotlin_codegen language_spacing lua_codegen macro_features meta_programming multi_language_project ocaml_codegen php_codegen python_codegen ruby_codegen rust_codegen scala_codegen swift_codegen typescript_codegen zsh_codegen; do cargo run --quiet --example "$example" >/dev/null; done
+    set -eu; for example in bash_codegen c_codegen code_fragments cpp_codegen csharp_codegen dart_codegen go_codegen haskell_codegen inline_control_flow java_codegen js_codegen kotlin_codegen language_spacing lua_codegen macro_features meta_programming multi_language_project ocaml_codegen php_codegen python_codegen response_types ruby_codegen rust_codegen scala_codegen swift_codegen typescript_codegen zsh_codegen; do cargo run --quiet --example "$example" >/dev/null; done
 
 # Run doctests only
 test-doc:

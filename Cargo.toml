@@ -50,6 +50,10 @@ serde_json = "1"
 trybuild = "1"
 
 [[example]]
+name = "response_types"
+test = true
+
+[[example]]
 name = "source_acceptance"
 test = true
 
