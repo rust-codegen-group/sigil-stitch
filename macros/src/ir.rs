@@ -45,6 +45,10 @@ impl FormattedCode {
         &self.args
     }
 
+    pub(crate) fn is_single_code_argument(&self) -> bool {
+        self.format == "%L" && matches!(self.args.as_slice(), [QuoteArg::Code(_)])
+    }
+
     #[cfg(test)]
     pub(crate) fn into_parts(self) -> (String, Vec<QuoteArg>) {
         (self.format, self.args)

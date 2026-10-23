@@ -79,6 +79,51 @@ fn test_code_block_interpolation() {
 }
 
 #[test]
+fn test_quoted_expression_composes_without_leaking_its_final_newline() {
+    let condition = sigil_quote!(TypeScript { response.status === 400 }).unwrap();
+    let block = sigil_quote!(TypeScript {
+        if ($C(condition)) {
+            return;
+        }
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert_eq!(output, "if (response.status === 400) {\n  return;\n}\n");
+}
+
+#[test]
+fn test_quoted_statement_composes_without_duplicating_its_final_newline() {
+    let body = sigil_quote!(TypeScript { return; }).unwrap();
+    let block = sigil_quote!(TypeScript {
+        if (response.status === 400) {
+            $C(body)
+        }
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert_eq!(output, "if (response.status === 400) {\n  return;\n}\n");
+}
+
+#[test]
+fn test_quoted_statement_composition_preserves_explicit_blank_lines() {
+    let body = sigil_quote!(TypeScript { return; }).unwrap();
+    let block = sigil_quote!(TypeScript {
+        $C(body)
+
+        const after = true;
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert!(
+        output.contains("return;\n\nconst after = true;"),
+        "got: {output}"
+    );
+}
+
+#[test]
 fn test_multiple_interpolations_in_one_statement() {
     let t1 = TypeName::primitive("string");
     let t2 = TypeName::primitive("number");

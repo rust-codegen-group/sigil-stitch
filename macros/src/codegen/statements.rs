@@ -172,6 +172,7 @@ fn generate_statement(
     }
 }
 
+#[derive(Clone, Copy)]
 enum FormattedCall {
     Statement,
     Line,
@@ -184,6 +185,10 @@ fn generate_formatted(
     helper_error: &Ident,
     call: FormattedCall,
 ) -> TokenStream {
+    if matches!(call, FormattedCall::Line) && formatted.is_single_code_argument() {
+        return generate_code_line(formatted, context, builder, helper_error);
+    }
+
     let format = formatted.format();
     generate_call(formatted, context, helper_error, |args| match call {
         FormattedCall::Statement => quote! { #builder.add_statement(#format, #args); },
@@ -191,6 +196,22 @@ fn generate_formatted(
             #builder.add(#format, #args);
             #builder.add_line();
         },
+    })
+}
+
+fn generate_code_line(
+    formatted: &FormattedCode,
+    context: &mut GenerateContext,
+    builder: &Ident,
+    helper_error: &Ident,
+) -> TokenStream {
+    let block = context.ident("code_line_block");
+    generate_call(formatted, context, helper_error, |args| {
+        quote! {
+            let (#block,) = #args;
+            #builder.add_code(#block);
+            #builder.add_line();
+        }
     })
 }
 
