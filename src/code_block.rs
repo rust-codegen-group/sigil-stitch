@@ -303,6 +303,20 @@ impl CodeBlock {
         check_last(&self.nodes)
     }
 
+    #[doc(hidden)]
+    pub fn __sigil_ends_with_newline(&self) -> bool {
+        fn check_last(nodes: &[CodeNode]) -> bool {
+            match nodes.last() {
+                Some(CodeNode::Newline) => true,
+                Some(CodeNode::Sequence(children)) => check_last(children),
+                Some(CodeNode::Nested(inner)) => check_last(&inner.nodes),
+                _ => false,
+            }
+        }
+
+        check_last(&self.nodes)
+    }
+
     /// Remove one trailing newline from this block.
     ///
     /// This is used internally when a nested block continues into the

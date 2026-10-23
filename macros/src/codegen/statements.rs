@@ -110,7 +110,7 @@ fn generate_statement(
                 for #item in #expr {
                     let #block: ::sigil_stitch::code_block::CodeBlock =
                         ::std::convert::Into::into(#item);
-                    let #needs_newline = !#block.ends_with_newline_or_block_close();
+                    let #needs_newline = !#block.__sigil_ends_with_newline();
                     #builder.add_code(#block);
                     if #needs_newline {
                         #builder.add_line();

@@ -252,6 +252,24 @@ fn test_c_each_code_block_of_gets_newlines() {
 }
 
 #[test]
+fn test_c_each_adds_newline_after_block_close_without_one() {
+    let mut item = CodeBlock::builder();
+    item.begin_control_flow("if (ready)", ());
+    item.add_statement("return", ());
+    item.end_control_flow_no_newline();
+    let blocks = vec![item.build().unwrap()];
+
+    let block = sigil_quote!(TypeScript {
+        $C_each(blocks);
+        const after = true;
+    })
+    .unwrap();
+
+    let output = render_ts(&block);
+    assert_eq!(output, "if (ready) {\n  return;\n}\nconst after = true;\n");
+}
+
+#[test]
 fn test_c_each_mixed_block_types() {
     let mut blocks: Vec<CodeBlock> = Vec::new();
 
