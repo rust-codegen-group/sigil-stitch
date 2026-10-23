@@ -305,9 +305,9 @@ impl CodeBlock {
 
     /// Remove one trailing newline from this block.
     ///
-    /// This is used by `sigil_quote!` for inline meta-splices (`$for`/`$if`
-    /// inside expressions). Statement bodies naturally emit a final newline,
-    /// but expression splices must not leak that newline before `]`, `)`, `}`,
+    /// This is used internally when a nested block continues into the
+    /// surrounding source. Statement bodies naturally emit a final newline,
+    /// but inline composition must not leak that newline before `]`, `)`, `}`,
     /// or `;` in the surrounding expression.
     #[doc(hidden)]
     pub fn __sigil_trim_trailing_newline(mut self) -> Self {

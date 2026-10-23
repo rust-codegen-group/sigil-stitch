@@ -77,7 +77,8 @@ fn tuple_from_idents(idents: &[Ident]) -> TokenStream {
 
 fn generate_arg(arg: &QuoteArg, context: &mut GenerateContext) -> TokenStream {
     match arg {
-        QuoteArg::Type(expr) | QuoteArg::Code(expr) => quote! { #expr },
+        QuoteArg::Type(expr) => quote! { #expr },
+        QuoteArg::Code(expr) => quote! { (#expr).__sigil_trim_trailing_newline() },
         QuoteArg::Name(expr) => {
             quote! { ::sigil_stitch::code_block::NameArg((#expr).to_string()) }
         }

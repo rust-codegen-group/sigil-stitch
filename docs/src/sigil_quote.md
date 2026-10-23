@@ -333,6 +333,11 @@ let block = sigil_quote!(TypeScript {
 # }
 ```
 
+Nested blocks compose at their insertion point. A trailing newline from the
+nested block is shared with the surrounding line instead of being repeated;
+when the surrounding syntax continues inline, it does not appear before the
+next token. Explicit blank lines in the outer quote remain blank lines.
+
 ### Dollar Escape (`$$`)
 
 ```rust
