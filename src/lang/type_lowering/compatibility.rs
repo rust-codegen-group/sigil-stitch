@@ -5,6 +5,7 @@
 use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::lang::CodeLang;
+use crate::lang::function_lowering::inline_default_value;
 use crate::spec::enum_variant_spec::{ValidatedVariants, VariantContext};
 use crate::spec::modifiers::{DeclarationContext, TypeKind};
 use crate::spec::parameter_spec::ParameterSpec;
@@ -561,7 +562,7 @@ fn emit_parameter<L: CodeLang + ?Sized>(
     }
     if let Some(default) = parameter.default_value() {
         format.push_str(" = %L");
-        arguments.push(Arg::Code(default.clone()));
+        arguments.push(Arg::Code(inline_default_value(default)));
     }
     block.add(&format, arguments);
 }

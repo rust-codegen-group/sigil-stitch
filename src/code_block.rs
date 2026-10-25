@@ -317,14 +317,7 @@ impl CodeBlock {
         check_last(&self.nodes)
     }
 
-    /// Remove one trailing newline from this block.
-    ///
-    /// This is used internally when a nested block continues into the
-    /// surrounding source. Statement bodies naturally emit a final newline,
-    /// but inline composition must not leak that newline before `]`, `)`, `}`,
-    /// or `;` in the surrounding expression.
-    #[doc(hidden)]
-    pub fn __sigil_trim_trailing_newline(mut self) -> Self {
+    pub(crate) fn for_inline_composition(mut self) -> Self {
         fn trim(nodes: &mut Vec<CodeNode>) -> bool {
             match nodes.last_mut() {
                 Some(CodeNode::Newline) => {
@@ -339,6 +332,16 @@ impl CodeBlock {
 
         trim(&mut self.nodes);
         self
+    }
+
+    /// Remove one trailing newline for inline macro composition.
+    ///
+    /// This hidden wrapper is called by generated `sigil_quote!` code. Other
+    /// inline composition inside the crate uses the context-specific internal
+    /// helper above rather than exposing a caller-facing trim operation.
+    #[doc(hidden)]
+    pub fn __sigil_trim_trailing_newline(self) -> Self {
+        self.for_inline_composition()
     }
 
     /// Collect all import references from this code block.

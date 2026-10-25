@@ -4,7 +4,9 @@
 
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
-use crate::lang::function_lowering::{SignatureBuilder, tupled_parameter_list};
+use crate::lang::function_lowering::{
+    SignatureBuilder, inline_default_value, tupled_parameter_list,
+};
 use crate::lang::php::Php;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
@@ -89,7 +91,7 @@ fn emit_parameter(block: &mut CodeBlockBuilder, lang: &Php, parameter: &Paramete
     }
     block.add("$%L", lang.escape_reserved(parameter.name()));
     if let Some(default) = parameter.default_value() {
-        block.add(" = %L", default.clone());
+        block.add(" = %L", inline_default_value(default));
     }
 }
 

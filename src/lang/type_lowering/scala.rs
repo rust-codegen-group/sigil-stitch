@@ -4,6 +4,7 @@
 
 use crate::code_block::{Arg, CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
+use crate::lang::function_lowering::inline_default_value;
 use crate::lang::scala::Scala;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
@@ -334,7 +335,7 @@ fn primary_constructor(
             ),
         );
         if let Some(default) = parameter.default_value() {
-            block.add(" = %L", default.clone());
+            block.add(" = %L", inline_default_value(default));
         }
     }
     block.build()

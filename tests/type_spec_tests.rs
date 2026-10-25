@@ -17,6 +17,7 @@ use sigil_stitch::lang::config::{
 use sigil_stitch::lang::rust::Rust;
 use sigil_stitch::lang::typescript::TypeScript;
 use sigil_stitch::lang::{CodeLang, RendererLang, ValidatedType};
+use sigil_stitch::prelude::sigil_quote;
 use sigil_stitch::spec::annotation_spec::AnnotationSpec;
 use sigil_stitch::spec::emittable::Emittable;
 use sigil_stitch::spec::enum_variant_spec::EnumVariantSpec;
@@ -352,6 +353,10 @@ impl CodeLang for TypeProbeLang {
 }
 
 fn render_blocks_ts(blocks: &[CodeBlock]) -> String {
+    render_blocks_ts_at_width(blocks, 80)
+}
+
+fn render_blocks_ts_at_width(blocks: &[CodeBlock], width: usize) -> String {
     let lang = TypeScript::new();
     let imports = ImportGroup::new();
     let mut output = String::new();
@@ -359,7 +364,7 @@ fn render_blocks_ts(blocks: &[CodeBlock]) -> String {
         if i > 0 {
             output.push('\n');
         }
-        let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+        let mut renderer = CodeRenderer::new(&lang, &imports, width);
         output.push_str(&renderer.render(block).unwrap());
     }
     output
@@ -844,6 +849,71 @@ fn test_ts_class() {
     assert!(output.contains("private name: string;"));
     assert!(output.contains("getName(): string {"));
     assert!(output.contains("return this.name"));
+}
+
+#[test]
+fn test_ts_constructor_default_expression_composes_inline_at_width_boundary() {
+    fn emit_class(detail_type: &str, class_name: &str) -> String {
+        let body = sigil_quote!(TypeScript {
+            super(response, msg);
+            this.detail = detail;
+        })
+        .unwrap();
+        let default_message = sigil_quote!(TypeScript {
+            $S("Response returned an error code")
+        })
+        .unwrap();
+        let constructor = FunSpec::builder("constructor")
+            .is_constructor()
+            .add_param(ParameterSpec::of(
+                "response",
+                TypeName::primitive("Response"),
+            ))
+            .add_param(ParameterSpec::of(
+                "detail",
+                TypeName::primitive(detail_type),
+            ))
+            .add_param(
+                ParameterSpec::builder("msg", TypeName::primitive(""))
+                    .default_value(default_message)
+                    .build()
+                    .unwrap(),
+            )
+            .body(body)
+            .build()
+            .unwrap();
+        let class = TypeSpec::builder(class_name, TypeKind::Class)
+            .visibility(Visibility::Public)
+            .extends(TypeName::primitive("ResponseError"))
+            .add_field(
+                FieldSpec::builder("detail", TypeName::primitive(detail_type))
+                    .is_readonly()
+                    .build()
+                    .unwrap(),
+            )
+            .add_method(constructor)
+            .build()
+            .unwrap();
+
+        render_blocks_ts_at_width(&class.emit(&TypeScript::new()).unwrap(), 100)
+    }
+
+    let short = emit_class("AddPetErrorDetail", "AddPetError");
+    let long = emit_class("CheckNoSuccessBodyErrorDetail", "CheckNoSuccessBodyError");
+
+    for output in [&short, &long] {
+        assert!(
+            output.contains("msg = 'Response returned an error code') {"),
+            "{output}"
+        );
+        assert!(!output.contains("error code'\n)"), "{output}");
+    }
+    assert!(
+        long.contains(
+            "constructor(response: Response, detail: CheckNoSuccessBodyErrorDetail,\n    msg ="
+        ),
+        "{long}"
+    );
 }
 
 #[test]

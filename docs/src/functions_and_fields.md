@@ -78,6 +78,11 @@ when the type is empty. Likewise, `is_property()` and
 `is_mutable_property()` record constructor-property intent; the adapter chooses
 spellings such as `val`/`var` in Kotlin or `readonly` in C#.
 
+Default values are composed as inline expressions. If a structured default
+value comes from `sigil_quote!` and carries the quote's terminal line boundary,
+the adapter normalizes that boundary automatically when embedding the value in
+the parameter list; callers do not need to trim it themselves.
+
 For a promoted primary-constructor property, use `annotate_storage()` for
 structured, import-aware metadata or `storage_annotation()` for a
 target-specific source block. Storage metadata requires `is_property()` or

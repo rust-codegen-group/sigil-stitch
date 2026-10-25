@@ -688,6 +688,34 @@ fn test_kotlin_primary_constructor_with_super() {
 }
 
 #[test]
+fn primary_constructor_default_blocks_compose_inline() {
+    let mut default_value = CodeBlock::builder();
+    default_value.add("fallback", ());
+    default_value.add_line();
+    let default_value = default_value.build().unwrap();
+    let kotlin = Kotlin::new();
+    let scala = sigil_stitch::lang::scala::Scala::new();
+
+    for lang in [&kotlin as &dyn sigil_stitch::lang::CodeLang, &scala] {
+        let output = render_type(
+            &TypeSpec::builder("Defaults", TypeKind::Struct)
+                .add_primary_constructor_param(
+                    ParameterSpec::builder("value", TypeName::primitive("Value"))
+                        .is_property()
+                        .default_value(default_value.clone())
+                        .build()
+                        .unwrap(),
+                )
+                .build()
+                .unwrap(),
+            lang,
+        );
+        assert!(output.contains("fallback)"), "{output}");
+        assert!(!output.contains("fallback\n)"), "{output}");
+    }
+}
+
+#[test]
 fn test_kotlin_data_class_primary_constructor() {
     let kt = Kotlin::new();
     let output = render_type(

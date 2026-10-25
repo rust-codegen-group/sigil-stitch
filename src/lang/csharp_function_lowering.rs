@@ -7,7 +7,9 @@ use crate::error::SigilStitchError;
 use crate::lang::capability::FunctionForm;
 use crate::lang::csharp::CSharp;
 use crate::lang::csharp_constraints;
-use crate::lang::function_lowering::{SignatureBuilder, tupled_parameter_list};
+use crate::lang::function_lowering::{
+    SignatureBuilder, inline_default_value, tupled_parameter_list,
+};
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::modifiers::{DeclarationContext, Visibility};
@@ -168,7 +170,7 @@ fn emit_parameter(block: &mut CodeBlockBuilder, lang: &CSharp, parameter: &Param
         format!("{property}{}", lang.escape_reserved(parameter.name())),
     );
     if let Some(default) = parameter.default_value() {
-        block.add(" = %L", default.clone());
+        block.add(" = %L", inline_default_value(default));
     }
 }
 

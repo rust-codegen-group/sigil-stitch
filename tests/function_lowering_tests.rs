@@ -386,6 +386,114 @@ fn typescript_async_empty_returns_are_structured_promise_void_only_when_empty() 
 }
 
 #[test]
+fn default_parameter_blocks_compose_inline_across_supported_lowerers() {
+    let mut default_value = CodeBlock::builder();
+    default_value.add("fallback", ());
+    default_value.add_line();
+    let default_value = default_value.build().unwrap();
+    struct Case {
+        language: &'static str,
+        lang: Box<dyn CodeLang>,
+        context: DeclarationContext,
+        typed: bool,
+    }
+    let cases = vec![
+        (
+            "C++",
+            Box::new(sigil_stitch::lang::cpp::Cpp::new()) as Box<dyn CodeLang>,
+            DeclarationContext::TopLevel,
+            true,
+        ),
+        (
+            "C#",
+            Box::new(sigil_stitch::lang::csharp::CSharp::new()) as Box<dyn CodeLang>,
+            DeclarationContext::Member,
+            true,
+        ),
+        (
+            "JavaScript",
+            Box::new(sigil_stitch::lang::javascript::JavaScript::new()) as Box<dyn CodeLang>,
+            DeclarationContext::TopLevel,
+            false,
+        ),
+        (
+            "Kotlin",
+            Box::new(sigil_stitch::lang::kotlin::Kotlin::new()) as Box<dyn CodeLang>,
+            DeclarationContext::TopLevel,
+            true,
+        ),
+        (
+            "PHP",
+            Box::new(sigil_stitch::lang::php::Php::new()) as Box<dyn CodeLang>,
+            DeclarationContext::TopLevel,
+            true,
+        ),
+        (
+            "Python",
+            Box::new(sigil_stitch::lang::python::Python::new()) as Box<dyn CodeLang>,
+            DeclarationContext::TopLevel,
+            true,
+        ),
+        (
+            "Ruby",
+            Box::new(sigil_stitch::lang::ruby::Ruby::new()) as Box<dyn CodeLang>,
+            DeclarationContext::TopLevel,
+            false,
+        ),
+        (
+            "Scala",
+            Box::new(sigil_stitch::lang::scala::Scala::new()) as Box<dyn CodeLang>,
+            DeclarationContext::TopLevel,
+            true,
+        ),
+        (
+            "Swift",
+            Box::new(sigil_stitch::lang::swift::Swift::new()) as Box<dyn CodeLang>,
+            DeclarationContext::TopLevel,
+            true,
+        ),
+        (
+            "TypeScript",
+            Box::new(sigil_stitch::lang::typescript::TypeScript::new()) as Box<dyn CodeLang>,
+            DeclarationContext::TopLevel,
+            true,
+        ),
+    ]
+    .into_iter()
+    .map(|(language, lang, context, typed)| Case {
+        language,
+        lang,
+        context,
+        typed,
+    })
+    .collect::<Vec<_>>();
+
+    for case in cases {
+        let parameter_type = if case.typed { "Value" } else { "" };
+        let mut builder = FunSpec::builder("work").add_param(
+            ParameterSpec::builder("value", TypeName::primitive(parameter_type))
+                .default_value(default_value.clone())
+                .build()
+                .unwrap(),
+        );
+        if case.typed {
+            builder = builder.returns(vec![TypeName::primitive("Result")]);
+        }
+        let function = builder
+            .body(CodeBlock::of("body", ()).unwrap())
+            .build()
+            .unwrap();
+        let output = render_in_context(&function, case.lang.as_ref(), case.context, 120);
+        assert!(output.contains("fallback"), "{}: {output}", case.language);
+        assert!(
+            !output.contains("fallback\n)"),
+            "{} kept the default expression's line boundary: {output}",
+            case.language
+        );
+    }
+}
+
+#[test]
 fn same_version_function_return_lists_are_revalidated_on_target_selection() {
     let function = FunSpec::builder("work")
         .returns(vec![
