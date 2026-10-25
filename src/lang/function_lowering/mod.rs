@@ -18,6 +18,10 @@ pub(crate) struct SignatureBuilder {
     args: Vec<Arg>,
 }
 
+pub(crate) fn inline_default_value(default: &CodeBlock) -> CodeBlock {
+    default.clone().for_inline_composition()
+}
+
 impl SignatureBuilder {
     pub(crate) fn new() -> Self {
         Self {

@@ -6,7 +6,8 @@ use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::lang::capability::FunctionForm;
 use crate::lang::function_lowering::{
-    SignatureBuilder, tupled_parameter_list, type_params_with_inline_constraints,
+    SignatureBuilder, inline_default_value, tupled_parameter_list,
+    type_params_with_inline_constraints,
 };
 use crate::lang::kotlin::Kotlin;
 use crate::lang::{CodeLang, RendererLang};
@@ -180,7 +181,7 @@ fn emit_parameter(block: &mut CodeBlockBuilder, lang: &Kotlin, parameter: &Param
         block.add(": %T", parameter.param_type().clone());
     }
     if let Some(default) = parameter.default_value() {
-        block.add(" = %L", default.clone());
+        block.add(" = %L", inline_default_value(default));
     }
 }
 

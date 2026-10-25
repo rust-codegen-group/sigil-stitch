@@ -193,7 +193,7 @@ impl ParameterSpec {
 
         if let Some(default) = &self.default_value {
             fmt.push_str(" = %L");
-            args.push(Arg::Code(default.clone()));
+            args.push(Arg::Code(default.clone().for_inline_composition()));
         }
 
         cb.add(&fmt, args);
@@ -349,6 +349,20 @@ mod tests {
             .default_value(default)
             .build()
             .unwrap();
+        let output = emit_param(&param);
+        assert_eq!(output, "count: number = 0");
+    }
+
+    #[test]
+    fn test_param_with_line_terminated_default_composes_inline() {
+        let mut default = CodeBlock::builder();
+        default.add("0", ());
+        default.add_line();
+        let param = ParameterSpec::builder("count", TypeName::primitive("number"))
+            .default_value(default.build().unwrap())
+            .build()
+            .unwrap();
+
         let output = emit_param(&param);
         assert_eq!(output, "count: number = 0");
     }

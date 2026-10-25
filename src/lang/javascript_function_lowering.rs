@@ -5,7 +5,9 @@
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
 use crate::lang::capability::FunctionForm;
-use crate::lang::function_lowering::{SignatureBuilder, tupled_parameter_list};
+use crate::lang::function_lowering::{
+    SignatureBuilder, inline_default_value, tupled_parameter_list,
+};
 use crate::lang::javascript::JavaScript;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
@@ -68,7 +70,7 @@ fn emit_parameter(block: &mut CodeBlockBuilder, lang: &JavaScript, parameter: &P
     }
     block.add("%L", lang.escape_reserved(parameter.name()));
     if let Some(default) = parameter.default_value() {
-        block.add(" = %L", default.clone());
+        block.add(" = %L", inline_default_value(default));
     }
 }
 
