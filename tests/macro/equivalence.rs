@@ -229,17 +229,44 @@ fn test_name_and_type_combined() {
     );
 }
 
-fn top_level_block_intents(block: &CodeBlock) -> Vec<(String, BlockIntent)> {
-    let mut block = block.clone();
-    block
-        .nodes_mut()
-        .iter()
-        .filter_map(|node| match node {
-            CodeNode::BlockOpenIntent { condition, intent } => Some((condition.clone(), *intent)),
-            CodeNode::BlockCloseIntent { condition, intent } => Some((condition.clone(), *intent)),
-            _ => None,
-        })
-        .collect()
+fn rendered_block_intents(block: &CodeBlock) -> Vec<(String, BlockIntent)> {
+    #[derive(Debug, Default)]
+    struct IntentRecorder(std::cell::RefCell<Vec<(String, BlockIntent)>>);
+
+    impl RendererLang for IntentRecorder {
+        fn file_extension(&self) -> &str {
+            "intent-test"
+        }
+
+        fn line_comment_prefix(&self) -> &str {
+            "//"
+        }
+
+        fn render_block_open(
+            &self,
+            intent: BlockIntent,
+            condition: &str,
+        ) -> Result<&str, SigilStitchError> {
+            self.0.borrow_mut().push((condition.to_string(), intent));
+            Ok("{")
+        }
+
+        fn render_block_close(
+            &self,
+            intent: BlockIntent,
+            condition: &str,
+        ) -> Result<&str, SigilStitchError> {
+            self.0.borrow_mut().push((condition.to_string(), intent));
+            Ok("}")
+        }
+    }
+
+    let recording = IntentRecorder::default();
+    let imports = sigil_stitch::import::ImportGroup::new();
+    sigil_stitch::code_renderer::CodeRenderer::new(&recording, &imports, 80)
+        .render(block)
+        .unwrap();
+    recording.0.into_inner()
 }
 
 #[test]
@@ -263,8 +290,8 @@ fn test_equiv_block_intent_bash() {
 
     assert_eq!(render_bash(&manual), render_bash(&macro_block));
     assert_eq!(
-        top_level_block_intents(&manual),
-        top_level_block_intents(&macro_block)
+        rendered_block_intents(&manual),
+        rendered_block_intents(&macro_block)
     );
 }
 
@@ -289,8 +316,8 @@ fn test_equiv_block_intent_lua() {
 
     assert_eq!(render_lua(&manual), render_lua(&macro_block));
     assert_eq!(
-        top_level_block_intents(&manual),
-        top_level_block_intents(&macro_block)
+        rendered_block_intents(&manual),
+        rendered_block_intents(&macro_block)
     );
 }
 
@@ -311,8 +338,8 @@ fn test_equiv_block_intent_haskell_class() {
 
     assert_eq!(render_hs(&manual), render_hs(&macro_block));
     assert_eq!(
-        top_level_block_intents(&manual),
-        top_level_block_intents(&macro_block)
+        rendered_block_intents(&manual),
+        rendered_block_intents(&macro_block)
     );
 }
 
@@ -333,7 +360,7 @@ fn test_equiv_block_intent_ocaml_match_after_let() {
 
     assert_eq!(render_ml(&manual), render_ml(&macro_block));
     assert_eq!(
-        top_level_block_intents(&manual),
-        top_level_block_intents(&macro_block)
+        rendered_block_intents(&manual),
+        rendered_block_intents(&macro_block)
     );
 }

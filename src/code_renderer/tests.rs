@@ -414,7 +414,7 @@ fn broken_soft_break_does_not_indent_an_empty_line() {
 fn nested_and_sequence_soft_breaks_select_the_pretty_adapter() {
     let nested = CodeBlock::of("nested(%>%Wa,%Wb%<)", ()).unwrap();
     let mut block = CodeBlock::of("outer[%L]", nested).unwrap();
-    block.nodes_mut().push(CodeNode::Sequence(vec![
+    block.nodes.push(CodeNode::Sequence(vec![
         CodeNode::Literal(" tail(".to_string()),
         CodeNode::Indent,
         CodeNode::SoftBreak,
@@ -431,7 +431,7 @@ fn nested_and_sequence_soft_breaks_select_the_pretty_adapter() {
 #[test]
 fn sequence_soft_break_alone_selects_the_pretty_adapter() {
     let mut block = CodeBlock::of("outer", ()).unwrap();
-    block.nodes_mut().push(CodeNode::Sequence(vec![
+    block.nodes.push(CodeNode::Sequence(vec![
         CodeNode::SoftBreak,
         CodeNode::Literal("child".to_string()),
     ]));
