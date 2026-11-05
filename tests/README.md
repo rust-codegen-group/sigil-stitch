@@ -69,6 +69,12 @@ The integration suites are grouped by the contract they protect:
   verify primitive, importable, compound, invalid, and target-derived raw import
   metadata without rewriting opaque bytes. The same suite covers standalone
   rendering and borrowed resolver behavior.
+- `src/code_block/rewrite.rs` checks the private rewrite interface: one hook
+  call, recursive traversal, complete-tree validation, unchanged input on success
+  and failure, and existing error paths. The external file and renderer fixtures
+  deliberately retain `nodes_mut()` to exercise the released root, nested, and
+  sequence mutation escape hatch. Non-compatibility assertions observe the
+  existing lowering and renderer hooks instead of inspecting mutable trees.
 - `tests/project_spec_tests.rs` owns cross-file orchestration: ordered
   aggregation preserves each file's complete member diagnostics, validation
   finishes before any file emission, and validation or later render failures
@@ -156,7 +162,13 @@ wide and moderately nested trees at three input sizes. Matched legacy/modern
 application and callable cases also measure direct rendering and complete
 `FileSpec` rendering with repeated imports, mixed request evidence, and name
 conflicts. Inputs are constructed outside timed iterations, and matched files
-must render identical source. Benchmark smoke checks run with
+must render identical source.
+
+Ordinary wide and nested inputs use the public builder. Sequence grouping has
+no public builder spelling, so that measured fixture retains the released
+node-tree escape hatch without adding a test-only public interface.
+
+Benchmark smoke checks run with
 `cargo bench --bench type_name_lowering -- --test`; they are not timing evidence:
 
 ```text

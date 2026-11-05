@@ -1,3 +1,5 @@
+mod rewrite;
+
 use crate::code_node::{BlockIntent, CodeNode, parts_args_to_nodes};
 use crate::import::ImportRef;
 use crate::lang::CodeLang;
@@ -169,7 +171,7 @@ impl Arg {
     }
 }
 
-/// An immutable code fragment with embedded type references.
+/// A structured code fragment with embedded type references.
 ///
 /// `CodeBlock` is the core composition primitive in sigil-stitch. It stores a tree
 /// of [`CodeNode`] nodes — self-contained source nodes produced from format strings
@@ -235,7 +237,12 @@ impl CodeBlock {
         CodeBlockBuilder::new()
     }
 
-    /// Access the node tree for rewriting. Used by language rewrite passes.
+    /// Access the mutable node tree as a compatibility escape hatch.
+    ///
+    /// Prefer the builder for ordinary source construction. Mutations here are
+    /// unchecked; source preparation rewrites a copy and validates the complete
+    /// resulting tree before type-name lowering. The internal preparation path
+    /// does not use this escape hatch.
     pub fn nodes_mut(&mut self) -> &mut Vec<CodeNode> {
         &mut self.nodes
     }
@@ -600,7 +607,7 @@ impl CodeBlockBuilder {
         self.add_code(fragment.into_code_block())
     }
 
-    /// Build the immutable CodeBlock.
+    /// Build the CodeBlock.
     ///
     /// Returns an error if any format string had an argument count mismatch,
     /// or if indent depth is not balanced (unmatched

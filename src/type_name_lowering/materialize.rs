@@ -5,7 +5,7 @@ use crate::lang::RendererLang;
 use crate::type_name::TypeName;
 
 use super::DiagnosticPath;
-use super::validation::{validate_lowered_block, validate_rewritten_block, validate_type_name};
+use super::validation::{validate_lowered_block, validate_type_name};
 
 pub(crate) struct TypeNameMaterializer<'a> {
     lang: &'a dyn RendererLang,
@@ -21,9 +21,7 @@ impl<'a> TypeNameMaterializer<'a> {
         block: &CodeBlock,
         path: DiagnosticPath,
     ) -> Result<CodeBlock, SigilStitchError> {
-        let mut rewritten = block.clone();
-        self.lang.rewrite_nodes(&mut rewritten.nodes);
-        validate_rewritten_block(&rewritten, &path)?;
+        let mut rewritten = block.rewrite_source(&path, |nodes| self.lang.rewrite_nodes(nodes))?;
         rewritten.nodes = self.materialize_nodes(rewritten.nodes, &path)?;
         Ok(rewritten)
     }

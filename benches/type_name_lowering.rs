@@ -78,16 +78,14 @@ fn matched_file(size: usize, modern: bool, callable: bool) -> FileSpec {
 }
 
 fn wide_block(type_count: usize) -> CodeBlock {
-    let mut block = CodeBlock::of("", ()).unwrap();
+    let mut block = CodeBlock::builder();
     for index in 0..type_count {
         if index > 0 {
-            block.nodes_mut().push(CodeNode::Literal("; ".to_string()));
+            block.add("; ", ());
         }
-        block
-            .nodes_mut()
-            .push(CodeNode::TypeRef(structural_type(index)));
+        block.add("%T", structural_type(index));
     }
-    block
+    block.build().unwrap()
 }
 
 fn nested_chunk(start: usize, type_count: usize, depth: usize) -> CodeBlock {
@@ -100,6 +98,8 @@ fn nested_chunk(start: usize, type_count: usize, depth: usize) -> CodeBlock {
             }
             sequence.push(CodeNode::TypeRef(structural_type(index)));
         }
+        // Preserve the measured Sequence grouping; the public builder has no
+        // Sequence constructor, so this fixture uses the released escape hatch.
         block.nodes_mut().push(CodeNode::Sequence(sequence));
         return block;
     }
@@ -109,14 +109,12 @@ fn nested_chunk(start: usize, type_count: usize, depth: usize) -> CodeBlock {
 
 fn nested_block(type_count: usize) -> CodeBlock {
     const CHUNK_SIZE: usize = 16;
-    let mut block = CodeBlock::of("", ()).unwrap();
+    let mut block = CodeBlock::builder();
     for start in (0..type_count).step_by(CHUNK_SIZE) {
         let chunk_size = CHUNK_SIZE.min(type_count - start);
-        block
-            .nodes_mut()
-            .push(CodeNode::Nested(nested_chunk(start, chunk_size, 3)));
+        block.add_code(nested_chunk(start, chunk_size, 3));
     }
-    block
+    block.build().unwrap()
 }
 
 fn render(block: &CodeBlock) {

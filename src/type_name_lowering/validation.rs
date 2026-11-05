@@ -234,41 +234,6 @@ fn validate_non_empty_types(
     Ok(())
 }
 
-pub(crate) fn validate_rewritten_block(
-    block: &CodeBlock,
-    path: &DiagnosticPath,
-) -> Result<(), SigilStitchError> {
-    validate_balanced_indent_markers(&block.nodes).map_err(|error| {
-        SigilStitchError::InvalidRewrittenSource {
-            context: path.to_string(),
-            reason: error.to_string(),
-        }
-    })?;
-    validate_no_unresolved_indent_markers(&block.nodes).map_err(|error| {
-        SigilStitchError::InvalidRewrittenSource {
-            context: path.to_string(),
-            reason: error.to_string(),
-        }
-    })?;
-    validate_source_nodes(&block.nodes, path)
-}
-
-fn validate_source_nodes(
-    nodes: &[CodeNode],
-    path: &DiagnosticPath,
-) -> Result<(), SigilStitchError> {
-    for (index, node) in nodes.iter().enumerate() {
-        let node_path = path.node(index);
-        match node {
-            CodeNode::TypeRef(type_name) => validate_type_name(type_name, &node_path)?,
-            CodeNode::Nested(block) => validate_source_nodes(&block.nodes, &path.nested(index))?,
-            CodeNode::Sequence(children) => validate_source_nodes(children, &path.sequence(index))?,
-            _ => {}
-        }
-    }
-    Ok(())
-}
-
 #[expect(
     deprecated,
     reason = "validator must classify frozen node variants exhaustively"

@@ -233,7 +233,17 @@ Lowering](type_name_lowering.md) for the complete contract.
 
 A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `NameRef`, `StringLit`, `Comment`, `Nested`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, and control-flow nodes carry a language-neutral `BlockIntent` (`BlockOpenIntent`, `BlockCloseIntent`, `BranchCloseIntent`) with no per-language rendering policy.
 
-CodeBlocks are immutable after construction. The builder (`CodeBlockBuilder`) validates argument counts and indent balance before producing a block.
+The builder (`CodeBlockBuilder`) validates argument counts and indent balance
+before producing a reusable block. The released `CodeBlock::nodes_mut()` method
+remains an unchecked compatibility escape hatch, not the internal source
+preparation interface. Ordinary source construction should use the builder.
+
+`CodeBlock` owns the private source-tree rewrite operation: clone the source,
+call the adapter hook once, and validate the complete rewritten copy. The
+language rewrite module owns recursive traversal; adapters own target-local
+corrections. Validation waits until the complete hook returns because indent
+scopes can span nested blocks and sequences. Source preparation leaves the
+caller's original block unchanged on success and failure.
 
 ## Declaration Specs
 

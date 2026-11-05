@@ -294,6 +294,24 @@ fn builtins_validate_return_cardinality_and_native_empty_conventions() {
 
 #[test]
 fn go_declarations_keep_all_slots_structured_in_each_existing_context() {
+    #[derive(Debug, Default)]
+    struct RecordingGo(std::cell::RefCell<Vec<TypeName>>);
+
+    impl RendererLang for RecordingGo {
+        fn file_extension(&self) -> &str {
+            "go"
+        }
+
+        fn line_comment_prefix(&self) -> &str {
+            "//"
+        }
+
+        fn lower_type_name(&self, type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
+            self.0.borrow_mut().push(type_name.clone());
+            sigil_stitch::lang::go::Go::new().lower_type_name(type_name)
+        }
+    }
+
     let lang = sigil_stitch::lang::go::Go::new();
     for context in [
         DeclarationContext::TopLevel,
@@ -318,21 +336,12 @@ fn go_declarations_keep_all_slots_structured_in_each_existing_context() {
                 }
                 let spec = builder.build().unwrap();
                 let block = spec.emit(&lang, context).unwrap();
-                // Every result survives declaration emission as a distinct TypeRef.
-                fn refs(nodes: &[sigil_stitch::code_node::CodeNode]) -> Vec<TypeName> {
-                    nodes
-                        .iter()
-                        .flat_map(|node| match node {
-                            sigil_stitch::code_node::CodeNode::TypeRef(ty) => vec![ty.clone()],
-                            sigil_stitch::code_node::CodeNode::Nested(block) => {
-                                refs(block.clone().nodes_mut())
-                            }
-                            sigil_stitch::code_node::CodeNode::Sequence(nodes) => refs(nodes),
-                            _ => vec![],
-                        })
-                        .collect()
-                }
-                assert!(refs(block.clone().nodes_mut()).ends_with(&returns));
+                let recording = RecordingGo::default();
+                let imports = sigil_stitch::import::ImportGroup::new();
+                sigil_stitch::code_renderer::CodeRenderer::new(&recording, &imports, 120)
+                    .render(&block)
+                    .unwrap();
+                assert!(recording.0.borrow().ends_with(&returns));
                 let output = render_in_context(&spec, &lang, context, 120);
                 let clause = match returns.len() {
                     0 => "work()",

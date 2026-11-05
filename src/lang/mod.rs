@@ -336,8 +336,14 @@ pub trait RendererLang: std::fmt::Debug + 'static {
         self.block_close_for(condition)
     }
 
-    /// Rewrite the node tree before rendering. Called automatically by the
-    /// renderer. Default is no-op.
+    /// Rewrite one source tree before type-name lowering and rendering.
+    ///
+    /// Source preparation calls this hook once on a copy of each owned source
+    /// block. Use [`rewrite::walk_nodes_mut`] to recurse through nested blocks
+    /// and sequences when needed; the core does not call this hook again for
+    /// those children. The complete rewritten tree is validated after the hook
+    /// returns. Type-name-lowering output and raw import metadata are not
+    /// rewritten. The default is a no-op.
     fn rewrite_nodes(&self, _nodes: &mut Vec<crate::code_node::CodeNode>) {}
 
     /// Lower one complete semantic type reference into target-associated
