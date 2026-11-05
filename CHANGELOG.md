@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.4
+
+### Added
+
+- A multi-language response-type example showing import-aware TypeScript `Record` composition and language-owned declarations.
+
+### Fixed
+
+- Nested `sigil_quote!` blocks now compose inline without leaking a terminal newline before surrounding punctuation or duplicating statement line breaks.
+- `$C_each` preserves line boundaries after structural block closes when splicing declarations.
+- Structured default parameter values compose inline automatically across supported function, primary-constructor, and compatibility emission paths, preventing standalone closing parentheses.
+
+### Changed
+
+- Source-tree rewriting now keeps cloning, one adapter hook, and complete-tree validation together inside `CodeBlock`, preserving rendering, diagnostics, and the released mutation interface.
+- The semver check now verifies the 0.7.3 to 0.7.4 patch boundary against the published 0.7.3 baseline.
+
 ## 0.7.3
 
 ### Fixed
