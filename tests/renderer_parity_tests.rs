@@ -778,7 +778,7 @@ fn expected_type_name(language: &str, kind: TypeNameExampleKind) -> ExpectedType
         QualifiedImportable => match language {
             "cpp" | "ruby" | "rust" => Output("example.module::Qualified"),
             "php" => Output("example.module\\Qualified"),
-            "bash" | "c" | "javascript" | "typescript" | "zsh" => Unsupported,
+            "bash" | "c" | "javascript" | "zsh" => Unsupported,
             _ => Output("example.module.Qualified"),
         },
         Primitive => Output("Value"),

@@ -2,9 +2,10 @@
 
 use crate::code_block::CodeBlock;
 use crate::error::SigilStitchError;
+use crate::lang::type_lowering::typescript::is_identifier;
 use crate::type_name::TypeName;
 use crate::type_name_lowering::structure::{
-    concat, delimited_soft, join_soft, literal, name, string_literal, surround, terminal,
+    concat, delimited_soft, join_soft, literal, name, qualified, string_literal, surround, terminal,
 };
 
 fn terminal_type(type_name: &TypeName) -> Option<CodeBlock> {
@@ -14,6 +15,38 @@ fn terminal_type(type_name: &TypeName) -> Option<CodeBlock> {
         }
         _ => None,
     }
+}
+
+fn lower_qualified(module: &str, imported_name: &str) -> Result<CodeBlock, SigilStitchError> {
+    if !module.split('.').all(is_identifier) || !is_identifier(imported_name) {
+        return Err(unsupported(
+            "TypeScript qualified references require a namespace identifier path and one member identifier",
+        ));
+    }
+    // These tokens start other type forms instead of a namespace reference.
+    // Later path segments are IdentifierNames and may use these spellings.
+    if matches!(
+        module.split('.').next(),
+        Some(
+            "this"
+                | "typeof"
+                | "import"
+                | "keyof"
+                | "unique"
+                | "readonly"
+                | "infer"
+                | "void"
+                | "null"
+                | "true"
+                | "false"
+                | "new"
+        )
+    ) {
+        return Err(unsupported(
+            "TypeScript qualified reference root starts a different type form",
+        ));
+    }
+    Ok(qualified(module, ".", imported_name))
 }
 
 fn generic_delimited(
@@ -103,16 +136,14 @@ fn supports_generic_application(type_name: &TypeName) -> bool {
     reason = "one semantic path also accepts released compatibility inputs"
 )]
 fn lower_unparenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
-    if matches!(
-        type_name,
-        TypeName::Importable {
-            qualified: true,
-            ..
-        }
-    ) {
-        return Err(unsupported(
-            "qualified type references have no TypeScript representation",
-        ));
+    if let TypeName::Importable {
+        module,
+        name: imported_name,
+        qualified: true,
+        ..
+    } = type_name
+    {
+        return lower_qualified(module, imported_name);
     }
     if let Some(terminal) = terminal_type(type_name) {
         return Ok(terminal);
