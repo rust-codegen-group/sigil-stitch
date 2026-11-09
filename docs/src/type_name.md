@@ -89,9 +89,9 @@ let map = TypeName::qualified("java.util", "HashMap");
 
 The selected language lowerer owns the separator between module and name:
 `"::"` for targets such as Rust and C++, and `"."` for targets such as Go,
-Python, Java, Kotlin, Scala, Swift, Dart, Haskell, and OCaml. A language that
-cannot preserve a qualified reference rejects it instead of silently dropping
-the module.
+Python, Java, Kotlin, Scala, Swift, Dart, Haskell, OCaml, and TypeScript. A
+language that cannot preserve a qualified reference rejects it instead of
+silently dropping the module.
 
 Qualified types work anywhere a `TypeName` is accepted, including inside generics:
 
@@ -114,6 +114,64 @@ You can also convert an existing importable type to qualified rendering with `.q
 let val = TypeName::importable("serde_json", "Value").qualify();
 # }
 ```
+
+### TypeScript namespace references
+
+For TypeScript, the qualifier is a namespace name already in scope, such as
+`globalThis` or `Domain.Nested`, not an import module specifier. Explicit
+qualification can select a global utility even when a generated declaration
+has the same name:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() {
+let target = TypeName::application(
+    TypeName::qualified("globalThis", "Record"),
+    vec![
+        TypeArgument::Single(TypeName::string_literal("eventType")),
+        TypeArgument::Single(TypeName::string_literal("data")),
+    ],
+);
+let output = FileSpec::builder("record.ts")
+    .add_type(
+        TypeSpec::builder("Record", TypeKind::TypeAlias)
+            .visibility(Visibility::Public)
+            .extends(target)
+            .build()
+            .unwrap(),
+    )
+    .build()
+    .unwrap()
+    .render(100)
+    .unwrap();
+assert_eq!(
+    output,
+    "export type Record = globalThis.Record<'eventType', 'data'>;\n",
+);
+# }
+```
+
+The namespace path contains dot-separated, decoded identifiers and the member
+is one decoded identifier name. Unicode, `$`, and `_` are supported. Contextual
+namespace names such as `type.Value` and keyword members such as
+`Models.default` retain their spelling. Tokens that start other type forms,
+such as `typeof` or `keyof`, cannot start the namespace path. The adapter does
+not resolve namespace visibility, type existence, or generic arity; those
+remain the caller's and TypeScript compiler's responsibility.
+
+Relative or package paths such as `./models` and `@scope/models`, empty path
+segments, and names containing type syntax are rejected with
+`SigilStitchError`. `.qualify()` preserves its supplied module string; it does
+not convert an import path into a namespace. Use `importable()` or
+`importable_type()` when an import is needed. Names are decoded spellings,
+not escaped source snippets or `import('./models').Item` expressions.
+
+Only the qualified reference skips imports. Its structured application
+arguments still collect imports, resolve aliases, and wrap at the requested
+width. Qualification does not automatically change unqualified references or
+the existing `TypeName::Map` spelling `Record<K, V>`. The deprecated document
+facades retain their frozen compatibility behavior.
 
 ## Collections
 
