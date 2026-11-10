@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.5
+
+### Added
+
+- TypeScript now supports structured qualified type references, including
+  `globalThis.Record`. Namespace references need no import, while nested type
+  arguments retain import tracking, alias resolution and width-aware layout.
+- `TypeName::IntegerLiteral(String)` and `TypeName::integer_literal(...)` describe
+  exact integer singleton types. TypeScript preserves exactly representable
+  `number` values, Python emits import-aware `typing.Literal`, and Scala emits
+  native `Int`/`Long` literal types. Canonical decimal validation and target
+  representability checks reject malformed or unsupported values without
+  rounding or widening to a primitive type.
+
+### Changed
+
+- The semver check now verifies the 0.7.4 to 0.7.5 patch boundary against the
+  published 0.7.4 baseline, with no approved breaking API changes.
+
 ## 0.7.4
 
 ### Added
