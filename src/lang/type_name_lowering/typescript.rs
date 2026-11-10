@@ -82,6 +82,22 @@ fn unsupported(reason: &str) -> SigilStitchError {
     }
 }
 
+fn integer_literal(value: &str) -> Result<CodeBlock, SigilStitchError> {
+    // Parsing alone may round the supplied integer. Fixed-point formatting with
+    // zero fractional digits recovers the full decimal value of the finite
+    // binary64 integer, unlike shortest-round-trip Display. Compare it with the
+    // original canonical text before emitting that text unchanged.
+    if !value
+        .parse::<f64>()
+        .is_ok_and(|number| number.is_finite() && format!("{number:.0}") == value)
+    {
+        return Err(unsupported(
+            "integer singleton value is not exactly representable as a TypeScript number",
+        ));
+    }
+    Ok(literal(value))
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Precedence {
     Function,
@@ -101,7 +117,7 @@ fn precedence(type_name: &TypeName) -> Precedence {
         TypeName::Function { .. } | TypeName::Callable { .. } => Precedence::Function,
         TypeName::Union(_) | TypeName::Optional(_) => Precedence::Union,
         TypeName::Intersection(_) => Precedence::Intersection,
-        TypeName::StringLiteral(_) => Precedence::Literal,
+        TypeName::StringLiteral(_) | TypeName::IntegerLiteral(_) => Precedence::Literal,
         TypeName::Array(_) | TypeName::ReadonlyArray(_) | TypeName::AssociatedType { .. } => {
             Precedence::Postfix
         }
@@ -401,6 +417,7 @@ fn lower_unparenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchE
             Err(unsupported("TypeScript has no wildcard type expression"))?
         }
         TypeName::StringLiteral(value) => string_literal(value.clone()),
+        TypeName::IntegerLiteral(value) => integer_literal(value)?,
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             unreachable!("terminal variants returned above")
         }

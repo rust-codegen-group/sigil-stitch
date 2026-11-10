@@ -34,7 +34,9 @@
     "positive": "typescript_positive.ts",
     "negative": [
       {"file": "typescript_missing.ts", "diagnostic": "TS2554: Expected 1-2 arguments, but got 0"},
-      {"file": "typescript_wrong_type.ts", "diagnostic": "TS2345: Argument of type 'number' is not assignable to parameter of type 'string'"}
+      {"file": "typescript_wrong_type.ts", "diagnostic": "TS2345: Argument of type 'number' is not assignable to parameter of type 'string'"},
+      {"file": "typescript_wrong_integer.ts", "diagnostic": "TS2322: Type '201' is not assignable to type '200'"},
+      {"file": "typescript_bigint.ts", "diagnostic": "TS2322: Type '200n' is not assignable to type '200'"}
     ]
   },
   "scala": {
@@ -43,7 +45,10 @@
     "flags": ["-color:never"],
     "positive": "scala_positive.scala",
     "negative": [
-      {"file": "scala_wrong_kind.scala", "diagnostic": "Type argument Int does not conform to upper bound \\[_\\] =>> Any"}
+      {"file": "scala_wrong_kind.scala", "diagnostic": "Type argument Int does not conform to upper bound \\[_\\] =>> Any"},
+      {"file": "scala_wrong_integer.scala", "diagnostic": "Found:.*\\(201 : Int\\).*Required: Status\\b"},
+      {"file": "scala_wrong_long.scala", "diagnostic": "Found:.*\\(2147483649L : Long\\).*Required: Large\\b"},
+      {"file": "scala_wrong_union.scala", "diagnostic": "Found:.*\\(202 : Int\\).*Required: Statuses\\b"}
     ]
   },
   "java": {

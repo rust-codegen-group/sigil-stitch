@@ -199,6 +199,7 @@ are unaffected.
 | `Map` | `Map<string, User>` | Key + value tracked |
 | `Pointer` / `Slice` | `*const T`, `&[T]` | Inner type tracked |
 | `StringLiteral` | `'active'`, `Literal["active"]` | Target-derived imports tracked after lowering |
+| `IntegerLiteral` | `200`, `Literal[200]` | Target-derived imports tracked after lowering |
 | `Raw` | any string | No |
 
 Every variant that contains other types remains structured until the selected
@@ -218,8 +219,11 @@ grammar. Each language preserves the concrete request or returns
 #### Type-Name Lowering
 
 `TypeName` variants are semantic: `Array(T)` means an array type and
-`StringLiteral(value)` means one decoded string singleton. They do not select a
-shared prefix, delimiter, precedence, or fallback. `RendererLang` owns one
+`StringLiteral(value)` means one decoded string singleton, and
+`IntegerLiteral(decimal)` means one exact mathematical integer singleton. Integer
+payloads are canonical decimal text validated before lowering; the selected
+target preserves the value exactly or rejects it. These variants do not select
+a shared prefix, delimiter, precedence, or fallback. `RendererLang` owns one
 fallible `lower_type_name(&TypeName) -> Result<CodeBlock, _>` method.
 
 The crate validates the semantic value before the call and validates the

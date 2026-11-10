@@ -83,6 +83,14 @@ pub(crate) fn lower<L: RendererLang + ?Sized>(
                     .to_string(),
             });
         }
+        TypeName::IntegerLiteral(_) => {
+            return Err(SigilStitchError::UnsupportedTypeName {
+                language: lang.file_extension().to_string(),
+                context: "root".to_string(),
+                reason: "the 0.6.8 compatibility lowerer does not support integer singleton types"
+                    .to_string(),
+            });
+        }
         TypeName::Generic { base, params } => {
             let base = recurse(base)?;
             let params = params.iter().map(recurse).collect::<Result<Vec<_>, _>>()?;

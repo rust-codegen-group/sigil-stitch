@@ -159,6 +159,27 @@ The language adapter either lowers it exactly or rejects it; several string
 literal types compose through `TypeName::Union`, not a string-enum or
 literal-set abstraction.
 
+### Integer literal type
+
+A type inhabited by exactly one mathematical integer, without a machine-word
+width. Value identity ignores source spelling and integer zero has one identity;
+the target preserves the value exactly or rejects it.
+
+This definition distinguishes a singleton value from a fixed-width integer
+carrier, a BigInt literal, a numeric source token, or a constant expression.
+Different primitive domains do not become interchangeable merely because their
+values have the same mathematical magnitude. A semantic value domain without a
+word-size bound does not promise unlimited resources or support on every target.
+
+[`TypeName::IntegerLiteral`](type_name.md#integer-literal-types) stores canonical
+decimal integer text. Intrinsic validation checks that representation before
+language-owned lowering; TypeScript preserves it as a number singleton or
+rejects it, Python lowers it through `typing.Literal`, and Scala uses native
+`Int`/`Long` literal types within their exact range. A
+[string literal type](type_name.md#string-literal-types) remains a separate
+semantic form, and target-specific syntax outside these forms can use the
+[Raw escape hatch](type_name.md#raw-escape-hatch).
+
 ### Field sequence
 
 The ordered fields owned by one type declaration or one record payload,

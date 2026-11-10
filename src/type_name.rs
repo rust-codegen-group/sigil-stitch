@@ -309,6 +309,14 @@ pub enum TypeName {
     /// The selected language owns quoting and escaping. Languages without
     /// string singleton types reject this variant.
     StringLiteral(String),
+    /// One exact integer value stored as canonical ASCII decimal text.
+    ///
+    /// Valid text is `0` or an optional minus followed by a nonzero digit and
+    /// further digits. There is no machine-word bound. Construction and Serde
+    /// decoding do not validate the text; intrinsic validation rejects other
+    /// spellings before language lowering. The target preserves the integer
+    /// exactly or rejects it, without widening or switching to BigInt.
+    IntegerLiteral(String),
 }
 
 impl TypeName {
@@ -562,6 +570,16 @@ impl TypeName {
         TypeName::StringLiteral(value.into())
     }
 
+    /// Store an exact integer singleton as canonical decimal text.
+    ///
+    /// This constructor does not parse or normalize its input. Intrinsic
+    /// validation accepts `0` or `-?[1-9][0-9]*` and rejects noncanonical text,
+    /// including `-0`, plus signs, and leading zeros. The selected language
+    /// must then preserve the integer exactly or reject the type.
+    pub fn integer_literal(value: impl Into<String>) -> Self {
+        TypeName::IntegerLiteral(value.into())
+    }
+
     /// Create an associated/path-dependent type with a qualifier.
     ///
     /// Rust: `<base as qualifier>::member` (e.g., `<T as Iterator>::Item`).
@@ -631,7 +649,7 @@ impl TypeName {
             TypeName::Application { base, .. } => base.simple_name(),
             TypeName::Parameter(name) => Some(name),
             TypeName::Raw(s) => Some(s),
-            TypeName::StringLiteral(_) => None,
+            TypeName::StringLiteral(_) | TypeName::IntegerLiteral(_) => None,
             _ => None,
         }
     }

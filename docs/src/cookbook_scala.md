@@ -141,3 +141,45 @@ let type_spec = TypeSpec::builder("Meters", TypeKind::Newtype)
 ```scala
 class Meters(val value: Double)
 ```
+
+## Integer literal types
+
+Use the shared integer-singleton leaf and ordinary union composition:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), SigilStitchError> {
+let file = FileSpec::builder_with("Status.scala", sigil_stitch::lang::scala::Scala::new())
+    .add_type(
+        TypeSpec::builder("Status", TypeKind::TypeAlias)
+            .extends(TypeName::union(vec![
+                TypeName::integer_literal("200"),
+                TypeName::integer_literal("201"),
+            ]))
+            .build()?,
+    )
+    .add_type(
+        TypeSpec::builder("Large", TypeKind::TypeAlias)
+            .extends(TypeName::integer_literal("2147483648"))
+            .build()?,
+    )
+    .build()?;
+let output = file.render(80)?;
+assert!(output.contains("type Status = 200 | 201"));
+assert!(output.contains("type Large = 2147483648L"));
+# Ok(())
+# }
+```
+
+```scala
+type Status = 200 | 201
+type Large = 2147483648L
+```
+
+Values in the signed `Int` range use unsuffixed syntax; larger magnitudes use
+`Long` singleton syntax through the signed Long boundaries. Inputs remain
+canonical decimal text without an `L` suffix. Values outside the native range
+return `UnsupportedTypeName`, not a primitive or BigInt fallback. See
+[integer literal types](type_name.md#integer-literal-types) for the shared
+validation and exact-value contract.

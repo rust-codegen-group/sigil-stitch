@@ -274,6 +274,13 @@ values documented before 0.7. No other Serde representation or binary format
 receives a cross-version guarantee. Deserializing an unknown variant remains
 an error; it is never reinterpreted as another type.
 
+`IntegerLiteral(String)` is a separate semantic form whose payload is canonical
+decimal integer text. It follows the same language-owned lowering and ordinary
+union composition, without changing existing string or Raw payloads. Its derived
+JSON shape does not extend the bounded historical fixture guarantee; old readers
+are not expected to recognize this new variant. Frozen document facades and the
+compatibility lowerer reject it rather than guessing a target representation.
+
 ### Closed sums
 
 Use the dedicated closed-sum builder for a complete set of unit, positional,

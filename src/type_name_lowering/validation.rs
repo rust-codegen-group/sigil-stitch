@@ -92,6 +92,19 @@ pub(crate) fn validate_type_name(
             }
         }
         TypeName::StringLiteral(_) => {}
+        TypeName::IntegerLiteral(value) => {
+            let magnitude = value.strip_prefix('-').unwrap_or(value);
+            if value != "0"
+                && (magnitude.is_empty()
+                    || magnitude.starts_with('0')
+                    || !magnitude.bytes().all(|byte| byte.is_ascii_digit()))
+            {
+                return Err(invalid(
+                    path,
+                    "integer singleton value must be canonical ASCII decimal: 0 or -?[1-9][0-9]*",
+                ));
+            }
+        }
         TypeName::Array(inner) => validate_type_name(inner, &path.child("array.inner"))?,
         TypeName::ReadonlyArray(inner) => {
             validate_type_name(inner, &path.child("readonly_array.inner"))?
@@ -489,6 +502,7 @@ mod tests {
         let non_terminals = [
             TypeName::array(TypeName::primitive("u32")),
             TypeName::qualified("module", "Qualified"),
+            TypeName::integer_literal("200"),
         ];
         for non_terminal in non_terminals {
             assert!(matches!(

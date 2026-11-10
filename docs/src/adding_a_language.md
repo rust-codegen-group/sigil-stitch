@@ -733,6 +733,15 @@ semantically exact for that target. In particular, a language without string
 singleton types rejects `TypeName::StringLiteral` instead of widening it to a
 string primitive.
 
+Integer singleton types likewise preserve the exact supplied mathematical
+integer or fail with `UnsupportedTypeName`. The core validates canonical
+decimal text; the adapter owns representability. TypeScript's `number` lowerer
+must reject rounding and overflow rather than switch to `bigint` or widen to
+`number`. Python emits an unquoted integer with an importable `typing.Literal`
+leaf. Scala chooses native `Int`/`Long` literal syntax and rejects values outside
+the signed Long range rather than selecting a floating or wrapper type. Leave
+no unresolved `IntegerLiteral` TypeRef in the lowered block.
+
 After source rewrite, the core recursively invokes the hook for `TypeRef` nodes
 in direct, nested, and sequenced blocks before import collection, validates each
 returned block, and aborts the complete file on any failure. Direct and pretty

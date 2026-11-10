@@ -164,6 +164,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             bounds("any ", values.iter().map(lower).collect::<Result<_, _>>()?)
         }
         TypeName::Wildcard { .. } => Err(unsupported("Swift has no wildcard type expression"))?,
+        TypeName::IntegerLiteral(_) => Err(unsupported(
+            "integer singleton types are not supported by this language adapter",
+        ))?,
         TypeName::StringLiteral(_) => {
             Err(unsupported("Swift has no string singleton type expression"))?
         }

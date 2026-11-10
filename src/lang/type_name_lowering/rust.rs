@@ -176,6 +176,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::Wildcard { .. } => Err(unsupported(
             "Rust bounded wildcards do not preserve upper or lower variance",
         ))?,
+        TypeName::IntegerLiteral(_) => Err(unsupported(
+            "integer singleton types are not supported by this language adapter",
+        ))?,
         TypeName::StringLiteral(_) => {
             Err(unsupported("Rust has no string singleton type expression"))?
         }
