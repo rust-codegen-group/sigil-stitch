@@ -423,8 +423,64 @@ TypeName::Union([
 ])
 ```
 
-There is no separate string-enum or literal-set type. Numeric literal types
-are not part of this extension.
+There is no separate string-enum or literal-set type.
+
+## Integer literal types
+
+`TypeName::IntegerLiteral(String)` describes one exact mathematical integer,
+not a fixed-width carrier or an opaque target-language token:
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# fn main() -> Result<(), SigilStitchError> {
+let status = TypeName::integer_literal("200");
+let block = CodeBlock::of("value: %T", (status,))?;
+assert_eq!(
+    block.render_standalone(&sigil_stitch::lang::typescript::TypeScript::new(), 80)?,
+    "value: 200",
+);
+assert_eq!(
+    block.render_standalone(&sigil_stitch::lang::python::Python::new(), 80)?,
+    "value: Literal[200]",
+);
+assert_eq!(
+    block.render_standalone(&sigil_stitch::lang::scala::Scala::new(), 80)?,
+    "value: 200",
+);
+# Ok(())
+# }
+```
+
+The payload must be canonical ASCII decimal: `0` or `-?[1-9][0-9]*`. Negative
+integers are supported; plus signs, leading zeros, `-0`, whitespace, radix
+prefixes, separators, fractions, exponents and `n` suffixes are rejected.
+Zero has one valid spelling, `0`. The constructor only stores text, without
+parsing or normalization. Direct variant construction and derived Serde decoding
+follow the same intrinsic-validation rule before language lowering.
+
+The shared value has no machine-word limit. TypeScript accepts a value only if
+its finite `number` representation preserves the integer exactly: `2^53` is
+accepted, while `2^53 + 1` is rejected. It never rounds, widens to `number`, or
+switches to `bigint`. Python emits an integer `typing.Literal` and collects its
+import structurally. Scala emits an unsuffixed `Int` singleton for
+`-2147483648..=2147483647`, or an `L`-suffixed `Long` singleton for the remaining
+values in `-9223372036854775808..=9223372036854775807`. For example, the payload
+`2147483648` becomes `2147483648L`; values outside that native range are rejected.
+The input remains suffix-free, and the shared API does not select a fixed-width
+carrier. Other built-in adapters reject integer literal types. Ordinary
+allocation and target resource limits still apply.
+
+Several values compose through ordinary `TypeName::Union`. In Python, integer
+and mixed literal unions use recursive union syntax, such as
+`Literal[200] | Literal[201]`; the string-only union optimization is unchanged.
+
+The derived JSON representation is `{"IntegerLiteral":"200"}`. Decoding a
+string does not validate it: `{"IntegerLiteral":"-0"}` decodes unchanged but
+fails intrinsic validation. `Eq`/`Hash` remain structural comparisons, not a
+general type-equivalence check. There is no separate public integer-value type,
+parser, implicit numeric conversion or custom Serde implementation, and no new
+cross-version wire or binary-serialization guarantee.
 
 ## Raw escape hatch
 

@@ -133,6 +133,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             "? extends ",
             "? super ",
         ),
+        TypeName::IntegerLiteral(_) => Err(unsupported(
+            "integer singleton types are not supported by this language adapter",
+        ))?,
         TypeName::StringLiteral(_) => {
             Err(unsupported("Java has no string singleton type expression"))?
         }

@@ -1169,7 +1169,9 @@ fn type_name_contains_parameter(type_name: &TypeName, parameter_name: &str) -> b
                     .as_deref()
                     .is_some_and(|bound| type_name_contains_parameter(bound, parameter_name))
         }
-        TypeName::Importable { .. } | TypeName::StringLiteral(_) => false,
+        TypeName::Importable { .. } | TypeName::StringLiteral(_) | TypeName::IntegerLiteral(_) => {
+            false
+        }
     }
 }
 
@@ -1215,6 +1217,7 @@ mod tests {
             TypeName::raw("Value"),
             TypeName::importable("Data.Text", "Text"),
             TypeName::string_literal("a"),
+            TypeName::integer_literal("200"),
             TypeName::wildcard(),
         ] {
             assert!(

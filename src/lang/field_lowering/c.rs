@@ -122,7 +122,8 @@ fn requires_interleaved_declarator(field_type: &crate::type_name::TypeName) -> b
         TypeName::Importable { .. }
         | TypeName::Primitive(_)
         | TypeName::Raw(_)
-        | TypeName::StringLiteral(_) => false,
+        | TypeName::StringLiteral(_)
+        | TypeName::IntegerLiteral(_) => false,
     }
 }
 

@@ -166,6 +166,10 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             typing("Literal"),
             delimited_soft("[", vec![string_literal(value.clone())], ",", "]"),
         ]),
+        TypeName::IntegerLiteral(value) => concat([
+            typing("Literal"),
+            delimited_soft("[", vec![literal(value.clone())], ",", "]"),
+        ]),
         TypeName::Parameter(_) => Err(unsupported(
             "Python modern type expressions are not supported in this position",
         ))?,

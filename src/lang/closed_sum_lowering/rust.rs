@@ -247,7 +247,9 @@ fn contains_parameter(ty: &crate::type_name::TypeName, name: &str) -> bool {
                     .as_deref()
                     .is_some_and(|value| contains_parameter(value, name))
         }
-        TypeName::Importable { .. } | TypeName::StringLiteral(_) => false,
+        TypeName::Importable { .. } | TypeName::StringLiteral(_) | TypeName::IntegerLiteral(_) => {
+            false
+        }
     }
 }
 

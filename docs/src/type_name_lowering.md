@@ -1,7 +1,7 @@
 # TypeName Validation and Lowering
 
-Status: implemented for every current `TypeName` variant, including string
-literal types, parameter references, applications, and callable sequences.
+Status: implemented for every current `TypeName` variant, including string and
+integer literal types, parameter references, applications, and callable sequences.
 
 `TypeName` records semantic type-reference structure. It does not describe a
 shared target grammar. One selected language adapter must either lower the
@@ -185,9 +185,57 @@ TypeName::Union([
 ])
 ```
 
-The core does not add `LiteralValue`, `StringEnum`, `LiteralSet`, or numeric
-literal variants. A future proven type-expression semantic receives its own
-explicit variant; it does not reinterpret the string payload as source code.
+The core does not add `LiteralValue`, `StringEnum`, or `LiteralSet`, and does not
+reinterpret the decoded string payload as source code.
+
+## Integer Literal Types
+
+`TypeName::IntegerLiteral(String)` and `TypeName::integer_literal(...)` store
+one exact integer as canonical ASCII decimal text, without a machine-word bound.
+The constructor and derived Deserialize only store their payload. Intrinsic
+validation accepts `0` or `-?[1-9][0-9]*` and rejects all other spellings with
+`InvalidTypeName`, including `-0`, plus signs and leading zeros. There is no
+normalizing constructor, separate public value type or custom Serde logic.
+
+- TypeScript lowers to a `number` singleton only when a finite binary64 number
+  preserves the integer exactly. Its lowerer compares the original canonical
+  text with the full fixed-point decimal integer represented by that number;
+  successful float parsing or shortest-round-trip formatting is not sufficient.
+  `2^53` is exact, `2^53 + 1` is not, and larger powers of two may still be exact.
+- Python lowers to `typing.Literal[200]`, retaining an importable Literal leaf
+  plus unquoted integer text. Integer and mixed literal unions follow ordinary
+  recursive union lowering; direct string-only unions retain their existing rule.
+- Scala lowers values in `-2147483648..=2147483647` to unsuffixed `Int`
+  singletons. Other values in `-9223372036854775808..=9223372036854775807` use
+  `Long` singleton syntax with an uppercase `L`, such as `2147483648L`.
+  Values outside that native range are rejected. This target-local range check
+  does not bound the shared integer domain or add a carrier-selection interface.
+  Literal grammar follows [Scala's integer syntax](https://www.scala-lang.org/files/archive/spec/3.4/01-lexical-syntax.html#integer-literals)
+  and [literal-based singleton types](https://docs.scala-lang.org/sips/42.type.html).
+- Other built-in adapters and the frozen compatibility lowerer reject the form.
+
+This support describes each adapter's current generated-source profile:
+
+| Built-in targets | Integer singleton representation |
+| ---------------- | -------------------------------- |
+| TypeScript | Exact ordinary `number` literal |
+| Python | Standard `typing.Literal` annotation |
+| Scala | Native `Int` or `Long` literal |
+| Bash, C, C++, C#, Dart, Go, Haskell, Java, JavaScript, Kotlin, Lua, OCaml, PHP, Ruby, Rust, Swift, Zsh | Unsupported in the current adapter profile |
+
+Kotlin's compiler-internal integer literal types are not source-denotable.
+Haskell's type-level naturals and C++/Rust/Swift constant arguments do not denote
+types inhabited by the ordinary integer itself. Integer literal facilities in
+RBS, PHPStan/Psalm PHPDoc, LuaLS annotations, or Flow belong to separate typing
+profiles; the Ruby, PHP, Lua, and JavaScript adapters do not emit those profiles.
+Their existence is not a reason to put that syntax in native type slots or to
+silently discard singleton intent.
+
+A target rejection uses `UnsupportedTypeName`. No target may round, truncate,
+widen to a primitive or substitute a BigInt singleton. Allocation and target
+resource limits still apply; the shared mathematical domain is not an unlimited
+input-resource guarantee. The derived JSON payload is a string, not a numeric
+token. It adds no cross-version wire/binary compatibility promise.
 
 ## Compatibility
 
@@ -232,6 +280,11 @@ The implementation must prove:
   backslashes, newlines, NUL, and Unicode;
 - Python union lowering retains the canonical `Literal` import;
 - a compatibility adapter that implements only pre-0.6.8 methods preserves
-  its old output and rejects `StringLiteral`;
+  its old output and rejects `StringLiteral` and `IntegerLiteral`;
+- canonical integer validation is identical for constructors, direct variants
+  and decoded data, and TypeScript accepts exact values above its safe-integer
+  range while rejecting rounded and overflowing values;
+- Scala preserves signed Int/Long boundaries and rejects values outside its
+  native integer-literal range on both renderer paths;
 - empty, statement-bearing, or unresolved adapter output fails closed; and
 - old serialized `TypeName` fixtures retain their exact shapes.

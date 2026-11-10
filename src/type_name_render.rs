@@ -140,7 +140,7 @@ where
         TypeName::Primitive(name) => BoxDoc::text(name.clone()),
         TypeName::Parameter(name) => BoxDoc::text(name.clone()),
         TypeName::Raw(s) => BoxDoc::text(s.clone()),
-        TypeName::StringLiteral(_) => BoxDoc::fail(),
+        TypeName::StringLiteral(_) | TypeName::IntegerLiteral(_) => BoxDoc::fail(),
         TypeName::Array(inner) => to_canonical_doc(inner, resolve).append(BoxDoc::text("[]")),
         TypeName::ReadonlyArray(inner) => BoxDoc::text("readonly ")
             .append(to_canonical_doc(inner, resolve))
@@ -538,7 +538,7 @@ where
                 BoxDoc::text(display)
             }
         }
-        TypeName::StringLiteral(_) => BoxDoc::fail(),
+        TypeName::StringLiteral(_) | TypeName::IntegerLiteral(_) => BoxDoc::fail(),
         _ => to_canonical_doc(tn, resolve),
     }
 }

@@ -102,6 +102,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::Wildcard { .. } => {
             Err(unsupported("Go has no bounded wildcard type expression"))?
         }
+        TypeName::IntegerLiteral(_) => Err(unsupported(
+            "integer singleton types are not supported by this language adapter",
+        ))?,
         TypeName::StringLiteral(_) => {
             Err(unsupported("Go has no string singleton type expression"))?
         }

@@ -56,6 +56,19 @@ fn unsupported(reason: &str) -> SigilStitchError {
     }
 }
 
+fn integer_literal(value: &str) -> Result<CodeBlock, SigilStitchError> {
+    let integer = value.parse::<i64>().map_err(|_| {
+        unsupported("integer singleton value is outside Scala's Int and Long literal range")
+    })?;
+    // Intrinsic validation already checked canonical decimal spelling. The
+    // native literal domain determines whether Scala needs a Long suffix.
+    Ok(if i32::try_from(integer).is_ok() {
+        literal(value)
+    } else {
+        literal(format!("{value}L"))
+    })
+}
+
 fn parenthesized(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError> {
     Ok(surround("(", lower(type_name)?, ")"))
 }
@@ -197,6 +210,7 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             (None, None) => literal("?"),
             (Some(_), Some(_)) => unreachable!("intrinsic validation rejects dual bounds"),
         },
+        TypeName::IntegerLiteral(value) => integer_literal(value)?,
         TypeName::StringLiteral(_) => {
             Err(unsupported("Scala has no string singleton type expression"))?
         }

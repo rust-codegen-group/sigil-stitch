@@ -22,7 +22,7 @@ expected diagnostics. The runner prints compiler versions on each run and uses
 a temporary directory for generated sources and compiler artifacts. These are
 local prerequisites, not a compiler minimum-version support promise.
 The fixtures have been checked with Apple Clang 21.0.0, GHC 9.14.1, OpenJDK
-21.0.12, Go 1.27.1, TypeScript 7.0.2 through vp, and Homebrew Scala 3.9.0.
+21.0.12, Go 1.27.1, TypeScript 7.0.2 through vp, and Homebrew Scala 3.10.0.
 
 Each negative fixture shares the positive declaration and setup. A unique
 `acceptance-failure` marker identifies its intended failing use-site; the
@@ -38,13 +38,20 @@ expected message for the marked use-site.
 | Haskell | `Array 2 Int -> Array 3 Int -> Array 5 Int` | Result declared as `Array 6 Int` |
 | Go | Zero/single/multiple declaration and callable returns, receiver/interface conformance, imported result slots and destructuring | Assign a two-result call to one scalar |
 | Java | A checked `IOException` declaration and caller that handles it | Caller omits handling; a lowerable `List<IOException>` exception shape rejected by `javac` |
-| TypeScript | Supplied and omitted optional scalar slots; explicit async empty returns used as `Promise<void>` | Missing required slot; incompatible argument |
-| Scala | `List` supplied to a constructor-kind binder | Scalar `Int` supplied as that constructor |
+| TypeScript | Supplied and omitted optional scalar slots; explicit async empty returns used as `Promise<void>`; exact integer singletons, negative-literal arrays and literal unions | Missing required slot; incompatible argument; wrong integer; bigint supplied to a number singleton |
+| Scala | `List` supplied to a constructor-kind binder; signed Int/Long singleton boundaries, integer unions, containers and callable types | Scalar `Int` supplied as that constructor; wrong Int/Long singleton or integer outside a union |
 
 The emitter also asserts full expansion patterns, requested callable labels,
 indexed results/imports, and constructor kinds. Compiler success alone would
 not prove those semantic facts. Caller-supplied fixture bodies are not executed.
 Go fixtures are compiled with `go build`; no generated function is run.
+
+The TypeScript integer fixtures prove singleton/domain restrictions at use-sites.
+They do not prove exact preservation for arbitrary decimal input: the compiler
+can accept rounded number literals. Rust tests in `integer_literal_types.rs`
+separately check exact binary64 values, rounded neighbors and overflow rejection.
+Scala fixtures likewise check exact Int/Long spellings and reject wrong singleton
+values; Rust tests separately reject out-of-range inputs before source emission.
 
 Haskell extensions are supplied explicitly by the manifest: `DataKinds`,
 `KindSignatures`, `ExplicitForAll`, `TypeOperators`, and

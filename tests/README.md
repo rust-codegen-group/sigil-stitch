@@ -49,6 +49,12 @@ The integration suites are grouped by the contract they protect:
   splices, and emitted generic closed sums. Wide/narrow output is checked against
   the builder path where applicable. These are Rust integration tests, not target-compiler
   acceptance tests; no new macro syntax is introduced.
+- `tests/integer_literal_types.rs` covers canonical decimal validation through
+  constructors, direct variants and JSON, TypeScript exactness beyond the safe
+  integer and machine-word ranges, rounding/overflow rejection, Scala Int/Long
+  boundaries and recursive composition, Python unbounded integer text,
+  recursive unions, and lowered-import alias resolution. These are
+  Rust behavior tests, not substitutes for target-compiler acceptance.
 - `tests/renderer_parity_tests.rs` covers all built-in languages on the direct
   and pretty renderer paths, the exact five-operation renderer-event matrix, a
   fully migrated external adapter that does not use legacy block config,

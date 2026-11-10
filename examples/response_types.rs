@@ -6,10 +6,10 @@
 //! These are related examples, not one portable anonymous-record type. TypeScript
 //! composes existing TypeName values; Go, Dart and Swift use target-associated
 //! source fragments with structured type references; Python, Rust and Kotlin use
-//! declaration specs. No new TypeName variant or automatic translation is needed.
+//! declaration specs. These examples do not define a portable record abstraction.
 //!
 //! Only the TypeScript and Python examples constrain status to exactly 200. Their
-//! numeric leaf uses the existing Raw escape hatch, not a numeric singleton API.
+//! status type uses IntegerLiteral, lowered by each selected language adapter.
 //! Optional keys are not modeled as TypeName::Optional nullable/optional values.
 
 use std::error::Error;
@@ -64,7 +64,10 @@ fn typescript_models() -> Result<FileSpec, SigilStitchError> {
 fn typescript_response() -> Result<FileSpec, SigilStitchError> {
     // A singleton key makes Record describe a required named property here.
     // This TypeScript-specific use does not give Map record semantics elsewhere.
-    let status = TypeName::map(TypeName::string_literal("status"), TypeName::raw("200"));
+    let status = TypeName::map(
+        TypeName::string_literal("status"),
+        TypeName::integer_literal("200"),
+    );
     let body = TypeName::map(
         TypeName::string_literal("body"),
         TypeName::importable_type("./models", "Body").with_alias("ResponseBody"),
@@ -131,10 +134,7 @@ fn swift_response() -> Result<FileSpec, SigilStitchError> {
 }
 
 fn python_response() -> Result<FileSpec, SigilStitchError> {
-    let status = TypeName::application(
-        TypeName::importable("typing", "Literal"),
-        vec![TypeArgument::Single(TypeName::raw("200"))],
-    );
+    let status = TypeName::integer_literal("200");
     let optional_body = TypeName::application(
         TypeName::importable("typing", "NotRequired"),
         vec![TypeArgument::Single(TypeName::primitive("str"))],

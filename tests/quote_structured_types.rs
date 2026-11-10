@@ -20,6 +20,27 @@ fn boxed_parameter() -> TypeName {
 }
 
 #[test]
+fn integer_singleton_interpolation_uses_the_existing_type_slot() {
+    let status = TypeName::union(vec![
+        TypeName::integer_literal("200"),
+        TypeName::integer_literal("201"),
+    ]);
+    let quoted = sigil_quote!(TypeScript { type Status = $T(status.clone()); }).unwrap();
+    let built = CodeBlock::of("type Status = %T;", (status,)).unwrap();
+    for width in [8, 120] {
+        let output = render("status.ts", quoted.clone(), width);
+        assert_eq!(output, render("status.ts", built.clone(), width));
+        assert!(
+            output
+                .split_whitespace()
+                .collect::<String>()
+                .contains("typeStatus=200|201;"),
+            "{output}"
+        );
+    }
+}
+
+#[test]
 fn type_interpolation_preserves_complete_callable_and_nested_imports() {
     let callable = TypeName::callable(
         vec![

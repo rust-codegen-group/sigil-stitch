@@ -717,6 +717,7 @@ enum TypeNameExampleKind {
     Callable,
     Raw,
     StringLiteral,
+    IntegerLiteral,
 }
 
 struct TypeNameExample {
@@ -1041,6 +1042,14 @@ fn expected_type_name(language: &str, kind: TypeNameExampleKind) -> ExpectedType
             language,
             &[("python", "Literal['active']"), ("typescript", "'active'")],
         ),
+        IntegerLiteral => output_for(
+            language,
+            &[
+                ("python", "Literal[200]"),
+                ("scala", "200"),
+                ("typescript", "200"),
+            ],
+        ),
     }
 }
 
@@ -1224,6 +1233,11 @@ fn every_existing_type_name_variant() -> Vec<TypeNameExample> {
             kind: StringLiteral,
             label: "string literal",
             value: TypeName::string_literal("active"),
+        },
+        TypeNameExample {
+            kind: IntegerLiteral,
+            label: "integer literal",
+            value: TypeName::integer_literal("200"),
         },
     ]
 }

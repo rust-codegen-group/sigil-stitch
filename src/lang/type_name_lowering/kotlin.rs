@@ -156,6 +156,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             "out ",
             "in ",
         ),
+        TypeName::IntegerLiteral(_) => Err(unsupported(
+            "integer singleton types are not supported by this language adapter",
+        ))?,
         TypeName::StringLiteral(_) => Err(unsupported(
             "Kotlin has no string singleton type expression",
         ))?,

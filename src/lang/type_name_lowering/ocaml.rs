@@ -157,6 +157,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
             Err(unsupported("OCaml has no dynamic-trait type expression"))?
         }
         TypeName::Wildcard { .. } => Err(unsupported("OCaml has no wildcard type expression"))?,
+        TypeName::IntegerLiteral(_) => Err(unsupported(
+            "integer singleton types are not supported by this language adapter",
+        ))?,
         TypeName::StringLiteral(_) => {
             Err(unsupported("OCaml has no string singleton type expression"))?
         }

@@ -157,12 +157,34 @@ fn typescript(failure: Option<&str>) -> Result<String, SigilStitchError> {
         "declare const handler: Handler;\nhandler('ok');\nhandler('ok', 2);\nconst completion: Promise<void> = complete();\n",
         (),
     );
+    use_sites.add(
+        "const responseStatus: Status = 200;\nconst large: Large = 9007199254740992;\nconst negative: %T = [-1];\nconst statuses: %T = [200, 201];\n",
+        (
+            TypeName::array(TypeName::integer_literal("-1")),
+            TypeName::array(TypeName::union(vec![
+                TypeName::integer_literal("200"),
+                TypeName::integer_literal("201"),
+            ])),
+        ),
+    );
     match failure {
         Some("missing") => {
             use_sites.add("handler(); // acceptance-failure\n", ());
         }
         Some("type") => {
             use_sites.add("handler(17); // acceptance-failure\n", ());
+        }
+        Some("integer") => {
+            use_sites.add(
+                "const wrongStatus: Status = 201; // acceptance-failure\n",
+                (),
+            );
+        }
+        Some("bigint") => {
+            use_sites.add(
+                "const wrongDomain: Status = 200n; // acceptance-failure\n",
+                (),
+            );
         }
         None => {}
         Some(_) => unreachable!(),
@@ -180,11 +202,23 @@ fn typescript(failure: Option<&str>) -> Result<String, SigilStitchError> {
                 .extends(callable)
                 .build()?,
         )
+        .add_type(
+            TypeSpec::builder("Status", TypeKind::TypeAlias)
+                .extends(TypeName::integer_literal("200"))
+                .build()?,
+        )
+        .add_type(
+            TypeSpec::builder("Large", TypeKind::TypeAlias)
+                .extends(TypeName::integer_literal("9007199254740992"))
+                .build()?,
+        )
         .add_code(use_sites.build()?)
         .build()?
         .render(120)?;
     assert!(output.contains("text: string, count?: number"));
     assert!(output.contains("async function complete(): Promise<void>"));
+    assert!(output.contains("type Status = 200;"));
+    assert!(output.contains("type Large = 9007199254740992;"));
     Ok(output)
 }
 
@@ -284,7 +318,7 @@ fn go(negative: bool) -> Result<String, SigilStitchError> {
     Ok(output)
 }
 
-fn scala(negative: bool) -> Result<String, SigilStitchError> {
+fn scala(failure: Option<&str>) -> Result<String, SigilStitchError> {
     let function = FunSpec::builder("wrap")
         .add_generic_param(GenericParamSpec::new(
             "F",
@@ -303,17 +337,94 @@ fn scala(negative: bool) -> Result<String, SigilStitchError> {
         .returns(vec![TypeName::parameter("A")])
         .body(CodeBlock::of("???", ())?)
         .build()?;
-    let use_sites = if negative {
-        "val invalid = wrap[Int, Int](???) // acceptance-failure\n"
-    } else {
-        "val valid: Int = wrap[List, Int](List(1))\n"
-    };
+    let mut use_sites = CodeBlock::builder();
+    use_sites.add("val valid: Int = wrap[List, Int](List(1))\n", ());
+    use_sites.add(
+        "val responseStatus: Status = 200\nval large: Large = 2147483648L\nval statuses: %T = Array[Statuses](200, 201)\nval optional: %T = Some[-1](-1)\nval pair: %T = (200, 2147483648L)\nval callback: %T = (_) => 2147483648L\n",
+        (
+            TypeName::array(TypeName::primitive("Statuses")),
+            TypeName::optional(TypeName::integer_literal("-1")),
+            TypeName::tuple(vec![
+                TypeName::integer_literal("200"),
+                TypeName::integer_literal("2147483648"),
+            ]),
+            TypeName::callable(
+                vec![CallableParam::Single {
+                    name: None,
+                    type_name: TypeName::integer_literal("200"),
+                    presence: CallableParamPresence::Required,
+                }],
+                vec![TypeName::integer_literal("2147483648")],
+            ),
+        ),
+    );
+    for (name, value, expression) in [
+        ("zero", "0", "0"),
+        ("intMin", "-2147483648", "-2147483648"),
+        ("intMax", "2147483647", "2147483647"),
+        ("belowInt", "-2147483649", "-2147483649L"),
+        ("longMin", "-9223372036854775808", "-9223372036854775808L"),
+        ("longMax", "9223372036854775807", "9223372036854775807L"),
+        ("aboveSafeInteger", "9007199254740993", "9007199254740993L"),
+    ] {
+        use_sites.add(
+            "val %N: %T = %L\n",
+            (
+                NameArg(name.to_owned()),
+                TypeName::integer_literal(value),
+                expression,
+            ),
+        );
+    }
+    match failure {
+        Some("kind") => {
+            use_sites.add(
+                "val invalid = wrap[Int, Int](???) // acceptance-failure\n",
+                (),
+            );
+        }
+        Some("integer") => {
+            use_sites.add("val wrongStatus: Status = 201 // acceptance-failure\n", ());
+        }
+        Some("long") => {
+            use_sites.add(
+                "val wrongLarge: Large = 2147483649L // acceptance-failure\n",
+                (),
+            );
+        }
+        Some("union") => {
+            use_sites.add("val wrongUnion: Statuses = 202 // acceptance-failure\n", ());
+        }
+        None => {}
+        Some(_) => unreachable!(),
+    }
     let output = FileSpec::builder("Kinds.scala")
         .add_function(function)
-        .add_code(CodeBlock::of(use_sites, ())?)
+        .add_type(
+            TypeSpec::builder("Status", TypeKind::TypeAlias)
+                .extends(TypeName::integer_literal("200"))
+                .build()?,
+        )
+        .add_type(
+            TypeSpec::builder("Large", TypeKind::TypeAlias)
+                .extends(TypeName::integer_literal("2147483648"))
+                .build()?,
+        )
+        .add_type(
+            TypeSpec::builder("Statuses", TypeKind::TypeAlias)
+                .extends(TypeName::union(vec![
+                    TypeName::integer_literal("200"),
+                    TypeName::integer_literal("201"),
+                ]))
+                .build()?,
+        )
+        .add_code(use_sites.build()?)
         .build()?
         .render(120)?;
     assert!(output.contains("F[_]"));
+    assert!(output.contains("type Status = 200"));
+    assert!(output.contains("type Large = 2147483648L"));
+    assert!(output.contains("type Statuses = 200 | 201"));
     Ok(output)
 }
 
@@ -382,8 +493,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         ("typescript_positive.ts", typescript(None)?),
         ("typescript_missing.ts", typescript(Some("missing"))?),
         ("typescript_wrong_type.ts", typescript(Some("type"))?),
-        ("scala_positive.scala", scala(false)?),
-        ("scala_wrong_kind.scala", scala(true)?),
+        ("typescript_wrong_integer.ts", typescript(Some("integer"))?),
+        ("typescript_bigint.ts", typescript(Some("bigint"))?),
+        ("scala_positive.scala", scala(None)?),
+        ("scala_wrong_kind.scala", scala(Some("kind"))?),
+        ("scala_wrong_integer.scala", scala(Some("integer"))?),
+        ("scala_wrong_long.scala", scala(Some("long"))?),
+        ("scala_wrong_union.scala", scala(Some("union"))?),
         ("java_positive.java", java(None)?),
         ("java_missing.java", java(Some("missing"))?),
         ("java_illegal_exception.java", java(Some("illegal"))?),

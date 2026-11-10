@@ -22,6 +22,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::Importable { .. } | TypeName::Primitive(_) | TypeName::Raw(_) => {
             Ok(terminal(type_name))
         }
+        TypeName::IntegerLiteral(_) => Err(unsupported(
+            "integer singleton types are not supported by this language adapter",
+        )),
         TypeName::StringLiteral(_) => Err(unsupported(
             "JavaScript has no string singleton type expression",
         )),

@@ -142,7 +142,8 @@ fn java_erasure_identity(type_name: &TypeName) -> Option<JavaErasureIdentity> {
         | TypeName::ImplTrait { .. }
         | TypeName::DynTrait { .. }
         | TypeName::Wildcard { .. }
-        | TypeName::StringLiteral(_) => return None,
+        | TypeName::StringLiteral(_)
+        | TypeName::IntegerLiteral(_) => return None,
         TypeName::Callable { .. } => return None,
     })
 }
@@ -846,6 +847,7 @@ mod tests {
             TypeName::impl_trait(vec![imported()]),
             TypeName::dyn_trait(vec![imported()]),
             TypeName::string_literal("value"),
+            TypeName::integer_literal("200"),
         ];
         for type_name in unsupported {
             assert!(java_erasure_identity(&type_name).is_none(), "{type_name:?}");

@@ -117,7 +117,8 @@ pub fn collect_imports(tn: &TypeName, out: &mut Vec<ImportRef>) {
         TypeName::Primitive(_)
         | TypeName::Parameter(_)
         | TypeName::Raw(_)
-        | TypeName::StringLiteral(_) => {}
+        | TypeName::StringLiteral(_)
+        | TypeName::IntegerLiteral(_) => {}
     }
 }
 

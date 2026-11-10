@@ -116,6 +116,9 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::ImplTrait { .. } => Err(unsupported("PHP has no impl-trait type expression"))?,
         TypeName::DynTrait { .. } => Err(unsupported("PHP has no dynamic-trait type expression"))?,
         TypeName::Wildcard { .. } => Err(unsupported("PHP has no wildcard type expression"))?,
+        TypeName::IntegerLiteral(_) => Err(unsupported(
+            "integer singleton types are not supported by this language adapter",
+        ))?,
         TypeName::StringLiteral(_) => {
             Err(unsupported("PHP has no string singleton type expression"))?
         }
