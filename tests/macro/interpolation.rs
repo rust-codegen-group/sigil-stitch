@@ -224,3 +224,38 @@ fn test_name_member_access() {
     let output = render_ts(&block);
     assert!(output.contains("this.email = value;"), "got: {output}");
 }
+
+#[test]
+fn forwarded_interpolation_preserves_call_site_bindings() {
+    macro_rules! forward {
+        ($name:expr) => {{
+            let __sigil_builder_0 = "wrapper";
+            sigil_quote!(TypeScript {
+                const $N($name) = $V(r#"@{Some(__sigil_builder_0).unwrap()}"#);
+            })
+        }};
+    }
+
+    let __sigil_builder_0 = "caller";
+    let block = forward!(__sigil_builder_0).unwrap();
+    assert_eq!(render_ts(&block), "const caller = `wrapper`;\n");
+}
+
+#[test]
+fn string_conversions_evaluate_once_in_source_order() {
+    let visits = std::cell::RefCell::new(Vec::new());
+    let record = |value| {
+        visits.borrow_mut().push(value);
+        value
+    };
+    let block = sigil_quote!(TypeScript {
+        const $N(record("name")) = $S(record("quoted")) + $V(record("raw")) + $L("@{record(\"embedded\")}");
+    })
+    .unwrap();
+
+    assert_eq!(*visits.borrow(), ["name", "quoted", "raw", "embedded"]);
+    assert_eq!(
+        render_ts(&block),
+        "const name = 'quoted' + `raw` + embedded;\n"
+    );
+}

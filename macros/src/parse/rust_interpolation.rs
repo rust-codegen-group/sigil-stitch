@@ -48,6 +48,9 @@ pub(super) fn parse_string_expr(
 }
 
 fn parse_literal(literal: &syn::LitStr, marker: &str) -> syn::Result<StringValue> {
+    // Reparsed expressions keep call-site name resolution, but diagnostics belong
+    // to the source literal. Stable spans cannot address its decoded substrings.
+    let span = Span::call_site().located_at(literal.span());
     let input = literal.value();
     let mut format_string = String::with_capacity(input.len());
     let mut literal_string = String::with_capacity(input.len());
@@ -95,7 +98,7 @@ fn parse_literal(literal: &syn::LitStr, marker: &str) -> syn::Result<StringValue
                     ),
                 );
             } else {
-                match syn::parse_str::<syn::Expr>(expression) {
+                match syn::LitStr::new(expression, span).parse::<syn::Expr>() {
                     Ok(expr) => expressions.push(expr),
                     Err(error) => combine_error(
                         &mut errors,
@@ -135,6 +138,7 @@ fn parse_literal(literal: &syn::LitStr, marker: &str) -> syn::Result<StringValue
         Ok(StringValue::Interpolated {
             format_string,
             expressions,
+            span,
         })
     } else {
         let value = if saw_escape { literal_string } else { input };

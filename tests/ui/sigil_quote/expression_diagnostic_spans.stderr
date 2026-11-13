@@ -1,0 +1,21 @@
+error[E0425]: cannot find value `missing_direct` in this scope
+ --> tests/ui/sigil_quote/expression_diagnostic_spans.rs:5:27
+  |
+5 |         const direct = $L(missing_direct);
+  |                           ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `missing_embedded` in this scope
+ --> tests/ui/sigil_quote/expression_diagnostic_spans.rs:6:29
+  |
+6 |         const embedded = $V("prefix @{missing_embedded}");
+  |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+  |
+  = note: this error originates in the macro `sigil_quote` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0425]: cannot find value `missing_nested` in this scope
+ --> tests/ui/sigil_quote/expression_diagnostic_spans.rs:7:27
+  |
+7 |         const nested = $L(r#"@{Some(missing_nested).unwrap()}"#);
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+  |
+  = note: this error originates in the macro `sigil_quote` (in Nightly builds, run with -Z macro-backtrace for more info)

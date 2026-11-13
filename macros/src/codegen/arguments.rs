@@ -1,5 +1,6 @@
-use proc_macro2::{Ident, Literal, TokenStream};
-use quote::quote;
+use proc_macro2::{Ident, Literal, Span, TokenStream};
+use quote::{quote, quote_spanned};
+use syn::spanned::Spanned;
 
 use crate::guard_plan::argument_is_fallible;
 use crate::ir::{FormattedCode, QuoteArg, Statement, StringValue};
@@ -80,10 +81,13 @@ fn generate_arg(arg: &QuoteArg, context: &mut GenerateContext) -> TokenStream {
         QuoteArg::Type(expr) => quote! { #expr },
         QuoteArg::Code(expr) => quote! { (#expr).__sigil_trim_trailing_newline() },
         QuoteArg::Name(expr) => {
-            quote! { ::sigil_stitch::code_block::NameArg((#expr).to_string()) }
+            // Move diagnostics without changing generated-token name resolution.
+            let span = Span::call_site().located_at(expr.span());
+            quote_spanned! {span=> ::sigil_stitch::code_block::NameArg((#expr).to_string()) }
         }
         QuoteArg::StringLit(expr) => {
-            quote! { ::sigil_stitch::code_block::StringLitArg((#expr).to_string()) }
+            let span = Span::call_site().located_at(expr.span());
+            quote_spanned! {span=> ::sigil_stitch::code_block::StringLitArg((#expr).to_string()) }
         }
         QuoteArg::VerbatimStr(value) => {
             let rendered = render_owned_string(value);
@@ -219,13 +223,18 @@ fn render_string(value: &StringValue, mode: StringMode) -> TokenStream {
         StringValue::Interpolated {
             format_string,
             expressions,
+            span,
         } => {
-            let format = Literal::string(format_string);
-            quote! { ::std::format!(#format, #(#expressions),*) }
+            let mut format = Literal::string(format_string);
+            format.set_span(*span);
+            quote_spanned! {*span=> ::std::format!(#format, #(#expressions),*) }
         }
         StringValue::Dynamic(expr) => match mode {
             StringMode::Literal => quote! { #expr },
-            StringMode::Owned => quote! { (#expr).to_string() },
+            StringMode::Owned => {
+                let span = Span::call_site().located_at(expr.span());
+                quote_spanned! {span=> (#expr).to_string() }
+            }
         },
     }
 }
