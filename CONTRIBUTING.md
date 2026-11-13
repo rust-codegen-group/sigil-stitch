@@ -46,7 +46,9 @@ sigil-stitch/
 │   ├── <lang>/             # main.rs + quote_*.rs + builder_*.rs submodules
 │   └── shared/golden.rs    # Golden test assertion helper
 ├── test-goldens/           # Golden test output files (one directory per language)
-└── docs/                   # mdbook documentation
+└── docs/                   # mdbook documentation and Cargo doctest harness
+    ├── Cargo.toml          # standalone documentation test crate
+    └── book_tests.rs       # chapters included as Rust doc modules
 ```
 
 **Key dependencies:** `pretty` (Wadler-Lindig formatting), `serde` + `derive` (serialization), `snafu` (errors).
@@ -56,8 +58,10 @@ For a deeper dive, see the [Architecture](docs/src/architecture.md) chapter.
 ## Build and Test Commands
 
 Requires Rust edition 2024, MSRV 1.88.0. Install [just](https://github.com/casey/just) for the task runner.
-Book commands require mdBook. `book-test` builds the library in an isolated
-temporary directory and supplies its search paths to `mdbook test`.
+Book commands require mdBook. `book-test` builds the documentation test crate
+with Cargo; its manifest uses a relative path dependency on this crate. Keep
+`docs/book_tests.rs` synchronized with the chapters listed in
+`docs/src/SUMMARY.md`.
 
 ```bash
 # Core workflow
@@ -79,7 +83,7 @@ just semver-check      # verify the active patch compatibility delta
 # Documentation
 just doc               # cargo doc --no-deps --open
 just book              # mdbook build docs
-just book-test         # compile and run mdBook examples
+just book-test         # compile and run documentation examples
 just book-serve        # mdbook serve with live reload
 ```
 
