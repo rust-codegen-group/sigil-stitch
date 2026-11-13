@@ -1,4 +1,4 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{Expr, Local, Pat};
 
@@ -78,6 +78,8 @@ pub(crate) enum StringValue {
     Interpolated {
         format_string: String,
         expressions: Vec<Expr>,
+        // Source-literal location with call-site name resolution.
+        span: Span,
     },
 }
 

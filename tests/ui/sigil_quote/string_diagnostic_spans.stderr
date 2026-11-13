@@ -1,0 +1,46 @@
+error[E0624]: method `to_string` is private
+  --> tests/ui/sigil_quote/string_diagnostic_spans.rs:20:27
+   |
+10 |         fn to_string(&self) -> String {
+   |         ----------------------------- private method defined here
+...
+20 |         const quoted = $S(PrivateConversion);
+   |                           ^^^^^^^^^^^^^^^^^ private method
+   |
+   = note: this error originates in the macro `sigil_quote` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0624]: method `to_string` is private
+  --> tests/ui/sigil_quote/string_diagnostic_spans.rs:21:18
+   |
+10 |         fn to_string(&self) -> String {
+   |         ----------------------------- private method defined here
+...
+21 |         const $N(PrivateConversion) = 1;
+   |                  ^^^^^^^^^^^^^^^^^ private method
+   |
+   = note: this error originates in the macro `sigil_quote` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0624]: method `to_string` is private
+  --> tests/ui/sigil_quote/string_diagnostic_spans.rs:22:29
+   |
+10 |         fn to_string(&self) -> String {
+   |         ----------------------------- private method defined here
+...
+22 |         const verbatim = $V(PrivateConversion);
+   |                             ^^^^^^^^^^^^^^^^^ private method
+   |
+   = note: this error originates in the macro `sigil_quote` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `NotDisplay` doesn't implement `std::fmt::Display`
+  --> tests/ui/sigil_quote/string_diagnostic_spans.rs:23:29
+   |
+23 |         const embedded = $V("prefix @{NotDisplay}");
+   |                             ^^^^^^^^^^^^^^^^^^^^^^ `NotDisplay` cannot be formatted with the default formatter
+   |
+help: the trait `std::fmt::Display` is not implemented for `NotDisplay`
+  --> tests/ui/sigil_quote/string_diagnostic_spans.rs:3:1
+   |
+ 3 | struct NotDisplay;
+   | ^^^^^^^^^^^^^^^^^
+   = note: in format strings you may be able to use `{:?}` (or `{:#?}` for pretty-print) instead
+   = note: this error originates in the macro `$crate::__export::format_args` which comes from the expansion of the macro `sigil_quote` (in Nightly builds, run with -Z macro-backtrace for more info)
