@@ -1,6 +1,7 @@
 mod rewrite;
 
 use crate::code_node::{BlockIntent, CodeNode, parts_args_to_nodes};
+use crate::float_value::FloatValue;
 use crate::import::ImportRef;
 use crate::lang::CodeLang;
 use crate::type_name::TypeName;
@@ -280,7 +281,8 @@ impl CodeBlock {
                 | CodeNode::BranchClose(_)
                 | CodeNode::BlockOpenIntent { .. }
                 | CodeNode::BlockCloseIntent { .. }
-                | CodeNode::BranchCloseIntent { .. } => false,
+                | CodeNode::BranchCloseIntent { .. }
+                | CodeNode::FloatValue(_) => false,
             }
         }
 
@@ -352,6 +354,9 @@ impl CodeBlock {
     }
 
     /// Collect all import references from this code block.
+    ///
+    /// This inspects existing references without language-owned value or type
+    /// lowering. Use `FileSpec::render` for complete target-derived imports.
     pub fn collect_imports(&self, out: &mut Vec<ImportRef>) {
         crate::import_collector::walk_nodes(&self.nodes, out);
     }
@@ -799,8 +804,8 @@ fn parse_format(format: &str) -> Result<Vec<FormatPart>, crate::error::SigilStit
 
 /// Trait for converting various types into a `Vec<Arg>` for format strings.
 ///
-/// Implemented for `()` (no args), `TypeName`, `&str`, `String`, `CodeBlock`,
-/// `NameArg`, `StringLitArg`, `Vec<Arg>`, and tuples up to 8 elements.
+/// Implemented for `()` (no args), `TypeName`, `FloatValue`, `&str`, `String`,
+/// `CodeBlock`, `CodeFragment`, marker wrappers, `Vec<Arg>`, and tuples up to 8 elements.
 /// Bare strings convert to `Arg::Literal`; use [`NameArg`] or [`StringLitArg`]
 /// wrappers to target `%N` or `%S` specifiers instead.
 pub trait IntoArgs {
@@ -846,6 +851,13 @@ impl IntoArgs for CodeBlock {
 impl IntoArgs for CodeFragment {
     fn into_args(self) -> Vec<Arg> {
         vec![Arg::Code(self.into_code_block())]
+    }
+}
+
+/// Single floating value, retained as structured source until target selection.
+impl IntoArgs for FloatValue {
+    fn into_args(self) -> Vec<Arg> {
+        vec![self.into()]
     }
 }
 
@@ -972,6 +984,14 @@ impl From<CodeBlock> for Arg {
 impl From<CodeFragment> for Arg {
     fn from(fragment: CodeFragment) -> Self {
         Arg::Code(fragment.into_code_block())
+    }
+}
+
+impl From<FloatValue> for Arg {
+    fn from(value: FloatValue) -> Self {
+        Arg::Code(CodeBlock {
+            nodes: vec![CodeNode::FloatValue(value)],
+        })
     }
 }
 

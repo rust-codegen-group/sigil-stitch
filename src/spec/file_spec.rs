@@ -4,6 +4,7 @@ use crate::error::SigilStitchError;
 use crate::import::{ImportAliasConflictResolver, ImportGroup};
 use crate::import_collector;
 use crate::lang::CodeLang;
+use crate::source_preparation::SourcePreparer;
 use crate::spec::closed_sum_spec::ClosedSumSpec;
 use crate::spec::emittable::Emittable;
 use crate::spec::fun_spec::FunSpec;
@@ -11,7 +12,7 @@ use crate::spec::import_spec::ImportSpec;
 use crate::spec::modifiers::DeclarationContext;
 use crate::spec::type_spec::TypeSpec;
 use crate::type_name::TypeName;
-use crate::type_name_lowering::{DiagnosticPath, TypeNameMaterializer};
+use crate::type_name_lowering::DiagnosticPath;
 
 #[cfg(test)]
 mod storage_tests {
@@ -339,11 +340,11 @@ impl FileSpec {
             });
         }
 
-        let mut materializer = TypeNameMaterializer::new(lang);
+        let mut preparer = SourcePreparer::new(lang);
         let prepared_header = self
             .header
             .as_ref()
-            .map(|header| materializer.prepare_source_block(header, DiagnosticPath::root("header")))
+            .map(|header| preparer.prepare_source_block(header, DiagnosticPath::root("header")))
             .transpose()?;
         let mut prepared = Vec::with_capacity(emitted.len());
         for (member_index, member) in emitted.into_iter().enumerate() {
@@ -353,7 +354,7 @@ impl FileSpec {
                         .iter()
                         .enumerate()
                         .map(|(block_index, block)| {
-                            materializer.prepare_source_block(
+                            preparer.prepare_source_block(
                                 block,
                                 DiagnosticPath::member_block(member_index, block_index),
                             )
@@ -366,7 +367,7 @@ impl FileSpec {
                         .iter()
                         .enumerate()
                         .map(|(type_index, type_name)| {
-                            materializer.prepare_metadata_type(
+                            preparer.prepare_metadata_type(
                                 type_name,
                                 DiagnosticPath::raw_metadata(member_index, type_index),
                             )

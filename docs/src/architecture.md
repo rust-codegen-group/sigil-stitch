@@ -21,7 +21,7 @@ shared renderer grammar used only by 0.6.8 bridges.
 ## Pipeline and Ownership
 
 ```text
-Declaration specs + TypeName + opaque CodeBlock payloads
+Declaration specs + TypeName + FloatValue + opaque CodeBlock payloads
                          |
                          +-- intrinsic validation
                          +-- target capability validation
@@ -35,10 +35,10 @@ Declaration specs + TypeName + opaque CodeBlock payloads
                          |
                          +-- rewrite each source tree exactly once
                          +-- validate rewritten structure
-                         +-- fallible language-owned TypeName lowering
-                         +-- validate lowered type blocks
+                         +-- fallible language-owned value/type lowering
+                         +-- validate lowering results
                          +-- collect and resolve imports
-                         +-- final render with no rewrite or type lowering
+                         +-- final render with no rewrite or semantic lowering
                          |
                          v
                      source text
@@ -56,8 +56,9 @@ target and is not a portable cross-language program.
 
 - **`RendererLang`** is the renderer-only interface used by
   `code_renderer.rs`. It covers file extensions, string literals, block
-  rendering, one complete fallible `lower_type_name()` seam, and other stable
-  final-rendering policy. Implementing it is sufficient for direct
+  rendering, complete fallible `lower_type_name()` and `lower_float_value()`
+  seams, and other stable final-rendering policy. Implementing it is sufficient
+  for direct
   `CodeBlock` rendering. Built-in adapters lower complete `TypeName` values to
   non-empty `CodeBlock`s; the provided default retains only frozen pre-0.6.8
   compatibility behavior.
@@ -176,6 +177,29 @@ input fails with a macro diagnostic instead of exhausting rustc while parsing
 the generated nesting. The public `CodeBlock`, error, and rendering contracts
 are unaffected.
 
+## Floating-Value Construction
+
+`FloatValue` carries binary32 or binary64 integer bits, not a type reference or
+decimal token. `%L`, macro `$L`, and template literal parameters accept it
+directly through the existing `Arg::Code` nested-block carrier. The resulting
+`CodeNode::FloatValue` retains the format and bits without choosing a target.
+
+Source preparation uses the actual file or renderer's selected language. After
+source rewrite and structural validation, it calls
+`RendererLang::lower_float_value()` for every value occurrence, including nested
+blocks and sequences. Each result must be non-empty, structurally balanced,
+and contain no further deferred floating values. Type references in the result
+then pass through ordinary type-name lowering before import collection and alias
+resolution. Completed lowering results are not rewritten again. Final rendering
+does not construct floating values or stringify types after imports.
+
+Rust uses absolute core primitive `from_bits` calls; the provided default rejects
+the request for other built-ins and unchanged external adapters at render time.
+No numeric or byte-array fallback is implicit. The core validates structure
+rather than parsing target expressions or proving a custom adapter's numeric
+semantics. See [Floating Values](float_values.md) for usage and the distinction
+from floating singleton types and quantization.
+
 ## Semantic Type References: TypeName
 
 `src/type_name.rs` defines type references. Key variants:
@@ -235,7 +259,7 @@ Lowering](type_name_lowering.md) for the complete contract.
 
 ## Structured Source Container: CodeBlock
 
-A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `NameRef`, `StringLit`, `Comment`, `Nested`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, and control-flow nodes carry a language-neutral `BlockIntent` (`BlockOpenIntent`, `BlockCloseIntent`, `BranchCloseIntent`) with no per-language rendering policy.
+A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `FloatValue`, `NameRef`, `StringLit`, `Comment`, `Nested`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, `FloatValue` carries its exact format and bits, and control-flow nodes carry a language-neutral `BlockIntent` (`BlockOpenIntent`, `BlockCloseIntent`, `BranchCloseIntent`) with no per-language rendering policy.
 
 The builder (`CodeBlockBuilder`) validates argument counts and indent balance
 before producing a reusable block. The released `CodeBlock::nodes_mut()` method
@@ -379,8 +403,8 @@ that recognizer or add a shared syntax hook.
 
 `FileSpec::render(width)` owns one ordered preparation and rendering pipeline.
 It does not emit an import header or body text until declaration lowering,
-source rewrite, type-name lowering, lowered-block validation, and import
-resolution have all succeeded.
+source rewrite, floating-value/type-name lowering, lowered-block validation,
+and import resolution have all succeeded.
 
 Declaration validation checks every `TypeSpec` against the type, function,
 field, property, and enum-variant profiles returned by
@@ -465,25 +489,30 @@ or explicitly raw content.
 
 ### Rewrite and Lower Source Blocks
 
-The core calls `RendererLang::rewrite_nodes()` exactly once for every owned
+The shared preparer in `src/source_preparation.rs` serves file and standalone
+rendering. It calls `RendererLang::rewrite_nodes()` exactly once for every owned
 source block: the header, each direct caller block, and each block returned by a
 declaration lowerer. The adapter may recurse through `Nested` and `Sequence`
 with the standard rewrite walker; the core does not call the hook again for
 those children. The complete rewritten tree is then checked for structural
 errors.
 
-Rewrite sees semantic, unaliased `TypeRef` nodes. It is a target source
-correction seam, not declaration or type grammar. The existing public hook can
+Rewrite sees semantic, unaliased `TypeRef` and deferred `FloatValue` nodes. It
+is a target source correction seam, not declaration grammar, value construction,
+or type grammar. The existing public hook can
 change those nodes, so the next step always observes the rewritten result.
 
-The core then walks every rewritten source tree and lowers each
-`CodeNode::TypeRef` through the selected adapter. Intrinsic type-name validation
+The preparer then walks every rewritten source tree. Floating-value nodes become
+validated target expression blocks; their newly introduced type references are
+prepared recursively. The core lowers each `CodeNode::TypeRef` through the
+selected adapter. Intrinsic type-name validation
 runs before `RendererLang::lower_type_name()`; the returned non-empty block is
 validated afterward and replaces the original node. The validator recurses
 through adapter-produced blocks and permits only terminal, import-aware type
 references. Unresolved compound types, empty output, or statement and
 control-flow nodes fail the complete file. Blocks returned by
-`lower_type_name()` are not source-rewrite inputs and are not rewritten again.
+`lower_type_name()` or `lower_float_value()` are not source-rewrite inputs and
+are not rewritten again.
 
 Opaque raw content is neither rewritten nor type-lowered. The separate types
 listed by `RawContentWithImports` are import metadata rather than source trees:
@@ -491,8 +520,9 @@ the core lowers and validates them to discover imports but never passes them
 through `rewrite_nodes()` or substitutes their spelling into the raw text.
 
 `FileSpec::validate()` checks stored declaration and type intent but does not
-invoke source rewrite or emit dynamic blocks. Render preparation remains the
-authoritative check for the actual rewritten output.
+invoke source rewrite, floating-value construction, or emit dynamic blocks.
+Render preparation remains the authoritative check for the actual rewritten
+output.
 
 ### Collect and Resolve Imports
 
@@ -560,6 +590,7 @@ not rewrite the tree or lower another type root:
 |------|--------|
 | `Literal(s)` | Emit string directly |
 | `TypeRef(tn)` | Resolve and emit one already-lowered terminal type reference |
+| `FloatValue(value)` | Not a terminal node; preparation must replace it with a validated expression or fail |
 | `NameRef(s)` | Emit identifier |
 | `StringLit(s)` | Call `lang.render_string_literal()` |
 | `VerbatimStr(s)` | Call `lang.render_verbatim_string()` |

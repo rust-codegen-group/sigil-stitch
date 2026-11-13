@@ -8,7 +8,7 @@
 //! | `T`  | `%T`      | `TypeName` |
 //! | `N`  | `%N`      | `NameArg`     |
 //! | `S`  | `%S`      | `StringLitArg`|
-//! | `L`  | `%L`      | `&str`, `String`, or `CodeBlock` |
+//! | `L`  | `%L`      | `&str`, `String`, `CodeBlock`, `CodeFragment`, or `FloatValue` |
 //!
 //! # Example
 //!
@@ -98,10 +98,10 @@ struct TemplateParam {
 
 /// A reusable, parameterized code template.
 ///
-/// Templates are language-agnostic format string patterns using `#{name:K}`
-/// syntax for named parameters. The language parameter `L` enters at
-/// [`apply`](CodeTemplate::apply) time when concrete arguments are provided.
-/// This allows the same template to be reused across different target languages.
+/// Templates use `#{name:K}` syntax for named parameters. Applying arguments
+/// builds structured source; the file or renderer selects the language later.
+/// Literal pattern text remains target syntax, while structured type references
+/// and floating values retain their intent until preparation.
 ///
 /// Duplicate parameter names are allowed -- the same value is used at each
 /// occurrence.

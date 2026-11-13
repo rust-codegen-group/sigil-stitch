@@ -122,6 +122,14 @@ The integration suites are grouped by the contract they protect:
   and diagnostic protocol. It is not part of ordinary Rust CI.
   The Rust runner in `examples/source_acceptance.rs` has synthetic diagnostic
   protocol tests included in ordinary Rust checks; these do not invoke compilers.
+- `tests/float_values.rs` covers public bit-pattern identity and same-version
+  value/source round-trips, deferred `%L`/`$L`/template/fragment composition,
+  target selection without source mutation, source rewrite before construction,
+  both renderer paths, and imported type aliases from custom lowerers. It checks
+  rejection by every other built-in and unchanged external adapters, malformed
+  or still-deferred output, and value nodes incorrectly returned by a type hook.
+  Rust generated-source
+  acceptance separately evaluates exact bit recovery in const contexts.
 
 Run only the compatibility gates with:
 
@@ -144,6 +152,7 @@ cargo test --test closed_sum_lowering_tests
 cargo test --test renderer_parity_tests
 cargo test --test declaration_generic_lowering_tests
 cargo test --test quote_structured_types
+cargo test --test float_values
 cargo test --test typescript shared::golden::tests
 ```
 

@@ -14,7 +14,7 @@ Templates use `#{name:K}` for named parameters, where `K` specifies the kind:
 | `T`  | `%T`      | `TypeName` |
 | `N`  | `%N`      | `NameArg`     |
 | `S`  | `%S`      | `StringLitArg`|
-| `L`  | `%L`      | `&str`, `String`, or `CodeBlock` |
+| `L`  | `%L`      | `&str`, `String`, `CodeBlock`, `CodeFragment`, or `FloatValue` |
 
 Use `##` to emit a literal `#` character.
 
@@ -45,6 +45,12 @@ let block = tmpl.apply()
 The template is parsed once by `CodeTemplate::new()`. Arguments are supplied
 via `.apply().set(...).build()`, producing a structured `CodeBlock` that retains
 typed placeholders alongside the pattern's target-language literals.
+
+A literal parameter can hold `FloatValue` without selecting a language at
+`.set()` or `.build()` time. Like type references, its exact intent survives
+until the file or renderer's selected adapter prepares the source. Unsupported
+construction fails there, not while applying the template. See
+[Floating Values](float_values.md).
 
 ## Reuse Across Types
 

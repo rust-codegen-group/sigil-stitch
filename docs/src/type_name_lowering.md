@@ -81,13 +81,12 @@ imports are collected:
 
 ```text
 declaration lowerers and caller CodeBlocks
-    -> CodeBlock tree containing TypeRef(TypeName)
+    -> CodeBlock tree containing TypeRef(TypeName) and optional FloatValue nodes
     -> RendererLang::rewrite_nodes exactly once
     -> validate the rewritten source tree
-    -> recursively find every TypeRef
-    -> intrinsic TypeName validation
-    -> RendererLang::lower_type_name
-    -> validate every lowered type block
+    -> recursively prepare source nodes
+       FloatValue -> lower and validate expression -> prepare introduced types
+       TypeRef -> intrinsic validation -> lower_type_name -> validate type block
     -> collect imports from the lowered CodeBlock tree
     -> resolve aliases
     -> render through one layout adapter with no further rewrite or lowering
@@ -104,8 +103,11 @@ type grammar.
 `rewrite_nodes()` is a source-tree correction seam, not a type-lowering hook.
 It runs for headers, direct caller blocks, and declaration-lowered blocks. It
 does not run for blocks returned by `lower_type_name()`, opaque raw content, or
-the type metadata attached to `RawContentWithImports`. Listed raw-import types
-are lowered and validated only so their derived imports can be collected.
+the type metadata attached to `RawContentWithImports`. Floating-value lowering
+results are likewise completed target expressions, not source-rewrite inputs;
+their introduced `TypeName` references still follow ordinary lowering. Listed
+raw-import types are lowered and validated only so their derived imports can be
+collected.
 
 ## Lowered Block Contract
 
@@ -124,8 +126,8 @@ later. A qualified importable reference and every compound variant must be
 fully lowered by the adapter.
 
 The crate rejects adapter output that contains statement or control-flow
-nodes, is empty, leaves a compound type reference unresolved, or otherwise
-cannot be interpreted as one type expression. This catches incomplete
+nodes or deferred floating values, is empty, leaves a compound type reference
+unresolved, or otherwise cannot be interpreted as one type expression. This catches incomplete
 external adapters instead of allowing recursive or silently empty output.
 
 `CodeBlock` remains the only shared structured source container. It carries

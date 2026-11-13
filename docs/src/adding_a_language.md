@@ -36,7 +36,7 @@ can't handle (e.g., shell flags, Go channel operators), you may also need to add
 
 ## The RendererLang Trait
 
-These methods are used by the renderer (`code_renderer.rs`) and type lowering:
+These methods cover final rendering and language-owned structured source lowering:
 
 ### Required Methods
 
@@ -60,6 +60,7 @@ Only two methods have no default:
 | `render_block_close()` | Delegates to legacy block hooks | Complete final closer |
 | `render_branch_transition()` | Delegates to legacy block hooks | Outgoing closer plus connector whitespace |
 | `lower_type_name()` | Frozen pre-0.6.8 compatibility lowering | Validate and lower one complete type expression |
+| `lower_float_value()` | Returns `UnsupportedFloatValue` | Construct one exact floating value as a structured expression |
 
 Override `render_verbatim_string()` if your language has string interpolation (e.g., Bash `"$x"`, TypeScript `` `${x}` ``, Python `f"{x}"`).
 
@@ -97,6 +98,17 @@ complete `TypeName`, returns a non-empty structured `CodeBlock` for every
 accepted form, and returns `SigilStitchError` for unsupported forms. See
 [TypeName Validation and Lowering](type_name_lowering.md) for the output
 contract.
+
+Override `lower_float_value()` only when the target can construct the supplied
+format and every encoded bit exactly, including NaN payloads and signed zeros.
+Return a non-empty, balanced `CodeBlock` with structured type references. The
+caller interpolates `FloatValue` directly through `%L` or macro `$L`. Source
+preparation calls the hook using the actual selected language after rewrite and
+before type-name lowering and import collection. Return a completed expression,
+not another deferred value node. This is not a final-renderer pass or an implicit
+conversion for `%L` text. If exact
+construction is unavailable, return `UnsupportedFloatValue` rather than a wider
+number or raw-byte fallback. See [Floating Values](float_values.md).
 
 ## The CodeLang Trait
 

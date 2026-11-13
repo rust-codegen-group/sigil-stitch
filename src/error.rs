@@ -2,6 +2,7 @@
 
 use snafu::prelude::*;
 
+use crate::float_value::FloatValue;
 use crate::lang::capability::{
     ClosedSumCaseForm, FieldCapability, FieldContext, FunctionCapability, FunctionContext,
     FunctionForm, PropertyCapability, PropertyContext, TypeCapability, TypeDeclarationCapability,
@@ -1284,6 +1285,28 @@ pub enum SigilStitchError {
         /// The builder operation that detected the invalid state.
         operation: &'static str,
         /// Why the operation cannot be represented in the current block.
+        reason: String,
+    },
+
+    /// A language adapter cannot construct an exact floating value.
+    #[snafu(display(
+        "language {language:?} cannot construct floating value {value:?} exactly: {reason}"
+    ))]
+    UnsupportedFloatValue {
+        /// Language file extension.
+        language: String,
+        /// Original format and bit pattern that could not be represented.
+        value: FloatValue,
+        /// Target-local reason for rejection.
+        reason: String,
+    },
+
+    /// A language adapter returned empty or structurally invalid floating-value output.
+    #[snafu(display("language {language:?} returned invalid floating-value output: {reason}"))]
+    InvalidFloatValueLowering {
+        /// Language file extension.
+        language: String,
+        /// Reason the adapter output was rejected.
         reason: String,
     },
 }
