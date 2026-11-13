@@ -440,6 +440,30 @@ fn sequence_soft_break_alone_selects_the_pretty_adapter() {
 }
 
 #[test]
+fn prepared_renderer_rejects_deferred_floating_values() {
+    let rust = crate::lang::rust::Rust::new();
+    let imports = ImportGroup::new();
+    let renderer = CodeRenderer::new(&rust, &imports, 80);
+    let deferred = CodeBlock::of("%L", crate::float_value::FloatValue::Binary32(0)).unwrap();
+
+    // Bypass preparation deliberately to check the terminal renderer's invariant.
+    for block in [deferred.clone(), CodeBlock::of("%W%L", deferred).unwrap()] {
+        assert!(matches!(
+            renderer.render_prepared(&block),
+            Err(SigilStitchError::InvalidFloatValueLowering { language, reason })
+                if language == "rs"
+                    && reason == "unresolved floating value reached the prepared renderer"
+        ));
+    }
+    assert_eq!(
+        renderer
+            .render_prepared(&CodeBlock::of("ready", ()).unwrap())
+            .unwrap(),
+        "ready"
+    );
+}
+
+#[test]
 fn direct_adapter_reports_invalid_internal_operations() {
     let mut adapter = DirectAdapter::new("  ", 80);
     assert!(matches!(

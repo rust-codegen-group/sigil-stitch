@@ -180,6 +180,19 @@ rejects it, Python lowers it through `typing.Literal`, and Scala uses native
 semantic form, and target-specific syntax outside these forms can use the
 [Raw escape hatch](type_name.md#raw-escape-hatch).
 
+### Floating value
+
+A machine floating-point value whose identity includes its scalar format and
+every bit of its encoding. Target construction preserves both or rejects the
+request. Construction is deferred until the target language is selected.
+It is not a singleton type, decimal source spelling, numeric conversion, or a
+block of values with a shared scale.
+
+[`FloatValue`](float_values.md) stores binary32 or binary64 bits as integers.
+Signed zeros and distinct NaN encodings have distinct identities. `%L` and macro
+`$L` retain the value in structured source; preparation asks the file or renderer's
+selected language for a structured expression, not a byte-array fallback.
+
 ### Field sequence
 
 The ordered fields owned by one type declaration or one record payload,
@@ -283,11 +296,12 @@ case-local payload fields, not ordinary members of the enclosing type.
 ### Source-tree rewrite
 
 One language-local structural correction is applied exactly once to each
-source `CodeBlock` after declaration lowering and before type-name lowering. It
-is for target source fixups that require a tree-level view, such as joining a
-Go IIFE close to its invocation. It does not own declaration grammar, type
-grammar, validation, or final layout. Raw content, raw import metadata, and
-blocks returned by type-name lowering are not source-rewrite inputs.
+source `CodeBlock` after declaration lowering and before floating-value and
+type-name lowering. It is for target source fixups that require a tree-level
+view, such as joining a Go IIFE close to its invocation. It does not own
+declaration grammar, floating-value construction, type grammar, validation, or
+final layout. Raw content, raw import metadata, and blocks returned by
+floating-value or type-name lowering are not source-rewrite inputs.
 
 ### Type-name lowering
 

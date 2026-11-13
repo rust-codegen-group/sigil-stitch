@@ -356,6 +356,30 @@ pub trait RendererLang: std::fmt::Debug + 'static {
         crate::type_name_lowering::compatibility::lower(self, type_name)
     }
 
+    /// Construct one bit-exact machine floating value as structured source.
+    ///
+    /// The result belongs to this target and must preserve the requested format
+    /// and every bit, including signed zeros and NaN encodings. Keep type
+    /// references structured and propagate construction errors. This operation
+    /// does not select a byte-array fallback, quantize, or perform arithmetic.
+    /// The provided default rejects the request, including for unchanged external
+    /// adapters. Source preparation calls this hook for a structured
+    /// [`crate::code_node::CodeNode::FloatValue`]. Introduced type references
+    /// follow ordinary lowering before import collection. The result must contain
+    /// source content, not only layout, and must not contain another unresolved
+    /// floating value; callers interpolate values directly through `%L` or macro `$L`.
+    fn lower_float_value(
+        &self,
+        value: &crate::float_value::FloatValue,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        Err(SigilStitchError::UnsupportedFloatValue {
+            language: self.file_extension().to_string(),
+            value: *value,
+            reason: "bit-exact floating-value construction is not implemented by this adapter"
+                .to_string(),
+        })
+    }
+
     /// Qualify an import name for rendering in code.
     ///
     /// Default: return the resolved name as-is.

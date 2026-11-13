@@ -16,7 +16,7 @@
 //! | `%T` | Type | `TypeName` | Emit type reference, track import |
 //! | `%N` | Name | `NameArg` | Emit identifier name |
 //! | `%S` | String | `StringLitArg` | Emit escaped string literal |
-//! | `%L` | Literal | `&str`, number, `CodeBlock` | Emit raw value or nested block |
+//! | `%L` | Literal | `&str`, `String`, `CodeBlock`, `CodeFragment`, `FloatValue` | Compose raw source, nested code, or an exact floating value |
 //! | `%W` | Wrap | (none) | Soft line break point |
 //! | `%>` | Indent | (none) | Increase indent level |
 //! | `%<` | Dedent | (none) | Decrease indent level |
@@ -82,12 +82,15 @@ pub mod code_renderer;
 pub mod code_template;
 /// Error types for sigil-stitch.
 pub mod error;
+/// Bit-exact machine floating values lowered to target-associated source blocks.
+pub mod float_value;
 /// Import types, grouping, and conflict resolution.
 pub mod import;
 /// Walks `CodeBlock` trees to extract all import references.
 pub mod import_collector;
 /// Language abstraction trait and per-language implementations.
 pub mod lang;
+mod source_preparation;
 /// Structural builders (TypeSpec, FunSpec, FileSpec, etc.) that emit `CodeBlock`s.
 pub mod spec;
 /// Exact rendered-code assertion helpers for tests.
@@ -107,6 +110,7 @@ pub mod prelude {
     pub use crate::code_node::{BlockIntent, CodeNode};
     pub use crate::code_template::{CodeTemplate, ParamKind};
     pub use crate::error::SigilStitchError;
+    pub use crate::float_value::FloatValue;
     pub use crate::lang::capability::{
         ClosedSumCapabilityProfile, ClosedSumCaseForm, FieldCapability, FieldCapabilityProfile,
         FieldContext, FunctionBodyPolicy, FunctionCapability, FunctionCapabilityProfile,

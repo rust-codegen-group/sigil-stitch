@@ -77,7 +77,7 @@ final newlines are significant.
 | `$N(expr)` | `%N` | `impl ToString` | Name identifier |
 | `$S(expr)` | `%S` | `impl ToString` | String literal (quoted in output) |
 | `$V(expr)` | `%V` | `impl ToString` | Verbatim string (interpolation preserved) |
-| `$L(expr)` | `%L` | `impl Into<Arg>` | Literal value, nested code, or parsed fragment |
+| `$L(expr)` | `%L` | `impl Into<Arg>` | Raw source, nested code, parsed fragment, or exact floating value |
 | `$C(expr)` | `%L` | `CodeBlock` | Nested code block |
 | `$W` | `%W` | (none) | Soft line-break point |
 | `$>` | `%>` | (none) | Increase indent level |
@@ -279,6 +279,12 @@ let block = sigil_quote!(TypeScript {
 // Output: const count = 0;
 # }
 ```
+
+`$L(FloatValue::from_f64(value))` retains an exact floating value until the file
+or renderer's selected language constructs it during source preparation. The
+macro's language tag does not pre-lower that value. Rust currently supports the
+operation; other built-in targets reject it at render time. See
+[Floating Values](float_values.md). `$C` remains a block splice, not a scalar slot.
 
 `$L` can also splice structured code via `CodeBlock` or `CodeFragment`. Use
 `CodeFragment` when the snippet contains format markers such as `%>` / `%<` and

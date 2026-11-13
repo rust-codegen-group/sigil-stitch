@@ -8,6 +8,7 @@
 
 use crate::code_block::{Arg, CodeBlock, FormatPart, Specifier};
 use crate::error::SigilStitchError;
+use crate::float_value::FloatValue;
 use crate::type_name::TypeName;
 
 /// Structural role of a control-flow block.
@@ -269,6 +270,10 @@ pub enum CodeNode {
     },
     /// A sequence of nodes (for grouping, e.g. a statement or control flow block).
     Sequence(Vec<CodeNode>),
+    /// An exact floating value, retained until the selected language constructs
+    /// its expression during source preparation. Introduced type references
+    /// follow ordinary lowering before import collection.
+    FloatValue(FloatValue),
 }
 
 /// Convert legacy `(FormatPart, Arg)` parallel vectors into `Vec<CodeNode>`.

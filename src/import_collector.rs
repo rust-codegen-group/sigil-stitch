@@ -4,6 +4,8 @@ use crate::import::ImportRef;
 
 /// Walk a prepared CodeBlock tree and collect all terminal import references.
 /// No rendering, column tracking, or pretty printing occurs here.
+/// Language-owned value/type lowering must already be complete to include
+/// target-derived imports; `FileSpec` rendering performs that preparation.
 pub fn collect_imports(block: &CodeBlock) -> Vec<ImportRef> {
     let mut refs = Vec::new();
     walk_nodes(&block.nodes, &mut refs);

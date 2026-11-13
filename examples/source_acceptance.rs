@@ -259,6 +259,32 @@ mod tests {
     }
 
     #[test]
+    fn rust_short_diagnostics_require_the_marked_format_mismatch() {
+        let source = "#![no_std]\nconst _: f64 = value; // acceptance-failure\n";
+        let check = |output| {
+            intended_failure(
+                "rust",
+                "rust_wrong_format.rs",
+                source,
+                output,
+                "E0308.*mismatched types",
+            )
+            .unwrap()
+        };
+        assert!(check(
+            "rust_wrong_format.rs:2:16: error[E0308]: mismatched types: expected `f64`, found `f32`"
+        ));
+        for output in [
+            "rust_wrong_format.rs:1:16: error[E0308]: mismatched types",
+            "rust_wrong_format.rs:2:16: error[E0425]: cannot find value",
+            "rust_wrong_format.rs:2:16: note: E0308 mismatched types",
+            "rust_wrong_format.rs:2:16: error[E0425]: cannot find value\nother.rs:9:16: error[E0308]: mismatched types",
+        ] {
+            assert!(!check(output), "{output}");
+        }
+    }
+
+    #[test]
     fn javac_location_and_diagnostic() {
         let source = "class Fixture {\n  void read() { read(); // acceptance-failure\n  }\n}\n";
         assert!(intended_failure(

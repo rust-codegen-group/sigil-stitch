@@ -56,6 +56,8 @@ For a deeper dive, see the [Architecture](docs/src/architecture.md) chapter.
 ## Build and Test Commands
 
 Requires Rust edition 2024, MSRV 1.88.0. Install [just](https://github.com/casey/just) for the task runner.
+Book commands require mdBook. `book-test` builds the library in an isolated
+temporary directory and supplies its search paths to `mdbook test`.
 
 ```bash
 # Core workflow

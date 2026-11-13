@@ -477,6 +477,84 @@ fn java(variant: Option<&str>) -> Result<String, SigilStitchError> {
     Ok(output)
 }
 
+fn rust(wrong_format: bool) -> Result<String, SigilStitchError> {
+    let language = sigil_stitch::lang::rust::Rust::new();
+    let mut body = CodeBlock::builder();
+    // Local names must not capture the primitive paths used by value lowering.
+    body.add("type f32 = ();\ntype f64 = ();\nmod core {}\n", ());
+    for bits in [
+        0,
+        0x8000_0000,
+        1,
+        0x007f_ffff,
+        0x0080_0000,
+        0x3f80_0000,
+        0x7f7f_ffff,
+        0x7f80_0000,
+        0xff80_0000,
+        0x7fc0_0042,
+        0x7f80_0001,
+        0xffc0_0042,
+        0xff80_0001,
+        u32::MAX,
+    ]
+    .into_iter()
+    .chain((0..32).map(|bit| 1u32 << bit))
+    {
+        body.add_statement(
+            "const _: () = assert!((%L).to_bits() == %L)",
+            (FloatValue::Binary32(bits), format!("0x{bits:08x}u32")),
+        );
+    }
+    for bits in [
+        0,
+        0x8000_0000_0000_0000,
+        1,
+        0x000f_ffff_ffff_ffff,
+        0x0010_0000_0000_0000,
+        0x3ff0_0000_0000_0000,
+        0x7fef_ffff_ffff_ffff,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7ff8_0000_0000_0042,
+        0x7ff0_0000_0000_0001,
+        0xfff8_0000_0000_0042,
+        0xfff0_0000_0000_0001,
+        u64::MAX,
+    ]
+    .into_iter()
+    .chain((0..64).map(|bit| 1u64 << bit))
+    {
+        body.add_statement(
+            "const _: () = assert!((%L).to_bits() == %L)",
+            (FloatValue::Binary64(bits), format!("0x{bits:016x}u64")),
+        );
+    }
+    body.add_code(sigil_quote!(Rust {
+        const FROM_F32: $T(TypeName::qualified("::core::primitive", "f32")) = $L(FloatValue::from_f32(1.0));
+        const FROM_F64: $T(TypeName::qualified("::core::primitive", "f64")) = $L(FloatValue::from_f64(-0.0));
+        const _: () = assert!(FROM_F32.to_bits() == 0x3f800000u32);
+        const _: () = assert!(FROM_F64.to_bits() == 0x8000000000000000u64);
+    })?);
+    if wrong_format {
+        body.add(
+            "const _: %T = %L; // acceptance-failure\n",
+            (
+                TypeName::qualified("::core::primitive", "f64"),
+                FloatValue::Binary32(0),
+            ),
+        );
+    }
+    FileSpec::builder_with("floats.rs", language)
+        .header(CodeBlock::of(
+            "#![no_std]\n#![allow(dead_code, non_camel_case_types)]\n",
+            (),
+        )?)
+        .add_code(body.build()?)
+        .build()?
+        .render(120)
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let directory = std::env::args_os()
         .nth(1)
@@ -503,6 +581,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         ("java_positive.java", java(None)?),
         ("java_missing.java", java(Some("missing"))?),
         ("java_illegal_exception.java", java(Some("illegal"))?),
+        ("rust_positive.rs", rust(false)?),
+        ("rust_wrong_format.rs", rust(true)?),
     ] {
         std::fs::write(directory.join(name), source)?;
     }

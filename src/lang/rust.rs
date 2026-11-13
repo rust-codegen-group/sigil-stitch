@@ -152,6 +152,24 @@ impl RendererLang for Rust {
     ) -> Result<crate::code_block::CodeBlock, crate::error::SigilStitchError> {
         crate::lang::type_name_lowering::rust(type_name)
     }
+
+    fn lower_float_value(
+        &self,
+        value: &crate::float_value::FloatValue,
+    ) -> Result<CodeBlock, SigilStitchError> {
+        use crate::float_value::FloatValue;
+        use crate::type_name::TypeName;
+
+        let (primitive, bits) = match value {
+            FloatValue::Binary32(bits) => ("f32", format!("0x{bits:08x}u32")),
+            FloatValue::Binary64(bits) => ("f64", format!("0x{bits:016x}u64")),
+        };
+        CodeBlock::of(
+            "%T::from_bits(%L)",
+            (TypeName::qualified("::core::primitive", primitive), bits),
+        )
+    }
+
     fn file_extension(&self) -> &str {
         &self.extension
     }

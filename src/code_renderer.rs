@@ -8,8 +8,9 @@ use crate::code_node::{BlockIntent, CodeNode};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::RendererLang;
+use crate::source_preparation::SourcePreparer;
 use crate::type_name::TypeName;
-use crate::type_name_lowering::{DiagnosticPath, TypeNameMaterializer};
+use crate::type_name_lowering::DiagnosticPath;
 use direct::DirectAdapter;
 use pretty::PrettyAdapter;
 
@@ -36,9 +37,8 @@ impl<'a> CodeRenderer<'a> {
 
     /// Render a CodeBlock to string.
     pub fn render(&mut self, block: &CodeBlock) -> Result<String, SigilStitchError> {
-        let mut materializer = TypeNameMaterializer::new(self.lang);
-        let prepared =
-            materializer.prepare_source_block(block, DiagnosticPath::root("standalone"))?;
+        let mut preparer = SourcePreparer::new(self.lang);
+        let prepared = preparer.prepare_source_block(block, DiagnosticPath::root("standalone"))?;
         self.render_prepared(&prepared)
     }
 
@@ -108,6 +108,13 @@ impl<'a> CodeRenderer<'a> {
                 CodeNode::Literal(text) => adapter.structured_text(text)?,
                 CodeNode::TypeRef(type_name) => {
                     adapter.structured_text(&self.resolve_terminal_type(type_name)?)?;
+                }
+                CodeNode::FloatValue(_) => {
+                    return Err(SigilStitchError::InvalidFloatValueLowering {
+                        language: self.lang.file_extension().to_string(),
+                        reason: "unresolved floating value reached the prepared renderer"
+                            .to_string(),
+                    });
                 }
                 CodeNode::NameRef(name) => {
                     adapter.structured_text(&self.lang.escape_reserved(name))?;

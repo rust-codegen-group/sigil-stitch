@@ -1,4 +1,13 @@
 {
+  "rust": {
+    "compiler": "rustc",
+    "version_flags": ["--version"],
+    "flags": ["--edition=2024", "--crate-type=lib", "--emit=metadata", "--error-format=short", "--color=never"],
+    "positive": "rust_positive.rs",
+    "negative": [
+      {"file": "rust_wrong_format.rs", "diagnostic": "E0308.*mismatched types"}
+    ]
+  },
   "cpp": {
     "compiler": "clang++",
     "version_flags": ["--version"],

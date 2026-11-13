@@ -11,7 +11,7 @@
 | `%S` | String | `StringLitArg` | Emit escaped string literal |
 | `%V` | Verbatim | `VerbatimStrArg` | Emit string with interpolation preserved |
 | `%R` | Remark | `CommentArg` | Emit inline comment |
-| `%L` | Literal | `&str`, `String`, `CodeBlock`, `CodeFragment` | Emit raw value or nested block/fragment |
+| `%L` | Literal | `&str`, `String`, `CodeBlock`, `CodeFragment`, `FloatValue` | Compose raw source, nested code, or an exact floating value |
 | `%W` | Wrap | (none) | Soft line break point |
 | `%>` | Indent | (none) | Increase indent level |
 | `%<` | Dedent | (none) | Decrease indent level |
@@ -282,6 +282,13 @@ arguments map to raw `Arg::Literal`, so no wrapper is needed for ordinary
 language text. `%L` also accepts `CodeBlock` and `CodeFragment` for nested code
 that should keep imports, indentation, and other structure. Supports `@{expr}`
 interpolation inside string literals in `sigil_quote!` (see above).
+
+`%L` also accepts `FloatValue` directly. It preserves the supplied format and
+bits as a structured node until the file or renderer's selected language
+constructs the expression during source preparation. Rust currently supports
+binary32/binary64; other built-in targets return `UnsupportedFloatValue` at
+render time. Bare host `f32`/`f64` values are not implicitly converted. See
+[Floating Values](float_values.md).
 
 ```rust
 # extern crate sigil_stitch;

@@ -342,7 +342,8 @@ pub(crate) fn validate_lowered_block(
                     }
                     walk(children, language, &path.sequence(index))?;
                 }
-                CodeNode::VerbatimStr(_)
+                CodeNode::FloatValue(_)
+                | CodeNode::VerbatimStr(_)
                 | CodeNode::Comment(_)
                 | CodeNode::Attribute(_)
                 | CodeNode::StatementBegin
@@ -418,6 +419,7 @@ mod tests {
                 intent: BlockIntent::Else,
             },
             CodeNode::Sequence(vec![CodeNode::Literal("sequence".to_string())]),
+            CodeNode::FloatValue(crate::float_value::FloatValue::Binary32(0)),
         ]
     }
 
@@ -437,7 +439,8 @@ mod tests {
             | CodeNode::Indent
             | CodeNode::Dedent
             | CodeNode::Sequence(_) => true,
-            CodeNode::VerbatimStr(_)
+            CodeNode::FloatValue(_)
+            | CodeNode::VerbatimStr(_)
             | CodeNode::Comment(_)
             | CodeNode::Attribute(_)
             | CodeNode::StatementBegin

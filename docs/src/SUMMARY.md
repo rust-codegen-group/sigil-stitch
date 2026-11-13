@@ -6,6 +6,7 @@
 - [Getting Started](getting_started.md)
 - [Format Specifiers](format_specifiers.md)
 - [TypeName](type_name.md)
+- [Floating Values](float_values.md)
 - [Building Functions & Fields](functions_and_fields.md)
 - [Building Types & Enums](types_and_enums.md)
 - [Files & Projects](files_and_projects.md)

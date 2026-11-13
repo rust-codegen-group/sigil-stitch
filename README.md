@@ -90,7 +90,7 @@ continuation in multi-line expressions. Go `const (`, `var (`, `import (`, and
 | `%N` | Name | `NameArg` | Emit identifier name, escape reserved words |
 | `%S` | String | `StringLitArg` | Emit escaped string literal |
 | `%V` | Verbatim | `VerbatimStrArg` | Emit string with interpolation preserved |
-| `%L` | Literal | `&str`, number, `CodeBlock` | Emit raw value or nested block |
+| `%L` | Literal | `&str`, `String`, `CodeBlock`, `CodeFragment`, `FloatValue` | Compose raw source, nested code, or an exact floating value |
 | `%W` | Wrap | (none) | Soft line break point |
 | `%>` | Indent | (none) | Increase indent level |
 | `%<` | Dedent | (none) | Decrease indent level |
@@ -99,6 +99,14 @@ continuation in multi-line expressions. Go `const (`, `var (`, `import (`, and
 
 Bare `&str` maps to `%L`. Use `NameArg` for `%N`, `StringLitArg` for `%S`, and `VerbatimStrArg` for `%V`.
 See the [Format Specifiers](docs/src/format_specifiers.md) chapter for the full deep dive.
+
+For bit-exact Rust floating values, `FloatValue::from_f32(value)` and
+`FloatValue::from_f64(value)` capture the original bits. Pass a `FloatValue`
+directly through `%L` or macro `$L`; the file or renderer's selected language
+constructs the expression during source preparation. Rust emits `from_bits`,
+while other built-in targets explicitly reject the request at render time.
+This is value construction, not a singleton type or quantization API. See
+[Floating Values](docs/src/float_values.md) for raw bit constructors and scope.
 
 ## Declaration Specs
 

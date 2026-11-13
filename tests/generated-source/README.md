@@ -2,13 +2,13 @@
 
 This local integration command compiles complete files emitted by
 `examples/generated_source_acceptance.rs` through public `FileSpec`,
-declaration, and `TypeName` APIs:
+declaration, `TypeName`, and `FloatValue` APIs:
 
 ```text
 just generated-source-acceptance
 ```
 
-The Rust runner requires Cargo, Clang C++, Go, GHC, a JDK's `javac`, Vite+'s
+The runner requires Cargo, rustc, Clang C++, Go, GHC, a JDK's `javac`, Vite+'s
 `vp`, and Scala 3's `scalac` on PATH. TypeScript runs through
 `vp dlx --package typescript@7.0.2 tsc`, without a global `tsc` installation
 or repository npm dependencies. The first run may download that package into
@@ -23,6 +23,7 @@ a temporary directory for generated sources and compiler artifacts. These are
 local prerequisites, not a compiler minimum-version support promise.
 The fixtures have been checked with Apple Clang 21.0.0, GHC 9.14.1, OpenJDK
 21.0.12, Go 1.27.1, TypeScript 7.0.2 through vp, and Homebrew Scala 3.10.0.
+The Rust floating-value fixtures have been checked with rustc 1.99.0.
 
 Each negative fixture shares the positive declaration and setup. A unique
 `acceptance-failure` marker identifies its intended failing use-site; the
@@ -31,9 +32,12 @@ failure or a note at that line does not count as success.
 Go's `go build` diagnostics use `file:line:column` without an `error` keyword;
 that header rule is limited to Go. Another diagnostic cannot supply the
 expected message for the marked use-site.
+Rust selects `--error-format=short` to keep the error location and diagnosis in
+one header; it uses the existing exact-location protocol, not a new parser.
 
 | Fixture family | Positive use-sites | Negative use-sites |
 |----------------|--------------------|--------------------|
+| Rust | `no_std` const assertions recover requested binary32/binary64 bits, including signed zeros, subnormal/normal boundaries, infinities, quiet/signaling NaN payloads and every individual bit; local names cannot capture primitive paths | Use a generated binary32 expression where binary64 is required |
 | C++ | Independent packs of different lengths, matching simultaneous `Pair<As, Bs>...`, empty packs and `Bundle<>` | Mismatched simultaneous pack lengths |
 | Haskell | `Array 2 Int -> Array 3 Int -> Array 5 Int` | Result declared as `Array 6 Int` |
 | Go | Zero/single/multiple declaration and callable returns, receiver/interface conformance, imported result slots and destructuring | Assign a two-result call to one scalar |
@@ -45,6 +49,8 @@ The emitter also asserts full expansion patterns, requested callable labels,
 indexed results/imports, and constructor kinds. Compiler success alone would
 not prove those semantic facts. Caller-supplied fixture bodies are not executed.
 Go fixtures are compiled with `go build`; no generated function is run.
+Rust bit-preservation assertions are evaluated by rustc at compile time; no
+generated executable is run.
 
 The TypeScript integer fixtures prove singleton/domain restrictions at use-sites.
 They do not prove exact preservation for arbitrary decimal input: the compiler

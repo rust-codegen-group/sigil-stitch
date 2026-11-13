@@ -3,15 +3,14 @@ use crate::code_node::CodeNode;
 use crate::error::SigilStitchError;
 use crate::lang::RendererLang;
 use crate::type_name::TypeName;
+use crate::type_name_lowering::DiagnosticPath;
+use crate::type_name_lowering::validation::{validate_lowered_block, validate_type_name};
 
-use super::DiagnosticPath;
-use super::validation::{validate_lowered_block, validate_type_name};
-
-pub(crate) struct TypeNameMaterializer<'a> {
+pub(crate) struct SourcePreparer<'a> {
     lang: &'a dyn RendererLang,
 }
 
-impl<'a> TypeNameMaterializer<'a> {
+impl<'a> SourcePreparer<'a> {
     pub(crate) fn new(lang: &'a dyn RendererLang) -> Self {
         Self { lang }
     }
@@ -22,7 +21,7 @@ impl<'a> TypeNameMaterializer<'a> {
         path: DiagnosticPath,
     ) -> Result<CodeBlock, SigilStitchError> {
         let mut rewritten = block.rewrite_source(&path, |nodes| self.lang.rewrite_nodes(nodes))?;
-        rewritten.nodes = self.materialize_nodes(rewritten.nodes, &path)?;
+        rewritten.nodes = self.prepare_nodes(rewritten.nodes, &path)?;
         Ok(rewritten)
     }
 
@@ -31,30 +30,36 @@ impl<'a> TypeNameMaterializer<'a> {
         type_name: &TypeName,
         path: DiagnosticPath,
     ) -> Result<CodeBlock, SigilStitchError> {
-        self.lower(type_name, &path)
+        self.lower_type(type_name, &path)
     }
 
-    fn materialize_nodes(
+    fn prepare_nodes(
         &mut self,
         nodes: Vec<CodeNode>,
         path: &DiagnosticPath,
     ) -> Result<Vec<CodeNode>, SigilStitchError> {
-        // Consume each vector once and replace every original TypeRef with one
-        // validated lowered block; terminal leaves are never lowered again.
+        // Consume each source vector once. Float expressions are prepared for
+        // type lowering, while validated type terminals are not lowered again.
         let mut prepared = Vec::with_capacity(nodes.len());
         for (index, node) in nodes.into_iter().enumerate() {
             match node {
                 CodeNode::TypeRef(type_name) => {
-                    let lowered = self.lower(&type_name, &path.node(index))?;
+                    let lowered = self.lower_type(&type_name, &path.node(index))?;
+                    prepared.push(CodeNode::Nested(lowered));
+                }
+                CodeNode::FloatValue(value) => {
+                    let mut lowered = crate::float_value::lower(&value, self.lang)?;
+                    lowered.nodes =
+                        self.prepare_nodes(lowered.nodes, &path.node(index).child("float_value"))?;
                     prepared.push(CodeNode::Nested(lowered));
                 }
                 CodeNode::Nested(mut block) => {
-                    block.nodes = self.materialize_nodes(block.nodes, &path.nested(index))?;
+                    block.nodes = self.prepare_nodes(block.nodes, &path.nested(index))?;
                     prepared.push(CodeNode::Nested(block));
                 }
                 CodeNode::Sequence(children) => {
                     prepared.push(CodeNode::Sequence(
-                        self.materialize_nodes(children, &path.sequence(index))?,
+                        self.prepare_nodes(children, &path.sequence(index))?,
                     ));
                 }
                 other => prepared.push(other),
@@ -63,7 +68,7 @@ impl<'a> TypeNameMaterializer<'a> {
         Ok(prepared)
     }
 
-    fn lower(
+    fn lower_type(
         &mut self,
         type_name: &TypeName,
         path: &DiagnosticPath,
