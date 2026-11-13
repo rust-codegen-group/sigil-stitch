@@ -1,0 +1,14 @@
+[package]
+name = "sigil-stitch-book-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Keep the documentation test crate independent from the parent workspace.
+[workspace]
+
+[dependencies]
+sigil-stitch = { path = ".." }
+
+[lib]
+path = "book_tests.rs"

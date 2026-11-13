@@ -82,15 +82,9 @@ doc:
 book:
     mdbook build docs
 
-# Test mdbook code examples
+# Test documentation code examples through Cargo's doctest harness
 book-test:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    target_dir="$(mktemp -d "${TMPDIR:-/tmp}/sigil-stitch-book.XXXXXX")"
-    trap 'rm -rf "$target_dir"' EXIT
-    cargo build --lib --target-dir "$target_dir"
-    library_paths="$(find "$target_dir" -type d -print | paste -sd, -)"
-    mdbook test docs -L "$library_paths"
+    cargo test --locked --manifest-path docs/Cargo.toml --doc
 
 # Serve the mdbook with live reload
 book-serve:
