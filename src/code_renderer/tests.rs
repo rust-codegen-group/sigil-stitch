@@ -63,7 +63,7 @@ fn test_lang(indent: &'static str) -> TestLang {
 fn render_block(block: &CodeBlock, width: usize) -> String {
     let ts = TypeScript::new();
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&ts, &imports, width);
+    let renderer = CodeRenderer::new(&ts, &imports, width);
     renderer.render(block).unwrap()
 }
 
@@ -192,7 +192,7 @@ fn test_type_rendering() {
     }]);
     let block = CodeBlock::of("const u: %T = getUser()", (user,)).unwrap();
     let ts = TypeScript::new();
-    let mut renderer = CodeRenderer::new(&ts, &imports, 80);
+    let renderer = CodeRenderer::new(&ts, &imports, 80);
     assert_eq!(
         renderer.render(&block).unwrap(),
         "const u: User = getUser()"
@@ -214,7 +214,7 @@ fn compatibility_type_lowerer_rejects_string_singletons() {
     let block = CodeBlock::of("%T", (TypeName::string_literal("active"),)).unwrap();
     let lang = test_lang("  ");
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
 
     assert!(matches!(
         renderer.render(&block),
@@ -290,7 +290,7 @@ fn test_block_open_for_override() {
     builder.add_statement("fmap :: a -> b", ());
     builder.end_control_flow();
     let block = builder.build().unwrap();
-    let mut renderer = CodeRenderer::new(&haskell, &imports, 80);
+    let renderer = CodeRenderer::new(&haskell, &imports, 80);
     let output = renderer.render(&block).unwrap();
     assert!(output.contains("class Functor f where"));
 }
@@ -300,7 +300,7 @@ fn pretty_path_preserves_exact_tab_indentation() {
     let block = CodeBlock::of("list(%>%Walpha,%Wbeta%<%W)", ()).unwrap();
     let lang = test_lang("\t");
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 8);
+    let renderer = CodeRenderer::new(&lang, &imports, 8);
 
     let output = renderer.render(&block).unwrap();
     assert_eq!(output, "list(\n\talpha,\n\tbeta )");
@@ -312,7 +312,7 @@ fn pretty_path_preserves_exact_multi_character_indentation() {
     let block = CodeBlock::of("list(%>%Walpha,%Wbeta%<%W)", ()).unwrap();
     let lang = test_lang(".-");
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 8);
+    let renderer = CodeRenderer::new(&lang, &imports, 8);
 
     let output = renderer.render(&block).unwrap();
     assert_eq!(output, "list(\n.-alpha,\n.-beta )");
@@ -345,7 +345,7 @@ fn opaque_multiline_hook_output_is_not_reindented() {
         (StringLitArg("first\nsecond".to_string()),),
     )
     .unwrap();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     assert_eq!(renderer.render(&direct).unwrap(), "  value: first\nsecond");
 
     let pretty =
@@ -571,7 +571,7 @@ fn renderer_state_is_local_after_post_rewrite_validation_error() {
         reject_bad_after_rewrite: true,
     };
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
 
     let bad = CodeBlock::of("bad", ()).unwrap();
     assert!(matches!(
@@ -588,7 +588,7 @@ fn renderer_state_is_local_after_post_rewrite_validation_error() {
 fn renderer_state_is_local_between_successful_calls() {
     let lang = test_lang("  ");
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 8);
+    let renderer = CodeRenderer::new(&lang, &imports, 8);
 
     let first = CodeBlock::of("first", ()).unwrap();
     assert_eq!(renderer.render(&first).unwrap(), "first");

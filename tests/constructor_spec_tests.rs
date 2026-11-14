@@ -27,7 +27,7 @@ fn render_fun(
 ) -> String {
     let block = spec.emit(lang, ctx).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
     renderer.render(&block).unwrap()
 }
 
@@ -39,7 +39,7 @@ fn render_type(spec: &TypeSpec, lang: &dyn sigil_stitch::lang::CodeLang) -> Stri
         if i > 0 {
             output.push('\n');
         }
-        let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
+        let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
         output.push_str(&renderer.render(block).unwrap());
     }
     output

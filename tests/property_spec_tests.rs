@@ -22,7 +22,7 @@ fn render_property(
         if i > 0 {
             output.push('\n');
         }
-        let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
+        let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
         output.push_str(&renderer.render(block).unwrap());
     }
     output
@@ -36,7 +36,7 @@ fn render_type(spec: &TypeSpec, lang: &dyn sigil_stitch::lang::CodeLang) -> Stri
         if i > 0 {
             output.push('\n');
         }
-        let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
+        let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
         output.push_str(&renderer.render(block).unwrap());
     }
     output

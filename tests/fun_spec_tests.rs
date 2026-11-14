@@ -20,7 +20,7 @@ fn emit_fun_ts(spec: &FunSpec, ctx: DeclarationContext) -> String {
     let lang = TypeScript::new();
     let block = spec.emit(&lang, ctx).unwrap();
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     renderer.render(&block).unwrap()
 }
 
@@ -28,7 +28,7 @@ fn emit_fun_rs(spec: &FunSpec, ctx: DeclarationContext) -> String {
     let lang = Rust::new();
     let block = spec.emit(&lang, ctx).unwrap();
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     renderer.render(&block).unwrap()
 }
 
@@ -310,7 +310,7 @@ fn test_emittable_uses_top_level_context() {
     let lang = TypeScript::new();
     let blocks = f.emit_members(&lang).unwrap();
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert!(
         output.contains("export"),

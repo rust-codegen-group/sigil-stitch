@@ -340,7 +340,7 @@ impl FileSpec {
             });
         }
 
-        let mut preparer = SourcePreparer::new(lang);
+        let preparer = SourcePreparer::new(lang);
         let prepared_header = self
             .header
             .as_ref()
@@ -419,9 +419,9 @@ impl FileSpec {
         lang.validate_resolved_imports(&imports)?;
 
         let mut output = String::new();
+        let renderer = CodeRenderer::new(lang, &imports, width);
 
         if let Some(header) = &prepared_header {
-            let renderer = CodeRenderer::new(lang, &imports, width);
             let header_output = renderer.render_prepared(header)?;
             if !header_output.is_empty() {
                 output.push_str(&header_output);
@@ -448,7 +448,6 @@ impl FileSpec {
                         if j > 0 {
                             output.push('\n');
                         }
-                        let renderer = CodeRenderer::new(lang, &imports, width);
                         let member_output = renderer.render_prepared(block)?;
                         output.push_str(&member_output);
                         if !member_output.ends_with('\n') {

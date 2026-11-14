@@ -24,7 +24,7 @@ fn render_fun(
 ) -> String {
     let block = spec.emit(lang, ctx).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
     renderer.render(&block).unwrap()
 }
 
@@ -36,7 +36,7 @@ fn render_type(spec: &TypeSpec, lang: &dyn sigil_stitch::lang::CodeLang) -> Stri
         if i > 0 {
             output.push('\n');
         }
-        let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
+        let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
         output.push_str(&renderer.render(block).unwrap());
     }
     output
@@ -49,7 +49,7 @@ fn render_field(
 ) -> String {
     let block = spec.emit(lang, ctx).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
     renderer.render(&block).unwrap()
 }
 
@@ -477,7 +477,7 @@ fn test_rust_args_bulk_derive() {
     let ann = AnnotationSpec::new("derive").args(["Debug", "Clone", "Serialize"]);
     let block = ann.emit(&rs).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
     let output = renderer.render(&block).unwrap();
     assert_eq!(output, "#[derive(Debug, Clone, Serialize)]");
 }
@@ -490,7 +490,7 @@ fn test_args_combined_with_arg() {
         .args(["deny_unknown_fields"]);
     let block = ann.emit(&rs).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
     let output = renderer.render(&block).unwrap();
     assert_eq!(
         output,
@@ -504,7 +504,7 @@ fn test_args_empty_iter_no_parens() {
     let ann = AnnotationSpec::new("test").args(Vec::<&str>::new());
     let block = ann.emit(&rs).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
     let output = renderer.render(&block).unwrap();
     assert_eq!(output, "#[test]");
 }
@@ -520,7 +520,7 @@ fn test_name_ref_escapes_rust_keyword() {
     )
     .unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
     let output = renderer.render(&block).unwrap();
     assert_eq!(output, "let r#type = 1");
 }
@@ -535,7 +535,7 @@ fn test_name_ref_escapes_go_keyword() {
     )
     .unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&go, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&go, &imports, 80);
     let output = renderer.render(&block).unwrap();
     assert_eq!(output, "var func_ int");
 }
@@ -549,7 +549,7 @@ fn test_name_ref_no_escape_non_keyword() {
     )
     .unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&rs, &imports, 80);
     let output = renderer.render(&block).unwrap();
     assert_eq!(output, "let myVar = 1");
 }

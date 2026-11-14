@@ -372,7 +372,7 @@ impl CodeBlock {
         width: usize,
     ) -> Result<String, crate::error::SigilStitchError> {
         let imports = crate::import::ImportGroup::new();
-        let mut renderer = crate::code_renderer::CodeRenderer::new(lang, &imports, width);
+        let renderer = crate::code_renderer::CodeRenderer::new(lang, &imports, width);
         renderer.render(self)
     }
 }

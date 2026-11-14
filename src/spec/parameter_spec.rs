@@ -321,7 +321,7 @@ mod tests {
         let block = cb.build().unwrap();
         // Use a basic renderer to get the output.
         let imports = crate::import::ImportGroup::new();
-        let mut renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+        let renderer = crate::code_renderer::CodeRenderer::new(&lang, &imports, 80);
         renderer.render(&block).unwrap()
     }
 
@@ -390,7 +390,7 @@ mod tests {
         param.emit_into(&mut cb, &kt);
         let block = cb.build().unwrap();
         let imports = crate::import::ImportGroup::new();
-        let mut renderer = crate::code_renderer::CodeRenderer::new(&kt, &imports, 80);
+        let renderer = crate::code_renderer::CodeRenderer::new(&kt, &imports, 80);
         let output = renderer.render(&block).unwrap();
         assert_eq!(output, "val name: String");
     }
@@ -406,7 +406,7 @@ mod tests {
         param.emit_into(&mut cb, &kt);
         let block = cb.build().unwrap();
         let imports = crate::import::ImportGroup::new();
-        let mut renderer = crate::code_renderer::CodeRenderer::new(&kt, &imports, 80);
+        let renderer = crate::code_renderer::CodeRenderer::new(&kt, &imports, 80);
         let output = renderer.render(&block).unwrap();
         assert_eq!(output, "var name: String");
     }

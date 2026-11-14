@@ -364,7 +364,7 @@ fn render_blocks_ts_at_width(blocks: &[CodeBlock], width: usize) -> String {
         if i > 0 {
             output.push('\n');
         }
-        let mut renderer = CodeRenderer::new(&lang, &imports, width);
+        let renderer = CodeRenderer::new(&lang, &imports, width);
         output.push_str(&renderer.render(block).unwrap());
     }
     output
@@ -378,7 +378,7 @@ fn render_blocks_rs(blocks: &[CodeBlock]) -> String {
         if i > 0 {
             output.push('\n');
         }
-        let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+        let renderer = CodeRenderer::new(&lang, &imports, 80);
         output.push_str(&renderer.render(block).unwrap());
     }
     output
@@ -426,7 +426,7 @@ fn permissive_external_adapter_uses_frozen_type_compatibility_lowering() {
     assert_eq!(blocks.len(), 1);
 
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&LegacyTypeLang, &imports, 80);
+    let renderer = CodeRenderer::new(&LegacyTypeLang, &imports, 80);
     let rendered = renderer.render(&blocks[0]).unwrap();
     assert!(rendered.starts_with("legacy_type Legacy"), "{rendered}");
 }
@@ -1086,7 +1086,7 @@ fn test_type_alias_cpp() {
     let lang = Cpp::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert_eq!(output.trim(), "using Meters = double;");
 }
@@ -1101,7 +1101,7 @@ fn test_type_alias_c() {
     let lang = C::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert_eq!(output.trim(), "typedef double Meters;");
 }
@@ -1116,7 +1116,7 @@ fn test_type_alias_go() {
     let lang = Go::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert_eq!(output.trim(), "type Meters = float64");
 }
@@ -1131,7 +1131,7 @@ fn test_type_alias_python() {
     let lang = Python::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert_eq!(output.trim(), "type UserId = str");
 }
@@ -1147,7 +1147,7 @@ fn test_type_alias_kotlin() {
     let lang = Kotlin::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert_eq!(output.trim(), "typealias Name = String");
 }
@@ -1174,7 +1174,7 @@ fn test_newtype_go() {
     let lang = Go::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert_eq!(output.trim(), "type Meters float64");
 }
@@ -1190,7 +1190,7 @@ fn test_newtype_kotlin() {
     let lang = Kotlin::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert_eq!(output.trim(), "value class Meters(val value: Double)");
 }
@@ -1205,7 +1205,7 @@ fn test_newtype_python() {
     let lang = Python::new();
     let imports = ImportGroup::new();
     let blocks = spec.emit(&lang).unwrap();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     let output = renderer.render(&blocks[0]).unwrap();
     assert_eq!(output.trim(), "UserId = NewType(\"UserId\", str)");
 }
@@ -1562,7 +1562,7 @@ fn render_blocks_go(blocks: &[CodeBlock]) -> String {
         if i > 0 {
             output.push('\n');
         }
-        let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+        let renderer = CodeRenderer::new(&lang, &imports, 80);
         output.push_str(&renderer.render(block).unwrap());
     }
     output

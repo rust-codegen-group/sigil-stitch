@@ -1662,6 +1662,6 @@ fn render_in_context(
 ) -> String {
     let block = function.emit(lang, context).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, width);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, width);
     renderer.render(&block).unwrap()
 }

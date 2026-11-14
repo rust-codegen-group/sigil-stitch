@@ -36,8 +36,8 @@ impl<'a> CodeRenderer<'a> {
     }
 
     /// Render a CodeBlock to string.
-    pub fn render(&mut self, block: &CodeBlock) -> Result<String, SigilStitchError> {
-        let mut preparer = SourcePreparer::new(self.lang);
+    pub fn render(&self, block: &CodeBlock) -> Result<String, SigilStitchError> {
+        let preparer = SourcePreparer::new(self.lang);
         let prepared = preparer.prepare_source_block(block, DiagnosticPath::root("standalone"))?;
         self.render_prepared(&prepared)
     }

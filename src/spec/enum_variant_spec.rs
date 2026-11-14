@@ -723,7 +723,7 @@ mod tests {
             if i > 0 {
                 output.push('\n');
             }
-            let mut renderer = crate::code_renderer::CodeRenderer::new(lang, &imports, 80);
+            let renderer = crate::code_renderer::CodeRenderer::new(lang, &imports, 80);
             output.push_str(&renderer.render(block).unwrap());
         }
         output
