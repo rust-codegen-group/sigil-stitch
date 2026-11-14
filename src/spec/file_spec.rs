@@ -1,10 +1,7 @@
 use crate::code_block::CodeBlock;
-use crate::code_renderer::CodeRenderer;
 use crate::error::SigilStitchError;
 use crate::import::{ImportAliasConflictResolver, ImportGroup};
-use crate::import_collector;
 use crate::lang::CodeLang;
-use crate::source_preparation::SourcePreparer;
 use crate::spec::closed_sum_spec::ClosedSumSpec;
 use crate::spec::emittable::Emittable;
 use crate::spec::fun_spec::FunSpec;
@@ -12,7 +9,8 @@ use crate::spec::import_spec::ImportSpec;
 use crate::spec::modifiers::DeclarationContext;
 use crate::spec::type_spec::TypeSpec;
 use crate::type_name::TypeName;
-use crate::type_name_lowering::DiagnosticPath;
+
+mod file_render_plan;
 
 #[cfg(test)]
 mod storage_tests {
@@ -302,103 +300,8 @@ impl FileSpec {
                     filename: self.filename.clone(),
                 })?;
 
-        enum Emitted {
-            Blocks(Vec<CodeBlock>),
-            Raw(String),
-            RawWithImports {
-                content: String,
-                types: Vec<TypeName>,
-            },
-        }
-
-        enum Prepared {
-            Blocks(Vec<CodeBlock>),
-            Raw(String),
-            RawWithImports {
-                content: String,
-                metadata: Vec<CodeBlock>,
-            },
-        }
-
-        let mut emitted = Vec::with_capacity(self.members.len());
-        for member in &self.members {
-            emitted.push(match member {
-                StoredFileMember::Code(block) => Emitted::Blocks(vec![block.clone()]),
-                StoredFileMember::RawContent(s) => Emitted::Raw(s.clone()),
-                StoredFileMember::RawContentWithImports { content, types } => {
-                    Emitted::RawWithImports {
-                        content: content.clone(),
-                        types: types.clone(),
-                    }
-                }
-                StoredFileMember::Type(spec) => Emitted::Blocks(spec.emit(lang)?),
-                StoredFileMember::ClosedSum(spec) => Emitted::Blocks(spec.emit(lang)?),
-                StoredFileMember::Fun(spec) => {
-                    Emitted::Blocks(vec![spec.emit(lang, DeclarationContext::TopLevel)?])
-                }
-                StoredFileMember::Spec(spec) => Emitted::Blocks(spec.emit_members(lang)?),
-            });
-        }
-
-        let preparer = SourcePreparer::new(lang);
-        let prepared_header = self
-            .header
-            .as_ref()
-            .map(|header| preparer.prepare_source_block(header, DiagnosticPath::root("header")))
-            .transpose()?;
-        let mut prepared = Vec::with_capacity(emitted.len());
-        for (member_index, member) in emitted.into_iter().enumerate() {
-            prepared.push(match member {
-                Emitted::Blocks(blocks) => Prepared::Blocks(
-                    blocks
-                        .iter()
-                        .enumerate()
-                        .map(|(block_index, block)| {
-                            preparer.prepare_source_block(
-                                block,
-                                DiagnosticPath::member_block(member_index, block_index),
-                            )
-                        })
-                        .collect::<Result<Vec<_>, _>>()?,
-                ),
-                Emitted::Raw(content) => Prepared::Raw(content),
-                Emitted::RawWithImports { content, types } => {
-                    let metadata = types
-                        .iter()
-                        .enumerate()
-                        .map(|(type_index, type_name)| {
-                            preparer.prepare_metadata_type(
-                                type_name,
-                                DiagnosticPath::raw_metadata(member_index, type_index),
-                            )
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    Prepared::RawWithImports { content, metadata }
-                }
-            });
-        }
-
-        let mut import_refs = Vec::new();
-
-        if let Some(header) = &prepared_header {
-            import_refs.extend(import_collector::collect_imports(header));
-        }
-
-        for member in &prepared {
-            match member {
-                Prepared::Blocks(blocks) => {
-                    for block in blocks {
-                        import_refs.extend(import_collector::collect_imports(block));
-                    }
-                }
-                Prepared::RawWithImports { metadata, .. } => {
-                    for block in metadata {
-                        import_refs.extend(import_collector::collect_imports(block));
-                    }
-                }
-                Prepared::Raw(_) => {}
-            }
-        }
+        let plan = file_render_plan::FileRenderPlan::prepare(self, lang)?;
+        let import_refs = plan.collect_imports();
 
         let explicit_entries: Vec<_> = self
             .explicit_imports
@@ -418,59 +321,7 @@ impl FileSpec {
         };
         lang.validate_resolved_imports(&imports)?;
 
-        let mut output = String::new();
-        let renderer = CodeRenderer::new(lang, &imports, width);
-
-        if let Some(header) = &prepared_header {
-            let header_output = renderer.render_prepared(header)?;
-            if !header_output.is_empty() {
-                output.push_str(&header_output);
-                if !header_output.ends_with('\n') {
-                    output.push('\n');
-                }
-                output.push('\n');
-            }
-        }
-
-        let import_header = lang.render_imports(&imports);
-        if !import_header.is_empty() {
-            output.push_str(&import_header);
-            output.push_str("\n\n");
-        }
-
-        for (i, member) in prepared.iter().enumerate() {
-            if i > 0 {
-                output.push('\n');
-            }
-            match member {
-                Prepared::Blocks(blocks) => {
-                    for (j, block) in blocks.iter().enumerate() {
-                        if j > 0 {
-                            output.push('\n');
-                        }
-                        let member_output = renderer.render_prepared(block)?;
-                        output.push_str(&member_output);
-                        if !member_output.ends_with('\n') {
-                            output.push('\n');
-                        }
-                    }
-                }
-                Prepared::Raw(content) => {
-                    output.push_str(content);
-                    if !content.ends_with('\n') {
-                        output.push('\n');
-                    }
-                }
-                Prepared::RawWithImports { content, .. } => {
-                    output.push_str(content);
-                    if !content.ends_with('\n') {
-                        output.push('\n');
-                    }
-                }
-            }
-        }
-
-        Ok(output)
+        plan.render(lang, &imports, width)
     }
 }
 
