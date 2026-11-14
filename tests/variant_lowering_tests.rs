@@ -1475,6 +1475,6 @@ fn render_type(spec: &TypeSpec, lang: &dyn CodeLang) -> String {
 
 fn render_block(lang: &dyn CodeLang, block: &CodeBlock) -> String {
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
     renderer.render(block).unwrap()
 }

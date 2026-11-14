@@ -120,7 +120,7 @@ fn nested_block(type_count: usize) -> CodeBlock {
 fn render(block: &CodeBlock) {
     let language = TypeScript::new();
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&language, &imports, usize::MAX);
+    let renderer = CodeRenderer::new(&language, &imports, usize::MAX);
     black_box(renderer.render(black_box(block)).unwrap());
 }
 

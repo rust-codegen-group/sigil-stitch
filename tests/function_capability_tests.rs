@@ -99,7 +99,7 @@ fn render_function(
 ) -> String {
     let block = fun.emit(lang, context).unwrap();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(lang, &imports, 80);
     renderer.render(&block).unwrap()
 }
 

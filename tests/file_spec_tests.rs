@@ -1057,7 +1057,7 @@ fn standalone_renderer_uses_the_callers_resolved_imports_without_mutating_them()
     )
     .unwrap();
     let lang = sigil_stitch::lang::typescript::TypeScript::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&lang, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&lang, &imports, 80);
 
     assert_eq!(renderer.render(&block).unwrap(), "value: CallerUser");
     assert_eq!(imports.entries()[0].alias.as_deref(), Some("CallerUser"));

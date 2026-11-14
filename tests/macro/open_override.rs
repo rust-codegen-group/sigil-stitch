@@ -72,7 +72,7 @@ fn test_empty_opener_via_builder_block_open_for() {
     b.add_line();
     b.end_control_flow();
     let block = b.build().unwrap();
-    let mut renderer = CodeRenderer::new(&ocaml, &imports, 80);
+    let renderer = CodeRenderer::new(&ocaml, &imports, 80);
     let output = renderer.render(&block).unwrap();
     assert!(
         output.contains("match color with\n"),

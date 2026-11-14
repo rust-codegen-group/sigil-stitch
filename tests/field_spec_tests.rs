@@ -12,7 +12,7 @@ fn emit_field_ts(spec: &FieldSpec, ctx: DeclarationContext) -> String {
     let lang = TypeScript::new();
     let block = spec.emit(&lang, ctx).unwrap();
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     renderer.render(&block).unwrap()
 }
 
@@ -20,14 +20,14 @@ fn emit_field_rs(spec: &FieldSpec, ctx: DeclarationContext) -> String {
     let lang = Rust::new();
     let block = spec.emit(&lang, ctx).unwrap();
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(&lang, &imports, 80);
+    let renderer = CodeRenderer::new(&lang, &imports, 80);
     renderer.render(&block).unwrap()
 }
 
 fn emit_for(lang: &dyn CodeLang, spec: &FieldSpec, ctx: DeclarationContext) -> String {
     let block = spec.emit(lang, ctx).unwrap();
     let imports = ImportGroup::new();
-    let mut renderer = CodeRenderer::new(lang, &imports, 80);
+    let renderer = CodeRenderer::new(lang, &imports, 80);
     renderer.render(&block).unwrap()
 }
 

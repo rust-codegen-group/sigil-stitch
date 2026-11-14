@@ -14,7 +14,7 @@ fn if_then_fi() {
 
     let zsh = Zsh::new();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&zsh, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&zsh, &imports, 80);
     let output = renderer.render(&block).unwrap();
 
     assert!(
@@ -41,7 +41,7 @@ fn for_do_done() {
 
     let zsh = Zsh::new();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&zsh, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&zsh, &imports, 80);
     let output = renderer.render(&block).unwrap();
 
     assert!(
@@ -64,7 +64,7 @@ fn while_do_done() {
 
     let zsh = Zsh::new();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&zsh, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&zsh, &imports, 80);
     let output = renderer.render(&block).unwrap();
 
     assert!(
@@ -89,7 +89,7 @@ fn if_else_fi() {
 
     let zsh = Zsh::new();
     let imports = sigil_stitch::import::ImportGroup::new();
-    let mut renderer = sigil_stitch::code_renderer::CodeRenderer::new(&zsh, &imports, 80);
+    let renderer = sigil_stitch::code_renderer::CodeRenderer::new(&zsh, &imports, 80);
     let output = renderer.render(&block).unwrap();
 
     assert!(

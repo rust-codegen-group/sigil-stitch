@@ -16,7 +16,7 @@ impl<'a> SourcePreparer<'a> {
     }
 
     pub(crate) fn prepare_source_block(
-        &mut self,
+        &self,
         block: &CodeBlock,
         path: DiagnosticPath,
     ) -> Result<CodeBlock, SigilStitchError> {
@@ -26,7 +26,7 @@ impl<'a> SourcePreparer<'a> {
     }
 
     pub(crate) fn prepare_metadata_type(
-        &mut self,
+        &self,
         type_name: &TypeName,
         path: DiagnosticPath,
     ) -> Result<CodeBlock, SigilStitchError> {
@@ -34,7 +34,7 @@ impl<'a> SourcePreparer<'a> {
     }
 
     fn prepare_nodes(
-        &mut self,
+        &self,
         nodes: Vec<CodeNode>,
         path: &DiagnosticPath,
     ) -> Result<Vec<CodeNode>, SigilStitchError> {
@@ -69,7 +69,7 @@ impl<'a> SourcePreparer<'a> {
     }
 
     fn lower_type(
-        &mut self,
+        &self,
         type_name: &TypeName,
         path: &DiagnosticPath,
     ) -> Result<CodeBlock, SigilStitchError> {
