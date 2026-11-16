@@ -14,6 +14,7 @@ pub(crate) enum MacroLang {
     Kotlin,
     OCaml,
     Php,
+    Python,
     Ruby,
     Swift,
     TypeScript,
@@ -37,12 +38,17 @@ impl MacroLang {
             "Kotlin" => Self::Kotlin,
             "OCaml" => Self::OCaml,
             "Php" => Self::Php,
+            "Python" => Self::Python,
             "Ruby" => Self::Ruby,
             "Swift" => Self::Swift,
             "TypeScript" => Self::TypeScript,
             "Zsh" => Self::Zsh,
             _ => Self::Unaware,
         })
+    }
+
+    pub(crate) fn is_python(self) -> bool {
+        matches!(self, Self::Python)
     }
 
     pub(crate) fn is_shell(self) -> bool {
@@ -57,6 +63,7 @@ impl MacroLang {
         !matches!(
             self,
             Self::Ruby
+                | Self::Python
                 | Self::Bash
                 | Self::C
                 | Self::Zsh

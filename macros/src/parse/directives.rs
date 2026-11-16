@@ -5,6 +5,7 @@ use super::MacroLang;
 use super::parse_body;
 use super::recovery::{Recovered, combine};
 use super::rust_interpolation::parse_expr;
+use super::spacing::MacroSpacingPolicy;
 use super::util::is_ident;
 use crate::ir::{ConditionalBranch, LoopSeparator, MetaIf, Statement};
 
@@ -35,9 +36,10 @@ pub(super) fn parse_for_components(
     tokens: &[TokenTree],
     paren_pos: usize,
     lang: MacroLang,
+    policy: MacroSpacingPolicy,
 ) -> Result<ForComponents, syn::Error> {
     let parts = parse_for_raw_components(tokens, paren_pos)?;
-    let body = parse_body(&parts.body_tokens, lang);
+    let body = parse_body(&parts.body_tokens, lang, policy);
 
     match (parts.header, body) {
         (Ok((pat, iter_expr, separator)), Ok(body)) => {
@@ -376,6 +378,7 @@ pub(super) fn parse_if_components(
     tokens: &[TokenTree],
     cond_pos: usize,
     lang: MacroLang,
+    policy: MacroSpacingPolicy,
 ) -> Result<IfComponents, syn::Error> {
     // Bounds check for first branch.
     if cond_pos >= tokens.len() {
@@ -425,6 +428,7 @@ pub(super) fn parse_if_components(
         "$if condition cannot be empty",
         &body_group,
         lang,
+        policy,
         &mut errors,
     );
 
@@ -493,6 +497,7 @@ pub(super) fn parse_if_components(
                 "$else_if condition cannot be empty",
                 &body_group,
                 lang,
+                policy,
                 &mut errors,
             ) {
                 else_if.push(branch);
@@ -522,7 +527,7 @@ pub(super) fn parse_if_components(
             pos += 1;
 
             let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-            match parse_body(&body_tokens, lang) {
+            match parse_body(&body_tokens, lang, policy) {
                 Ok(body) => otherwise = Some(body),
                 Err(error) => combine(&mut errors, error),
             }
@@ -577,6 +582,7 @@ fn parse_conditional_branch(
     empty_message: &str,
     body_group: &proc_macro2::Group,
     lang: MacroLang,
+    policy: MacroSpacingPolicy,
     errors: &mut Option<syn::Error>,
 ) -> Option<ConditionalBranch> {
     let condition = if condition_group.stream().is_empty() {
@@ -589,7 +595,7 @@ fn parse_conditional_branch(
         )
     };
     let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
-    let body = parse_body(&body_tokens, lang);
+    let body = parse_body(&body_tokens, lang, policy);
 
     match (condition, body) {
         (Ok(condition), Ok(body)) => Some(ConditionalBranch { condition, body }),
@@ -759,7 +765,12 @@ mod tests {
                 .parse()
                 .unwrap();
         let tokens: Vec<TokenTree> = ts.into_iter().collect();
-        let errors: Vec<String> = match parse_if_components(&tokens, 0, MacroLang::Unaware) {
+        let errors: Vec<String> = match parse_if_components(
+            &tokens,
+            0,
+            MacroLang::Unaware,
+            MacroSpacingPolicy::for_language(MacroLang::Unaware),
+        ) {
             Err(error) => error.into_iter().map(|error| error.to_string()).collect(),
             Ok(parts) => match parts.value {
                 Ok(_) => panic!("expected combined $if errors"),

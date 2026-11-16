@@ -69,6 +69,7 @@ mod ocaml_function_lowering;
 mod php_function_lowering;
 pub(crate) mod property_lowering;
 mod python_function_lowering;
+mod python_layout;
 mod ruby_function_lowering;
 mod rust_function_lowering;
 mod scala_function_lowering;

@@ -73,6 +73,7 @@ fn contains_source_content(nodes: &[CodeNode]) -> bool {
         }
         CodeNode::TypeRef(type_name) => !type_name.is_empty(),
         CodeNode::Nested(block) => contains_source_content(&block.nodes),
+        CodeNode::Layout(layout) => contains_source_content(layout.nodes()),
         CodeNode::Sequence(children) => contains_source_content(children),
         CodeNode::SoftBreak
         | CodeNode::Indent
@@ -88,6 +89,7 @@ fn contains_float_value(nodes: &[CodeNode]) -> bool {
     nodes.iter().any(|node| match node {
         CodeNode::FloatValue(_) => true,
         CodeNode::Nested(block) => contains_float_value(&block.nodes),
+        CodeNode::Layout(layout) => contains_float_value(layout.nodes()),
         CodeNode::Sequence(children) => contains_float_value(children),
         _ => false,
     })

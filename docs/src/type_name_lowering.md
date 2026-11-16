@@ -135,6 +135,21 @@ target-associated type-expression structure rather than defining a portable
 cross-language program. There is no separate type document tree and no public
 `BoxDoc`-producing language hook.
 
+## Python Declaration and Callable Layout
+
+Python declaration lowerers keep class bases, alias type parameters, function
+parameters, callable parameters, and nested type arguments as structured
+`CodeBlock` layouts. They do not flatten comma-separated type material into fixed
+strings. Broken groups receive one continuation indentation unit; flat groups do
+not acquire indentation. Empty parameter lists use literal empty delimiters rather
+than an empty `Layout` node, because lowered-block validation rejects empty layout
+nodes.
+
+Python builder defaults distinguish grammar roles: an unannotated parameter renders
+`value=1`, while an annotated parameter renders `value: int = 1`. This distinction is
+owned by the Python function lowerer; ordinary assignments and field initializers
+retain assignment spacing.
+
 ## Imports Stay Structural
 
 An adapter expresses a target-derived import by retaining an importable

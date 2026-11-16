@@ -1,11 +1,12 @@
 #![deny(deprecated)]
 
 use crate::code_block::CodeBlock;
+use crate::code_node::LayoutBreakMode;
 use crate::error::SigilStitchError;
+use crate::lang::python_layout;
 use crate::type_name::TypeName;
 use crate::type_name_lowering::structure::{
-    concat, delimited_soft, join, join_soft, literal, name, qualified, string_literal, surround,
-    terminal,
+    concat, literal, name, qualified, string_literal, terminal,
 };
 
 fn terminal_type(type_name: &TypeName, qualified_separator: Option<&str>) -> Option<CodeBlock> {
@@ -33,35 +34,30 @@ fn generic_delimited(
     open: &str,
     close: &str,
 ) -> CodeBlock {
-    concat([base, delimited_soft(open, params, ",", close)])
+    concat([
+        base,
+        python_layout::delimited(open, params, close, LayoutBreakMode::Space),
+    ])
 }
 
 fn generic_wrap(wrapper: &str, params: Vec<CodeBlock>, open: &str, close: &str) -> CodeBlock {
     concat([
         literal(wrapper),
-        delimited_soft(
+        python_layout::delimited(
             if open.is_empty() && !wrapper.is_empty() {
                 " "
             } else {
                 open
             },
             params,
-            ",",
             close,
+            LayoutBreakMode::Space,
         ),
     ])
 }
 
-fn delimited(open: &str, items: Vec<CodeBlock>, separator: &str, close: &str) -> CodeBlock {
-    surround(open, join(items, separator), close)
-}
-
-fn infix(items: Vec<CodeBlock>, separator: &str) -> CodeBlock {
-    join_soft(items, separator.trim_start())
-}
-
 fn optional_infix(inner: CodeBlock, separator: &str, absent: &str) -> CodeBlock {
-    infix(vec![inner, literal(absent)], separator)
+    python_layout::infix(vec![inner, literal(absent)], separator)
 }
 
 fn associated_dot(base: CodeBlock, member: &str) -> CodeBlock {
@@ -106,7 +102,7 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         {
             concat([
                 typing("Literal"),
-                delimited_soft(
+                python_layout::delimited(
                     "[",
                     members
                         .iter()
@@ -115,22 +111,25 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
                             _ => unreachable!("guard accepts only direct string literals"),
                         })
                         .collect(),
-                    ",",
                     "]",
+                    LayoutBreakMode::Space,
                 ),
             ])
         }
         TypeName::Union(members) => {
-            infix(members.iter().map(lower).collect::<Result<_, _>>()?, " | ")
+            python_layout::infix(members.iter().map(lower).collect::<Result<_, _>>()?, " | ")
         }
         TypeName::Intersection(_) => {
             Err(unsupported("Python has no intersection type expression"))?
         }
         TypeName::Pointer(_) => Err(unsupported("Python has no pointer type expression"))?,
         TypeName::Slice(_) => Err(unsupported("Python has no slice type expression"))?,
-        TypeName::Map { key, value } => {
-            delimited("dict[", vec![lower(key)?, lower(value)?], ", ", "]")
-        }
+        TypeName::Map { key, value } => python_layout::delimited(
+            "dict[",
+            vec![lower(key)?, lower(value)?],
+            "]",
+            LayoutBreakMode::Space,
+        ),
         TypeName::Optional(inner) => optional_infix(lower(inner)?, " | ", "None"),
         TypeName::Tuple(elements) if elements.is_empty() => literal("tuple[()]"),
         TypeName::Tuple(elements) => generic_wrap(
@@ -142,10 +141,20 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::Reference { .. } => Err(unsupported("Python has no reference type modifier"))?,
         TypeName::Function { .. } | TypeName::Callable { .. } => concat([
             typing("Callable"),
-            delimited("[[", lower_callable_parameters(type_name)?, ", ", "]"),
-            literal(", "),
-            lower_callable_returns(type_name)?,
-            literal("]"),
+            python_layout::delimited(
+                "[",
+                vec![
+                    python_layout::delimited(
+                        "[",
+                        lower_callable_parameters(type_name)?,
+                        "]",
+                        LayoutBreakMode::Space,
+                    ),
+                    lower_callable_returns(type_name)?,
+                ],
+                "]",
+                LayoutBreakMode::Space,
+            ),
         ]),
         TypeName::AssociatedType {
             base,
@@ -164,11 +173,21 @@ pub(crate) fn lower(type_name: &TypeName) -> Result<CodeBlock, SigilStitchError>
         TypeName::Wildcard { .. } => Err(unsupported("Python has no wildcard type expression"))?,
         TypeName::StringLiteral(value) => concat([
             typing("Literal"),
-            delimited_soft("[", vec![string_literal(value.clone())], ",", "]"),
+            python_layout::delimited(
+                "[",
+                vec![string_literal(value.clone())],
+                "]",
+                LayoutBreakMode::Space,
+            ),
         ]),
         TypeName::IntegerLiteral(value) => concat([
             typing("Literal"),
-            delimited_soft("[", vec![literal(value.clone())], ",", "]"),
+            python_layout::delimited(
+                "[",
+                vec![literal(value.clone())],
+                "]",
+                LayoutBreakMode::Space,
+            ),
         ]),
         TypeName::Parameter(_) => Err(unsupported(
             "Python modern type expressions are not supported in this position",

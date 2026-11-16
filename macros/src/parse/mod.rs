@@ -23,6 +23,7 @@ use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
 
 use crate::ir::Statement;
 use recovery::{combine, next_statement_boundary};
+use spacing::MacroSpacingPolicy;
 use statements::parse_one_statement;
 
 /// Parse the full `sigil_quote!` input.
@@ -60,13 +61,17 @@ pub(crate) fn parse_input(input: TokenStream) -> syn::Result<ParsedInput> {
 
     let body_tokens: Vec<TokenTree> = body_group.stream().into_iter().collect();
     let lang = MacroLang::parse(lang_tokens)?;
-    let statements = parse_body(&body_tokens, lang)?;
+    let statements = parse_body(&body_tokens, lang, MacroSpacingPolicy::for_language(lang))?;
 
     Ok(ParsedInput { statements })
 }
 
-/// Parse the body tokens into a list of statements.
-pub(super) fn parse_body(tokens: &[TokenTree], lang: MacroLang) -> syn::Result<Vec<Statement>> {
+/// Parse a body while preserving the enclosing language policy context.
+pub(in crate::parse) fn parse_body(
+    tokens: &[TokenTree],
+    lang: MacroLang,
+    policy: MacroSpacingPolicy,
+) -> syn::Result<Vec<Statement>> {
     let mut statements = Vec::new();
     let mut pos = 0;
     let mut errors = None;
@@ -96,7 +101,8 @@ pub(super) fn parse_body(tokens: &[TokenTree], lang: MacroLang) -> syn::Result<V
             }
         }
 
-        match parse_one_statement(tokens, pos, lang) {
+        let parsed = parse_one_statement(tokens, pos, lang, policy);
+        match parsed {
             Ok((stmt, next_pos)) => {
                 if next_pos > pos {
                     prev_line = Some(tokens[next_pos - 1].span().end().line);

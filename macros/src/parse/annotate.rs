@@ -42,6 +42,8 @@ pub(super) enum TokenAnnotation {
     CallOpen,
     /// `=` span-adjacent to preceding token (shell-style `NAME=val`) — suppress space.
     AssignAdjacent,
+    /// `:` inside a Python subscript slice (`items[start:stop]`).
+    SliceColon,
     /// `:` span-adjacent to both neighbors (Lua method call `obj:method()`).
     MethodCallColon,
     /// `:` used as Ruby symbol prefix (`:name`, `:foo`).

@@ -5,11 +5,15 @@ use sigil_stitch::spec::file_spec::FileSpec;
 use super::golden;
 
 fn render(block: &CodeBlock) -> String {
+    render_width(block, 80)
+}
+
+fn render_width(block: &CodeBlock, width: usize) -> String {
     FileSpec::builder("test.py")
         .add_code(block.clone())
         .build()
         .unwrap()
-        .render(80)
+        .render(width)
         .unwrap()
 }
 
@@ -23,6 +27,121 @@ fn test_decorator() {
     })
     .unwrap();
     golden::assert_golden("python/quote_decorator.py", &render(&block));
+}
+
+#[test]
+fn test_python_keyword_argument_spacing_is_contextual() {
+    let callable = TypeName::primitive("field");
+    let keyword = "kw_only";
+    let block = sigil_quote!(Python {
+        $T(callable)($N(keyword)=True, other == value)
+        value = True
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("field(kw_only=True, other == value)"),
+        "{output}"
+    );
+    assert!(output.contains("value = True"), "{output}");
+}
+
+#[test]
+fn test_python_slice_colon_stays_tight() {
+    let block = sigil_quote!(Python {
+        result = items[start:stop]
+        stepped = items[start::step]
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("result = items[start:stop]"), "{output}");
+    assert!(output.contains("stepped = items[start::step]"), "{output}");
+}
+
+#[test]
+fn test_python_call_group_breaks_with_explicit_continuation_scope() {
+    let block = sigil_quote!(Python {
+        result = function(first_argument, second_argument, third_argument)
+    })
+    .unwrap();
+    let output = render_width(&block, 30);
+    assert!(
+        output.contains("function(first_argument,\n    second_argument,\n    third_argument)"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_python_walrus_and_compound_assignment_spacing() {
+    let block = sigil_quote!(Python {
+        result = (value := source)
+        total += value
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("result = (value := source)"), "{output}");
+    assert!(output.contains("total += value"), "{output}");
+}
+
+#[test]
+fn test_python_default_parameter_spacing_is_contextual() {
+    let block = sigil_quote!(Python {
+        def defaults(value=1, typed: int = 2): {
+            return value + typed
+        }
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("def defaults(value=1, typed: int = 2):"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_python_lambda_default_spacing_is_tight() {
+    let block = sigil_quote!(Python { value = lambda item=1: item }).unwrap();
+    let output = render(&block);
+    assert!(output.contains("value = lambda item=1: item"), "{output}");
+}
+
+#[test]
+fn test_python_relative_import_spacing() {
+    let block = sigil_quote!(Python { from . import sibling }).unwrap();
+    let output = render(&block);
+    assert!(output.contains("from . import sibling"), "{output}");
+}
+
+#[test]
+fn test_python_inline_for_inherits_call_argument_context() {
+    let names = ["first", "second"];
+    let block = sigil_quote!(Python {
+        field($for(name in &names; separator = ", ") { $N(name)=True })
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(
+        output.contains("field(first=True, second=True)"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_python_inline_if_inherits_call_argument_context() {
+    let include_keyword = true;
+    let block = sigil_quote!(Python {
+        field($if(include_keyword) { kw_only=True } $else { other=False })
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("field(kw_only=True)"), "{output}");
+}
+
+#[test]
+fn test_python_comparison_is_not_angle_generic_spacing() {
+    let block = sigil_quote!(Python { result = left < right }).unwrap();
+    let output = render(&block);
+    assert!(output.contains("result = left < right"), "{output}");
 }
 
 #[test]

@@ -1,11 +1,15 @@
 use ::pretty::BoxDoc;
 
 use super::{LayoutGroup, RenderAdapter};
+use crate::code_node::{LayoutBlock, LayoutBreakMode, LayoutGroupMode};
 use crate::error::SigilStitchError;
 
 struct DocumentGroup {
     doc: BoxDoc<'static, ()>,
     layout: LayoutGroup,
+    break_mode: LayoutBreakMode,
+    is_layout: bool,
+    conditional_indent: usize,
 }
 
 pub(super) struct PrettyAdapter {
@@ -14,7 +18,7 @@ pub(super) struct PrettyAdapter {
     docs: Vec<DocumentGroup>,
     indent_depth: usize,
     at_line_start: bool,
-    pending_soft_break: Option<(String, LayoutGroup)>,
+    pending_soft_break: Option<(String, LayoutGroup, LayoutBreakMode)>,
 }
 
 impl PrettyAdapter {
@@ -25,6 +29,9 @@ impl PrettyAdapter {
             docs: vec![DocumentGroup {
                 doc: BoxDoc::nil(),
                 layout: LayoutGroup::IndependentBreaks,
+                break_mode: LayoutBreakMode::Space,
+                is_layout: false,
+                conditional_indent: 0,
             }],
             indent_depth: 0,
             at_line_start: true,
@@ -45,7 +52,7 @@ impl PrettyAdapter {
     }
 
     fn flush_soft_break(&mut self, indent_if_broken: bool) -> Result<(), SigilStitchError> {
-        let Some((indent, layout)) = self.pending_soft_break.take() else {
+        let Some((indent, layout, break_mode)) = self.pending_soft_break.take() else {
             return Ok(());
         };
         let broken = if indent_if_broken {
@@ -53,10 +60,26 @@ impl PrettyAdapter {
         } else {
             BoxDoc::hardline()
         };
-        let soft_break = broken.flat_alt(BoxDoc::space());
+        let flat = match break_mode {
+            LayoutBreakMode::Space => BoxDoc::space(),
+            LayoutBreakMode::Empty => BoxDoc::nil(),
+        };
+        let soft_break = broken.flat_alt(flat);
         match layout {
             LayoutGroup::IndependentBreaks => self.append_doc(soft_break.group()),
             LayoutGroup::ConsistentBreaks => self.append_doc(soft_break),
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn set_indent_depth_for_test(&mut self, depth: usize) {
+        self.indent_depth = depth;
+    }
+
+    #[cfg(test)]
+    pub(super) fn set_layout_indent_for_test(&mut self, depth: usize) {
+        if let Some(group) = self.docs.last_mut() {
+            group.conditional_indent = depth;
         }
     }
 
@@ -119,38 +142,89 @@ impl RenderAdapter for PrettyAdapter {
 
     fn soft_break(&mut self) -> Result<(), SigilStitchError> {
         self.flush_soft_break(false)?;
-        let layout =
-            self.docs
-                .last()
-                .map(|group| group.layout)
-                .ok_or_else(|| SigilStitchError::Render {
-                    context: "CodeRenderer pretty groups".to_string(),
-                    message: "missing document group".to_string(),
-                })?;
-        self.pending_soft_break = Some((self.indent_unit.repeat(self.indent_depth), layout));
+        let (layout, break_mode, conditional_indent) = self
+            .docs
+            .last()
+            .map(|group| (group.layout, group.break_mode, group.conditional_indent))
+            .ok_or_else(|| SigilStitchError::Render {
+                context: "CodeRenderer pretty groups".to_string(),
+                message: "missing document group".to_string(),
+            })?;
+        let depth = self
+            .indent_depth
+            .checked_add(conditional_indent)
+            .ok_or_else(|| SigilStitchError::Render {
+                context: "CodeRenderer pretty indentation".to_string(),
+                message: "indent depth overflow".to_string(),
+            })?;
+        self.pending_soft_break = Some((self.indent_unit.repeat(depth), layout, break_mode));
         self.at_line_start = false;
         Ok(())
     }
 
     fn indent(&mut self) -> Result<(), SigilStitchError> {
-        self.indent_depth =
-            self.indent_depth
-                .checked_add(1)
+        let is_layout = self
+            .docs
+            .last()
+            .map(|group| group.is_layout)
+            .unwrap_or(false);
+        if is_layout {
+            let group = self
+                .docs
+                .last_mut()
                 .ok_or_else(|| SigilStitchError::Render {
-                    context: "CodeRenderer pretty indentation".to_string(),
-                    message: "indent depth overflow".to_string(),
+                    context: "CodeRenderer pretty groups".to_string(),
+                    message: "missing document group".to_string(),
                 })?;
+            group.conditional_indent =
+                group.conditional_indent.checked_add(1).ok_or_else(|| {
+                    SigilStitchError::Render {
+                        context: "CodeRenderer pretty indentation".to_string(),
+                        message: "indent depth overflow".to_string(),
+                    }
+                })?;
+        } else {
+            self.indent_depth =
+                self.indent_depth
+                    .checked_add(1)
+                    .ok_or_else(|| SigilStitchError::Render {
+                        context: "CodeRenderer pretty indentation".to_string(),
+                        message: "indent depth overflow".to_string(),
+                    })?;
+        }
         Ok(())
     }
 
     fn dedent(&mut self) -> Result<(), SigilStitchError> {
-        self.indent_depth =
-            self.indent_depth
-                .checked_sub(1)
+        let is_layout = self
+            .docs
+            .last()
+            .map(|group| group.is_layout)
+            .unwrap_or(false);
+        if is_layout {
+            let group = self
+                .docs
+                .last_mut()
                 .ok_or_else(|| SigilStitchError::Render {
-                    context: "CodeRenderer pretty indentation".to_string(),
-                    message: "dedent below zero".to_string(),
+                    context: "CodeRenderer pretty groups".to_string(),
+                    message: "missing document group".to_string(),
                 })?;
+            group.conditional_indent =
+                group.conditional_indent.checked_sub(1).ok_or_else(|| {
+                    SigilStitchError::Render {
+                        context: "CodeRenderer pretty indentation".to_string(),
+                        message: "dedent below zero".to_string(),
+                    }
+                })?;
+        } else {
+            self.indent_depth =
+                self.indent_depth
+                    .checked_sub(1)
+                    .ok_or_else(|| SigilStitchError::Render {
+                        context: "CodeRenderer pretty indentation".to_string(),
+                        message: "dedent below zero".to_string(),
+                    })?;
+        }
         Ok(())
     }
 
@@ -159,8 +233,60 @@ impl RenderAdapter for PrettyAdapter {
         self.docs.push(DocumentGroup {
             doc: BoxDoc::nil(),
             layout,
+            break_mode: LayoutBreakMode::Space,
+            is_layout: false,
+            conditional_indent: 0,
         });
         Ok(())
+    }
+
+    fn begin_layout(&mut self, layout: &LayoutBlock) -> Result<(), SigilStitchError> {
+        self.flush_soft_break(true)?;
+        let group_layout = match layout.group_mode() {
+            LayoutGroupMode::Independent => LayoutGroup::IndependentBreaks,
+            LayoutGroupMode::Consistent => LayoutGroup::ConsistentBreaks,
+        };
+        self.docs.push(DocumentGroup {
+            doc: BoxDoc::nil(),
+            layout: group_layout,
+            break_mode: layout.break_mode(),
+            is_layout: true,
+            conditional_indent: 0,
+        });
+        self.append_doc(
+            BoxDoc::text(layout.broken_prefix().to_string())
+                .flat_alt(BoxDoc::text(layout.flat_prefix().to_string())),
+        )?;
+        Ok(())
+    }
+
+    fn end_layout(&mut self, layout: &LayoutBlock) -> Result<(), SigilStitchError> {
+        if self.docs.len() <= 1 {
+            return Err(SigilStitchError::Render {
+                context: "CodeRenderer pretty groups".to_string(),
+                message: "layout end without layout begin".to_string(),
+            });
+        }
+        if self
+            .docs
+            .last()
+            .is_some_and(|group| group.is_layout && group.conditional_indent != 0)
+        {
+            return Err(SigilStitchError::Render {
+                context: "CodeRenderer pretty indentation".to_string(),
+                message: "unbalanced layout indentation scope".to_string(),
+            });
+        }
+        self.flush_soft_break(false)?;
+        self.append_doc(
+            BoxDoc::text(layout.broken_suffix().to_string())
+                .flat_alt(BoxDoc::text(layout.flat_suffix().to_string())),
+        )?;
+        let group = self.docs.pop().ok_or_else(|| SigilStitchError::Render {
+            context: "CodeRenderer pretty groups".to_string(),
+            message: "missing completed layout group".to_string(),
+        })?;
+        self.append_doc(group.doc.group())
     }
 
     fn end_group(&mut self) -> Result<(), SigilStitchError> {

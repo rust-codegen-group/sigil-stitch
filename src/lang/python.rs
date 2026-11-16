@@ -73,6 +73,15 @@ pub struct Python {
     pub extension: String,
 }
 
+/// Construct a standalone Python keyword argument fragment (`label=value`).
+///
+/// Use this when a structured fragment is built separately from its outer call;
+/// the fragment preserves the existing `CodeBlock` structure without being
+/// mistaken for a statement assignment.
+pub fn keyword_argument(label: CodeBlock, value: CodeBlock) -> CodeBlock {
+    crate::lang::python_layout::keyword_argument(label, value)
+}
+
 impl Default for Python {
     #[expect(deprecated, reason = "0.6.8 quote-style compatibility bridge")]
     fn default() -> Self {

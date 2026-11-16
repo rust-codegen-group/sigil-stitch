@@ -1,19 +1,27 @@
 use super::parse_one_statement;
 use crate::ir::{QuoteArg, Statement};
 use crate::parse::MacroLang;
+use crate::parse::spacing::MacroSpacingPolicy;
 use proc_macro2::{TokenStream, TokenTree};
 
 fn parse_stmt(src: &str) -> Statement {
     let ts: TokenStream = src.parse().unwrap();
     let tokens: Vec<TokenTree> = ts.into_iter().collect();
-    let (stmt, _pos) = parse_one_statement(&tokens, 0, MacroLang::Unaware).unwrap();
+    let (stmt, _pos) = parse_one_statement(
+        &tokens,
+        0,
+        MacroLang::Unaware,
+        MacroSpacingPolicy::for_language(MacroLang::Unaware),
+    )
+    .unwrap();
     stmt
 }
 
 fn parse_stmt_lang(src: &str, lang: MacroLang) -> Statement {
     let ts: TokenStream = src.parse().unwrap();
     let tokens: Vec<TokenTree> = ts.into_iter().collect();
-    let (stmt, _pos) = parse_one_statement(&tokens, 0, lang).unwrap();
+    let (stmt, _pos) =
+        parse_one_statement(&tokens, 0, lang, MacroSpacingPolicy::for_language(lang)).unwrap();
     stmt
 }
 
@@ -23,7 +31,13 @@ fn parse_all_stmts(src: &str) -> Vec<Statement> {
     let mut stmts = Vec::new();
     let mut pos = 0;
     while pos < tokens.len() {
-        let (stmt, next) = parse_one_statement(&tokens, pos, MacroLang::Unaware).unwrap();
+        let (stmt, next) = parse_one_statement(
+            &tokens,
+            pos,
+            MacroLang::Unaware,
+            MacroSpacingPolicy::for_language(MacroLang::Unaware),
+        )
+        .unwrap();
         stmts.push(stmt);
         pos = next;
     }

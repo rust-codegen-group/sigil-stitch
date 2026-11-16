@@ -40,6 +40,7 @@ fn validate_source_nodes(
         match node {
             CodeNode::TypeRef(type_name) => validate_type_name(type_name, &node_path)?,
             CodeNode::Nested(block) => validate_source_nodes(&block.nodes, &path.nested(index))?,
+            CodeNode::Layout(layout) => validate_source_nodes(layout.nodes(), &path.nested(index))?,
             CodeNode::Sequence(children) => validate_source_nodes(children, &path.sequence(index))?,
             _ => {}
         }

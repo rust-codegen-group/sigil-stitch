@@ -4,9 +4,11 @@ use super::*;
 use super::{direct::DirectAdapter, pretty::PrettyAdapter};
 
 use crate::code_block::{CodeBlock, StringLitArg, VerbatimStrArg};
+use crate::code_node::{LayoutBlock, LayoutBreakMode, LayoutGroupMode};
 use crate::import::ImportGroup;
 use crate::lang::config::BlockSyntaxConfig;
 use crate::lang::typescript::TypeScript;
+use crate::spec::file_spec::FileSpec;
 use crate::type_name::TypeName;
 #[derive(Debug)]
 struct TestLang {
@@ -65,6 +67,103 @@ fn render_block(block: &CodeBlock, width: usize) -> String {
     let imports = ImportGroup::new();
     let renderer = CodeRenderer::new(&ts, &imports, width);
     renderer.render(block).unwrap()
+}
+
+#[test]
+fn layout_capsule_chooses_flat_and_broken_delimiter_alternatives() {
+    let layout = LayoutBlock::consistent(
+        LayoutBreakMode::Space,
+        "",
+        "",
+        "(",
+        ")",
+        vec![
+            CodeNode::Literal("VeryLongFirst".to_string()),
+            CodeNode::Indent,
+            CodeNode::SoftBreak,
+            CodeNode::Literal("| VeryLongSecond".to_string()),
+            CodeNode::Dedent,
+        ],
+    );
+    let block = CodeBlock {
+        nodes: vec![CodeNode::Layout(layout)],
+    };
+
+    assert_eq!(render_block(&block, 80), "VeryLongFirst | VeryLongSecond");
+    assert_eq!(
+        render_block(&block, 12),
+        "(VeryLongFirst\n  | VeryLongSecond)"
+    );
+}
+
+#[test]
+fn layout_capsule_survives_file_preparation_pipeline() {
+    let layout = LayoutBlock::consistent(
+        LayoutBreakMode::Space,
+        "call(",
+        ")",
+        "call(",
+        ")",
+        vec![
+            CodeNode::Literal("first".to_string()),
+            CodeNode::Indent,
+            CodeNode::SoftBreak,
+            CodeNode::Literal("second".to_string()),
+            CodeNode::Dedent,
+        ],
+    );
+    let body = CodeBlock {
+        nodes: vec![CodeNode::Layout(layout)],
+    };
+    let file = FileSpec::builder("layout.ts")
+        .add_code(body)
+        .build()
+        .unwrap();
+    assert_eq!(file.render(80).unwrap(), "call(first second)\n");
+    let float_layout = LayoutBlock::consistent(
+        LayoutBreakMode::Space,
+        "",
+        "",
+        "",
+        "",
+        vec![CodeNode::FloatValue(
+            crate::float_value::FloatValue::Binary32(0x3f80_0000),
+        )],
+    );
+    let float_file = FileSpec::builder("float.rs")
+        .add_code(CodeBlock {
+            nodes: vec![CodeNode::Layout(float_layout)],
+        })
+        .build()
+        .unwrap();
+    assert!(!float_file.render(80).unwrap().is_empty());
+}
+
+#[test]
+fn layout_capsule_supports_flat_empty_breaks_and_explicit_continuation_scope() {
+    let layout = LayoutBlock::consistent(
+        LayoutBreakMode::Empty,
+        "dict[",
+        "]",
+        "dict[",
+        "]",
+        vec![
+            CodeNode::Literal("VeryLongKey".to_string()),
+            CodeNode::Indent,
+            CodeNode::SoftBreak,
+            CodeNode::Literal("VeryLongValue".to_string()),
+            CodeNode::Dedent,
+        ],
+    );
+    let block = CodeBlock {
+        nodes: vec![CodeNode::Layout(layout)],
+    };
+
+    assert_eq!(render_block(&block, 80), "dict[VeryLongKeyVeryLongValue]");
+    assert_eq!(
+        render_block(&block, 12),
+        "dict[VeryLongKey\n  VeryLongValue]"
+    );
 }
 
 #[test]
@@ -472,6 +571,20 @@ fn direct_adapter_reports_invalid_internal_operations() {
             if context == "CodeRenderer direct indentation"
     ));
 
+    let layout = LayoutBlock::consistent(LayoutBreakMode::Space, "", "", "", "", Vec::new());
+    let mut adapter = DirectAdapter::new("  ", 80);
+    adapter.end_layout(&layout).unwrap();
+    assert!(matches!(
+        adapter.end_layout(&layout),
+        Err(SigilStitchError::Render { context, .. })
+            if context == "CodeRenderer direct layout"
+    ));
+    let empty_layout =
+        LayoutBlock::consistent(LayoutBreakMode::Empty, "[", "]", "[", "]", Vec::new());
+    let mut empty_adapter = DirectAdapter::new("  ", 80);
+    empty_adapter.begin_layout(&empty_layout).unwrap();
+    empty_adapter.soft_break().unwrap();
+    empty_adapter.end_layout(&empty_layout).unwrap();
     adapter.soft_break().unwrap();
     assert_eq!(adapter.finish(), " ");
 }
@@ -489,13 +602,70 @@ fn pretty_adapter_reports_invalid_internal_operations() {
         Err(SigilStitchError::Render { context, .. })
             if context == "CodeRenderer pretty groups"
     ));
+    let layout = LayoutBlock::consistent(LayoutBreakMode::Space, "", "", "", "", Vec::new());
+    assert!(matches!(
+        adapter.end_layout(&layout),
+        Err(SigilStitchError::Render { context, .. })
+            if context == "CodeRenderer pretty groups"
+    ));
+    let independent = LayoutBlock::new(
+        LayoutGroupMode::Independent,
+        LayoutBreakMode::Space,
+        "",
+        "",
+        "",
+        "",
+        vec![CodeNode::SoftBreak],
+    );
+    let mut independent_adapter = PrettyAdapter::new("  ", 80);
+    independent_adapter.begin_layout(&independent).unwrap();
+    independent_adapter.soft_break().unwrap();
+    independent_adapter.end_layout(&independent).unwrap();
 
-    let mut adapter = PrettyAdapter::new("  ", 80);
     adapter.begin_group(LayoutGroup::IndependentBreaks).unwrap();
     assert!(matches!(
         adapter.finish(),
         Err(SigilStitchError::Render { context, .. })
             if context == "CodeRenderer pretty groups"
+    ));
+}
+
+#[test]
+fn pretty_adapter_rejects_unbalanced_layout_scopes() {
+    let layout = LayoutBlock::consistent(LayoutBreakMode::Space, "", "", "", "", Vec::new());
+
+    let mut underflow = PrettyAdapter::new("  ", 80);
+    underflow.begin_layout(&layout).unwrap();
+    assert!(matches!(
+        underflow.dedent(),
+        Err(SigilStitchError::Render { context, .. })
+            if context == "CodeRenderer pretty indentation"
+    ));
+
+    let mut unbalanced = PrettyAdapter::new("  ", 80);
+    unbalanced.begin_layout(&layout).unwrap();
+    unbalanced.indent().unwrap();
+    let mut global_overflow = PrettyAdapter::new("  ", 80);
+    global_overflow.set_indent_depth_for_test(usize::MAX);
+    assert!(matches!(
+        global_overflow.indent(),
+        Err(SigilStitchError::Render { context, .. })
+            if context == "CodeRenderer pretty indentation"
+    ));
+
+    let mut layout_overflow = PrettyAdapter::new("  ", 80);
+    layout_overflow.begin_layout(&layout).unwrap();
+    layout_overflow.set_layout_indent_for_test(usize::MAX);
+    assert!(matches!(
+        layout_overflow.indent(),
+        Err(SigilStitchError::Render { context, .. })
+            if context == "CodeRenderer pretty indentation"
+    ));
+
+    assert!(matches!(
+        unbalanced.end_layout(&layout),
+        Err(SigilStitchError::Render { context, .. })
+            if context == "CodeRenderer pretty indentation"
     ));
 }
 

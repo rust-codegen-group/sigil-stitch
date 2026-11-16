@@ -336,6 +336,26 @@ pub(crate) fn validate_lowered_block(
                     }
                     walk(&block.nodes, language, &path.nested(index))?;
                 }
+                CodeNode::Layout(layout) => {
+                    if layout.nodes().is_empty() {
+                        return Err(invalid(language, &node_path, "layout must not be empty"));
+                    }
+                    for text in [
+                        layout.flat_prefix(),
+                        layout.flat_suffix(),
+                        layout.broken_prefix(),
+                        layout.broken_suffix(),
+                    ] {
+                        if text.contains(['\r', '\n', '\0']) {
+                            return Err(invalid(
+                                language,
+                                &node_path,
+                                "layout text contains a line break",
+                            ));
+                        }
+                    }
+                    walk(layout.nodes(), language, &path.nested(index))?;
+                }
                 CodeNode::Sequence(children) => {
                     if children.is_empty() {
                         return Err(invalid(language, &node_path, "sequence must not be empty"));
@@ -435,6 +455,7 @@ mod tests {
             | CodeNode::StringLit(_)
             | CodeNode::InlineLiteral(_)
             | CodeNode::Nested(_)
+            | CodeNode::Layout(_)
             | CodeNode::SoftBreak
             | CodeNode::Indent
             | CodeNode::Dedent

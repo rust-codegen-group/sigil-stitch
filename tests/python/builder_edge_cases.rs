@@ -1,7 +1,7 @@
 use sigil_stitch::code_block::{CodeBlock, NameArg};
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::lang::capability::TypeCapability;
-use sigil_stitch::lang::python::Python;
+use sigil_stitch::lang::python::{Python, keyword_argument};
 use sigil_stitch::spec::field_spec::FieldSpec;
 use sigil_stitch::spec::file_spec::FileSpec;
 use sigil_stitch::spec::fun_spec::FunSpec;
@@ -66,6 +66,43 @@ fn test_decorated_function() {
 // ── %N keyword escaping ─────────────────────────────────
 
 #[test]
+fn test_builder_unannotated_default_parameter_is_tight() {
+    let function = FunSpec::builder("defaults")
+        .add_param(
+            ParameterSpec::builder("value", TypeName::primitive(""))
+                .default_value(CodeBlock::of("1", ()).unwrap())
+                .build()
+                .unwrap(),
+        )
+        .body(CodeBlock::of("return value", ()).unwrap())
+        .build()
+        .unwrap();
+    let file = FileSpec::builder_with("defaults.py", Python::new())
+        .add_function(function)
+        .build()
+        .unwrap();
+
+    let output = file.render(80).unwrap();
+    assert!(output.contains("def defaults(value=1):"), "{output}");
+}
+
+#[test]
+fn test_zero_parameter_callable_type_lowers() {
+    let block = CodeBlock::of(
+        "%T",
+        TypeName::callable(Vec::new(), vec![TypeName::primitive("int")]),
+    )
+    .unwrap();
+    let file = FileSpec::builder_with("callable.py", Python::new())
+        .add_code(block)
+        .build()
+        .unwrap();
+
+    let output = file.render(80).unwrap();
+    assert!(output.contains("Callable[[], int]"), "{output}");
+}
+
+#[test]
 fn test_name_escapes_python_keywords() {
     let keywords = [
         "class", "def", "import", "from", "return", "lambda", "global", "yield",
@@ -116,6 +153,19 @@ fn test_name_escape_in_assignment() {
         .unwrap();
     let output = file.render(80).unwrap();
     assert!(output.contains("self.class_ = class_"));
+}
+
+#[test]
+fn test_standalone_keyword_argument_fragment_is_tight() {
+    let label = CodeBlock::of("%N", NameArg("kw_only".into())).unwrap();
+    let value = CodeBlock::of("True", ()).unwrap();
+    let fragment = keyword_argument(label, value);
+    let block = CodeBlock::of("field(%L)", (fragment,)).unwrap();
+    let file = FileSpec::builder_with("test.py", Python::new())
+        .add_code(block)
+        .build()
+        .unwrap();
+    assert_eq!(file.render(80).unwrap(), "field(kw_only=True)\n");
 }
 
 // ── Embedded fields in Python ───────────────────────────

@@ -171,6 +171,137 @@ fn capture_followed_by_parens(after_capture_start: &str) -> bool {
     after_capture_start[close + 1..].contains('(')
 }
 
+/// A grammar-neutral layout capsule carried inside a [`CodeNode`].
+///
+/// The fields are intentionally private: language adapters and macro codegen
+/// choose layout through crate-owned constructors, while the source tree keeps
+/// the complete layout decision available to rewrite, validation, import
+/// collection, and rendering. The derived representation is same-version data,
+/// not a stable serialized wire protocol.
+#[doc(hidden)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LayoutBlock {
+    recipe: LayoutRecipe,
+    nodes: Vec<CodeNode>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct LayoutRecipe {
+    group_mode: LayoutGroupMode,
+    break_mode: LayoutBreakMode,
+    flat_prefix: String,
+    flat_suffix: String,
+    broken_prefix: String,
+    broken_suffix: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) enum LayoutGroupMode {
+    Independent,
+    Consistent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) enum LayoutBreakMode {
+    Space,
+    Empty,
+}
+
+impl LayoutRecipe {
+    pub(crate) fn new(
+        group_mode: LayoutGroupMode,
+        break_mode: LayoutBreakMode,
+        flat_prefix: impl Into<String>,
+        flat_suffix: impl Into<String>,
+        broken_prefix: impl Into<String>,
+        broken_suffix: impl Into<String>,
+    ) -> Self {
+        Self {
+            group_mode,
+            break_mode,
+            flat_prefix: flat_prefix.into(),
+            flat_suffix: flat_suffix.into(),
+            broken_prefix: broken_prefix.into(),
+            broken_suffix: broken_suffix.into(),
+        }
+    }
+}
+
+impl LayoutBlock {
+    pub(crate) fn new(
+        group_mode: LayoutGroupMode,
+        break_mode: LayoutBreakMode,
+        flat_prefix: impl Into<String>,
+        flat_suffix: impl Into<String>,
+        broken_prefix: impl Into<String>,
+        broken_suffix: impl Into<String>,
+        nodes: Vec<CodeNode>,
+    ) -> Self {
+        Self {
+            recipe: LayoutRecipe::new(
+                group_mode,
+                break_mode,
+                flat_prefix,
+                flat_suffix,
+                broken_prefix,
+                broken_suffix,
+            ),
+            nodes,
+        }
+    }
+
+    pub(crate) fn consistent(
+        break_mode: LayoutBreakMode,
+        flat_prefix: impl Into<String>,
+        flat_suffix: impl Into<String>,
+        broken_prefix: impl Into<String>,
+        broken_suffix: impl Into<String>,
+        nodes: Vec<CodeNode>,
+    ) -> Self {
+        Self::new(
+            LayoutGroupMode::Consistent,
+            break_mode,
+            flat_prefix,
+            flat_suffix,
+            broken_prefix,
+            broken_suffix,
+            nodes,
+        )
+    }
+
+    pub(crate) fn group_mode(&self) -> LayoutGroupMode {
+        self.recipe.group_mode
+    }
+
+    pub(crate) fn break_mode(&self) -> LayoutBreakMode {
+        self.recipe.break_mode
+    }
+
+    pub(crate) fn flat_prefix(&self) -> &str {
+        &self.recipe.flat_prefix
+    }
+
+    pub(crate) fn flat_suffix(&self) -> &str {
+        &self.recipe.flat_suffix
+    }
+
+    pub(crate) fn broken_prefix(&self) -> &str {
+        &self.recipe.broken_prefix
+    }
+
+    pub(crate) fn broken_suffix(&self) -> &str {
+        &self.recipe.broken_suffix
+    }
+
+    pub(crate) fn nodes(&self) -> &[CodeNode] {
+        &self.nodes
+    }
+
+    pub(crate) fn nodes_mut(&mut self) -> &mut Vec<CodeNode> {
+        &mut self.nodes
+    }
+}
+
 /// A single node in the code generation tree.
 ///
 /// Each variant is self-contained: a type reference is `CodeNode::TypeRef(TypeName)`,
@@ -194,6 +325,11 @@ pub enum CodeNode {
     InlineLiteral(String),
     /// A nested code block (was `%L` + `Arg::Code`).
     Nested(CodeBlock),
+    /// A nested code block with an explicit fit/break policy.
+    ///
+    /// The capsule keeps delimiter alternatives and semantic child nodes in
+    /// the source tree without exposing a Python-specific AST.
+    Layout(LayoutBlock),
     /// A comment line. Rendered as `{prefix} {text}{suffix}` using the
     /// language's comment syntax.
     Comment(String),

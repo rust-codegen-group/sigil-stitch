@@ -36,7 +36,7 @@ pub(crate) fn generate(input: ParsedInput) -> TokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::{FormattedCode, QuoteArg, Statement};
+    use crate::ir::{FormattedCode, LayoutSpec, QuoteArg, Statement, StringValue};
 
     #[test]
     fn lowers_large_infallible_sequences_without_recursive_tail_building() {
@@ -64,5 +64,55 @@ mod tests {
             generated.to_string().matches("__fallible_stress__").count(),
             8_192
         );
+    }
+
+    #[test]
+    fn lowers_layout_arguments_with_the_hidden_runtime_abi() {
+        let mut inner = FormattedCode::new();
+        inner.push_argument(QuoteArg::Literal(StringValue::Literal("item".to_string())));
+        let mut formatted = FormattedCode::new();
+        formatted.push_layout(
+            inner,
+            LayoutSpec {
+                consistent: true,
+                empty_flat_break: false,
+                flat_prefix: "(".to_string(),
+                flat_suffix: ")".to_string(),
+                broken_prefix: "(".to_string(),
+                broken_suffix: ")".to_string(),
+            },
+        );
+
+        let generated = generate(ParsedInput {
+            statements: vec![Statement::Line(formatted)],
+        })
+        .to_string();
+        assert!(generated.contains("__sigil_layout"));
+        assert!(generated.contains("item"));
+    }
+
+    #[test]
+    fn lowers_layout_arguments_with_fallible_nested_children() {
+        let mut inner = FormattedCode::new();
+        inner.push_argument(QuoteArg::ParsedSplice(vec![Statement::BlankLine]));
+        let mut formatted = FormattedCode::new();
+        formatted.push_layout(
+            inner,
+            LayoutSpec {
+                consistent: true,
+                empty_flat_break: true,
+                flat_prefix: "[".to_string(),
+                flat_suffix: "]".to_string(),
+                broken_prefix: "[".to_string(),
+                broken_suffix: "]".to_string(),
+            },
+        );
+
+        let generated = generate(ParsedInput {
+            statements: vec![Statement::Line(formatted)],
+        })
+        .to_string();
+        assert!(generated.contains("nested_builder"));
+        assert!(generated.contains("__sigil_layout"));
     }
 }

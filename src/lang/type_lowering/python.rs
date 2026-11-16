@@ -3,9 +3,11 @@
 #![deny(deprecated)]
 
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
+use crate::code_node::LayoutBreakMode;
 use crate::error::SigilStitchError;
 use crate::lang::RendererLang;
 use crate::lang::python::Python;
+use crate::lang::python_layout;
 use crate::spec::modifiers::{TypeKind, Visibility};
 use crate::spec::type_spec::{TypeIntent, ValidatedType};
 
@@ -80,15 +82,16 @@ pub(crate) fn lower(
     let bases = type_
         .nominal_super_types()
         .iter()
-        .chain(type_.implemented_types());
-    let mut count = 0;
-    for base in bases {
-        block.add(if count == 0 { "(" } else { ", " }, ());
-        block.add("%T", base.clone());
-        count += 1;
-    }
-    if count > 0 {
-        block.add(")", ());
+        .chain(type_.implemented_types())
+        .map(|base| CodeBlock::of("%T", base.clone()))
+        .collect::<Result<Vec<_>, _>>()?;
+    if !bases.is_empty() {
+        block.add_code(python_layout::delimited(
+            "(",
+            bases,
+            ")",
+            LayoutBreakMode::Space,
+        ));
     }
     block.add(":", ());
     block.add_line();
@@ -130,14 +133,17 @@ fn lower_alias(type_: &ValidatedType<'_>) -> Result<CodeBlock, SigilStitchError>
     block.add("type ", ());
     block.add("%L", type_.name());
     if !type_.type_params().is_empty() {
-        block.add("[", ());
-        for (index, parameter) in type_.type_params().iter().enumerate() {
-            if index > 0 {
-                block.add(", ", ());
-            }
-            block.add("%L", parameter.name());
-        }
-        block.add("]", ());
+        let parameters = type_
+            .type_params()
+            .iter()
+            .map(|parameter| CodeBlock::of("%L", parameter.name()))
+            .collect::<Result<Vec<_>, _>>()?;
+        block.add_code(python_layout::delimited(
+            "[",
+            parameters,
+            "]",
+            LayoutBreakMode::Space,
+        ));
     }
     block.add(
         " = %T",
