@@ -117,6 +117,18 @@ selected target. Its Rust type is language-agnostic so declaration lowerers,
 rewrite, import collection, and rendering can compose it, but its literal
 content and structure are not a portable cross-language program.
 
+### Layout capsule
+
+`CodeNode::Layout(LayoutBlock)` is the shared structured carrier for a target-owned
+fit/break recipe. A capsule stores flat and broken delimiter alternatives, one
+consistent or independent group policy, and explicit `Indent`/`Dedent` nodes around
+broken continuation items. The scopes are interpreted only while the Layout group
+is active, so flat output remains unindented and nested groups do not inherit a
+leaked continuation depth. It is not a public
+Python AST: Python lowers its private group/item policy into this carrier, while
+other targets continue using their existing `Nested`, `Sequence`, and `SoftBreak`
+semantics. Raw `$L` content is never re-tokenized into a capsule.
+
 ### Generic binding and kind expression
 
 A declaration-owned name with a single, pack, or lifetime domain, optional

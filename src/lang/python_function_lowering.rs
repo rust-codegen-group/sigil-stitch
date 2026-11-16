@@ -4,10 +4,9 @@
 
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
 use crate::error::SigilStitchError;
-use crate::lang::function_lowering::{
-    SignatureBuilder, inline_default_value, tupled_parameter_list,
-};
+use crate::lang::function_lowering::{SignatureBuilder, inline_default_value};
 use crate::lang::python::Python;
+use crate::lang::python_layout;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::parameter_spec::ParameterSpec;
@@ -46,10 +45,16 @@ pub(crate) fn lower(
     signature.push_literal("def ");
     signature.push_literal(function.name());
     signature.push_literal("(");
-    signature.push_code(tupled_parameter_list(
-        function.parameters(),
-        |parameters, parameter| emit_parameter(parameters, lang, parameter),
-    )?);
+    signature.push_code(python_layout::delimited(
+        "",
+        function
+            .parameters()
+            .iter()
+            .map(|parameter| emit_parameter(lang, parameter))
+            .collect::<Result<Vec<_>, _>>()?,
+        "",
+        crate::code_node::LayoutBreakMode::Space,
+    ));
     signature.push_literal(")");
     append_suffixes(&mut signature, function);
     if let Some(returns) = function.returns() {
@@ -83,14 +88,23 @@ pub(crate) fn lower(
     block.build()
 }
 
-fn emit_parameter(block: &mut CodeBlockBuilder, lang: &Python, parameter: &ParameterSpec) {
+fn emit_parameter(lang: &Python, parameter: &ParameterSpec) -> Result<CodeBlock, SigilStitchError> {
+    let mut block = CodeBlock::builder();
     block.add("%L", lang.escape_reserved(parameter.name()));
     if !parameter.param_type().is_empty() {
         block.add(": %T", parameter.param_type().clone());
     }
     if let Some(default) = parameter.default_value() {
-        block.add(" = %L", inline_default_value(default));
+        block.add(
+            if parameter.param_type().is_empty() {
+                "=%L"
+            } else {
+                " = %L"
+            },
+            inline_default_value(default),
+        );
     }
+    block.build()
 }
 
 fn append_suffixes(signature: &mut SignatureBuilder, function: ValidatedFunction<'_>) {

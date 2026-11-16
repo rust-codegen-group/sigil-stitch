@@ -259,7 +259,7 @@ Lowering](type_name_lowering.md) for the complete contract.
 
 ## Structured Source Container: CodeBlock
 
-A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `FloatValue`, `NameRef`, `StringLit`, `Comment`, `Nested`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, `FloatValue` carries its exact format and bits, and control-flow nodes carry a language-neutral `BlockIntent` (`BlockOpenIntent`, `BlockCloseIntent`, `BranchCloseIntent`) with no per-language rendering policy.
+A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `FloatValue`, `NameRef`, `StringLit`, `Comment`, `Nested`, `Sequence`, and `Layout`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, `FloatValue` carries its exact format and bits, and control-flow nodes carry a language-neutral `BlockIntent` (`BlockOpenIntent`, `BlockCloseIntent`, `BranchCloseIntent`) with no per-language rendering policy. `CodeNode::Layout(LayoutBlock)` is the additive structured carrier for target-owned delimiter alternatives: it keeps flat/broken prefixes and suffixes, a break mode, and explicit continuation `Indent`/`Dedent` nodes without exposing a target AST.
 
 The builder (`CodeBlockBuilder`) validates argument counts and indent balance
 before producing a reusable block. The released `CodeBlock::nodes_mut()` method
@@ -596,6 +596,7 @@ not rewrite the tree or lower another type root:
 | `VerbatimStr(s)` | Call `lang.render_verbatim_string()` |
 | `InlineLiteral(s)` | Emit raw literal |
 | `Nested(block)` | Recursively render the inner CodeBlock |
+| `Layout(block)` | Emit target-owned flat/broken delimiter alternatives and render structured children in one explicit group |
 | `Comment(s)` | Emit with `lang.line_comment_prefix()` |
 | `SoftBreak` | Pretty-print decision point |
 | `Indent` / `Dedent` | Adjust indent level |
@@ -610,11 +611,17 @@ not rewrite the tree or lower another type root:
 `CodeNode`. CodeBlocks without `SoftBreak` use a direct string adapter. When a
 `SoftBreak` exists anywhere in the tree, the same walker uses a `pretty::BoxDoc`
 adapter for the whole tree so the Wadler-Lindig algorithm can choose between a
-space and an indented line break. `Nested` and `Sequence` nodes form layout
-groups without resetting renderer state. Both adapters preserve the language's
+space and an indented line break. `Nested`, `Sequence`, and `Layout` nodes form layout
+groups without resetting renderer state. A `Layout` group uses explicit continuation
+scopes only on its broken path; its flat first line remains at the caller's
+column. Both adapters preserve the language's
 `indent_unit()` string exactly.
 
-## Import Conflict Resolution
+A broken `Layout` alternative uses explicit `Indent`/`Dedent` nodes around its
+continuation items. The pretty adapter applies those scopes only while the Layout
+group is active, so flat output remains unindented and nested groups do not inherit
+an unconditional continuation depth. Ordinary language block and source
+continuations use the same explicit nodes.
 
 A concrete example of the conflict resolution:
 

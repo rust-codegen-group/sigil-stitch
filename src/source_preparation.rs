@@ -57,6 +57,11 @@ impl<'a> SourcePreparer<'a> {
                     block.nodes = self.prepare_nodes(block.nodes, &path.nested(index))?;
                     prepared.push(CodeNode::Nested(block));
                 }
+                CodeNode::Layout(mut layout) => {
+                    let children = std::mem::take(layout.nodes_mut());
+                    *layout.nodes_mut() = self.prepare_nodes(children, &path.nested(index))?;
+                    prepared.push(CodeNode::Layout(layout));
+                }
                 CodeNode::Sequence(children) => {
                     prepared.push(CodeNode::Sequence(
                         self.prepare_nodes(children, &path.sequence(index))?,

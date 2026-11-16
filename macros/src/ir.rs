@@ -29,6 +29,13 @@ impl FormattedCode {
         self.args.push(arg);
     }
 
+    pub(crate) fn push_layout(&mut self, code: FormattedCode, spec: LayoutSpec) {
+        self.push_argument(QuoteArg::Layout {
+            code: Box::new(code),
+            spec,
+        });
+    }
+
     pub(crate) fn push_marker(&mut self, marker: NoArgMarker) {
         self.format.push_str(marker.specifier());
     }
@@ -83,6 +90,16 @@ pub(crate) enum StringValue {
     },
 }
 
+/// Runtime layout metadata for one macro-owned delimiter group.
+pub(crate) struct LayoutSpec {
+    pub(crate) consistent: bool,
+    pub(crate) empty_flat_break: bool,
+    pub(crate) flat_prefix: String,
+    pub(crate) flat_suffix: String,
+    pub(crate) broken_prefix: String,
+    pub(crate) broken_suffix: String,
+}
+
 /// A typed argument accepted by a target-language format string.
 pub(crate) enum QuoteArg {
     Type(Expr),
@@ -91,11 +108,21 @@ pub(crate) enum QuoteArg {
     VerbatimStr(StringValue),
     Literal(StringValue),
     Code(Expr),
-    Join { separator: Expr, iter: Expr },
-    TypeJoin { separator: Expr, iter: Expr },
+    Join {
+        separator: Expr,
+        iter: Expr,
+    },
+    TypeJoin {
+        separator: Expr,
+        iter: Expr,
+    },
     Comment(StringValue),
     ParsedBlock(Vec<Statement>),
     ParsedSplice(Vec<Statement>),
+    Layout {
+        code: Box<FormattedCode>,
+        spec: LayoutSpec,
+    },
 }
 
 impl QuoteArg {
@@ -111,7 +138,8 @@ impl QuoteArg {
             | Self::Join { .. }
             | Self::TypeJoin { .. }
             | Self::ParsedBlock(_)
-            | Self::ParsedSplice(_) => "%L",
+            | Self::ParsedSplice(_)
+            | Self::Layout { .. } => "%L",
         }
     }
 }

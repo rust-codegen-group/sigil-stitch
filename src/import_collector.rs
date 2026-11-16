@@ -26,6 +26,9 @@ pub(crate) fn walk_nodes(nodes: &[CodeNode], refs: &mut Vec<ImportRef>) {
             CodeNode::Nested(inner) => {
                 walk_nodes(&inner.nodes, refs);
             }
+            CodeNode::Layout(layout) => {
+                walk_nodes(layout.nodes(), refs);
+            }
             CodeNode::Sequence(children) => {
                 walk_nodes(children, refs);
             }

@@ -46,6 +46,7 @@ Languages not in the enum get `MacroLang::Unaware`, which applies only universal
 | `Kotlin` | `sigil_quote!(Kotlin { ... })` | Postfix `?` nullable |
 | `OCaml` | `sigil_quote!(OCaml { ... })` | Space before `:`, prefix `?` nullable |
 | `Php` | `sigil_quote!(Php { ... })` | Prefix `?` nullable |
+| `Python` | `sigil_quote!(Python { ... })` | Structured delimiter groups, contextual keyword/default `=` spacing, relative-import dot argument |
 | `Ruby` | `sigil_quote!(Ruby { ... })` | Symbol colon, inheritance angle |
 | `Swift` | `sigil_quote!(Swift { ... })` | Postfix `?` nullable |
 | `TypeScript` | `sigil_quote!(TypeScript { ... })` | Postfix `?` nullable |
@@ -61,8 +62,31 @@ These annotations used to fire for ALL languages but are now restricted to langu
 | `PostfixAmpersand` | `has_postfix_ampersand()` | Cpp only | `auto&` — no space before `&` |
 | `PostfixQuestion` | `has_postfix_question_type()` | CSharp, Dart, Kotlin, Swift, TypeScript | `int?` — no space before `?` |
 | `AssignAdjacent` | `is_shell()` | Bash, Zsh | `NAME=val` — no space around `=` |
-| `GenericOpen` (ordinary) | `has_angle_generics()` | Excludes C, Go, Haskell, OCaml, Php, Bash, Zsh, Ruby | `<` as generic opener |
+| `GenericOpen` (ordinary) | `has_angle_generics()` | Excludes C, Go, Haskell, OCaml, Php, Bash, Zsh, Ruby, Python | `<` as generic opener |
 | `NullablePrefix` | `nullable_prefix_is_valid()` | Php, OCaml | `?User` — no space before `?` |
+
+### Python structured groups
+
+Python macro input keeps delimiter groups as a private layout IR before lowering to
+`CodeBlock::Layout`. Calls, subscripts, collections, and type arguments use one
+consistent break decision: commas become soft breaks and broken continuations receive
+one Python indentation unit without indenting the flat first line. A broken root
+union/optional expression receives parentheses so every physical line remains valid
+Python. Explicit source newlines inside a delimiter group remain explicit rather than
+being normalized away.
+
+Python spacing is contextual rather than a global rewrite: call keyword arguments use
+`label=value`, unannotated function/lambda defaults use `name=value`, annotated defaults
+retain `name: Type = value`, and ordinary assignments/operators retain spaces. A dot
+immediately following `from` is treated as a relative-import argument (`from . import x`).
+The public `lang::python::keyword_argument` helper is the supported way to compose a
+standalone structured keyword fragment; raw `$L` content remains opaque.
+
+The shared token walker does not expose a Python-specific scope. It carries a private
+`MacroSpacingPolicy` snapshot: Python owns its delimiter context and layout flag inside
+that policy, while generic languages carry no Python state. A future grammar-aware
+language should add a policy implementation at this seam and reuse the walker, rather
+than adding another language-specific scope field to the shared spacing state.
 
 ### Shell Languages (Bash, Zsh)
 

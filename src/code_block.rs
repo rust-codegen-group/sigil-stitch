@@ -265,6 +265,13 @@ impl CodeBlock {
                 | CodeNode::InlineLiteral(value) => value.is_empty(),
                 CodeNode::TypeRef(type_name) => type_name.is_empty(),
                 CodeNode::Nested(block) => block.is_empty(),
+                CodeNode::Layout(layout) => {
+                    layout.flat_prefix().is_empty()
+                        && layout.flat_suffix().is_empty()
+                        && layout.broken_prefix().is_empty()
+                        && layout.broken_suffix().is_empty()
+                        && layout.nodes().iter().all(node_is_empty)
+                }
                 CodeNode::Sequence(nodes) => nodes.iter().all(node_is_empty),
                 CodeNode::StringLit(_)
                 | CodeNode::VerbatimStr(_)
@@ -306,6 +313,7 @@ impl CodeBlock {
                 Some(CodeNode::BlockCloseIntent { .. }) => true,
                 Some(CodeNode::Sequence(children)) => check_last(children),
                 Some(CodeNode::Nested(inner)) => check_last(&inner.nodes),
+                Some(CodeNode::Layout(layout)) => check_last(layout.nodes()),
                 _ => false,
             }
         }
@@ -319,6 +327,7 @@ impl CodeBlock {
                 Some(CodeNode::Newline) => true,
                 Some(CodeNode::Sequence(children)) => check_last(children),
                 Some(CodeNode::Nested(inner)) => check_last(&inner.nodes),
+                Some(CodeNode::Layout(layout)) => check_last(layout.nodes()),
                 _ => false,
             }
         }
@@ -335,6 +344,7 @@ impl CodeBlock {
                 }
                 Some(CodeNode::Sequence(children)) => trim(children),
                 Some(CodeNode::Nested(inner)) => trim(&mut inner.nodes),
+                Some(CodeNode::Layout(layout)) => trim(layout.nodes_mut()),
                 _ => false,
             }
         }
@@ -343,11 +353,51 @@ impl CodeBlock {
         self
     }
 
+    /// Wrap a nested block in the grammar-neutral layout carrier used by
+    /// language-aware macro codegen. This is a hidden macro/runtime ABI, not a
+    /// caller-facing formatting configuration surface.
+    #[doc(hidden)]
+    pub fn __sigil_layout(
+        children: Self,
+        consistent: bool,
+        empty_flat_break: bool,
+        flat_prefix: &str,
+        flat_suffix: &str,
+        broken_prefix: &str,
+        broken_suffix: &str,
+    ) -> Self {
+        let group_mode = if consistent {
+            crate::code_node::LayoutGroupMode::Consistent
+        } else {
+            crate::code_node::LayoutGroupMode::Independent
+        };
+        let break_mode = if empty_flat_break {
+            crate::code_node::LayoutBreakMode::Empty
+        } else {
+            crate::code_node::LayoutBreakMode::Space
+        };
+        let mut scoped_nodes = Vec::with_capacity(children.nodes.len() + 2);
+        scoped_nodes.push(CodeNode::Indent);
+        scoped_nodes.extend(children.nodes);
+        scoped_nodes.push(CodeNode::Dedent);
+        Self {
+            nodes: vec![CodeNode::Layout(crate::code_node::LayoutBlock::new(
+                group_mode,
+                break_mode,
+                flat_prefix,
+                flat_suffix,
+                broken_prefix,
+                broken_suffix,
+                scoped_nodes,
+            ))],
+        }
+    }
+
     /// Remove one trailing newline for inline macro composition.
     ///
     /// This hidden wrapper is called by generated `sigil_quote!` code. Other
-    /// inline composition inside the crate uses the context-specific internal
-    /// helper above rather than exposing a caller-facing trim operation.
+    /// callers should use `for_inline_composition` only through crate-owned
+    /// composition paths.
     #[doc(hidden)]
     pub fn __sigil_trim_trailing_newline(self) -> Self {
         self.for_inline_composition()
@@ -695,6 +745,7 @@ fn validate_indent_markers(
                     }
                 }
                 CodeNode::Nested(block) => walk(&block.nodes, depth, reject_negative)?,
+                CodeNode::Layout(layout) => walk(layout.nodes(), depth, reject_negative)?,
                 CodeNode::Sequence(children) => walk(children, depth, reject_negative)?,
                 _ => {}
             }
@@ -730,6 +781,13 @@ pub(crate) fn validate_no_unresolved_indent_markers(
             CodeNode::Literal(text) => check_text(text, "format literal")?,
             CodeNode::InlineLiteral(text) => check_text(text, "%L literal")?,
             CodeNode::Nested(block) => validate_no_unresolved_indent_markers(&block.nodes)?,
+            CodeNode::Layout(layout) => {
+                check_text(layout.flat_prefix(), "layout flat prefix")?;
+                check_text(layout.flat_suffix(), "layout flat suffix")?;
+                check_text(layout.broken_prefix(), "layout broken prefix")?;
+                check_text(layout.broken_suffix(), "layout broken suffix")?;
+                validate_no_unresolved_indent_markers(layout.nodes())?;
+            }
             CodeNode::Sequence(children) => validate_no_unresolved_indent_markers(children)?,
             _ => {}
         }
@@ -1044,8 +1102,53 @@ impl_into_args_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::code_node::CodeNode;
+    use crate::code_node::{CodeNode, LayoutBlock, LayoutBreakMode};
     use crate::lang::typescript::TypeScript;
+
+    #[test]
+    fn layout_nodes_participate_in_block_shape_operations() {
+        let empty_layout =
+            LayoutBlock::consistent(LayoutBreakMode::Space, "", "", "", "", Vec::new());
+        let empty = CodeBlock {
+            nodes: vec![CodeNode::Layout(empty_layout)],
+        };
+        assert!(empty.is_empty());
+
+        let trailing_layout = LayoutBlock::consistent(
+            LayoutBreakMode::Space,
+            "",
+            "",
+            "",
+            "",
+            vec![CodeNode::Newline],
+        );
+        let mut trailing = CodeBlock {
+            nodes: vec![CodeNode::Layout(trailing_layout)],
+        };
+        assert!(trailing.ends_with_newline_or_block_close());
+        assert!(trailing.__sigil_ends_with_newline());
+        trailing = trailing.__sigil_trim_trailing_newline();
+        assert!(trailing.is_empty());
+    }
+
+    #[test]
+    fn hidden_layout_abi_preserves_group_and_break_policies() {
+        let children = CodeBlock::of("x%W y", ()).unwrap();
+        let consistent =
+            CodeBlock::__sigil_layout(children.clone(), true, false, "(", ")", "(", ")");
+        let independent_empty =
+            CodeBlock::__sigil_layout(children, false, true, "[", "]", "[", "]");
+        assert!(matches!(consistent.nodes.as_slice(), [CodeNode::Layout(_)]));
+        let CodeNode::Layout(layout) = &consistent.nodes[0] else {
+            unreachable!();
+        };
+        assert!(matches!(layout.nodes().first(), Some(CodeNode::Indent)));
+        assert!(matches!(layout.nodes().last(), Some(CodeNode::Dedent)));
+        assert!(matches!(
+            independent_empty.nodes.as_slice(),
+            [CodeNode::Layout(_)]
+        ));
+    }
 
     #[test]
     fn test_parse_all_specifiers() {

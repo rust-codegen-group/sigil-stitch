@@ -138,6 +138,68 @@ fn generate_arg(arg: &QuoteArg, context: &mut GenerateContext) -> TokenStream {
         QuoteArg::ParsedSplice(statements) => {
             generate_nested(statements, context, NestedKind::Splice)
         }
+        QuoteArg::Layout { code, spec } => {
+            let block = generate_formatted_result(code, context);
+            let layout_block = context.ident("layout_block");
+            let flat_prefix = Literal::string(&spec.flat_prefix);
+            let flat_suffix = Literal::string(&spec.flat_suffix);
+            let broken_prefix = Literal::string(&spec.broken_prefix);
+            let broken_suffix = Literal::string(&spec.broken_suffix);
+            let consistent = spec.consistent;
+            let empty_flat_break = spec.empty_flat_break;
+            quote! {
+                #block.map(|#layout_block| {
+                    ::sigil_stitch::code_block::CodeBlock::__sigil_layout(
+                        #layout_block,
+                        #consistent,
+                        #empty_flat_break,
+
+                        #flat_prefix,
+                        #flat_suffix,
+                        #broken_prefix,
+                        #broken_suffix,
+                    )
+                })
+            }
+        }
+    }
+}
+
+fn generate_formatted_result(
+    formatted: &FormattedCode,
+    context: &mut GenerateContext,
+) -> TokenStream {
+    let format = Literal::string(formatted.format());
+    let values: Vec<Ident> = formatted
+        .args()
+        .iter()
+        .map(|_| context.ident("layout_arg"))
+        .collect();
+    let bindings = formatted
+        .args()
+        .iter()
+        .zip(values.iter())
+        .map(|(arg, ident)| {
+            let value = generate_arg(arg, context);
+            if argument_is_fallible(arg) {
+                quote! { let #ident = #value?; }
+            } else {
+                quote! { let #ident = #value; }
+            }
+        });
+    let tuple = if values.is_empty() {
+        quote! { () }
+    } else {
+        quote! { (#(#values,)*) }
+    };
+    quote! {
+        (|| -> ::std::result::Result<
+            ::sigil_stitch::code_block::CodeBlock,
+            ::sigil_stitch::error::SigilStitchError,
+        > {
+            #(#bindings)*
+            ::sigil_stitch::code_block::CodeBlock::of(#format, #tuple)
+        })()
     }
 }
 

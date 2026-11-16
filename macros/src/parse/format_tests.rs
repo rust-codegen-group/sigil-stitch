@@ -1,6 +1,7 @@
 use super::tokens_to_format;
 use crate::ir::QuoteArg;
 use crate::parse::MacroLang;
+use crate::parse::spacing::{python_default_equals, python_keyword_equals};
 use proc_macro2::{TokenStream, TokenTree};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,6 +32,7 @@ fn arg_kind(arg: &QuoteArg) -> ArgKind {
         QuoteArg::Comment(_) => ArgKind::Comment,
         QuoteArg::ParsedBlock(_) => ArgKind::ParsedBlock,
         QuoteArg::ParsedSplice(_) => ArgKind::ParsedSplice,
+        QuoteArg::Layout { .. } => ArgKind::ParsedSplice,
     }
 }
 
@@ -76,6 +78,52 @@ fn fmt_errors(src: &str) -> Vec<String> {
         Ok(_) => panic!("expected errors for {src}"),
         Err(err) => err.into_iter().map(|error| error.to_string()).collect(),
     }
+}
+
+#[test]
+fn python_equals_predicates_distinguish_keyword_defaults_and_operators() {
+    let tokens: Vec<TokenTree> = "name = value"
+        .parse::<TokenStream>()
+        .unwrap()
+        .into_iter()
+        .collect();
+    assert!(python_keyword_equals(&tokens, 1));
+    assert!(python_default_equals(&tokens, 1));
+
+    let tokens: Vec<TokenTree> = "name == value"
+        .parse::<TokenStream>()
+        .unwrap()
+        .into_iter()
+        .collect();
+    assert!(!python_keyword_equals(&tokens, 1));
+
+    let tokens: Vec<TokenTree> = "name != value"
+        .parse::<TokenStream>()
+        .unwrap()
+        .into_iter()
+        .collect();
+    assert!(!python_keyword_equals(&tokens, 2));
+
+    let tokens: Vec<TokenTree> = "name + value"
+        .parse::<TokenStream>()
+        .unwrap()
+        .into_iter()
+        .collect();
+    assert!(!python_keyword_equals(&tokens, 1));
+
+    let tokens: Vec<TokenTree> = "$N(name) = True"
+        .parse::<TokenStream>()
+        .unwrap()
+        .into_iter()
+        .collect();
+    assert!(python_keyword_equals(&tokens, 3));
+
+    let tokens: Vec<TokenTree> = "value: int = 1"
+        .parse::<TokenStream>()
+        .unwrap()
+        .into_iter()
+        .collect();
+    assert!(!python_default_equals(&tokens, 3));
 }
 
 #[test]

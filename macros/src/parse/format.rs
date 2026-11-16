@@ -7,7 +7,7 @@ use super::annotate::{
 use super::directives::{parse_for_raw_components, parse_if_components};
 use super::recovery::combine;
 use super::rust_interpolation::{parse_expr, parse_string_expr};
-use super::spacing::{ColonContext, PrevTokenKind, SpacingState, maybe_space};
+use super::spacing::{ColonContext, MacroSpacingPolicy, PrevTokenKind, SpacingState, maybe_space};
 use super::util::is_ident;
 use crate::ir::{FormattedCode, NoArgMarker, QuoteArg, Statement};
 
@@ -19,13 +19,36 @@ pub(crate) fn tokens_to_format(
     tokens: &[TokenTree],
     lang: MacroLang,
 ) -> syn::Result<FormattedCode> {
+    tokens_to_format_with_policy(tokens, lang, MacroSpacingPolicy::for_language(lang))
+}
+
+pub(super) fn tokens_to_format_with_policy(
+    tokens: &[TokenTree],
+    lang: MacroLang,
+    policy: MacroSpacingPolicy,
+) -> syn::Result<FormattedCode> {
     let mut formatted = FormattedCode::new();
     let mut state = SpacingState::new(lang);
     let annotations = annotate_tokens(tokens, lang);
 
-    tokens_to_format_inner(tokens, &annotations, &mut formatted, &mut state, lang)?;
+    tokens_to_format_inner(
+        tokens,
+        &annotations,
+        &mut formatted,
+        &mut state,
+        lang,
+        policy,
+    )?;
 
     Ok(formatted)
+}
+
+fn tokens_to_format_with_policy_and_layout(
+    tokens: &[TokenTree],
+    lang: MacroLang,
+    policy: MacroSpacingPolicy,
+) -> syn::Result<FormattedCode> {
+    tokens_to_format_with_policy(tokens, lang, policy.with_layout())
 }
 
 fn tokens_to_format_inner(
@@ -34,6 +57,7 @@ fn tokens_to_format_inner(
     formatted: &mut FormattedCode,
     state: &mut SpacingState,
     lang: MacroLang,
+    mut policy: MacroSpacingPolicy,
 ) -> syn::Result<()> {
     let mut pos = 0;
     let mut errors = None;
@@ -172,7 +196,7 @@ fn tokens_to_format_inner(
                 }
                 let parts = parse_for_raw_components(tokens, pos)?;
                 let after_for = parts.next_pos;
-                let body = tokens_to_format(&parts.body_tokens, lang);
+                let body = tokens_to_format_with_policy(&parts.body_tokens, lang, policy);
                 let (pat, iter_expr, separator, body) = match (parts.header, body) {
                     (Ok((pat, iter_expr, separator)), Ok(body)) => {
                         (pat, iter_expr, separator, body)
@@ -221,7 +245,7 @@ fn tokens_to_format_inner(
                         "$if requires a parenthesized condition: $if(condition) { ... }",
                     ));
                 }
-                let parts = parse_if_components(tokens, pos, lang)?;
+                let parts = parse_if_components(tokens, pos, lang, policy)?;
                 let after_if = parts.next_pos;
                 let meta_if = match parts.value {
                     Ok(meta_if) => meta_if,
@@ -466,7 +490,7 @@ fn tokens_to_format_inner(
             ));
         }
 
-        let annotation = annotations[pos];
+        let mut annotation = annotations[pos];
 
         // Regular (non-interpolation) token — clear specifier adjacency tracking.
         state.prev_specifier_end = None;
@@ -487,9 +511,11 @@ fn tokens_to_format_inner(
                 maybe_space(formatted.format_mut(), state, kind, annotation);
                 formatted.format_mut().push_str(&s.replace('%', "%%"));
                 state.prev = kind;
+                policy = policy.after_ident(&s);
             }
             TokenTree::Punct(p) => {
                 let ch = p.as_char();
+                annotation = policy.annotate_punctuation(tokens, pos, annotation);
                 let new_kind = PrevTokenKind::Punct(ch, p.spacing());
 
                 // Set colon context before spacing decision so `maybe_space`
@@ -513,6 +539,9 @@ fn tokens_to_format_inner(
                     formatted.format_mut().push_str("%%");
                 } else {
                     formatted.format_mut().push(ch);
+                }
+                if ch == ',' && policy.break_after_comma() {
+                    formatted.push_marker(NoArgMarker::SoftBreak);
                 }
                 // Context transitions after emitting the token.
                 match (ch, p.spacing()) {
@@ -540,28 +569,33 @@ fn tokens_to_format_inner(
                     }
                     _ => {}
                 }
+                policy = policy.after_punctuation(ch);
                 // Set prev based on annotation.
-                state.prev = match annotation {
-                    TokenAnnotation::PathSepComplete => PrevTokenKind::PathSep,
-                    TokenAnnotation::GenericOpen => PrevTokenKind::GenericOpen,
-                    TokenAnnotation::PrefixOp | TokenAnnotation::SymbolColon => {
-                        PrevTokenKind::PrefixOp(ch)
-                    }
-                    TokenAnnotation::NullablePrefix => PrevTokenKind::PrefixOp('?'),
-                    TokenAnnotation::DashFlag => PrevTokenKind::PrefixOp(ch),
-                    TokenAnnotation::ArrowOp
-                    | TokenAnnotation::AssignAdjacent
-                    | TokenAnnotation::MethodCallColon
-                    | TokenAnnotation::DashSep
-                    | TokenAnnotation::SlashSep => PrevTokenKind::PathSep,
-                    TokenAnnotation::DotArg => {
-                        if p.spacing() == Spacing::Joint {
-                            new_kind // Punct('.', Joint) — keeps `..` glued
-                        } else {
-                            PrevTokenKind::Literal // standalone `.` — allow space after
+                state.prev = if ch == ',' && policy.break_after_comma() {
+                    PrevTokenKind::SoftBreak
+                } else {
+                    match annotation {
+                        TokenAnnotation::PathSepComplete => PrevTokenKind::PathSep,
+                        TokenAnnotation::GenericOpen => PrevTokenKind::GenericOpen,
+                        TokenAnnotation::PrefixOp
+                        | TokenAnnotation::SymbolColon
+                        | TokenAnnotation::SliceColon => PrevTokenKind::PrefixOp(ch),
+                        TokenAnnotation::NullablePrefix => PrevTokenKind::PrefixOp('?'),
+                        TokenAnnotation::DashFlag => PrevTokenKind::PrefixOp(ch),
+                        TokenAnnotation::ArrowOp
+                        | TokenAnnotation::AssignAdjacent
+                        | TokenAnnotation::MethodCallColon
+                        | TokenAnnotation::DashSep
+                        | TokenAnnotation::SlashSep => PrevTokenKind::PathSep,
+                        TokenAnnotation::DotArg => {
+                            if p.spacing() == Spacing::Joint {
+                                new_kind // Punct('.', Joint) — keeps `..` glued
+                            } else {
+                                PrevTokenKind::Literal // standalone `.` — allow space after
+                            }
                         }
+                        _ => new_kind,
                     }
-                    _ => new_kind,
                 };
             }
             TokenTree::Literal(lit) => {
@@ -600,7 +634,9 @@ fn tokens_to_format_inner(
                 formatted.format_mut().push_str(open);
 
                 let saved_ctx = state.colon_ctx;
-                if g.delimiter() == Delimiter::Brace {
+                let inner: Vec<TokenTree> = g.stream().into_iter().collect();
+                let group_policy = policy.enter_group(tokens, pos, g, annotation, &inner);
+                if group_policy.is_dict_group() {
                     state.colon_ctx = ColonContext::MapEntry;
                 } else if g.delimiter() == Delimiter::Parenthesis
                     && pos > 0
@@ -616,6 +652,27 @@ fn tokens_to_format_inner(
                 }
 
                 let inner: Vec<TokenTree> = g.stream().into_iter().collect();
+                if let Some(layout_spec) = policy.layout_spec(g, &inner, close) {
+                    let inner_formatted =
+                        tokens_to_format_with_policy_and_layout(&inner, lang, group_policy)?;
+                    formatted.push_layout(inner_formatted, layout_spec);
+                    state.colon_ctx = saved_ctx;
+                    let group_end = g.span().end();
+                    let next_adjacent = if pos + 1 < tokens.len() {
+                        let next_start = tokens[pos + 1].span().start();
+                        group_end.line == next_start.line && group_end.column == next_start.column
+                    } else {
+                        false
+                    };
+                    state.prev = if next_adjacent {
+                        PrevTokenKind::GroupOpen
+                    } else {
+                        PrevTokenKind::Literal
+                    };
+                    state.prev_specifier_end = None;
+                    pos += 1;
+                    continue;
+                }
                 // For parenthesized groups: if the first inner token is on a
                 // different line from `(`, emit a newline so content starts on
                 // a new line. This matches Go's paren-block behavior.
@@ -632,9 +689,14 @@ fn tokens_to_format_inner(
                     }
                 }
                 let inner_annotations = annotate_tokens(&inner, lang);
-                if let Err(error) =
-                    tokens_to_format_inner(&inner, &inner_annotations, formatted, state, lang)
-                {
+                if let Err(error) = tokens_to_format_inner(
+                    &inner,
+                    &inner_annotations,
+                    formatted,
+                    state,
+                    lang,
+                    group_policy,
+                ) {
                     combine(&mut errors, error);
                 }
 

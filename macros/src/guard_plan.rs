@@ -75,6 +75,9 @@ fn validate_formatted(formatted: &FormattedCode, enclosing_depth: usize) -> syn:
         if let QuoteArg::ParsedBlock(statements) | QuoteArg::ParsedSplice(statements) = arg {
             validate_sequence(statements, enclosing_depth)?;
         }
+        if let QuoteArg::Layout { code, .. } = arg {
+            validate_formatted(code, enclosing_depth)?;
+        }
     }
     Ok(())
 }
@@ -82,7 +85,10 @@ fn validate_formatted(formatted: &FormattedCode, enclosing_depth: usize) -> syn:
 pub(crate) fn argument_is_fallible(arg: &QuoteArg) -> bool {
     matches!(
         arg,
-        QuoteArg::TypeJoin { .. } | QuoteArg::ParsedBlock(_) | QuoteArg::ParsedSplice(_)
+        QuoteArg::TypeJoin { .. }
+            | QuoteArg::ParsedBlock(_)
+            | QuoteArg::ParsedSplice(_)
+            | QuoteArg::Layout { .. }
     )
 }
 

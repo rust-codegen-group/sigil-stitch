@@ -9,6 +9,7 @@ pub fn walk_nodes_mut(nodes: &mut Vec<CodeNode>, f: &dyn Fn(&mut Vec<CodeNode>))
     for node in nodes.iter_mut() {
         match node {
             CodeNode::Nested(block) => walk_nodes_mut(&mut block.nodes, f),
+            CodeNode::Layout(layout) => walk_nodes_mut(layout.nodes_mut(), f),
             CodeNode::Sequence(children) => walk_nodes_mut(children, f),
             _ => {}
         }

@@ -1,6 +1,7 @@
 use unicode_width::UnicodeWidthStr;
 
 use super::{LayoutGroup, RenderAdapter};
+use crate::code_node::{LayoutBlock, LayoutBreakMode};
 use crate::error::SigilStitchError;
 
 pub(super) struct DirectAdapter<'a> {
@@ -9,6 +10,7 @@ pub(super) struct DirectAdapter<'a> {
     indent_depth: usize,
     current_column: usize,
     at_line_start: bool,
+    break_modes: Vec<LayoutBreakMode>,
 }
 
 impl<'a> DirectAdapter<'a> {
@@ -19,6 +21,7 @@ impl<'a> DirectAdapter<'a> {
             indent_depth: 0,
             current_column: 0,
             at_line_start: true,
+            break_modes: vec![LayoutBreakMode::Space],
         }
     }
 
@@ -56,7 +59,27 @@ impl RenderAdapter for DirectAdapter<'_> {
     }
 
     fn soft_break(&mut self) -> Result<(), SigilStitchError> {
-        self.raw_text(" ")
+        if matches!(self.break_modes.last(), Some(LayoutBreakMode::Empty)) {
+            Ok(())
+        } else {
+            self.raw_text(" ")
+        }
+    }
+
+    fn begin_layout(&mut self, layout: &LayoutBlock) -> Result<(), SigilStitchError> {
+        self.structured_text(layout.flat_prefix())?;
+        self.break_modes.push(layout.break_mode());
+        Ok(())
+    }
+
+    fn end_layout(&mut self, layout: &LayoutBlock) -> Result<(), SigilStitchError> {
+        self.break_modes
+            .pop()
+            .ok_or_else(|| SigilStitchError::Render {
+                context: "CodeRenderer direct layout".to_string(),
+                message: "layout end without layout begin".to_string(),
+            })?;
+        self.structured_text(layout.flat_suffix())
     }
 
     fn indent(&mut self) -> Result<(), SigilStitchError> {

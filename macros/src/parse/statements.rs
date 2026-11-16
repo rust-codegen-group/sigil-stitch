@@ -3,20 +3,20 @@ use proc_macro2::{Delimiter, Spacing, TokenTree};
 use super::MacroLang;
 use super::brace_classifier::{self, BraceKind};
 use super::directives::{parse_for_components, parse_if_components};
-use super::format::tokens_to_format;
+use super::format::{tokens_to_format, tokens_to_format_with_policy};
 use super::intent::classify_branch;
 use super::parse_body;
 use super::recovery::{LineBoundary, Recovered, line_boundary};
 use super::rust_interpolation::{parse_expr, parse_string_expr};
+use super::spacing::MacroSpacingPolicy;
 use super::util::{is_ident, is_semicolon};
 use crate::ir::{Branch, BranchIntent, QuoteArg, Statement};
 
-/// Parse a single statement starting at `pos`.
-/// Returns the statement and the position after the consumed tokens.
 pub(super) fn parse_one_statement(
     tokens: &[TokenTree],
     start: usize,
     lang: MacroLang,
+    policy: MacroSpacingPolicy,
 ) -> Result<(Statement, usize), StatementParseError> {
     // Check for $comment(...) at current position.
     if let Some((comment_text, next)) = try_parse_comment(tokens, start)? {
@@ -39,7 +39,7 @@ pub(super) fn parse_one_statement(
     }
 
     // Check for $if(cond) { ... } [$else_if(cond) { ... }] [$else { ... }]
-    if let Some(recovered) = try_parse_meta_if(tokens, start, lang)? {
+    if let Some(recovered) = try_parse_meta_if(tokens, start, lang, policy)? {
         return recovered
             .value
             .map(|statement| (statement, recovered.next_pos))
@@ -47,7 +47,7 @@ pub(super) fn parse_one_statement(
     }
 
     // Check for $for(pat in expr) { ... }
-    if let Some((stmt, next)) = try_parse_meta_for(tokens, start, lang)? {
+    if let Some((stmt, next)) = try_parse_meta_for(tokens, start, lang, policy)? {
         return Ok((stmt, next));
     }
 
@@ -82,7 +82,7 @@ pub(super) fn parse_one_statement(
         // Check for `;` — statement terminator, unless inside a CF header.
         // (Any trailing `$+` in collected is handled by tokens_to_format_inner.)
         if is_semicolon(tt) && !in_cf_header {
-            let formatted = tokens_to_format(&collected, lang)?;
+            let formatted = tokens_to_format_with_policy(&collected, lang, policy)?;
             return Ok((Statement::Terminated(formatted), pos + 1));
         }
 
@@ -109,7 +109,8 @@ pub(super) fn parse_one_statement(
                     // Recursively parse the body and inline as %L + ParsedBlock.
                     // The `;` at pos+1 is the statement terminator (consumed below
                     // by the normal semicolon path — we skip it via pos+2).
-                    let formatted = handle_expression_brace_with_markers(&collected, g, lang)?;
+                    let formatted =
+                        handle_expression_brace_with_markers(&collected, g, lang, policy)?;
                     return Ok((Statement::Terminated(formatted), pos + 2));
                 } else {
                     // Part of a statement: `const x = { ... };`
@@ -151,7 +152,8 @@ pub(super) fn parse_one_statement(
             }
 
             // Control flow detected (if/for/while/function/class).
-            let (stmt, mut next_pos) = parse_control_flow(tokens, &collected, g, pos, lang)?;
+            let (stmt, mut next_pos) =
+                parse_control_flow(tokens, &collected, g, pos, lang, policy)?;
             // Expression-level control flow (e.g., `match` in PHP/Rust)
             // should emit a trailing `;` when one is present in the source.
             let is_expression_cf = collected
@@ -180,7 +182,7 @@ pub(super) fn parse_one_statement(
             && g.delimiter() == Delimiter::Parenthesis
             && is_paren_block_start(&collected, lang)
         {
-            let (stmt, next_pos) = parse_paren_block(&collected, g, pos, lang)?;
+            let (stmt, next_pos) = parse_paren_block(&collected, g, pos, lang, policy)?;
             return Ok((stmt, next_pos));
         }
 
@@ -192,7 +194,7 @@ pub(super) fn parse_one_statement(
                 collected.pop();
             }
             LineBoundary::Split => {
-                let formatted = tokens_to_format(&collected, lang)?;
+                let formatted = tokens_to_format_with_policy(&collected, lang, policy)?;
                 return Ok((Statement::Line(formatted), pos));
             }
         }
@@ -209,7 +211,7 @@ pub(super) fn parse_one_statement(
     if collected.is_empty() {
         Ok((Statement::BlankLine, pos))
     } else {
-        let formatted = tokens_to_format(&collected, lang)?;
+        let formatted = tokens_to_format_with_policy(&collected, lang, policy)?;
         Ok((Statement::Line(formatted), pos))
     }
 }
@@ -245,11 +247,12 @@ fn parse_control_flow(
     first_brace: &proc_macro2::Group,
     brace_pos: usize,
     lang: MacroLang,
+    policy: MacroSpacingPolicy,
 ) -> Result<(Statement, usize), syn::Error> {
     let condition = tokens_to_format(condition_tokens, lang)?;
     let intent = classify_branch(condition_tokens, lang);
     let body_tokens: Vec<TokenTree> = first_brace.stream().into_iter().collect();
-    let body = parse_body(&body_tokens, lang)?;
+    let body = parse_body(&body_tokens, lang, policy)?;
 
     let mut branches = vec![Branch {
         condition,
@@ -283,7 +286,7 @@ fn parse_control_flow(
                     && g.delimiter() == Delimiter::Brace
                 {
                     let body_toks: Vec<TokenTree> = g.stream().into_iter().collect();
-                    let body = parse_body(&body_toks, lang)?;
+                    let body = parse_body(&body_toks, lang, policy)?;
 
                     let mut condition = if else_condition_tokens.is_empty() {
                         crate::ir::FormattedCode::new()
@@ -396,6 +399,7 @@ fn try_parse_meta_if(
     tokens: &[TokenTree],
     start: usize,
     lang: MacroLang,
+    policy: MacroSpacingPolicy,
 ) -> Result<Option<Recovered<Statement>>, syn::Error> {
     // Need at least 4 tokens: `$`, `if`, `(cond)`, `{ body }`
     if start + 3 >= tokens.len() {
@@ -411,7 +415,7 @@ fn try_parse_meta_if(
         return Ok(None);
     }
 
-    let parts = parse_if_components(tokens, start + 2, lang)?;
+    let parts = parse_if_components(tokens, start + 2, lang, policy)?;
 
     Ok(Some(Recovered {
         next_pos: parts.next_pos,
@@ -425,6 +429,7 @@ fn try_parse_meta_for(
     tokens: &[TokenTree],
     start: usize,
     lang: MacroLang,
+    policy: MacroSpacingPolicy,
 ) -> Result<Option<(Statement, usize)>, syn::Error> {
     // Need at least 4 tokens: `$`, `for`, `(pat in expr)`, `{ body }`
     if start + 3 >= tokens.len() {
@@ -441,7 +446,7 @@ fn try_parse_meta_for(
     }
 
     let (next_pos, pat, iter_expr, separator, body) =
-        parse_for_components(tokens, start + 2, lang)?;
+        parse_for_components(tokens, start + 2, lang, policy)?;
 
     Ok(Some((
         Statement::MetaFor {
@@ -650,9 +655,10 @@ fn handle_expression_brace_with_markers(
     prefix_tokens: &[TokenTree],
     brace_group: &proc_macro2::Group,
     lang: MacroLang,
+    policy: MacroSpacingPolicy,
 ) -> syn::Result<crate::ir::FormattedCode> {
     let body_tokens: Vec<TokenTree> = brace_group.stream().into_iter().collect();
-    let body_stmts = parse_body(&body_tokens, lang)?;
+    let body_stmts = parse_body(&body_tokens, lang, policy)?;
 
     let mut formatted = tokens_to_format(prefix_tokens, lang)?;
     formatted.push_argument(QuoteArg::ParsedBlock(body_stmts));
@@ -680,12 +686,13 @@ fn parse_paren_block(
     paren_group: &proc_macro2::Group,
     _paren_pos: usize,
     lang: MacroLang,
+    policy: MacroSpacingPolicy,
 ) -> Result<(Statement, usize), syn::Error> {
     let mut header = tokens_to_format(header_tokens, lang)?;
     header.format_mut().push_str(" (");
 
     let body_tokens: Vec<TokenTree> = paren_group.stream().into_iter().collect();
-    let body = parse_body(&body_tokens, lang)?;
+    let body = parse_body(&body_tokens, lang, policy)?;
 
     Ok((Statement::ParenBlock { header, body }, _paren_pos + 1))
 }

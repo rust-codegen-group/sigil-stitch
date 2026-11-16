@@ -60,7 +60,7 @@ coverage-lcov:
 # Generate LCOV output using nextest
 coverage-nextest:
     mkdir -p coverage
-    cargo llvm-cov nextest --lcov --output-path coverage/lcov.info
+    cargo llvm-cov nextest --workspace --lcov --output-path coverage/lcov.info
 
 # Measure standalone TypeName materialization without a timing gate
 bench-type-name-lowering:

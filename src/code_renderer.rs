@@ -4,7 +4,7 @@ mod pretty;
 mod tests;
 
 use crate::code_block::CodeBlock;
-use crate::code_node::{BlockIntent, CodeNode};
+use crate::code_node::{BlockIntent, CodeNode, LayoutBlock};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
 use crate::lang::RendererLang;
@@ -131,6 +131,11 @@ impl<'a> CodeRenderer<'a> {
                     self.walk_nodes(&block.nodes, adapter)?;
                     adapter.end_group()?;
                 }
+                CodeNode::Layout(layout) => {
+                    adapter.begin_layout(layout)?;
+                    self.walk_nodes(layout.nodes(), adapter)?;
+                    adapter.end_layout(layout)?;
+                }
                 CodeNode::Comment(text) => {
                     adapter.structured_text(&Self::resolve_comment(self.lang, text))?;
                 }
@@ -212,6 +217,8 @@ trait RenderAdapter {
     fn ensure_indent(&mut self) -> Result<(), SigilStitchError>;
     fn hard_break(&mut self) -> Result<(), SigilStitchError>;
     fn soft_break(&mut self) -> Result<(), SigilStitchError>;
+    fn begin_layout(&mut self, layout: &LayoutBlock) -> Result<(), SigilStitchError>;
+    fn end_layout(&mut self, layout: &LayoutBlock) -> Result<(), SigilStitchError>;
     fn indent(&mut self) -> Result<(), SigilStitchError>;
     fn dedent(&mut self) -> Result<(), SigilStitchError>;
     fn begin_group(&mut self, group: LayoutGroup) -> Result<(), SigilStitchError>;
@@ -250,6 +257,7 @@ fn contains_soft_break(nodes: &[CodeNode]) -> bool {
     nodes.iter().any(|node| match node {
         CodeNode::SoftBreak => true,
         CodeNode::Nested(block) => contains_soft_break(&block.nodes),
+        CodeNode::Layout(layout) => contains_soft_break(layout.nodes()),
         CodeNode::Sequence(children) => contains_soft_break(children),
         _ => false,
     })

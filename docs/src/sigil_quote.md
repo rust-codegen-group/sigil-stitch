@@ -1509,6 +1509,20 @@ Without `$+`, each source line becomes its own statement. For semicolon-based
 languages, `;` still takes priority as the statement terminator regardless of
 line breaks.
 
+## Python structured groups
+
+For `sigil_quote!(Python { ... })`, calls, subscripts, collections, comprehensions,
+type arguments, and parameter lists retain delimiter context until rendering. At a
+narrow width, comma-separated groups break consistently and continuation lines use
+one Python indentation unit. Keyword arguments and unannotated defaults use tight
+`name=value` spacing; ordinary assignments and annotated defaults retain their
+normal spaces. `$if` and `$for` bodies inherit the surrounding policy context.
+
+This is structured layout, not a general Python formatter. `$L` content, raw
+annotations, and other opaque fragments are never reparsed or reformatted. The
+shared macro walker keeps language-specific spacing policy private so adding another
+grammar-aware language does not add a language-specific scope to shared parser state.
+
 ## Multi-Language Support
 
 The same syntax works with any language type:
