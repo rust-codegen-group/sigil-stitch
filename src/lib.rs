@@ -88,6 +88,7 @@ pub mod float_value;
 pub mod import;
 /// Walks `CodeBlock` trees to extract all import references.
 pub mod import_collector;
+mod import_compatibility;
 /// Language abstraction trait and per-language implementations.
 pub mod lang;
 mod source_preparation;
