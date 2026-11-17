@@ -9,7 +9,6 @@ rust-version = "1.88.0"
 license = "MIT OR Apache-2.0"
 authors = ["Adam Cavendish"]
 repository = "https://github.com/rust-codegen-group/sigil-stitch"
-homepage = "https://github.com/rust-codegen-group/sigil-stitch"
 
 [package]
 name = "sigil-stitch"
@@ -19,7 +18,6 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-homepage.workspace = true
 description = "Type-safe, import-aware, width-aware code generation for multiple languages"
 readme = "README.md"
 keywords = ["codegen", "code-generation", "pretty-printing", "multi-language", "builder"]
