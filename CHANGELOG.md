@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.7.6
+
+### Added
+
+- Bit-exact floating values through `FloatValue::Binary32` and
+  `FloatValue::Binary64`, accepted by `%L`, `$L`, and template `L`. Target
+  construction is deferred until a language is selected; Rust emits exact
+  values, while unsupported targets reject the request instead of rounding or
+  widening.
+- Structured Python layout for `sigil_quote!(Python { ... })` calls,
+  collections, comprehensions, type arguments, decorators and control headers.
+  Broken groups receive legal continuation indentation, keyword arguments and
+  unannotated defaults use contextual `name=value` spacing, and opaque `$L` and
+  `$C` content stays unformatted. Python type-name and declaration lowerers use
+  the same structured layout carrier.
+
+### Fixed
+
+- Macro string diagnostics now point at the source-literal inputs instead of
+  generated helpers, preserving call-site name resolution, evaluation order and
+  helper hygiene.
+
+### Changed
+
+- `CodeRenderer::render` and source preparation take shared borrows. Renderer
+  configuration is reused across file blocks while every render call keeps its
+  own adapter lifecycle.
+- File materialization, source preparation, import collection and final
+  rendering now sit behind a crate-private render plan; `FileSpec` remains the
+  validation and alias-resolution entry point.
+- The frozen 0.6.8 infallible import resolver now lives in a crate-private
+  compatibility module. The deprecated `ImportGroup::resolve` and
+  `resolve_with_explicit` methods forward to it with unchanged behavior.
+- Book examples run through the Cargo doctest harness.
+- The semver check now verifies the 0.7.5 to 0.7.6 patch boundary against the
+  published 0.7.5 baseline, with no approved breaking API changes.
+
 ## 0.7.5
 
 ### Added
