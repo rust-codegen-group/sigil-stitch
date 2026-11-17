@@ -341,20 +341,7 @@ impl ImportGroup {
     /// Preferred aliases from `TypeName::with_alias()` take precedence.
     #[deprecated(note = "legacy 0.6.8 infallible resolver; use ImportGroup::try_resolve in 0.7")]
     pub fn resolve(refs: &[ImportRef]) -> Self {
-        let mut entries = Vec::new();
-        let mut claimed: std::collections::HashMap<String, String> =
-            std::collections::HashMap::new();
-        let mut seen: std::collections::HashSet<(String, String)> =
-            std::collections::HashSet::new();
-
-        for import_ref in refs {
-            resolve_ref(import_ref, &mut claimed, &mut seen, &mut entries);
-        }
-
-        Self {
-            entries,
-            ..Self::default()
-        }
+        crate::import_compatibility::resolve(refs)
     }
 
     /// Resolve import references, merging with explicit (user-specified) entries.
@@ -363,42 +350,7 @@ impl ImportGroup {
     /// precedence over auto-generated aliases from conflict resolution.
     #[deprecated(note = "legacy 0.6.8 infallible resolver; use ImportGroup::try_resolve in 0.7")]
     pub fn resolve_with_explicit(refs: &[ImportRef], explicit: Vec<ImportEntry>) -> Self {
-        let mut entries = Vec::new();
-        let mut claimed: std::collections::HashMap<String, String> =
-            std::collections::HashMap::new();
-        let mut seen: std::collections::HashSet<(String, String)> =
-            std::collections::HashSet::new();
-
-        // Process explicit entries first — they take precedence.
-        for entry in explicit {
-            if entry.is_side_effect || entry.is_wildcard {
-                entries.push(entry);
-                continue;
-            }
-
-            let key = (entry.module.clone(), entry.name.clone());
-            seen.insert(key);
-
-            // Claim the resolved name (alias or name).
-            let resolved = entry.alias.as_deref().unwrap_or(&entry.name);
-            claimed.insert(resolved.to_string(), entry.module.clone());
-            // Also claim the original name to prevent auto-imports from taking it.
-            if entry.alias.is_some() {
-                claimed.insert(entry.name.clone(), entry.module.clone());
-            }
-
-            entries.push(entry);
-        }
-
-        // Then process auto-collected refs.
-        for import_ref in refs {
-            resolve_ref(import_ref, &mut claimed, &mut seen, &mut entries);
-        }
-
-        Self {
-            entries,
-            ..Self::default()
-        }
+        crate::import_compatibility::resolve_with_explicit(refs, explicit)
     }
 
     /// Look up the resolved name for a given (module, name) pair.
@@ -699,57 +651,10 @@ fn validate_import_text(value: &str, subject: &str) -> Result<(), SigilStitchErr
     Ok(())
 }
 
-/// Process a single import reference: dedup, detect conflicts, assign aliases.
-fn resolve_ref(
-    import_ref: &ImportRef,
-    claimed: &mut std::collections::HashMap<String, String>,
-    seen: &mut std::collections::HashSet<(String, String)>,
-    entries: &mut Vec<ImportEntry>,
-) {
-    let key = (import_ref.module.clone(), import_ref.name.clone());
-    if seen.contains(&key) {
-        return;
-    }
-    seen.insert(key);
-
-    let alias = if let Some(preferred) = &import_ref.alias {
-        // User explicitly requested this alias via with_alias().
-        claimed.insert(preferred.clone(), import_ref.module.clone());
-        claimed
-            .entry(import_ref.name.clone())
-            .or_insert_with(|| import_ref.module.clone());
-        Some(preferred.clone())
-    } else if let Some(existing_module) = claimed.get(&import_ref.name) {
-        if *existing_module == import_ref.module {
-            // Same module, same name, already claimed. No alias needed.
-            None
-        } else {
-            // Conflict: another module already claimed this simple name.
-            let module_prefix = module_to_prefix(&import_ref.module);
-            let auto_alias = format!("{}{}", module_prefix, import_ref.name);
-            claimed.insert(auto_alias.clone(), import_ref.module.clone());
-            Some(auto_alias)
-        }
-    } else {
-        // First to claim this simple name.
-        claimed.insert(import_ref.name.clone(), import_ref.module.clone());
-        None
-    };
-
-    entries.push(ImportEntry {
-        module: import_ref.module.clone(),
-        name: import_ref.name.clone(),
-        alias,
-        is_type_only: import_ref.is_type_only,
-        is_side_effect: false,
-        is_wildcard: false,
-    });
-}
-
 /// Convert a module path to a CamelCase prefix for aliasing.
 /// "./models" -> "Models", "std::collections" -> "Collections",
 /// "github.com/foo/bar" -> "Bar"
-fn module_to_prefix(module: &str) -> String {
+pub(crate) fn module_to_prefix(module: &str) -> String {
     let last_segment = module
         .rsplit(['/', ':', '.'])
         .find(|s| !s.is_empty())
@@ -835,82 +740,6 @@ mod tests {
     }
 
     #[test]
-    fn test_dedup_same_module() {
-        let refs = vec![
-            ImportRef {
-                module: "./models".into(),
-                name: "User".into(),
-                is_type_only: true,
-                alias: None,
-            },
-            ImportRef {
-                module: "./models".into(),
-                name: "User".into(),
-                is_type_only: true,
-                alias: None,
-            },
-        ];
-        let group = ImportGroup::resolve(&refs);
-        assert_eq!(group.entries().len(), 1);
-        assert_eq!(group.entries()[0].name, "User");
-        assert!(group.entries()[0].alias.is_none());
-    }
-
-    #[test]
-    fn test_conflict_different_modules() {
-        let refs = vec![
-            ImportRef {
-                module: "./models".into(),
-                name: "User".into(),
-                is_type_only: true,
-                alias: None,
-            },
-            ImportRef {
-                module: "./other".into(),
-                name: "User".into(),
-                is_type_only: true,
-                alias: None,
-            },
-        ];
-        let group = ImportGroup::resolve(&refs);
-        assert_eq!(group.entries().len(), 2);
-        // First wins simple name.
-        assert!(group.entries()[0].alias.is_none());
-        assert_eq!(group.entries()[0].name, "User");
-        // Second gets alias.
-        assert_eq!(group.entries()[1].alias.as_deref(), Some("OtherUser"));
-    }
-
-    #[test]
-    fn test_resolved_name_lookup() {
-        let refs = vec![
-            ImportRef {
-                module: "./models".into(),
-                name: "User".into(),
-                is_type_only: true,
-                alias: None,
-            },
-            ImportRef {
-                module: "./other".into(),
-                name: "User".into(),
-                is_type_only: true,
-                alias: None,
-            },
-        ];
-        let group = ImportGroup::resolve(&refs);
-        assert_eq!(group.resolved_name("./models", "User"), Some("User"));
-        assert_eq!(group.resolved_name("./other", "User"), Some("OtherUser"));
-    }
-
-    #[test]
-    fn test_module_to_prefix() {
-        assert_eq!(module_to_prefix("./models"), "Models");
-        assert_eq!(module_to_prefix("std::collections"), "Collections");
-        assert_eq!(module_to_prefix("github.com/foo/bar"), "Bar");
-        assert_eq!(module_to_prefix("net/http"), "Http");
-    }
-
-    #[test]
     fn test_validate_module_path() {
         assert!(validate_module_path("./models").is_ok());
         assert!(validate_module_path("std::collections").is_ok());
@@ -920,60 +749,6 @@ mod tests {
         assert!(validate_module_path("foo\0bar").is_err());
         assert!(validate_module_path("foo\tbar").is_err());
         assert!(validate_module_path("foo\u{2028}bar").is_err());
-    }
-
-    #[test]
-    fn test_preferred_alias_from_ref() {
-        let refs = vec![ImportRef {
-            module: "./models".into(),
-            name: "User".into(),
-            is_type_only: false,
-            alias: Some("MyUser".into()),
-        }];
-        let group = ImportGroup::resolve(&refs);
-        assert_eq!(group.entries().len(), 1);
-        assert_eq!(group.entries()[0].alias.as_deref(), Some("MyUser"));
-        assert_eq!(group.resolved_name("./models", "User"), Some("MyUser"));
-    }
-
-    #[test]
-    fn test_preferred_alias_with_conflict() {
-        // First import has a preferred alias, second import (same name, different module)
-        // should still get auto-aliased since the first claimed its alias, not the simple name.
-        let refs = vec![
-            ImportRef {
-                module: "./models".into(),
-                name: "User".into(),
-                is_type_only: false,
-                alias: Some("ModelUser".into()),
-            },
-            ImportRef {
-                module: "./other".into(),
-                name: "User".into(),
-                is_type_only: false,
-                alias: None,
-            },
-        ];
-        let group = ImportGroup::resolve(&refs);
-        assert_eq!(group.entries().len(), 2);
-        // First gets its preferred alias.
-        assert_eq!(group.entries()[0].alias.as_deref(), Some("ModelUser"));
-        // Second: "User" name is claimed by ./models, so it gets auto-aliased.
-        assert!(group.entries()[1].alias.is_some());
-    }
-
-    #[test]
-    fn test_preferred_alias_in_resolve_with_explicit() {
-        let refs = vec![ImportRef {
-            module: "./models".into(),
-            name: "User".into(),
-            is_type_only: false,
-            alias: Some("MyUser".into()),
-        }];
-        let group = ImportGroup::resolve_with_explicit(&refs, vec![]);
-        assert_eq!(group.entries().len(), 1);
-        assert_eq!(group.entries()[0].alias.as_deref(), Some("MyUser"));
-        assert_eq!(group.resolved_name("./models", "User"), Some("MyUser"));
     }
 
     #[test]
