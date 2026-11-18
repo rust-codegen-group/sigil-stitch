@@ -1,5 +1,4 @@
 if x > 0:
-    return 'positive'
+    return "positive"
 else:
-    return 'negative'
-
+    return "negative"

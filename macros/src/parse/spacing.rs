@@ -61,6 +61,7 @@ pub(super) enum MacroSpacingPolicy {
 pub(super) struct PythonContext {
     role: PythonGroupRole,
     layout: bool,
+    comprehension_target: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,6 +88,7 @@ impl MacroSpacingPolicy {
             Self::Python(PythonContext {
                 role: PythonGroupRole::Statement,
                 layout: false,
+                comprehension_target: false,
             })
         } else {
             Self::Generic
@@ -161,6 +163,7 @@ impl MacroSpacingPolicy {
         Self::Python(PythonContext {
             role,
             layout: parent.layout,
+            comprehension_target: false,
         })
     }
 
@@ -200,7 +203,17 @@ impl MacroSpacingPolicy {
                 Self::Python(PythonContext {
                     role: PythonGroupRole::LambdaParameters,
                     layout: context.layout,
+                    comprehension_target: context.comprehension_target,
                 })
+            }
+            Self::Python(context) if context.role == PythonGroupRole::Comprehension => {
+                let mut context = context;
+                if ident == "for" {
+                    context.comprehension_target = true;
+                } else if ident == "in" {
+                    context.comprehension_target = false;
+                }
+                Self::Python(context)
             }
             _ => self,
         }
@@ -214,6 +227,7 @@ impl MacroSpacingPolicy {
                 Self::Python(PythonContext {
                     role: PythonGroupRole::Statement,
                     layout: context.layout,
+                    comprehension_target: context.comprehension_target,
                 })
             }
             _ => self,
@@ -221,7 +235,14 @@ impl MacroSpacingPolicy {
     }
 
     pub(super) fn break_after_comma(self) -> bool {
-        matches!(self, Self::Python(PythonContext { layout: true, .. }))
+        matches!(
+            self,
+            Self::Python(PythonContext {
+                layout: true,
+                comprehension_target: false,
+                ..
+            })
+        )
     }
 
     pub(super) fn is_dict_group(self) -> bool {
@@ -229,6 +250,36 @@ impl MacroSpacingPolicy {
             self,
             Self::Python(PythonContext {
                 role: PythonGroupRole::Dict,
+                ..
+            })
+        )
+    }
+
+    pub(super) fn break_before_comprehension_clause(self, ident: &str) -> bool {
+        matches!(
+            self,
+            Self::Python(PythonContext {
+                role: PythonGroupRole::Comprehension,
+                layout: true,
+                ..
+            }) if matches!(ident, "for" | "if")
+        )
+    }
+
+    pub(super) fn needs_trailing_comma(self) -> bool {
+        matches!(
+            self,
+            Self::Python(PythonContext {
+                role: PythonGroupRole::CallArguments
+                    | PythonGroupRole::FunctionParameters
+                    | PythonGroupRole::LambdaParameters
+                    | PythonGroupRole::TypeArguments
+                    | PythonGroupRole::List
+                    | PythonGroupRole::Tuple
+                    | PythonGroupRole::Dict
+                    | PythonGroupRole::Set
+                    | PythonGroupRole::Subscript
+                    | PythonGroupRole::Decorator,
                 ..
             })
         )
@@ -249,6 +300,8 @@ impl MacroSpacingPolicy {
         Some(LayoutSpec {
             consistent: true,
             empty_flat_break: false,
+            edge_breaks: true,
+            trailing_comma: self.needs_trailing_comma() && python_contains_punct(inner, ','),
             flat_prefix: String::new(),
             flat_suffix: close.to_string(),
             broken_prefix: String::new(),

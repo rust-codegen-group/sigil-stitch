@@ -1040,7 +1040,10 @@ fn expected_type_name(language: &str, kind: TypeNameExampleKind) -> ExpectedType
         Raw => Output("TargetSpecific"),
         StringLiteral => output_for(
             language,
-            &[("python", "Literal['active']"), ("typescript", "'active'")],
+            &[
+                ("python", "Literal[\"active\"]"),
+                ("typescript", "'active'"),
+            ],
         ),
         IntegerLiteral => output_for(
             language,

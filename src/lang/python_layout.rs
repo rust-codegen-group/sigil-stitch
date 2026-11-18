@@ -7,11 +7,11 @@
 use crate::code_block::CodeBlock;
 use crate::code_node::{CodeNode, LayoutBlock, LayoutBreakMode};
 
-/// Build one Python delimiter group with a consistent item-break decision.
+/// Build a Python delimiter group with Ruff-compatible edge and item breaks.
 ///
-/// The continuation depth applies only to broken soft breaks. Flat output does
-/// not acquire leading indentation, and nested item layouts retain their own
-/// semantic structure.
+/// The inner group owns comma/item breaks while the outer group owns the
+/// opening/closing edge breaks. Keeping those decisions in separate layout
+/// groups lets an outer call break before a fitting nested generic.
 pub(crate) fn delimited(
     open: &str,
     items: Vec<CodeBlock>,
@@ -30,29 +30,25 @@ pub(crate) fn delimited(
     }
 
     let item_count = items.len();
-    let mut nodes = Vec::new();
+    if item_count == 1 {
+        let item = items.into_iter().next().expect("singleton item exists");
+        let mut inner_nodes = Vec::new();
+        inner_nodes.extend(item.nodes);
+        return edge_group(open, close, flat_break, false, inner_nodes);
+    }
+
+    let mut inner_nodes = Vec::new();
     for (index, item) in items.into_iter().enumerate() {
         if index > 0 {
-            if index == 1 {
-                nodes.push(CodeNode::Indent);
-            }
-            nodes.push(CodeNode::SoftBreak);
+            inner_nodes.push(CodeNode::SoftBreak);
         }
-        nodes.extend(item.nodes);
+        inner_nodes.extend(item.nodes);
         if index + 1 < item_count {
-            nodes.push(CodeNode::Literal(",".to_string()));
+            inner_nodes.push(CodeNode::Literal(",".to_string()));
         }
     }
 
-    if item_count > 1 {
-        nodes.push(CodeNode::Dedent);
-    }
-
-    CodeBlock {
-        nodes: vec![CodeNode::Layout(LayoutBlock::consistent(
-            flat_break, open, close, open, close, nodes,
-        ))],
-    }
+    edge_group(open, close, flat_break, item_count > 0, inner_nodes)
 }
 
 /// Build a Python type or expression infix list. A root broken list receives
@@ -62,27 +58,72 @@ pub(crate) fn infix(items: Vec<CodeBlock>, separator: &str) -> CodeBlock {
     let mut nodes = Vec::new();
     for (index, item) in items.into_iter().enumerate() {
         if index > 0 {
-            if index == 1 {
-                nodes.push(CodeNode::Indent);
-            }
             nodes.push(CodeNode::SoftBreak);
             nodes.push(CodeNode::Literal(separator.trim_start().to_string()));
         }
         nodes.extend(item.nodes);
     }
-    if item_count > 1 {
-        nodes.push(CodeNode::Dedent);
+
+    if item_count == 0 {
+        return CodeBlock { nodes: Vec::new() };
     }
 
+    edge_group_with_prefixes("", "", "(", ")", LayoutBreakMode::Space, false, nodes)
+}
+
+fn edge_group(
+    open: &str,
+    close: &str,
+    inner_break: LayoutBreakMode,
+    trailing_comma: bool,
+    inner_nodes: Vec<CodeNode>,
+) -> CodeBlock {
+    edge_group_with_prefixes(
+        open,
+        close,
+        open,
+        close,
+        inner_break,
+        trailing_comma,
+        inner_nodes,
+    )
+}
+
+fn edge_group_with_prefixes(
+    flat_prefix: &str,
+    flat_suffix: &str,
+    broken_prefix: &str,
+    broken_suffix: &str,
+    inner_break: LayoutBreakMode,
+    trailing_comma: bool,
+    inner_nodes: Vec<CodeNode>,
+) -> CodeBlock {
+    let child_layout = CodeNode::Layout(LayoutBlock::consistent(
+        inner_break,
+        "",
+        "",
+        "",
+        "",
+        inner_nodes,
+    ));
+    let edge_nodes = vec![
+        CodeNode::Indent,
+        CodeNode::SoftBreak,
+        child_layout,
+        CodeNode::Dedent,
+        CodeNode::SoftBreak,
+    ];
+    let layout = LayoutBlock::consistent(
+        LayoutBreakMode::Empty,
+        flat_prefix,
+        flat_suffix,
+        broken_prefix,
+        broken_suffix,
+        edge_nodes,
+    )
+    .with_trailing_comma(trailing_comma);
     CodeBlock {
-        nodes: vec![CodeNode::Layout(LayoutBlock::consistent(
-            LayoutBreakMode::Space,
-            "",
-            "",
-            "(",
-            ")",
-            nodes,
-        ))],
+        nodes: vec![CodeNode::Layout(layout)],
     }
 }
 

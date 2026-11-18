@@ -142,13 +142,23 @@ impl RenderAdapter for PrettyAdapter {
 
     fn soft_break(&mut self) -> Result<(), SigilStitchError> {
         self.flush_soft_break(false)?;
-        let (layout, break_mode, conditional_indent) = self
+        let (layout, break_mode) = self
             .docs
             .last()
-            .map(|group| (group.layout, group.break_mode, group.conditional_indent))
+            .map(|group| (group.layout, group.break_mode))
             .ok_or_else(|| SigilStitchError::Render {
                 context: "CodeRenderer pretty groups".to_string(),
                 message: "missing document group".to_string(),
+            })?;
+        let conditional_indent = self
+            .docs
+            .iter()
+            .try_fold(0usize, |depth, group| {
+                depth.checked_add(group.conditional_indent)
+            })
+            .ok_or_else(|| SigilStitchError::Render {
+                context: "CodeRenderer pretty indentation".to_string(),
+                message: "indent depth overflow".to_string(),
             })?;
         let depth = self
             .indent_depth
@@ -277,7 +287,10 @@ impl RenderAdapter for PrettyAdapter {
                 message: "unbalanced layout indentation scope".to_string(),
             });
         }
-        self.flush_soft_break(false)?;
+        if layout.trailing_comma() {
+            self.append_doc(BoxDoc::text(",").flat_alt(BoxDoc::nil()))?;
+        }
+        self.flush_soft_break(true)?;
         self.append_doc(
             BoxDoc::text(layout.broken_suffix().to_string())
                 .flat_alt(BoxDoc::text(layout.flat_suffix().to_string())),

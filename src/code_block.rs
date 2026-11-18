@@ -366,6 +366,39 @@ impl CodeBlock {
         broken_prefix: &str,
         broken_suffix: &str,
     ) -> Self {
+        Self::__sigil_layout_with_edges(
+            children,
+            consistent,
+            empty_flat_break,
+            false,
+            false,
+            flat_prefix,
+            flat_suffix,
+            broken_prefix,
+            broken_suffix,
+        )
+    }
+
+    /// Wrap a nested block in a layout carrier with optional delimiter edge
+    /// breaks. Edge breaks stay empty in flat output but become indented lines
+    /// when the group breaks; the nested child layout keeps comma breaks in its
+    /// own group so fitting inner types remain flat.
+    #[doc(hidden)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "hidden macro ABI keeps layout recipe fields explicit"
+    )]
+    pub fn __sigil_layout_with_edges(
+        children: Self,
+        consistent: bool,
+        empty_flat_break: bool,
+        edge_breaks: bool,
+        trailing_comma: bool,
+        flat_prefix: &str,
+        flat_suffix: &str,
+        broken_prefix: &str,
+        broken_suffix: &str,
+    ) -> Self {
         let group_mode = if consistent {
             crate::code_node::LayoutGroupMode::Consistent
         } else {
@@ -376,20 +409,61 @@ impl CodeBlock {
         } else {
             crate::code_node::LayoutBreakMode::Space
         };
-        let mut scoped_nodes = Vec::with_capacity(children.nodes.len() + 2);
-        scoped_nodes.push(CodeNode::Indent);
-        scoped_nodes.extend(children.nodes);
-        scoped_nodes.push(CodeNode::Dedent);
+        let mut child_nodes = children.nodes;
+        if !edge_breaks {
+            let mut scoped_nodes = Vec::with_capacity(child_nodes.len() + 2);
+            scoped_nodes.push(CodeNode::Indent);
+            scoped_nodes.append(&mut child_nodes);
+            scoped_nodes.push(CodeNode::Dedent);
+            child_nodes = scoped_nodes;
+        }
+
+        if !edge_breaks {
+            return Self {
+                nodes: vec![CodeNode::Layout(
+                    crate::code_node::LayoutBlock::new(
+                        group_mode,
+                        break_mode,
+                        flat_prefix,
+                        flat_suffix,
+                        broken_prefix,
+                        broken_suffix,
+                        child_nodes,
+                    )
+                    .with_trailing_comma(trailing_comma),
+                )],
+            };
+        }
+
+        let child_layout = CodeNode::Layout(crate::code_node::LayoutBlock::new(
+            group_mode,
+            break_mode,
+            "",
+            "",
+            "",
+            "",
+            child_nodes,
+        ));
+        let edge_nodes = vec![
+            CodeNode::Indent,
+            CodeNode::SoftBreak,
+            child_layout,
+            CodeNode::Dedent,
+            CodeNode::SoftBreak,
+        ];
         Self {
-            nodes: vec![CodeNode::Layout(crate::code_node::LayoutBlock::new(
-                group_mode,
-                break_mode,
-                flat_prefix,
-                flat_suffix,
-                broken_prefix,
-                broken_suffix,
-                scoped_nodes,
-            ))],
+            nodes: vec![CodeNode::Layout(
+                crate::code_node::LayoutBlock::new(
+                    crate::code_node::LayoutGroupMode::Consistent,
+                    crate::code_node::LayoutBreakMode::Empty,
+                    flat_prefix,
+                    flat_suffix,
+                    broken_prefix,
+                    broken_suffix,
+                    edge_nodes,
+                )
+                .with_trailing_comma(trailing_comma),
+            )],
         }
     }
 

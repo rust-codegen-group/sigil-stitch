@@ -508,6 +508,10 @@ fn tokens_to_format_inner(
                 } else {
                     PrevTokenKind::Ident
                 };
+                if policy.break_before_comprehension_clause(&s) {
+                    formatted.push_marker(NoArgMarker::SoftBreak);
+                    state.prev = PrevTokenKind::SoftBreak;
+                }
                 maybe_space(formatted.format_mut(), state, kind, annotation);
                 formatted.format_mut().push_str(&s.replace('%', "%%"));
                 state.prev = kind;
@@ -652,7 +656,7 @@ fn tokens_to_format_inner(
                 }
 
                 let inner: Vec<TokenTree> = g.stream().into_iter().collect();
-                if let Some(layout_spec) = policy.layout_spec(g, &inner, close) {
+                if let Some(layout_spec) = group_policy.layout_spec(g, &inner, close) {
                     let inner_formatted =
                         tokens_to_format_with_policy_and_layout(&inner, lang, group_policy)?;
                     formatted.push_layout(inner_formatted, layout_spec);

@@ -1,5 +1,6 @@
 class UserService:
     """Service for managing users."""
+
     _repo: UserRepository
 
     def get_user(self, user_id: str) -> User:

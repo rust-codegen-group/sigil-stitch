@@ -189,6 +189,7 @@ pub struct LayoutBlock {
 pub(crate) struct LayoutRecipe {
     group_mode: LayoutGroupMode,
     break_mode: LayoutBreakMode,
+    trailing_comma: bool,
     flat_prefix: String,
     flat_suffix: String,
     broken_prefix: String,
@@ -219,6 +220,7 @@ impl LayoutRecipe {
         Self {
             group_mode,
             break_mode,
+            trailing_comma: false,
             flat_prefix: flat_prefix.into(),
             flat_suffix: flat_suffix.into(),
             broken_prefix: broken_prefix.into(),
@@ -267,6 +269,15 @@ impl LayoutBlock {
             broken_suffix,
             nodes,
         )
+    }
+
+    pub(crate) fn with_trailing_comma(mut self, trailing_comma: bool) -> Self {
+        self.recipe.trailing_comma = trailing_comma;
+        self
+    }
+
+    pub(crate) fn trailing_comma(&self) -> bool {
+        self.recipe.trailing_comma
     }
 
     pub(crate) fn group_mode(&self) -> LayoutGroupMode {

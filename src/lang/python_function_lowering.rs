@@ -64,6 +64,14 @@ pub(crate) fn lower(
         signature.push_type(return_type);
     }
     signature.push_literal(":");
+    let inline_ellipsis =
+        function.body().is_none() && function.doc().is_empty() && function.delegation().is_none();
+    if inline_ellipsis {
+        signature.push_literal(" ...");
+        signature.append_to(&mut block);
+        block.add_line();
+        return block.build();
+    }
     signature.append_to(&mut block);
     block.add_line();
     block.add("%>", ());

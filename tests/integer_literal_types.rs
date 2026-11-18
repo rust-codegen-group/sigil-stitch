@@ -402,9 +402,9 @@ fn python_integer_and_mixed_unions_keep_order_duplicates_and_recursive_compositi
     for width in [8, 240] {
         let output = render_type(value.clone(), &Python::new(), false, width).unwrap();
         let expected = if width <= 8 {
-            "(Literal[200]|(Literal[201]|Literal['error'])|Literal[200])"
+            "(Literal[200]|(Literal[201]|Literal[\"error\"])|Literal[200])"
         } else {
-            "Literal[200]|Literal[201]|Literal['error']|Literal[200]"
+            "Literal[200]|Literal[201]|Literal[\"error\"]|Literal[200]"
         };
         assert_eq!(output.split_whitespace().collect::<String>(), expected);
     }

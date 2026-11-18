@@ -68,6 +68,6 @@ fn assert_rendered_handles_code_fragment_composition() {
     assert_rendered!(
         Python::new(),
         block,
-        "def choose(enabled: bool, value: str) -> str:\n    if enabled:\n        return value\n    return \"fallback\"\n\n",
+        "def choose(enabled: bool, value: str) -> str:\n    if enabled:\n        return value\n    return \"fallback\"\n",
     );
 }

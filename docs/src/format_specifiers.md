@@ -102,7 +102,8 @@ Emits a language-aware quoted string. The
 `RendererLang::render_string_literal()` method on each language controls the
 quoting style and escape rules. TypeScript and JavaScript default to single
 quotes; Rust, Java, Go, C, C++, Swift, and Kotlin use double quotes; Dart uses
-single quotes; Python uses single quotes.
+single quotes; Python prefers double quotes but chooses the quote requiring fewer
+escapes by default (single-quote mode remains explicit).
 
 Requires the `StringLitArg` wrapper.
 

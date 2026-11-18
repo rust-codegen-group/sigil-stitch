@@ -42,8 +42,8 @@ fn test_inline_for_inside_parens_py() {
     .unwrap();
     let output = render_py(&block);
     assert!(output.contains("x = ["), "got: {output}");
-    assert!(output.contains("'a'"), "got: {output}");
-    assert!(output.contains("'b'"), "got: {output}");
+    assert!(output.contains("\"a\""), "got: {output}");
+    assert!(output.contains("\"b\""), "got: {output}");
     // No stray colon from block delimiters
     assert!(
         !output.contains(": ["),
@@ -493,7 +493,7 @@ fn test_inline_for_python_list_exact() {
     })
     .unwrap();
     let output = render_py(&block);
-    assert_eq!(output, "x = ['a','b',]\n");
+    assert_eq!(output, "x = [\"a\",\"b\",]\n");
 }
 
 #[test]

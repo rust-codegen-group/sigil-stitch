@@ -974,6 +974,18 @@ pub trait CodeLang: RendererLang {
         String::new()
     }
 
+    /// Separator inserted between complete top-level member blocks during
+    /// file assembly. The default preserves the existing one-newline gap.
+    fn top_level_member_separator(&self) -> &str {
+        "\n"
+    }
+
+    /// Whether file assembly should collapse trailing blank lines to one final
+    /// newline. The default preserves existing file output behavior.
+    fn trim_trailing_blank_lines(&self) -> bool {
+        false
+    }
+
     /// Render a doc comment block.
     ///
     /// Default: wraps each line with `line_comment_prefix()` and

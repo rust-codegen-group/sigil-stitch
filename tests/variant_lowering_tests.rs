@@ -473,7 +473,7 @@ fn php_and_python_lower_documented_and_explicit_enum_members() {
     let python = render_type(&python, &sigil_stitch::lang::python::Python::new());
     assert!(python.contains("# Ready docs\n    #"), "{python}");
     assert!(python.contains("Ready = 1"), "{python}");
-    assert!(python.contains("Pending = 'Pending'"), "{python}");
+    assert!(python.contains("Pending = \"Pending\""), "{python}");
 }
 
 #[test]
