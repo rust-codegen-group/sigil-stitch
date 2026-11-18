@@ -62,8 +62,9 @@ use crate::type_name::{AssociatedTypeStyle, FunctionPresentation, TypeName, Type
 pub struct Python {
     /// Indent with this string (default: "    " — 4 spaces per PEP 8).
     pub indent: String,
-    /// Quote style for string literals. Python accepts both; `Single` is the
-    /// community default (Black defaults to `Double`).
+    /// Quote style for string literals. Python accepts both; `Double` is the
+    /// Ruff-compatible default preference and chooses the quote requiring fewer
+    /// escapes, while `Single` remains available explicitly.
     #[deprecated(
         note = "legacy 0.6.8 field; use Python::with_single_quotes() or Python::with_double_quotes()"
     )]
@@ -87,7 +88,7 @@ impl Default for Python {
     fn default() -> Self {
         Self {
             indent: "    ".to_string(),
-            quote_style: QuoteStyle::Single,
+            quote_style: QuoteStyle::Double,
             extension: "py".to_string(),
         }
     }
@@ -136,10 +137,18 @@ impl Python {
     }
 
     #[expect(deprecated, reason = "0.6.8 quote compatibility bridge")]
-    fn quote_char(&self) -> char {
+    fn quote_char_for(&self, value: &str) -> char {
         match self.quote_style {
             QuoteStyle::Single => '\'',
-            QuoteStyle::Double => '"',
+            QuoteStyle::Double => {
+                let single_quotes = value.chars().filter(|&character| character == '\'').count();
+                let double_quotes = value.chars().filter(|&character| character == '"').count();
+                if double_quotes > single_quotes {
+                    '\''
+                } else {
+                    '"'
+                }
+            }
         }
     }
 }
@@ -271,7 +280,7 @@ impl RendererLang for Python {
     }
 
     fn render_string_literal(&self, s: &str) -> String {
-        let quote = self.quote_char();
+        let quote = self.quote_char_for(s);
         let mut escaped = String::with_capacity(s.len() + 2);
         escaped.push(quote);
         for ch in s.chars() {
@@ -300,8 +309,22 @@ impl RendererLang for Python {
     }
 
     fn render_verbatim_string(&self, s: &str) -> String {
-        let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
-        format!("f\"{escaped}\"")
+        let quote = self.quote_char_for(s);
+        let mut escaped = String::with_capacity(s.len() + 3);
+        escaped.push('f');
+        escaped.push(quote);
+        for character in s.chars() {
+            match character {
+                '\\' => escaped.push_str("\\\\"),
+                value if value == quote => {
+                    escaped.push('\\');
+                    escaped.push(value);
+                }
+                value => escaped.push(value),
+            }
+        }
+        escaped.push(quote);
+        escaped
     }
 
     fn line_comment_prefix(&self) -> &str {
@@ -743,6 +766,14 @@ impl CodeLang for Python {
         lines.join("\n")
     }
 
+    fn top_level_member_separator(&self) -> &str {
+        "\n\n"
+    }
+
+    fn trim_trailing_blank_lines(&self) -> bool {
+        true
+    }
+
     fn render_doc_comment(&self, lines: &[&str]) -> String {
         if lines.len() == 1 {
             format!("\"\"\"{}\"\"\"", lines[0])
@@ -969,8 +1000,8 @@ mod tests {
     #[test]
     fn test_string_literal() {
         let py = Python::new();
-        assert_eq!(py.render_string_literal("hello"), "'hello'");
-        assert_eq!(py.render_string_literal("it's"), "'it\\'s'");
+        assert_eq!(py.render_string_literal("hello"), "\"hello\"");
+        assert_eq!(py.render_string_literal("it's"), "\"it's\"");
     }
 
     #[test]
@@ -990,6 +1021,10 @@ mod tests {
             convenience.render_string_literal(input)
         );
         assert_eq!(
+            Python::new().render_string_literal(input),
+            convenience.render_string_literal(input)
+        );
+        assert_ne!(
             Python::new()
                 .with_single_quotes()
                 .render_string_literal(input),
@@ -1000,14 +1035,14 @@ mod tests {
     #[test]
     fn string_literals_escape_source_controls_without_rewriting_unicode() {
         let py = Python::new();
-        assert_eq!(py.render_string_literal(""), "''");
+        assert_eq!(py.render_string_literal(""), "\"\"");
         assert_eq!(
             py.render_string_literal("\0\u{0001}\u{0008}\t\n\u{000B}\u{000C}\r\u{001F}\u{007F}\u{0085}\u{2028}\u{2029}雪😀"),
-            "'\\x00\\x01\\b\\t\\n\\x0B\\f\\r\\x1F\\x7F\\x85\\u2028\\u2029雪😀'"
+            "\"\\x00\\x01\\b\\t\\n\\x0B\\f\\r\\x1F\\x7F\\x85\\u2028\\u2029雪😀\""
         );
         assert_eq!(
             py.render_string_literal("\0\u{0037}\u{0001}A$#{value}"),
-            "'\\x007\\x01A$#{value}'"
+            "\"\\x007\\x01A$#{value}\""
         );
         assert_eq!(
             Python::new()
@@ -1029,21 +1064,21 @@ mod tests {
 
         assert_eq!(
             render(TypeName::string_literal("a'\\\n")),
-            "Literal['a\\'\\\\\\n']"
+            "Literal[\"a'\\\\\\n\"]"
         );
         assert_eq!(
             render(TypeName::union(vec![
                 TypeName::string_literal("active"),
                 TypeName::string_literal("inactive"),
             ])),
-            "Literal['active', 'inactive']"
+            "Literal[\"active\", \"inactive\"]"
         );
         assert_eq!(
             render(TypeName::union(vec![
                 TypeName::string_literal("active"),
                 TypeName::primitive("int"),
             ])),
-            "Literal['active'] | int"
+            "Literal[\"active\"] | int"
         );
         assert_eq!(
             render(TypeName::union(vec![
@@ -1053,7 +1088,7 @@ mod tests {
                 ]),
                 TypeName::primitive("int"),
             ])),
-            "Literal['active', 'inactive'] | int"
+            "Literal[\"active\", \"inactive\"] | int"
         );
     }
 
@@ -1080,7 +1115,7 @@ mod tests {
         );
         assert!(output.contains("external: Literal"), "{output}");
         assert!(
-            output.contains("singleton: TypingLiteral['active']"),
+            output.contains("singleton: TypingLiteral[\"active\"]"),
             "{output}"
         );
     }

@@ -76,6 +76,8 @@ mod tests {
             LayoutSpec {
                 consistent: true,
                 empty_flat_break: false,
+                edge_breaks: false,
+                trailing_comma: false,
                 flat_prefix: "(".to_string(),
                 flat_suffix: ")".to_string(),
                 broken_prefix: "(".to_string(),
@@ -101,6 +103,8 @@ mod tests {
             LayoutSpec {
                 consistent: true,
                 empty_flat_break: true,
+                edge_breaks: false,
+                trailing_comma: false,
                 flat_prefix: "[".to_string(),
                 flat_suffix: "]".to_string(),
                 broken_prefix: "[".to_string(),

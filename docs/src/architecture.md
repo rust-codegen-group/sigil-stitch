@@ -259,7 +259,16 @@ Lowering](type_name_lowering.md) for the complete contract.
 
 ## Structured Source Container: CodeBlock
 
-A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `FloatValue`, `NameRef`, `StringLit`, `Comment`, `Nested`, `Sequence`, and `Layout`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, `FloatValue` carries its exact format and bits, and control-flow nodes carry a language-neutral `BlockIntent` (`BlockOpenIntent`, `BlockCloseIntent`, `BranchCloseIntent`) with no per-language rendering policy. `CodeNode::Layout(LayoutBlock)` is the additive structured carrier for target-owned delimiter alternatives: it keeps flat/broken prefixes and suffixes, a break mode, and explicit continuation `Indent`/`Dedent` nodes without exposing a target AST.
+A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (`Literal`, `TypeRef`, `FloatValue`, `NameRef`, `StringLit`, `Comment`, `Nested`, `Sequence`, and `Layout`, etc.). Format strings are parsed at build time and immediately converted to `CodeNode` nodes. Each node is self-contained: `TypeRef(TypeName)` carries its type reference directly, `FloatValue` carries its exact format and bits, and control-flow nodes carry a language-neutral `BlockIntent` (`BlockOpenIntent`, `BlockCloseIntent`, `BranchCloseIntent`) with no per-language rendering policy. `CodeNode::Layout(LayoutBlock)` is the additive structured carrier for target-owned delimiter alternatives: it keeps flat/broken prefixes and suffixes, edge/item break policy, conditional trailing commas, and explicit continuation `Indent`/`Dedent` nodes without exposing a target AST.
+
+Python's private layout planner lowers delimiter roles, comprehension clauses,
+precedence-sensitive control headers, and declaration spacing into this carrier.
+The shared renderer interprets only the grammar-neutral recipe. Python structured
+output is checked as a fixed point against the pinned Ruff 0.17.5 oracle at the
+selected width; opaque `$L`, raw content, and runtime source remain escape hatches
+and are not reparsed by the renderer. `CodeLang` also owns the file-level
+separator and trailing-blank-line policy so Python can match Ruff without
+changing other language defaults.
 
 The builder (`CodeBlockBuilder`) validates argument counts and indent balance
 before producing a reusable block. The released `CodeBlock::nodes_mut()` method

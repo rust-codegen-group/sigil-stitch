@@ -9,6 +9,7 @@ mod quote_edge_cases;
 mod quote_imports;
 mod quote_suite;
 mod quote_verbatim_string;
+mod ruff_compatibility;
 #[path = "../shared/mod.rs"]
 mod shared;
 use shared::golden;

@@ -9,6 +9,7 @@ use super::parse_body;
 use super::recovery::{LineBoundary, Recovered, line_boundary};
 use super::rust_interpolation::{parse_expr, parse_string_expr};
 use super::spacing::MacroSpacingPolicy;
+use super::statement_policy::StatementPolicy;
 use super::util::{is_ident, is_semicolon};
 use crate::ir::{Branch, BranchIntent, QuoteArg, Statement};
 
@@ -240,7 +241,7 @@ impl From<syn::Error> for StatementParseError {
     }
 }
 
-/// Parse a control flow chain starting from tokens that lead into a brace group.
+/// Parse a control-flow chain after target-owned statement preparation.
 fn parse_control_flow(
     tokens: &[TokenTree],
     condition_tokens: &[TokenTree],
@@ -249,8 +250,10 @@ fn parse_control_flow(
     lang: MacroLang,
     policy: MacroSpacingPolicy,
 ) -> Result<(Statement, usize), syn::Error> {
-    let condition = tokens_to_format(condition_tokens, lang)?;
-    let intent = classify_branch(condition_tokens, lang);
+    let statement_policy = StatementPolicy::for_language(lang);
+    let normalized_condition = statement_policy.normalize_control_header(condition_tokens);
+    let condition = tokens_to_format(&normalized_condition, lang)?;
+    let intent = classify_branch(&normalized_condition, lang);
     let body_tokens: Vec<TokenTree> = first_brace.stream().into_iter().collect();
     let body = parse_body(&body_tokens, lang, policy)?;
 
@@ -288,10 +291,12 @@ fn parse_control_flow(
                     let body_toks: Vec<TokenTree> = g.stream().into_iter().collect();
                     let body = parse_body(&body_toks, lang, policy)?;
 
-                    let mut condition = if else_condition_tokens.is_empty() {
+                    let normalized_condition_tokens = statement_policy
+                        .normalize_branch_condition(&else_condition_tokens, is_elseif || is_elif);
+                    let mut condition = if normalized_condition_tokens.is_empty() {
                         crate::ir::FormattedCode::new()
                     } else {
-                        tokens_to_format(&else_condition_tokens, lang)?
+                        tokens_to_format(&normalized_condition_tokens, lang)?
                     };
                     let prefix = if is_bare_else {
                         "else"
@@ -309,7 +314,7 @@ fn parse_control_flow(
                     } else if else_condition_tokens.is_empty() {
                         BranchIntent::Else
                     } else {
-                        match classify_branch(&else_condition_tokens, lang) {
+                        match classify_branch(&normalized_condition_tokens, lang) {
                             BranchIntent::If => BranchIntent::ElseIf,
                             other => other,
                         }

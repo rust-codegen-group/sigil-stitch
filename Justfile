@@ -37,6 +37,10 @@ build:
 # Run all checks (fmt + lint + test)
 check: fmt-check lint test
 
+# Check generated Python against the pinned Ruff oracle
+ruff-python:
+    scripts/check-ruff-python.sh
+
 # Verify the exact supported public API delta for the active patch release.
 semver-check:
     cargo test --test compatibility_semver_script

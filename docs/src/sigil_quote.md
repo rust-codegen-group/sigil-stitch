@@ -60,7 +60,7 @@ let block = sigil_quote!(Python {
 assert_rendered!(
     Python::new().with_indent("    "),
     block,
-    "print('hi')\n",
+    "print(\"hi\")\n",
 );
 # }
 ```
@@ -1512,16 +1512,33 @@ line breaks.
 ## Python structured groups
 
 For `sigil_quote!(Python { ... })`, calls, subscripts, collections, comprehensions,
-type arguments, and parameter lists retain delimiter context until rendering. At a
-narrow width, comma-separated groups break consistently and continuation lines use
-one Python indentation unit. Keyword arguments and unannotated defaults use tight
-`name=value` spacing; ordinary assignments and annotated defaults retain their
-normal spaces. `$if` and `$for` bodies inherit the surrounding policy context.
+type arguments, and parameter lists retain delimiter and clause context until
+rendering. At a narrow width, Ruff-compatible groups break at delimiter edges,
+commas, and comprehension clauses; continuation lines use one Python indentation
+unit. Keyword arguments and unannotated defaults use tight `name=value` spacing;
+ordinary assignments and annotated defaults retain their normal spaces. Control
+headers normalize only provably redundant outer parentheses, preserving Python
+expression precedence. Python's default string quote policy prefers double quotes
+and chooses the quote requiring fewer escapes, matching Ruff; explicit single-quote
+mode remains available.
 
-This is structured layout, not a general Python formatter. `$L` content, raw
-annotations, and other opaque fragments are never reparsed or reformatted. The
-shared macro walker keeps language-specific spacing policy private so adding another
-grammar-aware language does not add a language-specific scope to shared parser state.
+For the default four-space indentation and selected render width, structured
+Python output is tested as a fixed point against `ruff==0.17.5`:
+
+```sh
+ruff format --check --diff --isolated \
+  --stdin-filename generated.py \
+  --line-length 88 < generated.py
+```
+
+The Ruff oracle is a validation tool, not a production dependency or a formatter
+spawned during rendering. `$L` content, raw annotations, `RawContent`, runtime
+file contents, and other opaque fragments remain explicit escape hatches and are
+never reparsed or reformatted. A file containing such content is outside the
+structured Ruff-compatible guarantee; callers must provide already formatted
+content or use a separately configured Ruff invocation. The shared macro walker
+keeps Python grammar policy private, while the renderer interprets only the
+language-neutral layout carrier.
 
 ## Multi-Language Support
 

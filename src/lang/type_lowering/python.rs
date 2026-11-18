@@ -100,6 +100,13 @@ pub(crate) fn lower(
     let mut has_body = false;
     if !type_.doc().is_empty() {
         common::emit_doc(&mut block, lang, &type_);
+        if type_.variants().is_some()
+            || type_.fields().is_some()
+            || !type_.methods().is_empty()
+            || !type_.extra_members().is_empty()
+        {
+            block.add_line();
+        }
         has_body = true;
     }
     if type_.variants().is_some() {

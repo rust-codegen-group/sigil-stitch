@@ -478,9 +478,9 @@ fn test_meta_let_with_python() {
     .unwrap();
 
     let output = render_py(&block);
-    assert!(output.contains("GET = 'get'"), "got: {output}");
-    assert!(output.contains("POST = 'post'"), "got: {output}");
-    assert!(output.contains("DELETE = 'delete'"), "got: {output}");
+    assert!(output.contains("GET = \"get\""), "got: {output}");
+    assert!(output.contains("POST = \"post\""), "got: {output}");
+    assert!(output.contains("DELETE = \"delete\""), "got: {output}");
 }
 
 #[test]

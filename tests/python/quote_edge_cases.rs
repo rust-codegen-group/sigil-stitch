@@ -1,4 +1,5 @@
 use sigil_stitch::code_block::{CodeBlock, CodeFragment};
+use sigil_stitch::lang::python::Python;
 use sigil_stitch::prelude::*;
 use sigil_stitch::spec::file_spec::FileSpec;
 
@@ -47,6 +48,21 @@ fn test_python_keyword_argument_spacing_is_contextual() {
 }
 
 #[test]
+fn test_python_control_header_parentheses_preserve_generators_and_normalize_elif() {
+    let block = sigil_quote!(Python {
+        if (item for item in values) {
+            return item;
+        } elif (enabled) {
+            return fallback;
+        }
+    })
+    .unwrap();
+    let output = render(&block);
+    assert!(output.contains("if (item for item in values):"), "{output}");
+    assert!(output.contains("elif enabled:"), "{output}");
+}
+
+#[test]
 fn test_python_slice_colon_stays_tight() {
     let block = sigil_quote!(Python {
         result = items[start:stop]
@@ -66,7 +82,9 @@ fn test_python_call_group_breaks_with_explicit_continuation_scope() {
     .unwrap();
     let output = render_width(&block, 30);
     assert!(
-        output.contains("function(first_argument,\n    second_argument,\n    third_argument)"),
+        output.contains(
+            "function(\n    first_argument,\n    second_argument,\n    third_argument,\n)"
+        ),
         "{output}"
     );
 }
@@ -250,6 +268,18 @@ fn test_code_fragment_composes_python_indentation() {
 }
 
 #[test]
+fn test_python_raw_member_preserves_trailing_newlines() {
+    let raw = "print('opaque')\n\n";
+    let output = FileSpec::builder_with("raw.py", Python::new())
+        .add_raw(raw)
+        .build()
+        .unwrap()
+        .render(88)
+        .unwrap();
+    assert_eq!(output, raw);
+}
+
+#[test]
 fn test_raw_python_literal_rejects_unresolved_indent_marker() {
     let result = CodeBlock::of("%L", "if enabled:\n%>return value\n%<");
 
@@ -258,5 +288,100 @@ fn test_raw_python_literal_rejects_unresolved_indent_marker() {
     assert!(
         err_msg.contains("unresolved indentation marker '%>'"),
         "got: {err_msg}"
+    );
+}
+
+#[test]
+fn test_ruff_singleton_call_edge_layout() {
+    let block = sigil_quote!(Python {
+        value = function(argument)
+    })
+    .unwrap();
+    let output = render_width(&block, 20);
+    assert_eq!(output, "value = function(\n    argument\n)\n");
+}
+
+#[test]
+fn test_ruff_local_import_spacing() {
+    let block = sigil_quote!(Python {
+        def load(): {
+            from . import sibling
+            return sibling
+        }
+    })
+    .unwrap();
+    let output = render_width(&block, 88);
+    assert_eq!(
+        output,
+        "def load():\n    from . import sibling\n\n    return sibling\n"
+    );
+}
+
+#[test]
+fn test_ruff_top_level_declaration_spacing() {
+    let first = sigil_quote!(Python {
+        def first(): {
+            pass
+        }
+    })
+    .unwrap();
+    let second = sigil_quote!(Python {
+        def second(): {
+            pass
+        }
+    })
+    .unwrap();
+    let output = FileSpec::builder("test.py")
+        .add_code(first)
+        .add_code(second)
+        .build()
+        .unwrap()
+        .render(88)
+        .unwrap();
+    assert_eq!(
+        output,
+        "def first():\n    pass\n\n\ndef second():\n    pass\n"
+    );
+}
+
+#[test]
+fn test_ruff_nested_generator_condition_shape() {
+    let block = sigil_quote!(Python {
+        if (_support.is_dict(value) and all((_support.number(_item, True)
+            or isinstance(_item, str)) for _item in _support.as_dict(value).values())) {
+            return value;
+        }
+    })
+    .unwrap();
+    let output = render_width(&block, 88);
+    assert_eq!(
+        output,
+        "if _support.is_dict(value) and all(\n    (_support.number(_item, True) or isinstance(_item, str))\n    for _item in _support.as_dict(value).values()\n):\n    return value\n"
+    );
+}
+
+#[test]
+fn test_ruff_dict_comprehension_shape() {
+    let block = sigil_quote!(Python {
+        return {key: convert(item) for key, item in values.items()}
+    })
+    .unwrap();
+    let output = render_width(&block, 40);
+    assert_eq!(
+        output,
+        "return {\n    key: convert(item)\n    for key, item in values.items()\n}\n"
+    );
+}
+
+#[test]
+fn test_ruff_nested_generic_call_shape() {
+    let block = sigil_quote!(Python {
+        additional_properties: _dict[_str, dict[str, Choice] | str] = _dataclass_field(default_factory=lambda: _dict[_str, dict[str, Choice] | str](), kw_only=True, metadata={"openapi_additional_properties": True, "openapi_dictionary": True})
+    })
+    .unwrap();
+    let output = render_width(&block, 88);
+    assert_eq!(
+        output,
+        "additional_properties: _dict[_str, dict[str, Choice] | str] = _dataclass_field(\n    default_factory=lambda: _dict[_str, dict[str, Choice] | str](),\n    kw_only=True,\n    metadata={\"openapi_additional_properties\": True, \"openapi_dictionary\": True},\n)\n"
     );
 }

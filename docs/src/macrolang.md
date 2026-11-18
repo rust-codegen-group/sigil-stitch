@@ -67,20 +67,25 @@ These annotations used to fire for ALL languages but are now restricted to langu
 
 ### Python structured groups
 
-Python macro input keeps delimiter groups as a private layout IR before lowering to
-`CodeBlock::Layout`. Calls, subscripts, collections, and type arguments use one
-consistent break decision: commas become soft breaks and broken continuations receive
-one Python indentation unit without indenting the flat first line. A broken root
-union/optional expression receives parentheses so every physical line remains valid
-Python. Explicit source newlines inside a delimiter group remain explicit rather than
-being normalized away.
+Python macro input keeps delimiter groups and comprehension clauses as a private
+layout IR before lowering to `CodeBlock::Layout`. Calls, subscripts, collections,
+comprehensions, type arguments, and parameter lists use Ruff-compatible edge,
+comma, and clause breaks; broken continuations receive one Python indentation unit.
+Flat output remains unindented, and fitting nested groups may stay flat when an
+outer call breaks. Explicit source newlines inside a delimiter group remain
+explicit rather than being normalized away.
 
-Python spacing is contextual rather than a global rewrite: call keyword arguments use
-`label=value`, unannotated function/lambda defaults use `name=value`, annotated defaults
-retain `name: Type = value`, and ordinary assignments/operators retain spaces. A dot
-immediately following `from` is treated as a relative-import argument (`from . import x`).
-The public `lang::python::keyword_argument` helper is the supported way to compose a
-standalone structured keyword fragment; raw `$L` content remains opaque.
+Structured Python output is validated as a fixed point against the pinned
+`ruff==0.17.5` oracle at the selected render width. This does not make
+sigil-stitch a general Python formatter: `$L` content, raw annotations, runtime
+file contents, and other opaque fragments are never reparsed or reformatted.
+
+Python spacing remains contextual rather than a global rewrite: call keyword
+arguments use `label=value`, unannotated function/lambda defaults use `name=value`,
+annotated defaults retain `name: Type = value`, ordinary assignments/operators
+retain spaces, and a dot immediately following `from` is a relative-import argument
+(`from . import x`). The public `lang::python::keyword_argument` helper remains
+the supported way to compose a standalone structured keyword fragment.
 
 The shared token walker does not expose a Python-specific scope. It carries a private
 `MacroSpacingPolicy` snapshot: Python owns its delimiter context and layout flag inside

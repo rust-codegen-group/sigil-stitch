@@ -94,6 +94,8 @@ pub(crate) enum StringValue {
 pub(crate) struct LayoutSpec {
     pub(crate) consistent: bool,
     pub(crate) empty_flat_break: bool,
+    pub(crate) edge_breaks: bool,
+    pub(crate) trailing_comma: bool,
     pub(crate) flat_prefix: String,
     pub(crate) flat_suffix: String,
     pub(crate) broken_prefix: String,

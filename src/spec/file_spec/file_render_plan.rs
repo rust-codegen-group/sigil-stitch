@@ -99,42 +99,54 @@ impl FileRenderPlan {
         let import_header = lang.render_imports(imports);
         if !import_header.is_empty() {
             output.push_str(&import_header);
-            output.push_str("\n\n");
+            output.push('\n');
+            if self.members.is_empty() {
+                output.push('\n');
+            } else {
+                output.push_str(lang.top_level_member_separator());
+            }
         }
 
         for (member_index, member) in self.members.iter().enumerate() {
             if member_index > 0 {
-                output.push('\n');
+                output.push_str(lang.top_level_member_separator());
             }
             match member {
                 PreparedMember::Blocks(blocks) => {
                     for (block_index, block) in blocks.iter().enumerate() {
                         if block_index > 0 {
-                            output.push('\n');
+                            output.push_str(lang.top_level_member_separator());
                         }
                         let member_output = renderer.render_prepared(block)?;
-                        output.push_str(&member_output);
-                        if !member_output.ends_with('\n') {
-                            output.push('\n');
-                        }
+                        append_member_output(
+                            &mut output,
+                            &member_output,
+                            lang.trim_trailing_blank_lines(),
+                        );
                     }
                 }
                 PreparedMember::Raw(content) => {
-                    output.push_str(content);
-                    if !content.ends_with('\n') {
-                        output.push('\n');
-                    }
+                    append_member_output(&mut output, content, false);
                 }
                 PreparedMember::RawWithImports { content, .. } => {
-                    output.push_str(content);
-                    if !content.ends_with('\n') {
-                        output.push('\n');
-                    }
+                    append_member_output(&mut output, content, false);
                 }
             }
         }
 
         Ok(output)
+    }
+}
+
+fn append_member_output(output: &mut String, content: &str, trim_trailing_blank_lines: bool) {
+    let content = if trim_trailing_blank_lines {
+        content.trim_end_matches('\n')
+    } else {
+        content
+    };
+    output.push_str(content);
+    if !output.ends_with('\n') {
+        output.push('\n');
     }
 }
 

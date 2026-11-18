@@ -12,6 +12,7 @@ mod lang;
 mod recovery;
 mod rust_interpolation;
 mod spacing;
+mod statement_policy;
 mod statements;
 mod stmt_rewrite;
 mod util;
@@ -24,6 +25,7 @@ use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
 use crate::ir::Statement;
 use recovery::{combine, next_statement_boundary};
 use spacing::MacroSpacingPolicy;
+use statement_policy::StatementPolicy;
 use statements::parse_one_statement;
 
 /// Parse the full `sigil_quote!` input.
@@ -75,6 +77,8 @@ pub(in crate::parse) fn parse_body(
     let mut statements = Vec::new();
     let mut pos = 0;
     let mut errors = None;
+    let statement_policy = StatementPolicy::for_language(lang);
+    let mut previous_role = None;
 
     // Track the line of the last consumed token for blank-line detection.
     let mut prev_line: Option<usize> = None;
@@ -107,7 +111,12 @@ pub(in crate::parse) fn parse_body(
                 if next_pos > pos {
                     prev_line = Some(tokens[next_pos - 1].span().end().line);
                 }
+                let current_role = statement_policy.classify(&tokens[pos..next_pos]);
+                if statement_policy.needs_blank_line(previous_role, current_role) {
+                    statements.push(Statement::BlankLine);
+                }
                 statements.push(stmt);
+                previous_role = Some(current_role);
                 pos = next_pos;
             }
             Err(recovered) => {

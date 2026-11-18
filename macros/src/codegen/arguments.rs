@@ -147,12 +147,16 @@ fn generate_arg(arg: &QuoteArg, context: &mut GenerateContext) -> TokenStream {
             let broken_suffix = Literal::string(&spec.broken_suffix);
             let consistent = spec.consistent;
             let empty_flat_break = spec.empty_flat_break;
+            let edge_breaks = spec.edge_breaks;
+            let trailing_comma = spec.trailing_comma;
             quote! {
                 #block.map(|#layout_block| {
-                    ::sigil_stitch::code_block::CodeBlock::__sigil_layout(
+                    ::sigil_stitch::code_block::CodeBlock::__sigil_layout_with_edges(
                         #layout_block,
                         #consistent,
                         #empty_flat_break,
+                        #edge_breaks,
+                        #trailing_comma,
 
                         #flat_prefix,
                         #flat_suffix,
