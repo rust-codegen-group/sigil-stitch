@@ -143,18 +143,27 @@ fn edge_group_with_prefixes(
 }
 
 /// Normalize structural blank lines in a function suite. Python's closing
-/// block markers render no token, so consecutive nested closes can otherwise
-/// each contribute a blank line. Opaque source and the interiors of layouts
-/// are left alone.
+/// block markers render no token, so a close that already ends its line would
+/// otherwise contribute a redundant blank line. Only that closer break is
+/// dropped, and only once: explicit blank lines after a close and closers that
+/// still own the line's only break are preserved. Opaque source and the
+/// interiors of layouts are left alone.
 pub(crate) fn function_body(body: &CodeBlock) -> CodeBlock {
     if body.contains_opaque_multiline() {
         return body.clone();
     }
 
     #[allow(deprecated)]
+    fn is_block_close(node: &CodeNode) -> bool {
+        matches!(
+            node,
+            CodeNode::BlockCloseIntent { .. } | CodeNode::BlockClose(_)
+        )
+    }
+
     fn ends_with_close(nodes: &[CodeNode]) -> bool {
         match nodes.last() {
-            Some(CodeNode::BlockCloseIntent { .. } | CodeNode::BlockClose(_)) => true,
+            Some(node) if is_block_close(node) => true,
             Some(CodeNode::Newline) => ends_with_close(&nodes[..nodes.len() - 1]),
             Some(CodeNode::Nested(block)) => ends_with_close(&block.nodes),
             Some(CodeNode::Sequence(children)) => ends_with_close(children),
@@ -162,7 +171,6 @@ pub(crate) fn function_body(body: &CodeBlock) -> CodeBlock {
         }
     }
 
-    #[allow(deprecated)]
     fn ends_with_terminated_close(nodes: &[CodeNode]) -> bool {
         match nodes.last() {
             Some(CodeNode::Newline) => ends_with_close(&nodes[..nodes.len() - 1]),
@@ -172,15 +180,11 @@ pub(crate) fn function_body(body: &CodeBlock) -> CodeBlock {
         }
     }
 
-    #[allow(deprecated)]
     fn tail_breaks_after_closes(nodes: &[CodeNode]) -> usize {
         let mut breaks = 0;
         let mut saw_close = false;
         for node in nodes.iter().rev() {
             match node {
-                CodeNode::BlockCloseIntent { .. } | CodeNode::BlockClose(_) => {
-                    saw_close = true;
-                }
                 CodeNode::Newline if saw_close => {
                     breaks += 1;
                     if breaks == 2 {
@@ -190,19 +194,43 @@ pub(crate) fn function_body(body: &CodeBlock) -> CodeBlock {
                 CodeNode::Newline | CodeNode::Indent | CodeNode::Dedent => {}
                 CodeNode::Nested(block) => return tail_breaks_after_closes(&block.nodes),
                 CodeNode::Sequence(children) => return tail_breaks_after_closes(children),
+                node if is_block_close(node) => {
+                    saw_close = true;
+                }
                 _ => break,
             }
         }
         breaks
     }
 
-    #[allow(deprecated)]
+    fn line_break_precedes_close(nodes: &[CodeNode]) -> bool {
+        let mut terminated = false;
+        for node in nodes.iter().rev() {
+            match node {
+                CodeNode::Indent
+                | CodeNode::Dedent
+                | CodeNode::StatementBegin
+                | CodeNode::StatementEnd => {}
+                CodeNode::Newline => {
+                    terminated = true;
+                    break;
+                }
+                node if is_block_close(node) => {}
+                _ => break,
+            }
+        }
+        terminated
+    }
+
     fn normalize(nodes: &mut Vec<CodeNode>) {
         let mut normalized = Vec::with_capacity(nodes.len());
+        let mut skip_next_newline = false;
         for mut node in std::mem::take(nodes) {
+            let skip_newline = std::mem::take(&mut skip_next_newline);
             match &mut node {
                 CodeNode::Nested(block) => normalize(&mut block.nodes),
                 CodeNode::Sequence(children) => normalize(children),
+                CodeNode::Newline if skip_newline => continue,
                 CodeNode::Newline
                     if normalized.last().is_some_and(|node| {
                         matches!(node, CodeNode::Nested(block)
@@ -212,10 +240,11 @@ pub(crate) fn function_body(body: &CodeBlock) -> CodeBlock {
                 {
                     continue;
                 }
-                CodeNode::BlockCloseIntent { .. } | CodeNode::BlockClose(_) => {
+                node if is_block_close(node) => {
                     if matches!(normalized.last(), Some(CodeNode::Newline)) {
                         normalized.pop();
                     }
+                    skip_next_newline = line_break_precedes_close(&normalized);
                 }
                 _ => {}
             }
@@ -249,17 +278,11 @@ pub(crate) fn function_body(body: &CodeBlock) -> CodeBlock {
         true
     }
 
-    #[allow(deprecated)]
     fn invisible(node: &CodeNode) -> bool {
         matches!(
             node,
-            CodeNode::Indent
-                | CodeNode::Dedent
-                | CodeNode::StatementBegin
-                | CodeNode::StatementEnd
-                | CodeNode::BlockCloseIntent { .. }
-                | CodeNode::BlockClose(_)
-        )
+            CodeNode::Indent | CodeNode::Dedent | CodeNode::StatementBegin | CodeNode::StatementEnd
+        ) || is_block_close(node)
     }
 
     let mut body = body.clone();

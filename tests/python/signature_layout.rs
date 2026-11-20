@@ -211,6 +211,122 @@ fn nested_suite_closers_do_not_accumulate_blank_lines() {
 }
 
 #[test]
+fn splice_each_control_flow_does_not_add_blank_suite_lines() {
+    let checks = vec![
+        sigil_quote!(Python {
+            if not check_one(value) {
+                return False
+            }
+        })
+        .unwrap(),
+        sigil_quote!(Python {
+            if not check_two(value) {
+                return False
+            }
+        })
+        .unwrap(),
+    ];
+    let result = sigil_quote!(Python {
+        if value is None {
+            return True
+        }
+    })
+    .unwrap();
+    let function = FunSpec::builder("check")
+        .body(
+            sigil_quote!(Python {
+                $C_each(checks)
+                $C(result)
+            })
+            .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let output = FileSpec::builder("check.py")
+        .add_function(function)
+        .build()
+        .unwrap()
+        .render(WIDTH)
+        .unwrap();
+    assert_eq!(
+        output,
+        concat!(
+            "def check():\n",
+            "    if not check_one(value):\n",
+            "        return False\n",
+            "    if not check_two(value):\n",
+            "        return False\n",
+            "    if value is None:\n",
+            "        return True\n",
+        )
+    );
+}
+
+#[test]
+fn explicit_blank_line_after_control_flow_is_preserved() {
+    let body = sigil_quote!(Python {
+        if invalid {
+            return None
+        }
+
+        return value
+    })
+    .unwrap();
+    let function = FunSpec::builder("check").body(body).build().unwrap();
+    let output = FileSpec::builder("check.py")
+        .add_function(function)
+        .build()
+        .unwrap()
+        .render(WIDTH)
+        .unwrap();
+
+    assert_eq!(
+        output,
+        concat!(
+            "def check():\n",
+            "    if invalid:\n",
+            "        return None\n",
+            "\n",
+            "    return value\n",
+        )
+    );
+}
+
+#[test]
+fn spliced_block_preserves_explicit_blank_line() {
+    let guard = sigil_quote!(Python {
+        if invalid {
+            return None
+        }
+
+        return value
+    })
+    .unwrap();
+    let body = sigil_quote!(Python {
+        $C(guard)
+    })
+    .unwrap();
+    let function = FunSpec::builder("check").body(body).build().unwrap();
+    let output = FileSpec::builder("check.py")
+        .add_function(function)
+        .build()
+        .unwrap()
+        .render(WIDTH)
+        .unwrap();
+
+    assert_eq!(
+        output,
+        concat!(
+            "def check():\n",
+            "    if invalid:\n",
+            "        return None\n",
+            "\n",
+            "    return value\n",
+        )
+    );
+}
+
+#[test]
 fn no_newline_nested_control_flow_keeps_following_statement_separate() {
     let mut guard_builder = CodeBlock::builder();
     guard_builder.begin_control_flow("if present", ());
@@ -221,6 +337,57 @@ fn no_newline_nested_control_flow_keeps_following_statement_separate() {
     let mut body_builder = CodeBlock::builder();
     body_builder.add_code(guard);
     body_builder.add_line();
+    body_builder.add_statement("return value", ());
+    let body = body_builder.build().unwrap();
+
+    let function = FunSpec::builder("check").body(body).build().unwrap();
+    let output = FileSpec::builder("check.py")
+        .add_function(function)
+        .build()
+        .unwrap()
+        .render(WIDTH)
+        .unwrap();
+
+    assert_eq!(
+        output,
+        "def check():\n    if present:\n        pass\n    return value\n"
+    );
+}
+
+#[test]
+fn nested_suite_closer_break_is_not_repeated() {
+    let mut guard_builder = CodeBlock::builder();
+    guard_builder.begin_control_flow("if present", ());
+    guard_builder.add("pass", ());
+    guard_builder.end_control_flow();
+    let guard = guard_builder.build().unwrap();
+
+    let mut body_builder = CodeBlock::builder();
+    body_builder.add_code(guard);
+    body_builder.add_line();
+    body_builder.add_statement("return value", ());
+    let body = body_builder.build().unwrap();
+
+    let function = FunSpec::builder("check").body(body).build().unwrap();
+    let output = FileSpec::builder("check.py")
+        .add_function(function)
+        .build()
+        .unwrap()
+        .render(WIDTH)
+        .unwrap();
+
+    assert_eq!(
+        output,
+        "def check():\n    if present:\n        pass\n    return value\n"
+    );
+}
+
+#[test]
+fn flat_suite_without_trailing_newline_keeps_following_statement_separate() {
+    let mut body_builder = CodeBlock::builder();
+    body_builder.begin_control_flow("if present", ());
+    body_builder.add("pass", ());
+    body_builder.end_control_flow();
     body_builder.add_statement("return value", ());
     let body = body_builder.build().unwrap();
 
