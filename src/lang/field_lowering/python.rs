@@ -2,7 +2,8 @@
 
 #![deny(deprecated)]
 
-use crate::code_block::CodeBlock;
+use crate::code_block::{CodeBlock, CodeBlockBuilder, CommentArg};
+use crate::code_node::{CodeNode, LayoutBlock, LayoutBreakMode};
 use crate::error::SigilStitchError;
 use crate::lang::capability::{FieldCapability, FieldCapabilityProfile, FieldContext};
 use crate::lang::python::Python;
@@ -103,9 +104,48 @@ pub(crate) fn lower(
             block.add(": %T", field.field_type().clone());
         }
         if let Some(initializer) = field.initializer() {
-            block.add(" = %L", initializer.clone());
+            add_initializer(&mut block, initializer);
         }
         block.add_line();
     }
     block.build()
+}
+
+fn add_initializer(block: &mut CodeBlockBuilder, initializer: &CodeBlock) {
+    if initializer.contains_opaque_multiline() {
+        block.add(" = %L", initializer.clone().for_inline_composition());
+        return;
+    }
+
+    let mut value = initializer.clone().for_inline_composition();
+    let pragma = take_inline_pragma(&mut value);
+    let layout =
+        LayoutBlock::consistent(LayoutBreakMode::Space, " = ", "", " = (", ")", value.nodes)
+            .with_preferred_inner_breaks();
+    block.add_code(CodeBlock {
+        nodes: vec![CodeNode::Layout(layout)],
+    });
+    if let Some(comment) = pragma {
+        block.add("  %R", (CommentArg(comment),));
+    }
+}
+
+fn take_inline_pragma(initializer: &mut CodeBlock) -> Option<String> {
+    let mut comment_index = initializer.nodes.len();
+    if matches!(initializer.nodes.last(), Some(CodeNode::Newline)) {
+        comment_index -= 1;
+    }
+    let comment_index = comment_index.checked_sub(1)?;
+    let CodeNode::Comment(comment) = initializer.nodes.get(comment_index)? else {
+        return None;
+    };
+    if !crate::lang::python::is_pragma_comment(comment) {
+        return None;
+    }
+    let comment = comment.clone();
+    initializer.nodes.truncate(comment_index);
+    if let Some(CodeNode::Literal(text)) = initializer.nodes.last_mut() {
+        text.truncate(text.trim_end_matches([' ', '\t']).len());
+    }
+    Some(comment)
 }

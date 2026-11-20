@@ -9,6 +9,7 @@ mod directives;
 mod format;
 mod intent;
 mod lang;
+mod python_expressions;
 mod recovery;
 mod rust_interpolation;
 mod spacing;

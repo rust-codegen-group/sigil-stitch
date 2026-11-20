@@ -107,6 +107,16 @@ use crate::spec::where_spec::{TypeParamSpec, WhereConstraint};
 use crate::type_name::TypeName;
 use compatibility_markers::LegacyTypeMarkers;
 
+/// Width behavior for a rendered comment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CommentLayout {
+    /// The comment participates in normal width-aware rendering.
+    WidthAware,
+    /// Preserve the comment line without using its text to trigger wrapping.
+    WidthOpaque,
+}
+
 /// Narrow trait for `CodeRenderer` and `TypeName` rendering.
 ///
 /// Implementors must provide only:
@@ -164,6 +174,15 @@ pub trait RendererLang: std::fmt::Debug + 'static {
     /// OCaml overrides to `" *)"` to close `(* comment *)` block comments.
     fn line_comment_suffix(&self) -> &str {
         ""
+    }
+
+    /// Select whether a comment participates in width-aware rendering.
+    ///
+    /// The default treats comment text as ordinary structured output. Target
+    /// adapters may classify grammar-specific directives without exposing that
+    /// classification to the shared renderer.
+    fn comment_layout(&self, _text: &str) -> CommentLayout {
+        CommentLayout::WidthAware
     }
 
     /// Render an attribute / annotation with language-specific syntax.
@@ -974,9 +993,27 @@ pub trait CodeLang: RendererLang {
         String::new()
     }
 
+    /// Render an import group with the file's target width available.
+    ///
+    /// The default delegates to the existing width-independent hook so other
+    /// languages keep their established import text and ordering. Languages
+    /// whose import grammar has width-aware layout may override this hook.
+    fn render_imports_with_width(&self, imports: &ImportGroup, _width: usize) -> String {
+        self.render_imports(imports)
+    }
+
     /// Separator inserted between complete top-level member blocks during
     /// file assembly. The default preserves the existing one-newline gap.
     fn top_level_member_separator(&self) -> &str {
+        "\n"
+    }
+
+    /// Separator appended after the common newline when a file has no members.
+    ///
+    /// The default preserves the historical file assembly behavior. Python
+    /// overrides this to append nothing, keeping one final newline to match
+    /// Ruff's import-only module layout.
+    fn import_only_file_suffix(&self) -> &str {
         "\n"
     }
 

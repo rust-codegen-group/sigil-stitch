@@ -7,7 +7,7 @@ use super::recovery::{Recovered, combine};
 use super::rust_interpolation::parse_expr;
 use super::spacing::MacroSpacingPolicy;
 use super::util::is_ident;
-use crate::ir::{ConditionalBranch, LoopSeparator, MetaIf, Statement};
+use crate::ir::{ConditionalBranch, LoopSeparator, MetaIf, SeparatorIntent, Statement};
 
 type ForComponents = (
     usize,
@@ -42,9 +42,13 @@ pub(super) fn parse_for_components(
     let body = parse_body(&parts.body_tokens, lang, policy);
 
     match (parts.header, body) {
-        (Ok((pat, iter_expr, separator)), Ok(body)) => {
-            Ok((parts.next_pos, pat, iter_expr, separator, body))
-        }
+        (Ok((pat, iter_expr, separator)), Ok(body)) => Ok((
+            parts.next_pos,
+            pat,
+            iter_expr,
+            separator.map(|separator| policy.classify_loop_separator(separator)),
+            body,
+        )),
         (header, body) => {
             let mut errors = None;
             if let Err(error) = header {
@@ -341,7 +345,11 @@ fn parse_for_options(
         return Err(error);
     }
 
-    Ok(separator.map(|expr| LoopSeparator { expr, trailing }))
+    Ok(separator.map(|expr| LoopSeparator {
+        expr,
+        trailing,
+        intent: SeparatorIntent::Verbatim,
+    }))
 }
 
 #[derive(Clone, Copy)]

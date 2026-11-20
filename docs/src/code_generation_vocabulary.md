@@ -119,6 +119,14 @@ content and structure are not a portable cross-language program.
 
 ### Layout capsule
 
+The parser lowers its choices through a closed macro-owned `LayoutPlan` (`Inline`
+or `Delimited`) rather than passing independent layout booleans through codegen.
+The delimited plan is converted once into the hidden grammar-neutral
+`LayoutOptions` carrier before it becomes a `LayoutBlock`; the shared renderer
+never sees parser-owned Python roles or separator expressions. The older hidden
+edge constructor remains only as a compatibility wrapper for already-expanded
+macros.
+
 `CodeNode::Layout(LayoutBlock)` is the shared structured carrier for a target-owned
 fit/break recipe. A capsule stores flat and broken delimiter alternatives, edge,
 item, and clause break policy, conditional trailing-comma behavior, one consistent
@@ -128,8 +136,13 @@ active, so flat output remains unindented and nested groups do not inherit a
 leaked continuation depth. Python lowers its private group/item policy into this
 carrier and validates structured output against the pinned Ruff fixed-point
 oracle; other targets continue using their existing `Nested`, `Sequence`, and
-`SoftBreak` semantics. It is not a public Python AST, and raw `$L` content is
-never re-tokenized into a capsule.
+`SoftBreak` semantics. `TrailingCommaPolicy` records whether a comma is never
+emitted, emitted only on a broken path, or requires a broken path. Target-local
+comment width behavior and parser-known separator intent are carried as small
+policy facts; the shared renderer does not infer grammar from extensions or
+runtime strings. It is not a public Python AST, and raw `$L` content is never
+re-tokenized into a capsule. Raw/provider-owned source is outside sigil-stitch's
+Ruff repair responsibility.
 
 ### Generic binding and kind expression
 

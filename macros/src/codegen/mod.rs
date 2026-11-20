@@ -36,7 +36,8 @@ pub(crate) fn generate(input: ParsedInput) -> TokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::{FormattedCode, LayoutSpec, QuoteArg, Statement, StringValue};
+    use crate::ir::{FormattedCode, QuoteArg, Statement};
+    use crate::parse::parse_input;
 
     #[test]
     fn lowers_large_infallible_sequences_without_recursive_tail_building() {
@@ -67,56 +68,24 @@ mod tests {
     }
 
     #[test]
-    fn lowers_layout_arguments_with_the_hidden_runtime_abi() {
-        let mut inner = FormattedCode::new();
-        inner.push_argument(QuoteArg::Literal(StringValue::Literal("item".to_string())));
-        let mut formatted = FormattedCode::new();
-        formatted.push_layout(
-            inner,
-            LayoutSpec {
-                consistent: true,
-                empty_flat_break: false,
-                edge_breaks: false,
-                trailing_comma: false,
-                flat_prefix: "(".to_string(),
-                flat_suffix: ")".to_string(),
-                broken_prefix: "(".to_string(),
-                broken_suffix: ")".to_string(),
-            },
-        );
-
-        let generated = generate(ParsedInput {
-            statements: vec![Statement::Line(formatted)],
-        })
-        .to_string();
-        assert!(generated.contains("__sigil_layout"));
-        assert!(generated.contains("item"));
+    fn lowers_delimiters_through_the_hidden_runtime_options() {
+        let input =
+            parse_input(quote! { Python { call(first, second); values = [first, second] } })
+                .unwrap();
+        let generated = generate(input).to_string();
+        assert_eq!(generated.matches("__sigil_layout_with_options").count(), 2);
+        assert_eq!(generated.matches("LayoutEdgeMode :: WithBreaks").count(), 1);
+        assert_eq!(generated.matches("LayoutEdgeMode :: Coupled").count(), 1);
     }
 
     #[test]
-    fn lowers_layout_arguments_with_fallible_nested_children() {
-        let mut inner = FormattedCode::new();
-        inner.push_argument(QuoteArg::ParsedSplice(vec![Statement::BlankLine]));
-        let mut formatted = FormattedCode::new();
-        formatted.push_layout(
-            inner,
-            LayoutSpec {
-                consistent: true,
-                empty_flat_break: true,
-                edge_breaks: false,
-                trailing_comma: false,
-                flat_prefix: "[".to_string(),
-                flat_suffix: "]".to_string(),
-                broken_prefix: "[".to_string(),
-                broken_suffix: "]".to_string(),
-            },
-        );
-
-        let generated = generate(ParsedInput {
-            statements: vec![Statement::Line(formatted)],
+    fn lowers_delimiter_layout_with_a_fallible_verbatim_splice() {
+        let input = parse_input(quote! {
+            Python { call($for(item in items; separator = separator) { $N(item) }) }
         })
-        .to_string();
+        .unwrap();
+        let generated = generate(input).to_string();
         assert!(generated.contains("nested_builder"));
-        assert!(generated.contains("__sigil_layout"));
+        assert!(generated.contains("__sigil_layout_with_options"));
     }
 }

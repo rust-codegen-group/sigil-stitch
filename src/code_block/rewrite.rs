@@ -40,7 +40,15 @@ fn validate_source_nodes(
         match node {
             CodeNode::TypeRef(type_name) => validate_type_name(type_name, &node_path)?,
             CodeNode::Nested(block) => validate_source_nodes(&block.nodes, &path.nested(index))?,
-            CodeNode::Layout(layout) => validate_source_nodes(layout.nodes(), &path.nested(index))?,
+            CodeNode::Layout(layout) => {
+                layout.validate_edge_structure().map_err(|reason| {
+                    SigilStitchError::InvalidRewrittenSource {
+                        context: node_path.to_string(),
+                        reason: reason.to_string(),
+                    }
+                })?;
+                validate_source_nodes(layout.nodes(), &path.nested(index))?
+            }
             CodeNode::Sequence(children) => validate_source_nodes(children, &path.sequence(index))?,
             _ => {}
         }
@@ -197,6 +205,33 @@ mod tests {
         }
     }
 
+    #[test]
+    fn rewrite_rejects_malformed_layout_edge_scopes() {
+        let child = CodeBlock::of("first%Wsecond", ()).unwrap();
+        let source = CodeBlock::of(
+            "%L",
+            child.__sigil_coupled_layout(")", crate::code_node::TrailingCommaPolicy::Never, false),
+        )
+        .unwrap();
+
+        let error = source
+            .rewrite_source(&DiagnosticPath::root("source"), |nodes| {
+                walk_nodes_mut(nodes, &|nodes| {
+                    for node in nodes {
+                        if let CodeNode::Layout(layout) = node {
+                            layout.nodes_mut().pop();
+                        }
+                    }
+                });
+            })
+            .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("layout continuation edge scope is malformed")
+        );
+    }
     #[test]
     fn rewritten_type_preconditions_preserve_the_diagnostic_path() {
         let source = CodeBlock::of("original", ()).unwrap();

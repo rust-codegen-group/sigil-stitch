@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use sigil_stitch::code_block::CodeBlock;
-use sigil_stitch::code_node::{BlockIntent, CodeNode};
+use sigil_stitch::code_block::{CodeBlock, CommentArg};
+use sigil_stitch::code_node::{BlockIntent, CodeNode, TrailingCommaPolicy};
 use sigil_stitch::error::SigilStitchError;
 use sigil_stitch::import::{ImportEntry, ImportGroup};
 use sigil_stitch::lang::CodeLang;
@@ -321,6 +321,98 @@ fn every_builtin_renders_language_owned_non_default_indentation() {
     }
 }
 
+#[test]
+fn every_builtin_preserves_unicode_comments_on_direct_and_pretty_paths() {
+    for descriptor in languages_registry::BUILT_IN_LANGUAGES {
+        for (label, language) in [
+            ("default", descriptor.adapter()),
+            ("tab", descriptor.adapter_with_indent("\t")),
+        ] {
+            let expected = format!(
+                "{}{} Unicode café 世界{}",
+                language.indent_unit(),
+                language.line_comment_prefix(),
+                language.line_comment_suffix(),
+            );
+            let direct = CodeBlock::of("%>%R%<", (CommentArg("Unicode café 世界".to_string()),))
+                .unwrap()
+                .render_standalone(language.as_ref(), 240)
+                .unwrap();
+            assert_eq!(direct, expected, "direct {label} {}", descriptor.id);
+
+            let pretty = CodeBlock::of(
+                "%>%R%Wtail%<",
+                (CommentArg("Unicode café 世界".to_string()),),
+            )
+            .unwrap()
+            .render_standalone(language.as_ref(), 240)
+            .unwrap();
+            assert!(
+                pretty.starts_with(&expected),
+                "pretty {label} {}: {pretty:?}",
+                descriptor.id
+            );
+            assert!(
+                pretty.contains("tail"),
+                "pretty {label} {} lost trailing content: {pretty:?}",
+                descriptor.id
+            );
+        }
+    }
+}
+
+fn nested_coupled_layout_block() -> CodeBlock {
+    let inner = CodeBlock::of("inner[alpha%Wbeta", ())
+        .unwrap()
+        .__sigil_coupled_layout("]", TrailingCommaPolicy::Never, false);
+    CodeBlock::of("outer(%L", (inner,))
+        .unwrap()
+        .__sigil_coupled_layout(")", TrailingCommaPolicy::Never, false)
+}
+
+#[test]
+fn every_builtin_preserves_nested_coupled_layout_custom_indentation() {
+    for descriptor in languages_registry::BUILT_IN_LANGUAGES {
+        let flat = nested_coupled_layout_block()
+            .render_standalone(descriptor.adapter().as_ref(), 240)
+            .unwrap();
+        assert_eq!(flat, "outer(inner[alpha beta])", "flat {}", descriptor.id);
+
+        let custom = nested_coupled_layout_block()
+            .render_standalone(descriptor.adapter_with_indent("--->").as_ref(), 12)
+            .unwrap();
+        assert!(
+            custom.contains("outer"),
+            "custom {}: {custom:?}",
+            descriptor.id
+        );
+        assert!(
+            custom.contains("inner"),
+            "custom {}: {custom:?}",
+            descriptor.id
+        );
+        assert!(
+            custom.contains('\n'),
+            "custom {} did not break",
+            descriptor.id
+        );
+        for line in custom.lines().skip(1).filter(|line| !line.is_empty()) {
+            if matches!(line.trim(), ")" | "]") {
+                continue;
+            }
+            assert!(
+                line.starts_with("--->"),
+                "custom {} leaked continuation indentation: {custom:?}",
+                descriptor.id
+            );
+        }
+        assert!(
+            !custom.contains("\n    "),
+            "custom {} leaked four-space indentation: {custom:?}",
+            descriptor.id
+        );
+    }
+}
 #[derive(Debug)]
 struct CompleteExternalRenderer;
 

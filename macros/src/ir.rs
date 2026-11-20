@@ -29,11 +29,16 @@ impl FormattedCode {
         self.args.push(arg);
     }
 
-    pub(crate) fn push_layout(&mut self, code: FormattedCode, spec: LayoutSpec) {
+    pub(crate) fn push_layout(&mut self, code: FormattedCode, spec: LayoutPlan) {
         self.push_argument(QuoteArg::Layout {
             code: Box::new(code),
             spec,
         });
+    }
+
+    pub(crate) fn append(&mut self, mut fragment: Self) {
+        self.format.push_str(&fragment.format);
+        self.args.append(&mut fragment.args);
     }
 
     pub(crate) fn push_marker(&mut self, marker: NoArgMarker) {
@@ -91,11 +96,53 @@ pub(crate) enum StringValue {
 }
 
 /// Runtime layout metadata for one macro-owned delimiter group.
-pub(crate) struct LayoutSpec {
-    pub(crate) consistent: bool,
-    pub(crate) empty_flat_break: bool,
-    pub(crate) edge_breaks: bool,
-    pub(crate) trailing_comma: bool,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TrailingCommaPolicy {
+    Never,
+    IfBroken,
+    Always,
+}
+
+impl TrailingCommaPolicy {
+    pub(crate) fn runtime_value(self) -> proc_macro2::TokenStream {
+        let value = match self {
+            Self::Never => "Never",
+            Self::IfBroken => "IfBroken",
+            Self::Always => "Always",
+        };
+        let ident = proc_macro2::Ident::new(value, proc_macro2::Span::call_site());
+        quote!(::sigil_stitch::code_node::TrailingCommaPolicy::#ident)
+    }
+}
+
+/// Mutually exclusive layout plans selected by the target-owned parser.
+pub(crate) enum LayoutPlan {
+    /// The fragment continues at the containing delimiter's indentation.
+    Inline,
+    /// A complete delimiter group with an explicit edge policy.
+    Delimited(DelimitedLayout),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LayoutEdgesPlan {
+    /// Delimiter edges wrap a separately laid-out item group.
+    WithBreaks,
+    /// Delimiter edges and items break together.
+    Coupled,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LayoutForceBreak {
+    Automatic,
+    Forced,
+}
+
+/// Complete grammar-neutral recipe for one delimiter layout.
+pub(crate) struct DelimitedLayout {
+    pub(crate) edges: LayoutEdgesPlan,
+    pub(crate) trailing_comma: TrailingCommaPolicy,
+    pub(crate) force_break: LayoutForceBreak,
+    pub(crate) delimited_loop: Option<DelimitedLoopLayout>,
     pub(crate) flat_prefix: String,
     pub(crate) flat_suffix: String,
     pub(crate) broken_prefix: String,
@@ -123,7 +170,7 @@ pub(crate) enum QuoteArg {
     ParsedSplice(Vec<Statement>),
     Layout {
         code: Box<FormattedCode>,
-        spec: LayoutSpec,
+        spec: LayoutPlan,
     },
 }
 
@@ -185,9 +232,29 @@ pub(crate) enum Statement {
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SingletonCommaPolicy {
+    KeepInline,
+    ForceBroken,
+}
+
+/// Delimiter mechanics for a complete loop of structured comma-separated items.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct DelimitedLoopLayout {
+    pub(crate) edges: LayoutEdgesPlan,
+    pub(crate) singleton_comma: SingletonCommaPolicy,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SeparatorIntent {
+    Verbatim,
+    CommaSpace,
+}
+
 pub(crate) struct LoopSeparator {
     pub(crate) expr: Expr,
     pub(crate) trailing: Option<Expr>,
+    pub(crate) intent: SeparatorIntent,
 }
 
 /// Structural block role carried from parse time to builder lowering.

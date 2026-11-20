@@ -14,7 +14,7 @@ use crate::lang::config::{
     BlockSyntaxConfig, EnumAndAnnotationConfig, FunctionSyntaxConfig, GenericSyntaxConfig,
     QuoteStyle, TypeDeclSyntaxConfig, TypePresentationConfig,
 };
-use crate::lang::{CodeLang, FunctionIntent, RendererLang};
+use crate::lang::{CodeLang, CommentLayout, FunctionIntent, RendererLang};
 use crate::spec::annotation_spec::AnnotationNameRef;
 use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 #[expect(
@@ -24,6 +24,8 @@ use crate::spec::modifiers::{DeclarationContext, TypeKind, Visibility};
 use crate::spec::where_spec::TypeParamSpec;
 #[expect(deprecated, reason = "0.6.8 compatibility implementation")]
 use crate::type_name::{AssociatedTypeStyle, FunctionPresentation, TypeName, TypePresentation};
+
+use unicode_width::UnicodeWidthStr;
 
 /// Python language implementation.
 ///
@@ -329,6 +331,14 @@ impl RendererLang for Python {
 
     fn line_comment_prefix(&self) -> &str {
         "#"
+    }
+
+    fn comment_layout(&self, text: &str) -> CommentLayout {
+        if is_pragma_comment(text) {
+            CommentLayout::WidthOpaque
+        } else {
+            CommentLayout::WidthAware
+        }
     }
 
     fn block_open_for(&self, condition: &str) -> Option<&str> {
@@ -711,6 +721,10 @@ impl CodeLang for Python {
     }
 
     fn render_imports(&self, imports: &ImportGroup) -> String {
+        self.render_imports_with_width(imports, usize::MAX)
+    }
+
+    fn render_imports_with_width(&self, imports: &ImportGroup, width: usize) -> String {
         if imports.entries().is_empty() {
             return String::new();
         }
@@ -750,7 +764,13 @@ impl CodeLang for Python {
 
         // Emit stdlib imports.
         for (module, entries) in &stdlib {
-            lines.push(render_from_import(module, entries));
+            lines.push(render_from_import(
+                module,
+                entries,
+                width,
+                imports,
+                &self.indent,
+            ));
         }
 
         // Blank line between groups.
@@ -760,10 +780,20 @@ impl CodeLang for Python {
 
         // Emit third-party imports.
         for (module, entries) in &thirdparty {
-            lines.push(render_from_import(module, entries));
+            lines.push(render_from_import(
+                module,
+                entries,
+                width,
+                imports,
+                &self.indent,
+            ));
         }
 
         lines.join("\n")
+    }
+
+    fn import_only_file_suffix(&self) -> &str {
+        ""
     }
 
     fn top_level_member_separator(&self) -> &str {
@@ -873,8 +903,23 @@ impl CodeLang for Python {
     }
 }
 
+/// Tool directives on Python source lines do not influence expression fit.
+pub(crate) fn is_pragma_comment(comment: &str) -> bool {
+    let comment = comment.trim_start();
+    comment.starts_with("type: ignore")
+        || comment.starts_with("noqa")
+        || comment.starts_with("ruff:")
+        || comment.starts_with("fmt:")
+}
+
 /// Render a `from module import name1, name2` line.
-fn render_from_import(module: &str, entries: &[&ImportEntry]) -> String {
+fn render_from_import(
+    module: &str,
+    entries: &[&ImportEntry],
+    width: usize,
+    imports: &ImportGroup,
+    indent_unit: &str,
+) -> String {
     let mut names = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for entry in entries {
@@ -882,12 +927,31 @@ fn render_from_import(module: &str, entries: &[&ImportEntry]) -> String {
         if seen.insert(local_name) {
             names.push(match &entry.alias {
                 Some(alias) => format!("{} as {alias}", entry.name),
+                None if imports
+                    .request_summary(module, &entry.name)
+                    .is_some_and(|summary| summary.has_same_name_alias()) =>
+                {
+                    format!("{} as {}", entry.name, entry.name)
+                }
                 None => entry.name.clone(),
             });
         }
     }
     names.sort();
-    format!("from {} import {}", module, names.join(", "))
+
+    let inline = format!("from {module} import {}", names.join(", "));
+    if inline.width() <= width {
+        return inline;
+    }
+
+    let mut wrapped = format!("from {module} import (\n");
+    for name in names {
+        wrapped.push_str(indent_unit);
+        wrapped.push_str(&name);
+        wrapped.push_str(",\n");
+    }
+    wrapped.push(')');
+    wrapped
 }
 
 #[cfg(test)]

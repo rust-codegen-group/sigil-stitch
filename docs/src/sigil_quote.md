@@ -1081,7 +1081,9 @@ sigil_quote!(Haskell {
 
 Use `trailing = true` only when you really want the same separator after the
 last emitted iteration. Empty loops emit neither separators nor trailing
-separators.
+separators. For Python's structured literal-separator path, this behavior
+requires the delimiter and inline loop to be on one physical input line; an
+explicitly multiline delimiter preserves caller-owned layout instead.
 
 Use `$join(sep, iter)` when each item is just a value that can be converted to
 text. Use inline `$for(...; separator = ...)` when each item is a fragment that
@@ -1089,7 +1091,8 @@ needs interpolation markers like `$T` / `$N` / `$S`. Use statement `$for` when
 each iteration emits structured code: multiple statements, comments, attributes,
 or nested `$if`.
 
-The separator is a Rust expression. It is converted to a string and inserted via
+Outside the Python structured literal-separator path described below, the
+separator is a Rust expression. It is converted to a string and inserted via
 `%L`, so `format!(...)` works too. Statement `$for` bodies already emit their
 normal trailing newline, so start a statement-loop separator with text unless you
 intentionally want a blank line:
@@ -1114,7 +1117,28 @@ sigil_quote!(TypeScript {
 # }
 ```
 
-### Destructuring Patterns
+For Python structured output, use the literal separator `", "` for a
+comma-separated inline `$for` when you want the generated call/list to remain
+Ruff-compatible. The structured path recognizes this parser-visible literal
+when the loop supplies the delimiter's complete item sequence and the
+input delimiter is not explicitly multiline; mixed static and dynamic items,
+or a runtime variable that happens to contain `", "`, remain verbatim. Other
+runtime separator expressions are caller-owned text and are not reinterpreted
+as Python comma layout.
+
+```rust
+# extern crate sigil_stitch;
+# use sigil_stitch::prelude::*;
+# use sigil_stitch::lang::python::Python;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let names = vec!["first", "second"];
+sigil_quote!(Python {
+    result = function($for(name in &names; separator = ", ") { $N(*name) })
+})?;
+// A multi-item call can use Ruff's broken magic-comma layout at a narrow width.
+# Ok(())
+# }
+```
 
 Any Rust `for` pattern works:
 
@@ -1522,8 +1546,11 @@ expression precedence. Python's default string quote policy prefers double quote
 and chooses the quote requiring fewer escapes, matching Ruff; explicit single-quote
 mode remains available.
 
-For the default four-space indentation and selected render width, structured
-Python output is tested as a fixed point against `ruff==0.17.5`:
+With the default four-space indentation, the pinned Ruff oracle checks that
+structured Python fixtures are fixed points at the widths used to render them.
+Run those checks with `just ruff-python`. To check a generated file yourself,
+use the oracle's Ruff version and pass the same line width used for rendering
+(88 in this example):
 
 ```sh
 ruff format --check --diff --isolated \
@@ -1533,12 +1560,14 @@ ruff format --check --diff --isolated \
 
 The Ruff oracle is a validation tool, not a production dependency or a formatter
 spawned during rendering. `$L` content, raw annotations, `RawContent`, runtime
-file contents, and other opaque fragments remain explicit escape hatches and are
-never reparsed or reformatted. A file containing such content is outside the
-structured Ruff-compatible guarantee; callers must provide already formatted
-content or use a separately configured Ruff invocation. The shared macro walker
-keeps Python grammar policy private, while the renderer interprets only the
-language-neutral layout carrier.
+file contents, and other provider-owned opaque fragments remain explicit escape
+hatches: sigil-stitch never reparses or reformats those bytes. A file containing
+such content is not promised as a fixed point for that opaque portion; callers
+provide already formatted content or use a separately configured Ruff
+invocation. Structured composition that sigil-stitch itself lowers around those
+escape hatches remains governed by the structured contract. The shared macro
+walker keeps Python grammar policy private, while the renderer interprets only
+the language-neutral layout carrier.
 
 ## Multi-Language Support
 

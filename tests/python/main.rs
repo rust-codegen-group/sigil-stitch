@@ -3,6 +3,9 @@ mod builder_edge_cases;
 mod builder_functions;
 mod builder_imports;
 mod builder_types;
+mod conditional_layout;
+mod field_ruff;
+mod import_layout;
 mod quote_basic;
 mod quote_control_flow;
 mod quote_edge_cases;
@@ -12,4 +15,5 @@ mod quote_verbatim_string;
 mod ruff_compatibility;
 #[path = "../shared/mod.rs"]
 mod shared;
+mod signature_layout;
 use shared::golden;

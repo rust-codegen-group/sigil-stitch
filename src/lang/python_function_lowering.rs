@@ -3,10 +3,10 @@
 #![deny(deprecated)]
 
 use crate::code_block::{CodeBlock, CodeBlockBuilder};
+use crate::code_node::{CodeNode, LayoutBlock, LayoutBreakMode, TrailingCommaPolicy};
 use crate::error::SigilStitchError;
 use crate::lang::function_lowering::{SignatureBuilder, inline_default_value};
 use crate::lang::python::Python;
-use crate::lang::python_layout;
 use crate::lang::{CodeLang, RendererLang};
 use crate::spec::fun_spec::ValidatedFunction;
 use crate::spec::parameter_spec::ParameterSpec;
@@ -38,42 +38,13 @@ pub(crate) fn lower(
     let mut block = CodeBlock::builder();
     emit_decorators(&mut block, function)?;
 
-    let mut signature = SignatureBuilder::new();
-    if function.modifiers().is_async {
-        signature.push_literal("async ");
-    }
-    signature.push_literal("def ");
-    signature.push_literal(function.name());
-    signature.push_literal("(");
-    signature.push_code(python_layout::delimited(
-        "",
-        function
-            .parameters()
-            .iter()
-            .map(|parameter| emit_parameter(lang, parameter))
-            .collect::<Result<Vec<_>, _>>()?,
-        "",
-        crate::code_node::LayoutBreakMode::Space,
-    ));
-    signature.push_literal(")");
-    append_suffixes(&mut signature, function);
-    if let Some(returns) = function.returns() {
-        let native_empty = crate::type_name::TypeName::primitive("None");
-        let return_type = returns.first().unwrap_or(&native_empty);
-        signature.push_literal(" -> ");
-        signature.push_type(return_type);
-    }
-    signature.push_literal(":");
     let inline_ellipsis =
         function.body().is_none() && function.doc().is_empty() && function.delegation().is_none();
+    emit_signature(&mut block, lang, function, inline_ellipsis)?;
+    block.add_line();
     if inline_ellipsis {
-        signature.push_literal(" ...");
-        signature.append_to(&mut block);
-        block.add_line();
         return block.build();
     }
-    signature.append_to(&mut block);
-    block.add_line();
     block.add("%>", ());
 
     if !function.doc().is_empty() {
@@ -85,15 +56,101 @@ pub(crate) fn lower(
         block.add_statement("%L", delegation.clone());
     }
     if let Some(body) = function.body() {
-        block.add_code(body.clone());
-        if !body.ends_with_newline_or_block_close() {
-            block.add_line();
-        }
+        block.add_code(super::python_layout::function_body(body));
     } else {
         block.add_statement("...", ());
     }
     block.add("%<", ());
     block.build()
+}
+
+fn emit_signature(
+    block: &mut CodeBlockBuilder,
+    lang: &Python,
+    function: ValidatedFunction<'_>,
+    inline_ellipsis: bool,
+) -> Result<(), SigilStitchError> {
+    if function.modifiers().is_async {
+        block.add("async ", ());
+    }
+    block.add("def %L(", function.name());
+
+    let mut suffix = SignatureBuilder::new();
+    suffix.push_literal(")");
+    append_suffixes(&mut suffix, function);
+    if let Some(returns) = function.returns() {
+        let native_empty = crate::type_name::TypeName::primitive("None");
+        let return_type = returns.first().unwrap_or(&native_empty);
+        suffix.push_literal(" -> ");
+        suffix.push_type(return_type);
+    }
+    suffix.push_literal(if inline_ellipsis { ": ..." } else { ":" });
+    let mut tail = CodeBlock::builder();
+    suffix.append_to(&mut tail);
+
+    let parameters = function
+        .parameters()
+        .iter()
+        .map(|parameter| emit_parameter(lang, parameter))
+        .collect::<Result<Vec<_>, _>>()?;
+    block.add_code(signature_layout(parameters, tail.build()?));
+    Ok(())
+}
+
+fn signature_layout(parameters: Vec<CodeBlock>, tail: CodeBlock) -> CodeBlock {
+    let parameter_count = parameters.len();
+    if parameter_count == 0 {
+        return tail;
+    }
+
+    let mut items = Vec::new();
+    for (index, parameter) in parameters.into_iter().enumerate() {
+        if index > 0 {
+            items.push(CodeNode::Literal(",".into()));
+            items.push(CodeNode::SoftBreak);
+        }
+        items.extend(parameter.nodes);
+    }
+
+    let signature = if parameter_count == 1 {
+        // A singleton always gets a comma if its parameter list breaks. End
+        // the capsule at the closing edge (before the return annotation), so
+        // its conditional comma is emitted before that edge's pending break.
+        let mut edges = vec![CodeNode::Indent, CodeNode::SoftBreak];
+        edges.extend(items);
+        edges.extend([CodeNode::Dedent, CodeNode::SoftBreak]);
+        let mut signature = vec![CodeNode::Layout(
+            LayoutBlock::consistent(LayoutBreakMode::Empty, "", "", "", "", edges)
+                .with_trailing_comma(TrailingCommaPolicy::IfBroken),
+        )];
+        signature.extend(tail.nodes);
+        signature
+    } else {
+        // Test the parameter edges against the whole signature so that a
+        // fitting return annotation does not break just to keep the
+        // parameters inline. Once the edges break, the list can still pack
+        // parameters that fit on one line without a trailing comma.
+        let mut edges = vec![
+            CodeNode::Indent,
+            CodeNode::SoftBreak,
+            CodeNode::Layout(
+                LayoutBlock::consistent(LayoutBreakMode::Space, "", "", "", "", items)
+                    .with_trailing_comma(TrailingCommaPolicy::IfBroken),
+            ),
+            CodeNode::Dedent,
+            CodeNode::SoftBreak,
+        ];
+        edges.extend(tail.nodes);
+        vec![CodeNode::Layout(LayoutBlock::consistent(
+            LayoutBreakMode::Empty,
+            "",
+            "",
+            "",
+            "",
+            edges,
+        ))]
+    };
+    CodeBlock { nodes: signature }
 }
 
 fn emit_parameter(lang: &Python, parameter: &ParameterSpec) -> Result<CodeBlock, SigilStitchError> {
