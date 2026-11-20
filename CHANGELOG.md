@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.7
+
+### Fixed
+
+- Structured Python output now preserves expression semantics, async
+  comprehension clauses, delimiter behavior and complete-file Ruff-compatible
+  formatting across the remaining structured paths.
+- Python function suites no longer accumulate blank lines when control-flow
+  blocks are composed, while explicit blank lines and required line boundaries
+  remain intact.
+
+### Changed
+
+- Package metadata now keeps the repository as the single published project
+  link.
+- The semver check now verifies the 0.7.6 to 0.7.7 patch boundary against the
+  published 0.7.6 baseline, with no approved breaking API changes.
+
 ## 0.7.6
 
 ### Added
