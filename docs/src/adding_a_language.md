@@ -61,6 +61,7 @@ Only two methods have no default:
 | `render_branch_transition()` | Delegates to legacy block hooks | Outgoing closer plus connector whitespace |
 | `lower_type_name()` | Frozen pre-0.6.8 compatibility lowering | Validate and lower one complete type expression |
 | `lower_float_value()` | Returns `UnsupportedFloatValue` | Construct one exact floating value as a structured expression |
+| `comment_layout()` | `WidthAware` | Whether a target-specific comment participates in width-aware layout |
 
 Override `render_verbatim_string()` if your language has string interpolation (e.g., Bash `"$x"`, TypeScript `` `${x}` ``, Python `f"{x}"`).
 
@@ -348,7 +349,10 @@ These methods don't belong to a config struct but have sensible defaults you can
   for that symbol. The two-argument `qualify_import_name()` is the frozen
   0.6.8 bridge.
 - `line_comment_suffix()` -- suffix for line comments (default `""`).
-
+- `render_imports_with_width()` -- width-aware import rendering; the default delegates to `render_imports()`.
+- `top_level_member_separator()` -- separator between complete top-level members; the default preserves existing output.
+- `import_only_file_suffix()` -- suffix policy for import-only files; the default preserves existing output.
+- `trim_trailing_blank_lines()` -- whether structured member output trims trailing blank lines; the default preserves existing output.
 Deprecated standalone declaration hooks such as type fragments, preamble
 ordering, optional-field style, and property style are listed with their replacements in the
 [legacy surface matrix](legacy_compatibility_and_migration.md#legacy-surface-matrix).

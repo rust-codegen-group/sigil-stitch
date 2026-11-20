@@ -263,12 +263,18 @@ A `CodeBlock` stores `nodes: Vec<CodeNode>` — a tree of self-contained nodes (
 
 Python's private layout planner lowers delimiter roles, comprehension clauses,
 precedence-sensitive control headers, and declaration spacing into this carrier.
-The shared renderer interprets only the grammar-neutral recipe. Python structured
-output is checked as a fixed point against the pinned Ruff 0.17.5 oracle at the
-selected width; opaque `$L`, raw content, and runtime source remain escape hatches
-and are not reparsed by the renderer. `CodeLang` also owns the file-level
-separator and trailing-blank-line policy so Python can match Ruff without
-changing other language defaults.
+The shared renderer interprets only the grammar-neutral recipe. Target-local
+comment width behavior enters through `RendererLang::comment_layout()`; the
+renderer never identifies Python pragmas by file extension or comment text.
+`TrailingCommaPolicy` and parser-owned separator intent likewise carry facts
+into the renderer without rescanning runtime strings or opaque literal text.
+Python structured output is checked as a fixed point at the selected width by
+the pinned Ruff oracle (`just ruff-python`). Opaque `$L`, raw content, and
+runtime source remain caller/provider-owned escape hatches: sigil-stitch does not
+reparse them or claim to repair their Ruff compatibility. Structured content
+that sigil-stitch itself lowers remains inside the fixed-point contract.
+`CodeLang` also owns the file-level separator and trailing-blank-line policy so
+Python can match Ruff without changing other language defaults.
 
 The builder (`CodeBlockBuilder`) validates argument counts and indent balance
 before producing a reusable block. The released `CodeBlock::nodes_mut()` method

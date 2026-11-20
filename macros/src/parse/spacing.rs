@@ -2,7 +2,11 @@ use proc_macro2::{Delimiter, Group, Spacing, TokenTree};
 
 use super::MacroLang;
 use super::annotate::TokenAnnotation;
-use crate::ir::LayoutSpec;
+use super::util::is_ident;
+use crate::ir::{
+    DelimitedLayout, DelimitedLoopLayout, LayoutEdgesPlan, LayoutForceBreak, LayoutPlan,
+    LoopSeparator, SeparatorIntent, SingletonCommaPolicy, TrailingCommaPolicy,
+};
 
 /// What kind of token was just emitted (for spacing decisions).
 #[derive(Clone, Copy, PartialEq)]
@@ -103,6 +107,29 @@ impl MacroSpacingPolicy {
                 Self::Python(context)
             }
         }
+    }
+
+    pub(super) fn classify_loop_separator(self, mut separator: LoopSeparator) -> LoopSeparator {
+        if matches!(self, Self::Python(_)) && is_string_literal(&separator.expr, ", ") {
+            separator.intent = SeparatorIntent::CommaSpace;
+        }
+        separator
+    }
+
+    pub(super) fn python_expression_context(self) -> Option<super::python_expressions::Context> {
+        use super::python_expressions::Context;
+        let Self::Python(context) = self else {
+            return None;
+        };
+        Some(match context.role {
+            PythonGroupRole::Statement => Context::Statement,
+            PythonGroupRole::CallArguments if context.layout => Context::CallArguments,
+            PythonGroupRole::Comprehension if context.layout => Context::Comprehension,
+            PythonGroupRole::Parenthesized | PythonGroupRole::ControlHeader if context.layout => {
+                Context::Parenthesized
+            }
+            _ => Context::Other,
+        })
     }
 
     pub(super) fn enter_group(
@@ -255,34 +282,31 @@ impl MacroSpacingPolicy {
         )
     }
 
-    pub(super) fn break_before_comprehension_clause(self, ident: &str) -> bool {
-        matches!(
+    pub(super) fn break_before_comprehension_clause(
+        self,
+        tokens: &[TokenTree],
+        pos: usize,
+    ) -> bool {
+        if !matches!(
             self,
             Self::Python(PythonContext {
                 role: PythonGroupRole::Comprehension,
                 layout: true,
                 ..
-            }) if matches!(ident, "for" | "if")
-        )
-    }
-
-    pub(super) fn needs_trailing_comma(self) -> bool {
-        matches!(
-            self,
-            Self::Python(PythonContext {
-                role: PythonGroupRole::CallArguments
-                    | PythonGroupRole::FunctionParameters
-                    | PythonGroupRole::LambdaParameters
-                    | PythonGroupRole::TypeArguments
-                    | PythonGroupRole::List
-                    | PythonGroupRole::Tuple
-                    | PythonGroupRole::Dict
-                    | PythonGroupRole::Set
-                    | PythonGroupRole::Subscript
-                    | PythonGroupRole::Decorator,
-                ..
             })
-        )
+        ) {
+            return false;
+        }
+        let ident = &tokens[pos];
+        if is_ident(ident, "for") {
+            comprehension_for_start(tokens, pos) == pos
+        } else {
+            is_ident(ident, "if")
+                || (is_ident(ident, "async")
+                    && tokens
+                        .get(pos + 1)
+                        .is_some_and(|next| is_ident(next, "for")))
+        }
     }
 
     pub(super) fn layout_spec(
@@ -290,23 +314,93 @@ impl MacroSpacingPolicy {
         group: &Group,
         inner: &[TokenTree],
         close: &str,
-    ) -> Option<LayoutSpec> {
-        if !matches!(self, Self::Python(_))
-            || group.delimiter() == Delimiter::None
-            || python_group_has_explicit_newline(group, inner)
-        {
+    ) -> Option<LayoutPlan> {
+        let Self::Python(context) = self else {
+            return None;
+        };
+        if group.delimiter() == Delimiter::None || python_group_has_explicit_newline(group, inner) {
             return None;
         }
-        Some(LayoutSpec {
-            consistent: true,
-            empty_flat_break: false,
-            edge_breaks: true,
-            trailing_comma: self.needs_trailing_comma() && python_contains_punct(inner, ','),
+        let comma_count = inner.iter().filter(|token| is_comma(token)).count();
+        let explicit_comma = inner.last().is_some_and(is_comma);
+        let edges = if !inner.is_empty()
+            && matches!(
+                context.role,
+                PythonGroupRole::Tuple
+                    | PythonGroupRole::List
+                    | PythonGroupRole::Dict
+                    | PythonGroupRole::Set
+            ) {
+            LayoutEdgesPlan::Coupled
+        } else {
+            LayoutEdgesPlan::WithBreaks
+        };
+        Some(LayoutPlan::Delimited(DelimitedLayout {
+            edges,
+            trailing_comma: if context.role.has_comma_items() && comma_count > 0 && !explicit_comma
+            {
+                TrailingCommaPolicy::IfBroken
+            } else {
+                TrailingCommaPolicy::Never
+            },
+            force_break: if context.role.has_comma_items()
+                && explicit_comma
+                && !(comma_count == 1 && context.role.keeps_singleton_comma_inline())
+            {
+                LayoutForceBreak::Forced
+            } else {
+                LayoutForceBreak::Automatic
+            },
+            delimited_loop: if context.role.has_comma_items()
+                || context.role == PythonGroupRole::Parenthesized
+            {
+                Some(DelimitedLoopLayout {
+                    edges: if context.role == PythonGroupRole::Parenthesized {
+                        LayoutEdgesPlan::Coupled
+                    } else {
+                        edges
+                    },
+                    singleton_comma: if context.role.keeps_singleton_comma_inline() {
+                        SingletonCommaPolicy::KeepInline
+                    } else {
+                        SingletonCommaPolicy::ForceBroken
+                    },
+                })
+            } else {
+                None
+            },
             flat_prefix: String::new(),
             flat_suffix: close.to_string(),
             broken_prefix: String::new(),
             broken_suffix: close.to_string(),
-        })
+        }))
+    }
+}
+
+pub(super) fn comprehension_for_start(tokens: &[TokenTree], for_pos: usize) -> usize {
+    if tokens[..for_pos]
+        .last()
+        .is_some_and(|previous| is_ident(previous, "async"))
+    {
+        for_pos - 1
+    } else {
+        for_pos
+    }
+}
+
+impl PythonGroupRole {
+    fn has_comma_items(self) -> bool {
+        !matches!(
+            self,
+            Self::Statement | Self::Comprehension | Self::ControlHeader | Self::Parenthesized
+        )
+    }
+
+    fn keeps_singleton_comma_inline(self) -> bool {
+        matches!(
+            self,
+            Self::Tuple | Self::Parenthesized | Self::Subscript | Self::TypeArguments
+        )
     }
 }
 
@@ -341,6 +435,15 @@ fn python_function_parameter_group(tokens: &[TokenTree], pos: usize) -> bool {
     matches!(&tokens[pos - 1], TokenTree::Ident(_)) && is_def(pos - 2)
 }
 
+fn is_string_literal(expr: &syn::Expr, expected: &str) -> bool {
+    matches!(
+        expr,
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(value),
+            ..
+        }) if value.value() == expected
+    )
+}
 fn python_contains_comprehension_for(tokens: &[TokenTree]) -> bool {
     tokens.iter().enumerate().any(|(index, token)| {
         matches!(token, TokenTree::Ident(value) if value == "for")
@@ -355,6 +458,10 @@ fn python_contains_punct(tokens: &[TokenTree], punctuation: char) -> bool {
     tokens
         .iter()
         .any(|token| matches!(token, TokenTree::Punct(value) if value.as_char() == punctuation))
+}
+
+fn is_comma(token: &TokenTree) -> bool {
+    matches!(token, TokenTree::Punct(p) if p.as_char() == ',')
 }
 
 fn python_control_header_before(tokens: &[TokenTree], pos: usize) -> bool {

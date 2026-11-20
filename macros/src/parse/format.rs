@@ -27,6 +27,17 @@ pub(super) fn tokens_to_format_with_policy(
     lang: MacroLang,
     policy: MacroSpacingPolicy,
 ) -> syn::Result<FormattedCode> {
+    super::python_expressions::format_expression(tokens, policy, |fragment| {
+        format_regular_tokens(fragment, lang, policy)
+    })
+    .unwrap_or_else(|| format_regular_tokens(tokens, lang, policy))
+}
+
+fn format_regular_tokens(
+    tokens: &[TokenTree],
+    lang: MacroLang,
+    policy: MacroSpacingPolicy,
+) -> syn::Result<FormattedCode> {
     let mut formatted = FormattedCode::new();
     let mut state = SpacingState::new(lang);
     let annotations = annotate_tokens(tokens, lang);
@@ -198,9 +209,12 @@ fn tokens_to_format_inner(
                 let after_for = parts.next_pos;
                 let body = tokens_to_format_with_policy(&parts.body_tokens, lang, policy);
                 let (pat, iter_expr, separator, body) = match (parts.header, body) {
-                    (Ok((pat, iter_expr, separator)), Ok(body)) => {
-                        (pat, iter_expr, separator, body)
-                    }
+                    (Ok((pat, iter_expr, separator)), Ok(body)) => (
+                        pat,
+                        iter_expr,
+                        separator.map(|separator| policy.classify_loop_separator(separator)),
+                        body,
+                    ),
                     (header, body) => {
                         if let Err(error) = header {
                             combine(&mut errors, error);
@@ -466,7 +480,9 @@ fn tokens_to_format_inner(
                     }
                 };
 
-                if !adjacent_to_prev_specifier {
+                if lang.is_python() && kind_str == "comment" && state.prev != PrevTokenKind::None {
+                    formatted.format_mut().push_str("  ");
+                } else if !adjacent_to_prev_specifier {
                     maybe_space(
                         formatted.format_mut(),
                         state,
@@ -508,7 +524,7 @@ fn tokens_to_format_inner(
                 } else {
                     PrevTokenKind::Ident
                 };
-                if policy.break_before_comprehension_clause(&s) {
+                if policy.break_before_comprehension_clause(tokens, pos) {
                     formatted.push_marker(NoArgMarker::SoftBreak);
                     state.prev = PrevTokenKind::SoftBreak;
                 }
@@ -544,7 +560,7 @@ fn tokens_to_format_inner(
                 } else {
                     formatted.format_mut().push(ch);
                 }
-                if ch == ',' && policy.break_after_comma() {
+                if ch == ',' && policy.break_after_comma() && pos + 1 < tokens.len() {
                     formatted.push_marker(NoArgMarker::SoftBreak);
                 }
                 // Context transitions after emitting the token.

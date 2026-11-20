@@ -3,7 +3,10 @@ use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
 use crate::guard_plan::argument_is_fallible;
-use crate::ir::{FormattedCode, QuoteArg, Statement, StringValue};
+use crate::ir::{
+    DelimitedLayout, FormattedCode, LayoutEdgesPlan, LayoutForceBreak, LayoutPlan, LoopSeparator,
+    QuoteArg, SeparatorIntent, SingletonCommaPolicy, Statement, StringValue, TrailingCommaPolicy,
+};
 
 use super::context::GenerateContext;
 use super::statements::generate_sequence;
@@ -138,34 +141,164 @@ fn generate_arg(arg: &QuoteArg, context: &mut GenerateContext) -> TokenStream {
         QuoteArg::ParsedSplice(statements) => {
             generate_nested(statements, context, NestedKind::Splice)
         }
-        QuoteArg::Layout { code, spec } => {
-            let block = generate_formatted_result(code, context);
-            let layout_block = context.ident("layout_block");
-            let flat_prefix = Literal::string(&spec.flat_prefix);
-            let flat_suffix = Literal::string(&spec.flat_suffix);
-            let broken_prefix = Literal::string(&spec.broken_prefix);
-            let broken_suffix = Literal::string(&spec.broken_suffix);
-            let consistent = spec.consistent;
-            let empty_flat_break = spec.empty_flat_break;
-            let edge_breaks = spec.edge_breaks;
-            let trailing_comma = spec.trailing_comma;
-            quote! {
-                #block.map(|#layout_block| {
-                    ::sigil_stitch::code_block::CodeBlock::__sigil_layout_with_edges(
-                        #layout_block,
-                        #consistent,
-                        #empty_flat_break,
-                        #edge_breaks,
-                        #trailing_comma,
-
-                        #flat_prefix,
-                        #flat_suffix,
-                        #broken_prefix,
-                        #broken_suffix,
-                    )
-                })
+        QuoteArg::Layout { code, spec } => match spec {
+            LayoutPlan::Inline => {
+                let block = generate_formatted_result(code, context);
+                quote! { #block.map(::sigil_stitch::code_block::CodeBlock::__sigil_inline_layout) }
             }
+            LayoutPlan::Delimited(layout) => {
+                if let Some(block) = generate_delimited_loop(code, layout, context) {
+                    return block;
+                }
+                let block = generate_formatted_result(code, context);
+                let layout_block = context.ident("layout_block");
+                // An unclassified splice may already supply its own terminal separator.
+                let trailing_comma = if code
+                    .args()
+                    .iter()
+                    .any(|arg| matches!(arg, QuoteArg::ParsedSplice(_)))
+                {
+                    TrailingCommaPolicy::Never
+                } else {
+                    layout.trailing_comma
+                };
+                let wrap = generate_layout_call(
+                    layout,
+                    layout.edges,
+                    &layout_block,
+                    trailing_comma.runtime_value(),
+                );
+                quote! { #block.map(|#layout_block| #wrap) }
+            }
+        },
+    }
+}
+
+fn generate_delimited_loop(
+    code: &FormattedCode,
+    spec: &DelimitedLayout,
+    context: &mut GenerateContext,
+) -> Option<TokenStream> {
+    let plan = spec.delimited_loop?;
+    if code.format() != "%L" {
+        return None;
+    }
+    let [QuoteArg::ParsedSplice(statements)] = code.args() else {
+        return None;
+    };
+    let [
+        Statement::InlineFor {
+            pat,
+            iter_expr,
+            separator:
+                Some(LoopSeparator {
+                    intent: SeparatorIntent::CommaSpace,
+                    trailing,
+                    ..
+                }),
+            body,
+        },
+    ] = statements.as_slice()
+    else {
+        return None;
+    };
+
+    let builder = context.ident("loop_builder");
+    let item = context.ident("loop_item");
+    let count = context.ident("loop_count");
+    let comma = context.ident("loop_comma");
+    let children = context.ident("loop_children");
+    let item_code = generate_formatted_result(body, context);
+    let request = trailing.as_ref().map_or_else(
+        || quote! { false },
+        |expr| quote! { #count != 0 && (#expr) },
+    );
+    let never = TrailingCommaPolicy::Never.runtime_value();
+    let if_broken = TrailingCommaPolicy::IfBroken.runtime_value();
+    let always = TrailingCommaPolicy::Always.runtime_value();
+    let requested = match plan.singleton_comma {
+        SingletonCommaPolicy::KeepInline => quote! {
+            if #count == 1 {
+                #builder.add(",", ());
+                #never
+            } else {
+                #always
+            }
+        },
+        SingletonCommaPolicy::ForceBroken => always.clone(),
+    };
+    let wrap = generate_layout_call(spec, plan.edges, &children, quote! { #comma });
+    Some(quote! {
+        (|| -> ::std::result::Result<
+            ::sigil_stitch::code_block::CodeBlock,
+            ::sigil_stitch::error::SigilStitchError,
+        > {
+            let mut #builder = ::sigil_stitch::code_block::CodeBlock::builder();
+            let mut #count = 0u8;
+            for #pat in #iter_expr {
+                let #item = #item_code?;
+                if !#item.is_empty() {
+                    if #count != 0 {
+                        #builder.add(",%W", ());
+                    }
+                    #builder.add_code(#item);
+                    #count = (#count + 1).min(2);
+                }
+            }
+            let #comma = if #request {
+                #requested
+            } else if #count > 1 {
+                #if_broken
+            } else {
+                #never
+            };
+            let #children = #builder.build()?.__sigil_trim_trailing_newline();
+            ::std::result::Result::Ok(#wrap)
+        })()
+    })
+}
+
+fn generate_layout_call(
+    spec: &DelimitedLayout,
+    edges_plan: LayoutEdgesPlan,
+    children: &Ident,
+    trailing_comma: TokenStream,
+) -> TokenStream {
+    let flat_prefix = Literal::string(&spec.flat_prefix);
+    let flat_suffix = Literal::string(&spec.flat_suffix);
+    let broken_prefix = Literal::string(&spec.broken_prefix);
+    let broken_suffix = Literal::string(&spec.broken_suffix);
+    let force_break = match spec.force_break {
+        LayoutForceBreak::Automatic => {
+            quote! { ::sigil_stitch::code_node::LayoutForceBreak::Automatic }
         }
+        LayoutForceBreak::Forced => {
+            quote! { ::sigil_stitch::code_node::LayoutForceBreak::Forced }
+        }
+    };
+    let edges = match edges_plan {
+        LayoutEdgesPlan::WithBreaks => {
+            quote! { ::sigil_stitch::code_node::LayoutEdgeMode::WithBreaks }
+        }
+        LayoutEdgesPlan::Coupled => {
+            quote! { ::sigil_stitch::code_node::LayoutEdgeMode::Coupled }
+        }
+    };
+    quote! {
+        ::sigil_stitch::code_block::CodeBlock::__sigil_layout_with_options(
+            #children,
+            ::sigil_stitch::code_block::LayoutOptions {
+                group_mode: ::sigil_stitch::code_node::LayoutGroupMode::Consistent,
+                break_mode: ::sigil_stitch::code_node::LayoutBreakMode::Space,
+                edges: #edges,
+                trailing_comma: #trailing_comma,
+                force_break: #force_break,
+                flat_prefix: #flat_prefix,
+                flat_suffix: #flat_suffix,
+                broken_prefix: #broken_prefix,
+                broken_suffix: #broken_suffix,
+            },
+        )
     }
 }
 

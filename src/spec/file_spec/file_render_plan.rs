@@ -96,12 +96,12 @@ impl FileRenderPlan {
             }
         }
 
-        let import_header = lang.render_imports(imports);
+        let import_header = lang.render_imports_with_width(imports, width);
         if !import_header.is_empty() {
             output.push_str(&import_header);
             output.push('\n');
             if self.members.is_empty() {
-                output.push('\n');
+                output.push_str(lang.import_only_file_suffix());
             } else {
                 output.push_str(lang.top_level_member_separator());
             }

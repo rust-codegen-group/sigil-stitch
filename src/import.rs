@@ -46,6 +46,7 @@ pub struct ImportGroup {
 pub struct ImportRequestSummary {
     type_only: bool,
     ordinary: bool,
+    same_name_alias: bool,
 }
 
 impl ImportRequestSummary {
@@ -59,9 +60,15 @@ impl ImportRequestSummary {
         self.ordinary
     }
 
-    fn record(&mut self, is_type_only: bool) {
+    /// Whether an explicit import requested `name as name`.
+    pub fn has_same_name_alias(self) -> bool {
+        self.same_name_alias
+    }
+
+    fn record(&mut self, is_type_only: bool, same_name_alias: bool) {
         self.type_only |= is_type_only;
         self.ordinary |= !is_type_only;
+        self.same_name_alias |= same_name_alias;
     }
 }
 
@@ -414,7 +421,10 @@ fn resolve_fallible(
         request_summaries
             .entry(identity.clone())
             .or_default()
-            .record(entry.is_type_only);
+            .record(
+                entry.is_type_only,
+                entry.alias.as_deref() == Some(entry.name.as_str()),
+            );
         let requested_name = entry.resolved_name().to_string();
         validate_import_text(&requested_name, "explicit local binding")?;
         if let Some(existing_index) = pending_by_identity.get(&identity).copied() {
@@ -450,7 +460,7 @@ fn resolve_fallible(
         request_summaries
             .entry(identity.clone())
             .or_default()
-            .record(import_ref.is_type_only);
+            .record(import_ref.is_type_only, false);
         if let Some(existing_index) = pending_by_identity.get(&identity).copied() {
             pending[existing_index].entry.is_type_only &= import_ref.is_type_only;
             continue;

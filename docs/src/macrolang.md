@@ -75,10 +75,10 @@ Flat output remains unindented, and fitting nested groups may stay flat when an
 outer call breaks. Explicit source newlines inside a delimiter group remain
 explicit rather than being normalized away.
 
-Structured Python output is validated as a fixed point against the pinned
-`ruff==0.17.5` oracle at the selected render width. This does not make
-sigil-stitch a general Python formatter: `$L` content, raw annotations, runtime
-file contents, and other opaque fragments are never reparsed or reformatted.
+The pinned Ruff oracle (`just ruff-python`) checks structured Python output as
+a fixed point at the selected render width. This does not make sigil-stitch a
+general Python formatter: `$L` content, raw annotations, runtime file contents,
+and other opaque fragments are never reparsed or reformatted.
 
 Python spacing remains contextual rather than a global rewrite: call keyword
 arguments use `label=value`, unannotated function/lambda defaults use `name=value`,

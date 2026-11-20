@@ -427,14 +427,19 @@ fn python_integer_target_imports_are_deduplicated_and_alias_resolved_after_lower
         .unwrap();
     for width in [8, 240] {
         let output = file.render(width).unwrap();
-        assert!(output.contains("from example import Literal"), "{output}");
-        assert_eq!(
-            output
-                .matches("from typing import Literal as TypingLiteral")
-                .count(),
-            1,
-            "{output}"
-        );
+        let (external_import, typing_import) = if width == 8 {
+            (
+                "from example import (\n    Literal,\n)",
+                "from typing import (\n    Literal as TypingLiteral,\n)",
+            )
+        } else {
+            (
+                "from example import Literal",
+                "from typing import Literal as TypingLiteral",
+            )
+        };
+        assert!(output.contains(external_import), "{output}");
+        assert_eq!(output.matches(typing_import).count(), 1, "{output}");
         let compact = output.split_whitespace().collect::<String>();
         assert!(compact.contains("status:TypingLiteral[200]"), "{output}");
         assert!(

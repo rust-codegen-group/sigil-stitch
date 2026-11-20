@@ -1,6 +1,6 @@
 mod rewrite;
 
-use crate::code_node::{BlockIntent, CodeNode, parts_args_to_nodes};
+use crate::code_node::{BlockIntent, CodeNode, TrailingCommaPolicy, parts_args_to_nodes};
 use crate::float_value::FloatValue;
 use crate::import::ImportRef;
 use crate::lang::CodeLang;
@@ -232,6 +232,19 @@ impl CodeFragment {
     }
 }
 
+#[doc(hidden)]
+pub struct LayoutOptions {
+    pub group_mode: crate::code_node::LayoutGroupMode,
+    pub break_mode: crate::code_node::LayoutBreakMode,
+    pub edges: crate::code_node::LayoutEdgeMode,
+    pub trailing_comma: TrailingCommaPolicy,
+    pub force_break: crate::code_node::LayoutForceBreak,
+    pub flat_prefix: &'static str,
+    pub flat_suffix: &'static str,
+    pub broken_prefix: &'static str,
+    pub broken_suffix: &'static str,
+}
+
 impl CodeBlock {
     /// Create a new CodeBlockBuilder.
     pub fn builder() -> CodeBlockBuilder {
@@ -294,6 +307,22 @@ impl CodeBlock {
         }
 
         self.nodes.iter().all(node_is_empty)
+    }
+
+    pub(crate) fn contains_opaque_multiline(&self) -> bool {
+        fn walk(nodes: &[CodeNode]) -> bool {
+            nodes.iter().any(|node| match node {
+                CodeNode::InlineLiteral(text)
+                | CodeNode::StringLit(text)
+                | CodeNode::VerbatimStr(text) => text.contains('\n'),
+                CodeNode::Nested(block) => walk(&block.nodes),
+                CodeNode::Layout(layout) => walk(layout.nodes()),
+                CodeNode::Sequence(children) => walk(children),
+                _ => false,
+            })
+        }
+
+        walk(&self.nodes)
     }
 
     /// Create a parsed fragment from a single format string and arguments.
@@ -379,6 +408,46 @@ impl CodeBlock {
         )
     }
 
+    /// Continue an inline expression at the containing delimiter's indent.
+    #[doc(hidden)]
+    pub fn __sigil_inline_layout(self) -> Self {
+        use crate::code_node::{LayoutBlock, LayoutBreakMode};
+        Self {
+            nodes: vec![CodeNode::Layout(LayoutBlock::consistent(
+                LayoutBreakMode::Space,
+                "",
+                "",
+                "",
+                "",
+                self.nodes,
+            ))],
+        }
+    }
+
+    /// Delimiter edges and item separators make a single layout decision.
+    #[doc(hidden)]
+    pub fn __sigil_coupled_layout(
+        self,
+        close: &str,
+        trailing_comma: TrailingCommaPolicy,
+        force_break: bool,
+    ) -> Self {
+        if self.is_empty() {
+            return Self {
+                nodes: vec![CodeNode::Literal(close.to_string())],
+            };
+        }
+        use crate::code_node::{LayoutBlock, LayoutBreakMode};
+        Self {
+            nodes: vec![CodeNode::Layout(
+                LayoutBlock::consistent(LayoutBreakMode::Space, "", close, "", close, self.nodes)
+                    .with_trailing_comma(trailing_comma)
+                    .with_force_break(force_break)
+                    .with_coupled_edges(),
+            )],
+        }
+    }
+
     /// Wrap a nested block in a layout carrier with optional delimiter edge
     /// breaks. Edge breaks stay empty in flat output but become indented lines
     /// when the group breaks; the nested child layout keeps comma breaks in its
@@ -399,6 +468,87 @@ impl CodeBlock {
         broken_prefix: &str,
         broken_suffix: &str,
     ) -> Self {
+        Self::__sigil_layout_with_policy(
+            children,
+            consistent,
+            empty_flat_break,
+            edge_breaks,
+            if trailing_comma {
+                TrailingCommaPolicy::IfBroken
+            } else {
+                TrailingCommaPolicy::Never
+            },
+            false,
+            flat_prefix,
+            flat_suffix,
+            broken_prefix,
+            broken_suffix,
+        )
+    }
+
+    #[doc(hidden)]
+    pub fn __sigil_layout_with_options(children: Self, options: LayoutOptions) -> Self {
+        match options.edges {
+            crate::code_node::LayoutEdgeMode::Coupled => children.__sigil_coupled_layout(
+                options.flat_suffix,
+                options.trailing_comma,
+                matches!(
+                    options.force_break,
+                    crate::code_node::LayoutForceBreak::Forced
+                ),
+            ),
+            edge_mode => Self::__sigil_layout_with_policy(
+                children,
+                matches!(
+                    options.group_mode,
+                    crate::code_node::LayoutGroupMode::Consistent
+                ),
+                matches!(options.break_mode, crate::code_node::LayoutBreakMode::Empty),
+                matches!(edge_mode, crate::code_node::LayoutEdgeMode::WithBreaks),
+                options.trailing_comma,
+                matches!(
+                    options.force_break,
+                    crate::code_node::LayoutForceBreak::Forced
+                ),
+                options.flat_prefix,
+                options.flat_suffix,
+                options.broken_prefix,
+                options.broken_suffix,
+            ),
+        }
+    }
+
+    #[doc(hidden)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "hidden macro ABI keeps layout recipe fields explicit"
+    )]
+    pub fn __sigil_layout_with_policy(
+        children: Self,
+        consistent: bool,
+        empty_flat_break: bool,
+        edge_breaks: bool,
+        trailing_comma: TrailingCommaPolicy,
+        force_break: bool,
+        flat_prefix: &str,
+        flat_suffix: &str,
+        broken_prefix: &str,
+        broken_suffix: &str,
+    ) -> Self {
+        if edge_breaks
+            && children.is_empty()
+            && flat_prefix == broken_prefix
+            && flat_suffix == broken_suffix
+        {
+            let mut nodes = Vec::new();
+            if !flat_prefix.is_empty() {
+                nodes.push(CodeNode::Literal(flat_prefix.to_string()));
+            }
+            if !flat_suffix.is_empty() {
+                nodes.push(CodeNode::Literal(flat_suffix.to_string()));
+            }
+            return Self { nodes };
+        }
         let group_mode = if consistent {
             crate::code_node::LayoutGroupMode::Consistent
         } else {
@@ -430,20 +580,18 @@ impl CodeBlock {
                         broken_suffix,
                         child_nodes,
                     )
-                    .with_trailing_comma(trailing_comma),
+                    .with_trailing_comma(trailing_comma)
+                    .with_force_break(force_break),
                 )],
             };
         }
 
-        let child_layout = CodeNode::Layout(crate::code_node::LayoutBlock::new(
-            group_mode,
-            break_mode,
-            "",
-            "",
-            "",
-            "",
-            child_nodes,
-        ));
+        let child_layout = CodeNode::Layout(
+            crate::code_node::LayoutBlock::new(group_mode, break_mode, "", "", "", "", child_nodes)
+                .with_trailing_comma(trailing_comma)
+                .with_force_break(force_break),
+        );
+        let force_break = force_break || trailing_comma == TrailingCommaPolicy::Always;
         let edge_nodes = vec![
             CodeNode::Indent,
             CodeNode::SoftBreak,
@@ -462,7 +610,7 @@ impl CodeBlock {
                     broken_suffix,
                     edge_nodes,
                 )
-                .with_trailing_comma(trailing_comma),
+                .with_force_break(force_break),
             )],
         }
     }

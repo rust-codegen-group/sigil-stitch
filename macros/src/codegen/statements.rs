@@ -344,7 +344,6 @@ fn generate_meta_for(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn generate_inline_for(
     pat: &syn::Pat,
     iter_expr: &syn::Expr,
@@ -369,14 +368,17 @@ fn generate_inline_for(
             .trailing
             .as_ref()
             .map_or_else(|| quote! { false }, |expr| quote! { #expr });
+        let add_separator = quote! {
+            #builder.add(
+                "%L",
+                ::std::string::ToString::to_string(&(#separator_expr)),
+            );
+        };
         quote! {
             let mut #emitted = false;
             for #pat in #iter_expr {
                 if #emitted {
-                    #builder.add(
-                        "%L",
-                        ::std::string::ToString::to_string(&(#separator_expr)),
-                    );
+                    #add_separator
                 }
                 #emitted = true;
                 #body
@@ -385,10 +387,7 @@ fn generate_inline_for(
                 }
             }
             if #helper_error.is_none() && #emitted && (#trailing) {
-                #builder.add(
-                    "%L",
-                    ::std::string::ToString::to_string(&(#separator_expr)),
-                );
+                #add_separator
             }
         }
     } else {

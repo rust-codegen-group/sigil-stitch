@@ -4,10 +4,10 @@ mod pretty;
 mod tests;
 
 use crate::code_block::CodeBlock;
-use crate::code_node::{BlockIntent, CodeNode, LayoutBlock};
+use crate::code_node::{BlockIntent, CodeNode, LayoutBlock, LayoutEdge};
 use crate::error::SigilStitchError;
 use crate::import::ImportGroup;
-use crate::lang::RendererLang;
+use crate::lang::{CommentLayout, RendererLang};
 use crate::source_preparation::SourcePreparer;
 use crate::type_name::TypeName;
 use crate::type_name_lowering::DiagnosticPath;
@@ -48,13 +48,13 @@ impl<'a> CodeRenderer<'a> {
         if contains_soft_break(nodes) {
             let mut adapter = PrettyAdapter::new(indent_unit, self.width);
             adapter.begin_group(LayoutGroup::IndependentBreaks)?;
-            self.walk_nodes(nodes, &mut adapter)?;
+            self.walk_nodes(nodes, None, &mut adapter)?;
             adapter.end_group()?;
             adapter.finish()
         } else {
             let mut adapter = DirectAdapter::new(indent_unit, self.width);
             adapter.begin_group(LayoutGroup::IndependentBreaks)?;
-            self.walk_nodes(nodes, &mut adapter)?;
+            self.walk_nodes(nodes, None, &mut adapter)?;
             adapter.end_group()?;
             Ok(adapter.finish())
         }
@@ -101,9 +101,10 @@ impl<'a> CodeRenderer<'a> {
     fn walk_nodes<A: RenderAdapter>(
         &self,
         nodes: &[CodeNode],
+        layout: Option<&LayoutBlock>,
         adapter: &mut A,
     ) -> Result<(), SigilStitchError> {
-        for node in nodes {
+        for (index, node) in nodes.iter().enumerate() {
             match node {
                 CodeNode::Literal(text) => adapter.structured_text(text)?,
                 CodeNode::TypeRef(type_name) => {
@@ -128,21 +129,25 @@ impl<'a> CodeRenderer<'a> {
                 CodeNode::InlineLiteral(text) => adapter.structured_text(text)?,
                 CodeNode::Nested(block) => {
                     adapter.begin_group(LayoutGroup::IndependentBreaks)?;
-                    self.walk_nodes(&block.nodes, adapter)?;
+                    self.walk_nodes(&block.nodes, None, adapter)?;
                     adapter.end_group()?;
                 }
                 CodeNode::Layout(layout) => {
                     adapter.begin_layout(layout)?;
-                    self.walk_nodes(layout.nodes(), adapter)?;
+                    self.walk_nodes(layout.nodes(), Some(layout), adapter)?;
                     adapter.end_layout(layout)?;
                 }
                 CodeNode::Comment(text) => {
-                    adapter.structured_text(&Self::resolve_comment(self.lang, text))?;
+                    let rendered = Self::resolve_comment(self.lang, text);
+                    adapter.comment_text(&rendered, self.lang.comment_layout(text))?;
                 }
                 CodeNode::Attribute(text) => {
                     adapter.structured_text(&self.lang.render_attribute(text))?;
                 }
-                CodeNode::SoftBreak => adapter.soft_break()?,
+                CodeNode::SoftBreak => match layout.and_then(|layout| layout.edge_at(index)) {
+                    Some(edge) => adapter.layout_edge(edge)?,
+                    None => adapter.soft_break()?,
+                },
                 CodeNode::Indent => adapter.indent()?,
                 CodeNode::Dedent => adapter.dedent()?,
                 CodeNode::StatementBegin => adapter.ensure_indent()?,
@@ -197,7 +202,7 @@ impl<'a> CodeRenderer<'a> {
                 }
                 CodeNode::Sequence(children) => {
                     adapter.begin_group(LayoutGroup::ConsistentBreaks)?;
-                    self.walk_nodes(children, adapter)?;
+                    self.walk_nodes(children, None, adapter)?;
                     adapter.end_group()?;
                 }
             }
@@ -217,12 +222,20 @@ trait RenderAdapter {
     fn ensure_indent(&mut self) -> Result<(), SigilStitchError>;
     fn hard_break(&mut self) -> Result<(), SigilStitchError>;
     fn soft_break(&mut self) -> Result<(), SigilStitchError>;
+    fn layout_edge(&mut self, _edge: LayoutEdge) -> Result<(), SigilStitchError> {
+        Ok(())
+    }
     fn begin_layout(&mut self, layout: &LayoutBlock) -> Result<(), SigilStitchError>;
     fn end_layout(&mut self, layout: &LayoutBlock) -> Result<(), SigilStitchError>;
     fn indent(&mut self) -> Result<(), SigilStitchError>;
     fn dedent(&mut self) -> Result<(), SigilStitchError>;
     fn begin_group(&mut self, group: LayoutGroup) -> Result<(), SigilStitchError>;
     fn end_group(&mut self) -> Result<(), SigilStitchError>;
+
+    fn comment_text(&mut self, text: &str, layout: CommentLayout) -> Result<(), SigilStitchError> {
+        let _ = layout;
+        self.structured_text(text)
+    }
 
     fn structured_text(&mut self, text: &str) -> Result<(), SigilStitchError> {
         for (index, line) in text.split('\n').enumerate() {
@@ -257,7 +270,7 @@ fn contains_soft_break(nodes: &[CodeNode]) -> bool {
     nodes.iter().any(|node| match node {
         CodeNode::SoftBreak => true,
         CodeNode::Nested(block) => contains_soft_break(&block.nodes),
-        CodeNode::Layout(layout) => contains_soft_break(layout.nodes()),
+        CodeNode::Layout(layout) => layout.force_break() || contains_soft_break(layout.nodes()),
         CodeNode::Sequence(children) => contains_soft_break(children),
         _ => false,
     })

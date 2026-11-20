@@ -3,11 +3,12 @@
 use super::*;
 use super::{direct::DirectAdapter, pretty::PrettyAdapter};
 
-use crate::code_block::{CodeBlock, StringLitArg, VerbatimStrArg};
+use crate::code_block::{CodeBlock, CommentArg, StringLitArg, VerbatimStrArg};
 use crate::code_node::{LayoutBlock, LayoutBreakMode, LayoutGroupMode};
 use crate::import::ImportGroup;
 use crate::lang::config::BlockSyntaxConfig;
 use crate::lang::typescript::TypeScript;
+use crate::lang::{CommentLayout, RendererLang};
 use crate::spec::file_spec::FileSpec;
 use crate::type_name::TypeName;
 #[derive(Debug)]
@@ -15,6 +16,7 @@ struct TestLang {
     indent: &'static str,
     multiline_strings: bool,
     reject_bad_after_rewrite: bool,
+    opaque_comments: bool,
 }
 
 impl RendererLang for TestLang {
@@ -33,6 +35,13 @@ impl RendererLang for TestLang {
         }
     }
 
+    fn comment_layout(&self, _text: &str) -> CommentLayout {
+        if self.opaque_comments {
+            CommentLayout::WidthOpaque
+        } else {
+            CommentLayout::WidthAware
+        }
+    }
     fn render_string_literal(&self, value: &str) -> String {
         if self.multiline_strings {
             value.to_string()
@@ -59,14 +68,41 @@ fn test_lang(indent: &'static str) -> TestLang {
         indent,
         multiline_strings: false,
         reject_bad_after_rewrite: false,
+        opaque_comments: false,
     }
 }
-
 fn render_block(block: &CodeBlock, width: usize) -> String {
     let ts = TypeScript::new();
     let imports = ImportGroup::new();
     let renderer = CodeRenderer::new(&ts, &imports, width);
     renderer.render(block).unwrap()
+}
+#[test]
+fn comment_width_policy_is_owned_by_the_selected_adapter() {
+    let payload = || CommentArg("note\n\na very long comment".to_string());
+    let block = CodeBlock::of("%R%Wtail", (payload(),)).unwrap();
+    let lang = TestLang {
+        opaque_comments: true,
+        ..test_lang("  ")
+    };
+    let imports = ImportGroup::new();
+    let renderer = CodeRenderer::new(&lang, &imports, 8);
+    let direct_block = CodeBlock::of("%R", (payload(),)).unwrap();
+    assert_eq!(
+        renderer.render(&direct_block).unwrap(),
+        "// note\n//\n// a very long comment"
+    );
+    assert_eq!(
+        renderer.render(&block).unwrap(),
+        "// note\n//\n// a very long comment tail"
+    );
+    let width_aware = test_lang("  ");
+    assert_eq!(
+        CodeRenderer::new(&width_aware, &imports, 8)
+            .render(&block)
+            .unwrap(),
+        "// note\n//\n// a very long comment\ntail"
+    );
 }
 
 #[test]
@@ -93,6 +129,46 @@ fn layout_capsule_chooses_flat_and_broken_delimiter_alternatives() {
     assert_eq!(
         render_block(&block, 12),
         "(VeryLongFirst\n  | VeryLongSecond)"
+    );
+}
+
+#[test]
+fn legacy_layout_edges_keep_commas_off_empty_and_flat_groups() {
+    let wrap = |body| {
+        CodeBlock::__sigil_layout_with_edges(
+            body, true, false, true, true, "call(", ")", "call(", ")",
+        )
+    };
+    let empty = wrap(CodeBlock::of("", ()).unwrap());
+    assert_eq!(render_block(&empty, 4), "call()");
+
+    let call = wrap(CodeBlock::of("first_item,%Wsecond_item", ()).unwrap());
+    assert_eq!(render_block(&call, 80), "call(first_item, second_item)");
+    assert_eq!(
+        render_block(&call, 18),
+        "call(\n  first_item,\n  second_item,\n)"
+    );
+}
+
+#[test]
+fn preferred_layout_preserves_hard_lines_and_tab_indentation() {
+    let body = CodeBlock::of("first_value\n\nsecond_value", ()).unwrap();
+    let layout = LayoutBlock::consistent(LayoutBreakMode::Space, "", "", "(", ")", body.nodes)
+        .with_preferred_inner_breaks();
+    let block = CodeBlock::of(
+        "const long_name = %L",
+        CodeBlock {
+            nodes: vec![CodeNode::Layout(layout)],
+        },
+    )
+    .unwrap();
+    let lang = test_lang("\t");
+    let imports = ImportGroup::new();
+    assert_eq!(
+        CodeRenderer::new(&lang, &imports, 24)
+            .render(&block)
+            .unwrap(),
+        "const long_name = (\n\tfirst_value\n\n\tsecond_value\n)"
     );
 }
 
@@ -436,6 +512,7 @@ fn opaque_multiline_hook_output_is_not_reindented() {
         indent: "  ",
         multiline_strings: true,
         reject_bad_after_rewrite: false,
+        opaque_comments: false,
     };
     let imports = ImportGroup::new();
 
@@ -662,6 +739,16 @@ fn pretty_adapter_rejects_unbalanced_layout_scopes() {
             if context == "CodeRenderer pretty indentation"
     ));
 
+    let mut continuation_overflow = PrettyAdapter::new("  ", 80);
+    continuation_overflow.set_indent_depth_for_test(usize::MAX);
+    continuation_overflow.begin_layout(&layout).unwrap();
+    continuation_overflow.indent().unwrap();
+    assert!(matches!(
+        continuation_overflow.soft_break(),
+        Err(SigilStitchError::Render { context, message })
+            if context == "CodeRenderer pretty indentation" && message == "indent depth overflow"
+    ));
+
     assert!(matches!(
         unbalanced.end_layout(&layout),
         Err(SigilStitchError::Render { context, .. })
@@ -739,6 +826,7 @@ fn renderer_state_is_local_after_post_rewrite_validation_error() {
         indent: "  ",
         multiline_strings: false,
         reject_bad_after_rewrite: true,
+        opaque_comments: false,
     };
     let imports = ImportGroup::new();
     let renderer = CodeRenderer::new(&lang, &imports, 80);

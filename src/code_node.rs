@@ -185,27 +185,73 @@ pub struct LayoutBlock {
     nodes: Vec<CodeNode>,
 }
 
+/// Grammar-neutral policy for emitting a delimiter group's trailing comma.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum TrailingCommaPolicy {
+    /// Never emit a trailing comma.
+    Never,
+    /// Emit the comma only when the layout group is broken.
+    IfBroken,
+    /// Emit the comma and force the group onto its broken path.
+    Always,
+}
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct LayoutRecipe {
     group_mode: LayoutGroupMode,
     break_mode: LayoutBreakMode,
-    trailing_comma: bool,
+    trailing_comma: TrailingCommaPolicy,
+    #[serde(default)]
+    force_break: bool,
+    #[serde(default)]
+    edges: LayoutEdges,
     flat_prefix: String,
     flat_suffix: String,
     broken_prefix: String,
     broken_suffix: String,
 }
 
+#[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub(crate) enum LayoutGroupMode {
+pub enum LayoutGroupMode {
     Independent,
     Consistent,
 }
 
+#[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub(crate) enum LayoutBreakMode {
+pub enum LayoutBreakMode {
     Space,
     Empty,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum LayoutEdgeMode {
+    Plain,
+    WithBreaks,
+    Coupled,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum LayoutForceBreak {
+    Automatic,
+    Forced,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+enum LayoutEdges {
+    #[default]
+    Ordinary,
+    Coupled,
+    PreferInner,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum LayoutEdge {
+    Open,
+    Close,
 }
 
 impl LayoutRecipe {
@@ -220,7 +266,9 @@ impl LayoutRecipe {
         Self {
             group_mode,
             break_mode,
-            trailing_comma: false,
+            trailing_comma: TrailingCommaPolicy::Never,
+            force_break: false,
+            edges: LayoutEdges::Ordinary,
             flat_prefix: flat_prefix.into(),
             flat_suffix: flat_suffix.into(),
             broken_prefix: broken_prefix.into(),
@@ -271,12 +319,67 @@ impl LayoutBlock {
         )
     }
 
-    pub(crate) fn with_trailing_comma(mut self, trailing_comma: bool) -> Self {
+    pub(crate) fn with_trailing_comma(mut self, trailing_comma: TrailingCommaPolicy) -> Self {
         self.recipe.trailing_comma = trailing_comma;
         self
     }
 
-    pub(crate) fn trailing_comma(&self) -> bool {
+    pub(crate) fn with_force_break(mut self, force_break: bool) -> Self {
+        self.recipe.force_break |= force_break;
+        self
+    }
+
+    pub(crate) fn force_break(&self) -> bool {
+        self.recipe.force_break || self.recipe.trailing_comma == TrailingCommaPolicy::Always
+    }
+
+    pub(crate) fn with_coupled_edges(self) -> Self {
+        self.with_continuation_scope(LayoutEdges::Coupled)
+    }
+
+    /// Let the child layout fit on its own before trying a surrounding continuation.
+    pub(crate) fn with_preferred_inner_breaks(self) -> Self {
+        self.with_continuation_scope(LayoutEdges::PreferInner)
+    }
+
+    fn with_continuation_scope(mut self, edges: LayoutEdges) -> Self {
+        self.recipe.edges = edges;
+        self.nodes
+            .splice(..0, [CodeNode::Indent, CodeNode::SoftBreak]);
+        self.nodes.extend([CodeNode::Dedent, CodeNode::SoftBreak]);
+        self
+    }
+
+    pub(crate) fn validate_edge_structure(&self) -> Result<(), &'static str> {
+        if self.recipe.edges == LayoutEdges::Ordinary {
+            return Ok(());
+        }
+        let valid = self.nodes.len() >= 4
+            && matches!(self.nodes.first(), Some(CodeNode::Indent))
+            && matches!(self.nodes.get(1), Some(CodeNode::SoftBreak))
+            && matches!(self.nodes.get(self.nodes.len() - 2), Some(CodeNode::Dedent))
+            && matches!(self.nodes.last(), Some(CodeNode::SoftBreak));
+        valid
+            .then_some(())
+            .ok_or("layout continuation edge scope is malformed")
+    }
+    pub(crate) fn edge_at(&self, index: usize) -> Option<LayoutEdge> {
+        if self.recipe.edges == LayoutEdges::Ordinary {
+            None
+        } else if index == 1 {
+            Some(LayoutEdge::Open)
+        } else if index + 1 == self.nodes.len() {
+            Some(LayoutEdge::Close)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn prefers_inner_breaks(&self) -> bool {
+        self.recipe.edges == LayoutEdges::PreferInner
+    }
+
+    pub(crate) fn trailing_comma(&self) -> TrailingCommaPolicy {
         self.recipe.trailing_comma
     }
 
